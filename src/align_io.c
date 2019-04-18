@@ -48,7 +48,7 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
         int i = 0;
         int j = 0;
         int c = 0;
-        int free_read = 1;
+
 
         ASSERT(param!= NULL, "No parameters");
 
@@ -57,41 +57,32 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
         for(i = 0; i < param->num_infiles;i++){
                 ASSERT( my_file_exists(param->infile[i]) == 1, "File %s does not exists.",param->infile[i]);
         }
-        while(free_read == 1 || param->infile[i]){
-                num_input++;
-        }
 
 
-        input = malloc(sizeof(char*) * num_input);
-        input_type = malloc(sizeof(unsigned short int) * num_input);
-        input_numseq = malloc(sizeof(unsigned short int) * num_input);
+        MMALLOC(input, sizeof(char*)* (param->num_infiles+1));
+        MMALLOC(input_type,sizeof(unsigned short int) *  (param->num_infiles+1));
+        MMALLOC(input_numseq,sizeof(unsigned short int) *  (param->num_infiles+1));
 
-        for (i = 0; i < num_input;i++){
+        for (i = 0; i <  (param->num_infiles+1);i++){
                 input[i] = 0;
                 input_type[i] = 0;
                 input_numseq[i] = 0;
         }
 
-        free_read = 0;
 
-        if(param->quiet){
+        /* try reading from stdin */
+        input[0] = get_input_into_string(NULL);
+        c =0;
+        if(input[0]){
                 c = 1;
-        }else{
-                c = 0;
         }
+        for (i = 0; i < param->num_infiles;i++){
+
+                LOG_MSG("reading from %s: ",param->infile[i]);
 
 
-        for (i = c; i < num_input;i++){
-                if(!param->infile[i]){
-                        fprintf(stderr,"reading from STDIN: ");
-                }else{
-                        fprintf(stderr,"reading from %s: ",param->infile[i]);
-                }
+                RUNP(input[i] = get_input_into_string(param->infile[i]));
 
-                input[i] = get_input_into_string(param->infile[i]);
-
-                if(input[i]){
-                        free_read++;
                         if (byg_start("<macsim>",input[i]) != -1){
                                 input_numseq[i] = count_sequences_macsim(input[i]);
                                 feature = 1;
@@ -129,11 +120,11 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
                         }else{
                                 numseq += input_numseq[i];
                         }
-                }else{
-                        fprintf(stderr,"found no sequences.\n");
-                        if(!param->outfile && i){
+                        /**else{
+                        LOG_MSG("found no sequences.");
+                        if(!param->outfile){
                                 param->outfile = param->infile[i];
-                                fprintf(stderr,"-> output file, in ");
+                                LOG_MSG("-> output file, in ");
                                 //try to set format....
                                 if(!param->format){
                                         if (byg_start("msf",param->outfile) != -1){
@@ -156,46 +147,30 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
                                         }
                                 }
                         }
-                        fprintf(stderr,"\n");
-                }
+                        }*/
         }
 
 
         if(numseq < 2){
                 fprintf(stderr,"%s\n", usage);
                 if(!numseq){
-                        fprintf(stderr,"\nWARNING: No sequences found.\n\n");
+                        ERROR_MSG("No sequences found.");
                 }else{
-                        fprintf(stderr,"\nWARNING: Only one sequence found.\n\n");
+                        ERROR_MSG("Only one sequence found.");
                 }
-                for (i = 0; i < num_input;i++){
-                        free(input[i]);
-                }
-                free(input_numseq);
-                free(input_type);
-                free(input);
-                free_parameters(param);
-                exit(0);
         }
 
         if(byg_start(param->alignment_type,"profPROFprofilePROFILE") != -1){
-                if( free_read  < 2){
+                //if( free_read  < 2){
                         fprintf(stderr,"\nWARNING: You are trying to perform a profile - profile alignment but ony one input file was detected.\n\n");
                         param->alignment_type = "default";
-                }
+                        //}
         }
 
 
         if (param->feature_type && !feature){
-                fprintf(stderr,"\nWARNING: You are trying to perform a feature alignment but the input format(s) do not contain feature information.\n");
-                for (i = 0; i < num_input;i++){
-                        free(input[i]);
-                }
-                free(input_numseq);
-                free(input_type);
-                free(input);
-                free_parameters(param);
-                exit(0);
+                ERROR_MSG("You are trying to perform a feature alignment but the input format(s) do not contain feature information.");
+                return NULL;
         }
 
 
@@ -203,45 +178,44 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
         //numseq = 0;
         if(byg_start(param->alignment_type,"profPROFprofilePROFILE") != -1){
                 j = 0;
-                for (i = 0; i < num_input;i++){
+                for (i = 0; i < param->num_infiles+1;i++){
 
-                        if(input[i]){
+                        //if(input[i]){
 
                                 switch(input_type[i]){
                                 case 0:
-                                        aln = read_alignment(aln,input[i]);
+                                        RUNP(aln = read_alignment(aln,input[i]));
                                         break;
                                 case 1:
-                                        aln = read_alignment_macsim_xml(aln,input[i]);
+                                        RUNP(aln = read_alignment_macsim_xml(aln,input[i]));
                                         break;
                                 case 2:
-                                        aln = read_alignment_uniprot_xml(aln,input[i]);
+                                        RUNP(aln = read_alignment_uniprot_xml(aln,input[i]));
                                         break;
                                 case 3:
-
-                                        aln = read_alignment_from_swissprot(aln, input[i]);
+                                        RUNP(aln = read_alignment_from_swissprot(aln, input[i]));
                                         break;
                                 case 4:
-                                        aln = read_alignment_clustal(aln,input[i]);
+                                        RUNP(aln = read_alignment_clustal(aln,input[i]));
                                         break;
                                 case 5:
-                                        aln = read_alignment_stockholm(aln,input[i]);
+                                        RUNP(aln = read_alignment_stockholm(aln,input[i]));
                                         break;
 
                                 default:
-                                        aln = read_alignment(aln,input[i]);
+                                        RUNP(aln = read_alignment(aln,input[i]));
                                         break;
                                 }
                                 input[i] = 0;
                                 //create partial profile....
                                 aln->nsip[numseq+j] = input_numseq[i];
-                                aln->sip[numseq+j] = malloc(sizeof(int)*aln->nsip[numseq+j]);
+                                MMALLOC(aln->sip[numseq+j],sizeof(int)*aln->nsip[numseq+j]);
 
                                 //fprintf(stderr,"%d	%d\n",numseq+j,aln->sl[numseq+j]);
-                                j++;
-                        }
+                                //j++;
+                                //}
                 }
-                num_input = j;
+                //num_input = j;
                 c = 0;
                 for (i = 0;i < num_input;i++){
                         //
@@ -265,17 +239,7 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
                                         b = aln->sip[numseq+i][c];
                                         b = aln->sl[b];
                                         if(a != b){
-                                                fprintf(stderr,"Unaligned sequences in input %s.\n",param->infile[i]);
-                                                for (i = 0; i < num_input;i++){
-                                                        free(input[i]);
-                                                }
-                                                free(input_numseq);
-                                                free(input_type);
-                                                free(input);
-
-                                                free_aln(aln);
-                                                free_parameters(param);
-                                                exit(0);
+                                                ERROR_MSG("Unaligned sequences in input %s.\n",param->infile[i]);
                                         }
                                 }
 
@@ -349,7 +313,7 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
         if(numseq < 2){
                 fprintf(stderr,"\nNo sequences could be read.\n");
                 free_parameters(param);
-                exit(0);
+                return NULL;
         }
         if(!param->format && param->outfile){
                 if (byg_start("msf",param->outfile) != -1){
@@ -364,12 +328,27 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
                 fprintf(stderr,"Output file: %s, in %s format.\n",param->outfile,param->format);
         }
 
-
-        free(input);
-        free(input_type);
-        free(input_numseq);
+        for (i = 0; i < param->num_infiles+1;i++){
+                if(input[i]){
+                        MFREE(input[i]);
+                }
+        }
+        MFREE(input_numseq);
+        MFREE(input_type);
+        MFREE(input);
         return aln;
 ERROR:
+        free_aln(aln);
+        if(input){
+                for (i = 0; i < param->num_infiles+1;i++){
+                        if(input[i]){
+                                MFREE(input[i]);
+                        }
+                }
+        }
+        MFREE(input_numseq);
+        MFREE(input_type);
+        MFREE(input);
         return NULL;
 }
 
@@ -659,7 +638,7 @@ struct alignment* read_alignment_from_swissprot(struct alignment* aln,char* stri
                 p+=i;
                 j = byg_start(" ",p);
                 aln->lsn[c] = j;
-                aln->sn[c] = malloc(sizeof(char)*(j+1));
+                MMALLOC(aln->sn[c],sizeof(char)*(j+1));
                 for (i = 0;i < j;i++){
                         aln->sn[c][i] = p[i];
                 }
@@ -671,8 +650,8 @@ struct alignment* read_alignment_from_swissprot(struct alignment* aln,char* stri
                 p+= j;
                 j = byg_start("//",p);
                 fprintf(stderr,"found sequence:\n");
-                aln->s[c] = malloc(sizeof(int)*(j+1));
-                aln->seq[c] = malloc(sizeof(char)*(j+1));
+                MMALLOC(aln->s[c],sizeof(int)*(j+1));
+                MMALLOC(aln->seq[c],sizeof(char)*(j+1));
                 n = 0;
                 for (i = 0;i < j;i++){
                         if((int)p[i] > 32){
@@ -693,8 +672,10 @@ struct alignment* read_alignment_from_swissprot(struct alignment* aln,char* stri
                 aln->sl[c] = n;
                 c++;
         }
-        free(string);
         return aln;
+ERROR:
+        free_aln(aln);
+        return NULL;
 }
 
 struct alignment* read_sequences_macsim_xml(struct alignment* aln,char* string)
@@ -896,7 +877,7 @@ struct alignment* read_alignment_macsim_xml(struct alignment* aln,char* string)
                         j = byg_start("</seq-name>",p);
 
                         aln->lsn[c] = j;
-                        aln->sn[c] = malloc(sizeof(char)*(j+1));
+                        MMALLOC(aln->sn[c],sizeof(char)*(j+1));
                         for (i = 0;i < j;i++){
                                 aln->sn[c][i] = p[i];
                         }
@@ -911,8 +892,9 @@ struct alignment* read_alignment_macsim_xml(struct alignment* aln,char* string)
                 if(i < max){
                         p+= i;
                         j = byg_start("</seq-data>",p);
-                        aln->s[c] = malloc(sizeof(int)*(j+1));
-                        aln->seq[c] = malloc(sizeof(char)*(j+1));
+
+                        MMALLOC(aln->s[c],sizeof(int)*(j+1));
+                        MMALLOC(aln->seq[c],sizeof(char)*(j+1));
                         n = 0;
                         for (i = 0;i < j;i++){
                                 if((int)p[i]>32){
@@ -932,8 +914,10 @@ struct alignment* read_alignment_macsim_xml(struct alignment* aln,char* string)
 
                 c++;
         }
-        free(string);
         return aln;
+ERROR:
+        free_aln(aln);
+        return NULL;
 }
 
 
@@ -1151,7 +1135,7 @@ struct alignment* read_alignment_uniprot_xml(struct alignment* aln,char* string)
                 p1 +=i; //p1 is at the end of the sequence name tag
                 j = byg_start("</name>",p1);
                 aln->lsn[c] = j;
-                aln->sn[c] = malloc(sizeof(char)*(j+1));
+                MMALLOC(aln->sn[c],sizeof(char)*(j+1));
                 for (i = 0;i < j;i++){
                         aln->sn[c][i] = p1[i];
                 }
@@ -1161,8 +1145,8 @@ struct alignment* read_alignment_uniprot_xml(struct alignment* aln,char* string)
                 i = byg_end(">",p1);
                 p1 +=i;
                 j = byg_start("</sequence>",p1);
-                aln->s[c] = malloc(sizeof(int)*(j+1));
-                aln->seq[c] = malloc(sizeof(char)*(j+1));
+                MMALLOC( aln->s[c],sizeof(int)*(j+1));
+                MMALLOC(aln->seq[c],sizeof(char)*(j+1));
                 n = 0;
                 for (i = 0;i < j;i++){
                         if((int)p1[i] > 32){
@@ -1180,8 +1164,10 @@ struct alignment* read_alignment_uniprot_xml(struct alignment* aln,char* string)
                 aln->sl[c] = n;
                 c++;
         }
-        free(string);
         return aln;
+ERROR:
+        free_aln(aln);
+        return NULL;
 }
 
 struct alignment* read_sequences_stockholm(struct alignment* aln,char* string)
@@ -1335,7 +1321,7 @@ struct alignment* read_alignment_stockholm(struct alignment* aln,char* string)
                 if(j != 1){
                         j = byg_start(" ",p1);
                         aln->lsn[c] = j;
-                        aln->sn[c] = malloc(sizeof(char)*(j+1));
+                        MMALLOC(aln->sn[c],sizeof(char)*(j+1));
                         for (i = 0;i < j;i++){
                                 aln->sn[c][i] = p1[i];
                         }
@@ -1345,8 +1331,8 @@ struct alignment* read_alignment_stockholm(struct alignment* aln,char* string)
                         p1+=j;
                         j = byg_start("\n",p1);
 
-                        aln->s[c] = malloc(sizeof(int)*(j+1));
-                        aln->seq[c] = malloc(sizeof(char)*(j+1));
+                        MMALLOC(aln->s[c],sizeof(int)*(j+1));
+                        MMALLOC(aln->seq[c],sizeof(char)*(j+1));
                         n = 0;
                         for (i = 0;i < j;i++){
                                 if((int)p1[i] > 32){
@@ -1365,9 +1351,10 @@ struct alignment* read_alignment_stockholm(struct alignment* aln,char* string)
                         c++;
                 }
         }
-
-        free(string);
         return aln;
+ERROR:
+        free_aln(aln);ss
+        return NULL;
 }
 
 
@@ -1555,8 +1542,8 @@ struct alignment* read_alignment_clustal(struct alignment* aln,char* string)
         }
 
         for(i =start;i < local_numseq+start;i++){
-                aln->s[i] = malloc(sizeof(int)*(len+1));
-                aln->seq[i] = malloc(sizeof(char)*(len+1));
+                MMALLOC(aln->s[i],sizeof(int)*(len+1));
+                MMALLOC(aln->seq[i],sizeof(char)*(len+1));
         }
 
         p1 = string;
@@ -1568,7 +1555,7 @@ struct alignment* read_alignment_clustal(struct alignment* aln,char* string)
                 if(n > 2 && n>j && j!= 1){
                         if(aln->lsn[c] == 0){
                                 aln->lsn[c] = j;
-                                aln->sn[c] = malloc(sizeof(char)*(j+1));
+                                MMALLOC(aln->sn[c],sizeof(char)*(j+1));
                                 for (i = 0;i < j;i++){
                                         aln->sn[c][i] = p1[i];
                                 }
@@ -1597,8 +1584,10 @@ struct alignment* read_alignment_clustal(struct alignment* aln,char* string)
                 aln->s[i][aln->sl[i]] = 0;
                 aln->seq[i][aln->sl[i]] = 0;
         }
-        free(string);
         return aln;
+ERROR:
+        free_aln(aln);
+        return NULL;
 }
 
 struct alignment* read_sequences(struct alignment* aln,char* string)
@@ -1818,9 +1807,9 @@ struct alignment* read_alignment(struct alignment* aln,char* string)
         //for (i = numseq;i--;){
         for (i = start; i < local_numseq+start;i++){
                 //	fprintf(stderr,"len:%d %d\n",i,aln->sl[i]);
-                aln->s[i] = malloc(sizeof(int)*(aln->sl[i]+1));
-                aln->seq[i] = malloc(sizeof(char)*(aln->sl[i]+1));
-                aln->sn[i] = malloc(sizeof(char)*(aln->lsn[i]+1));
+                MMALLOC(aln->s[i],sizeof(int)*(aln->sl[i]+1));
+                MMALLOC(aln->seq[i],sizeof(char)*(aln->sl[i]+1));
+                MMALLOC(aln->sn[i],sizeof(char)*(aln->lsn[i]+1));
                 //aln->sip[i] = malloc(sizeof(int)*1);
                 //aln->nsip[i] = 1;
                 //aln->sip[i][0] = i;
@@ -1862,9 +1851,11 @@ struct alignment* read_alignment(struct alignment* aln,char* string)
                 aln->seq[i][aln->sl[i]] = 0;
                 aln->sn[i][aln->lsn[i]] = 0;
         }
-
-        free(string);
         return aln;
+ERROR:
+
+        free_aln(aln);
+        return NULL;
 }
 
 
