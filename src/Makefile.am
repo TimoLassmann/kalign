@@ -30,10 +30,17 @@ AM_CPPFLAGS=${MYINCDIRS} ${HDF5_CPPFLAGS}
 
 #LOGO_SOURCES = motif_logo.c motif_logo.h
 
-bin_PROGRAMS =  kalign 
+bin_PROGRAMS =  kalign
 
 
-kalign_SOURCES =
+kalign_SOURCES = run_kalign.c \
+global.h \
+parameters.h \
+parameters.c \
+align_io.h \
+align_io.c \
+misc.h \
+misc.c
 
 
 #kalign_LDADD =  ${MYLIBDIRS}
@@ -45,7 +52,7 @@ TESTS =  kalign_ITEST
 TESTS_ENVIRONMENT = \
 	$(VALGRIND)
 
-check_PROGRAMS = kalign_ITEST 
+check_PROGRAMS = kalign_ITEST
 kalign_ITEST_SOURCES = $(KALIGNSOURCE)
 kalign_ITEST_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
 kalign_ITEST_LDADD = $(MYLIBDIRS)

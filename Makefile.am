@@ -1,6 +1,7 @@
-EXTRA_DIST = autogen.sh
-# Build the library in the hand subdirectory first.
-LIB_TLDEVELDIR = @LIB_TLDEVELDIR@ 
+EXTRA_DIST = version.sh autogen.sh VERSION
+
+# Build the library in the hand subdirectory first
+LIB_TLDEVELDIR = @LIB_TLDEVELDIR@
 
 # top_builddir = @top_builddir@
 

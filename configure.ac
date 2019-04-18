@@ -1,4 +1,4 @@
-AC_INIT([wims], [m4_esyscmd_s([git describe --always])])
+AC_INIT([kalign], [m4_esyscmd_s([./version.sh])])
 AC_CONFIG_AUX_DIR([.])
 AM_INIT_AUTOMAKE
 AC_PROG_CC
