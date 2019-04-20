@@ -11,6 +11,9 @@
 
 #include "tldevel.h"
 
+
+
+extern int byg_detect(int* text,int n);
 extern int byg_start(char* pattern,char*text);
 extern int byg_end(char* pattern,char*text);
 extern int byg_count(char* pattern,char*text);

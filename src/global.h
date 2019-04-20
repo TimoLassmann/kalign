@@ -40,6 +40,7 @@ struct alignment{
         char** sn;
         int numseq;
         int num_profiles;
+        int dna;
 };
 
 #endif
