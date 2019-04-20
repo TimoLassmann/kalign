@@ -1,11 +1,31 @@
 
-
-
 #include "global.h"
 #include "parameters.h"
 #include "align_io.h"
 
 #include "misc.h"
+
+
+struct infile_buffer{
+        char* input;
+        unsigned short int input_type;
+        unsigned short int input_numseq;
+
+};
+
+struct align_io_buffer{
+        struct infile_buffer** in_buf;
+        int feature;
+        int num_inputs;
+        int numseq;
+};
+
+struct align_io_buffer* alloc_align_io_buffer(int num_infiles);
+int read_all_sequences(struct alignment* aln, struct align_io_buffer* b);
+int count_sequences_and_detect(struct align_io_buffer* b);
+int check_out_and_errors(struct align_io_buffer* b, struct parameters* param);
+void free_align_io_buffer(struct align_io_buffer* b);
+
 
 struct alignment* aln_alloc(int numseq);
 static char* get_input_into_string(char* infile);
@@ -37,282 +57,38 @@ struct alignment* read_sequences_stockholm(struct alignment* aln,char* string);
 struct alignment* detect_and_read_sequences(struct parameters* param)
 {
         struct alignment* aln = NULL;
-        int feature = 0;
-        char **input = NULL;
-        unsigned short int* input_type = NULL;
-        unsigned short int* input_numseq = NULL;
-
-
+        struct align_io_buffer* b = NULL;
         int numseq = 0;
-        int num_input = 0;
+
         int i = 0;
-        int j = 0;
-        int c = 0;
+
 
 
         ASSERT(param!= NULL, "No parameters");
+        /* if profile do something else... */
+        /* allocate input buffers  */
 
-        /* check if files exist  */
-
+        RUNP(b = alloc_align_io_buffer(param->num_infiles)); /* this will allocate and extra buffer for stdin (param->num_profiles) */
+        /* read from stdin */
+        RUNP(b->in_buf[param->num_infiles]->input = get_input_into_string(NULL));
+        /* try to read in as much as possible  */
         for(i = 0; i < param->num_infiles;i++){
-                ASSERT( my_file_exists(param->infile[i]) == 1, "File %s does not exists.",param->infile[i]);
-        }
-
-
-        MMALLOC(input, sizeof(char*)* (param->num_infiles+1));
-        MMALLOC(input_type,sizeof(unsigned short int) *  (param->num_infiles+1));
-        MMALLOC(input_numseq,sizeof(unsigned short int) *  (param->num_infiles+1));
-
-        for (i = 0; i <  (param->num_infiles+1);i++){
-                input[i] = 0;
-                input_type[i] = 0;
-                input_numseq[i] = 0;
-        }
-
-
-        /* try reading from stdin */
-        input[0] = get_input_into_string(NULL);
-        c =0;
-        if(input[0]){
-                c = 1;
-        }
-        for (i = 0; i < param->num_infiles;i++){
-
-                LOG_MSG("reading from %s: ",param->infile[i]);
-
-                RUNP(input[i] = get_input_into_string(param->infile[i]));
-
-                if (byg_start("<macsim>",input[i]) != -1){
-                        input_numseq[i] = count_sequences_macsim(input[i]);
-                        feature = 1;
-                        input_type[i] = 1;
-                }else if (byg_start("<uniprot",input[i]) != -1){
-                        input_numseq[i] = count_sequences_uniprot(input[i]);
-                        input_type[i] = 2;
-                }else if(byg_start("This SWISS-PROT",input[i]) != -1){
-                        input_numseq[i] = count_sequences_swissprot(input[i]);
-                        input_type[i] = 3;
-                }else if (byg_start("This Swiss-Prot",input[i]) != -1){
-                        input_numseq[i] = count_sequences_swissprot(input[i]);
-                        input_type[i] = 3;
-                }else if (byg_start("CLUSTAL W",input[i]) != -1){
-                        input_numseq[i] = count_sequences_clustalw(input[i]);
-                        input_type[i] = 4;
-                }else if (byg_start("PileUp",input[i]) != -1){
-                        input_numseq[i] = count_sequences_clustalw(input[i]);
-                        input_type[i] = 4;
-                }else if (byg_start("MSF:",input[i]) != -1){
-                        input_numseq[i] = count_sequences_clustalw(input[i]);
-                        input_type[i] = 4;
-                }else if (byg_start("STOCKHOLM",input[i]) != -1){
-                        input_numseq[i] = count_sequences_stockholm(input[i]);
-                        input_type[i] = 5;
-                }else{
-                        input_numseq[i]  = count_sequences_fasta(input[i]);
-                        input_type[i] = 0;
+                if(my_file_exists(param->infile[i])){
+                        RUNP(b->in_buf[i]->input = get_input_into_string(param->infile[i]));
                 }
-                fprintf(stderr,"found %d sequences\n",input_numseq[i]);
-
-                if(input_numseq[i] < 1){
-                        free(input[i]);
-                        input[i] = 0;
-                }else{
-                        numseq += input_numseq[i];
-                }
-                /**else{
-                   LOG_MSG("found no sequences.");
-                   if(!param->outfile){
-                   param->outfile = param->infile[i];
-                   LOG_MSG("-> output file, in ");
-                   //try to set format....
-                   if(!param->format){
-                   if (byg_start("msf",param->outfile) != -1){
-                   param->format = "msf";
-                   }else if (byg_start("clustal",param->outfile) != -1){
-                   param->format = "clustal";
-                   }else if (byg_start("aln",param->outfile) != -1){
-                   param->format = "clustal";
-                   }else if (byg_start("macsim",param->outfile) != -1){
-                   param->format = "macsim";
-                   }else{
-                   param->format = "fasta";
-                   }
-                   if(param->reformat){
-                   fprintf(stderr,"unaligned fasta format\n");
-                   }else if(param->format){
-                   fprintf(stderr,"%s format\n",param->format);
-                   }else{
-                   fprintf(stderr,"fasta format\n");
-                   }
-                   }
-                   }
-                   }*/
         }
+        /* count  */
+        RUN(count_sequences_and_detect(b));
+        /* detect errors  */
+        RUN(check_out_and_errors(b,param));
 
+        /* allocate alignment structure */
+        RUNP(aln = aln_alloc(b->numseq));
+        /* read sequences */
+        RUN(read_all_sequences(aln,b));
 
         if(numseq < 2){
-                fprintf(stderr,"%s\n", usage);
-                if(!numseq){
-                        ERROR_MSG("No sequences found.");
-                }else{
-                        ERROR_MSG("Only one sequence found.");
-                }
-        }
-
-        if(byg_start(param->alignment_type,"profPROFprofilePROFILE") != -1){
-                //if( free_read  < 2){
-                fprintf(stderr,"\nWARNING: You are trying to perform a profile - profile alignment but ony one input file was detected.\n\n");
-                param->alignment_type = "default";
-                //}
-        }
-
-
-        if (param->feature_type && !feature){
-                ERROR_MSG("You are trying to perform a feature alignment but the input format(s) do not contain feature information.");
-                return NULL;
-        }
-
-
-        aln = aln_alloc(numseq);
-        //numseq = 0;
-        if(byg_start(param->alignment_type,"profPROFprofilePROFILE") != -1){
-                j = 0;
-                for (i = 0; i < param->num_infiles+1;i++){
-
-                        //if(input[i]){
-
-                        switch(input_type[i]){
-                        case 0:
-                                RUNP(aln = read_alignment(aln,input[i]));
-                                break;
-                        case 1:
-                                RUNP(aln = read_alignment_macsim_xml(aln,input[i]));
-                                break;
-                        case 2:
-                                RUNP(aln = read_alignment_uniprot_xml(aln,input[i]));
-                                break;
-                        case 3:
-                                RUNP(aln = read_alignment_from_swissprot(aln, input[i]));
-                                break;
-                        case 4:
-                                RUNP(aln = read_alignment_clustal(aln,input[i]));
-                                break;
-                        case 5:
-                                RUNP(aln = read_alignment_stockholm(aln,input[i]));
-                                break;
-
-                        default:
-                                RUNP(aln = read_alignment(aln,input[i]));
-                                break;
-                        }
-                        input[i] = 0;
-                        //create partial profile....
-                        aln->nsip[numseq+j] = input_numseq[i];
-                        MMALLOC(aln->sip[numseq+j],sizeof(int)*aln->nsip[numseq+j]);
-
-                        //fprintf(stderr,"%d	%d\n",numseq+j,aln->sl[numseq+j]);
-                        //j++;
-                        //}
-                }
-                //num_input = j;
-                c = 0;
-                for (i = 0;i < num_input;i++){
-                        //
-                        for ( j = 0; j < aln->nsip[numseq+i];j++){
-                                aln->sip[numseq+i][j] = c;
-                                c++;
-                                //		fprintf(stderr,"%d ",aln->sip[numseq+i][j]);
-                        }
-                        aln->sl[numseq+i] = aln->sl[aln->sip[numseq+i][0]];
-                        //	fprintf(stderr,"PROFILE:%d	contains: %d long:%d\n",i+numseq,aln->nsip[numseq+i],aln->sl[numseq+i]);
-                        //		fprintf(stderr,"\n");
-                }
-
-                //sanity check -are all input
-                int a,b;
-                for (i = 0;i < num_input;i++){
-                        for ( j = 0; j < aln->nsip[numseq+i]-1;j++){
-                                a = aln->sip[numseq+i][j];
-                                a = aln->sl[a];
-                                for (c =  j+1; j < aln->nsip[numseq+i];j++){
-                                        b = aln->sip[numseq+i][c];
-                                        b = aln->sl[b];
-                                        if(a != b){
-                                                ERROR_MSG("Unaligned sequences in input %s.\n",param->infile[i]);
-                                        }
-                                }
-
-                        }
-
-                }
-
-                //exit(0);
-
-                /*for (i = 0; i < numseq;i++){
-                  fprintf(stderr,"len%d:%d\n",i,aln->sl[i]);
-                  for ( j =0 ; j < aln->sl[i];j++){
-                  //if(aln->s[i][j]> 23 || aln->s[i][j] < 0){
-                  //	 aln->s[i][j] = -1;
-                  //}
-                  fprintf(stderr,"%d ",aln->s[i][j]);
-                  }
-                  //	fprintf(stderr,"\n");
-                  }
-                  exit(0);*/
-        }else{
-                for (i = 0; i < num_input;i++){
-                        if(input[i]){
-                                switch(input_type[i]){
-                                case 0:
-                                        aln = read_sequences(aln,input[i]);
-                                        break;
-                                case 1:
-                                        aln = read_sequences_macsim_xml(aln,input[i]);
-                                        break;
-                                case 2:
-                                        aln = read_sequences_uniprot_xml(aln,input[i]);
-                                        break;
-                                case 3:
-                                        aln = read_sequences_from_swissprot(aln, input[i]);
-                                        break;
-                                case 4:
-                                        aln = read_sequences_clustal(aln,input[i]);
-                                        break;
-                                case 5:
-                                        aln = read_sequences_stockholm(aln,input[i]);
-                                        break;
-
-                                default:
-                                        aln = read_sequences(aln,input[i]);
-                                        break;
-                                }
-                                /*if (byg_start("<macsim>",input[i]) != -1){
-                                  aln = read_sequences_macsim_xml(aln,input[i]);
-                                  }else if (byg_start("<uniprot",input[i]) != -1){
-                                  aln = read_sequences_uniprot_xml(aln,input[i]);
-                                  }else if(byg_start("This SWISS-PROT entry is copyright.",input[i]) != -1){
-                                  aln = read_sequences_from_swissprot(aln, input[i]);
-                                  }else if (byg_start("This Swiss-Prot entry is copyright.",input[i]) != -1){
-                                  aln = read_sequences_from_swissprot(aln, input[i]);
-                                  }else if (byg_start("CLUSTAL W",input[i]) != -1){
-                                  aln = read_sequences_clustal(aln,input[i]);
-                                  }else if (byg_start("PileUp",input[i]) != -1){
-                                  aln = read_sequences_clustal(aln,input[i]);
-                                  }else if (byg_start("MSF:",input[i]) != -1){
-                                  aln = read_sequences_clustal(aln,input[i]);
-                                  }else if (byg_start("STOCKHOLM",input[i]) != -1){
-                                  aln = read_sequences_stockholm(aln,input[i]);
-                                  }else{
-                                  aln = read_sequences(aln,input[i]);
-                                  }*/
-                                input[i] = 0;
-                        }
-                }
-        }
-        if(numseq < 2){
-                fprintf(stderr,"\nNo sequences could be read.\n");
-                free_parameters(param);
-                return NULL;
+                ERROR_MSG("No sequences could be read.");
         }
         if(!param->format && param->outfile){
                 if (byg_start("msf",param->outfile) != -1){
@@ -326,30 +102,15 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
                 }
                 fprintf(stderr,"Output file: %s, in %s format.\n",param->outfile,param->format);
         }
-
-        for (i = 0; i < param->num_infiles+1;i++){
-                if(input[i]){
-                        MFREE(input[i]);
-                }
-        }
-        MFREE(input_numseq);
-        MFREE(input_type);
-        MFREE(input);
+        free_align_io_buffer(b);
         return aln;
 ERROR:
+        free_align_io_buffer(b);
         free_aln(aln);
-        if(input){
-                for (i = 0; i < param->num_infiles+1;i++){
-                        if(input[i]){
-                                MFREE(input[i]);
-                        }
-                }
-        }
-        MFREE(input_numseq);
-        MFREE(input_type);
-        MFREE(input);
         return NULL;
 }
+
+
 
 int count_sequences_macsim(char* string)
 {
@@ -464,9 +225,6 @@ int count_sequences_fasta(char* string)
         }
         return n;
 }
-
-
-
 
 char* get_input_into_string(char* infile)
 {
@@ -1352,8 +1110,8 @@ struct alignment* read_alignment_stockholm(struct alignment* aln,char* string)
         }
         return aln;
 ERROR:
-        free_aln(aln);ss
-                              return NULL;
+        free_aln(aln);
+        return NULL;
 }
 
 
@@ -1948,5 +1706,192 @@ void free_aln(struct alignment* aln)
                 MFREE(aln);
 
 
+        }
+}
+
+
+int read_all_sequences(struct alignment* aln, struct align_io_buffer* b)
+{
+        struct infile_buffer* in = NULL;
+        int i;
+        ASSERT(aln != NULL, "No alignment");
+        ASSERT(b != NULL, "No IO buffer");
+        for(i = 0; i < b->num_inputs;i++){
+                in = b->in_buf[i];
+                if(in->input){
+                        switch(in->input_type){
+                        case 0:
+                                aln = read_sequences(aln,in->input);
+                                break;
+                        case 1:
+                                aln = read_sequences_macsim_xml(aln,in->input);
+                                break;
+                        case 2:
+                                aln = read_sequences_uniprot_xml(aln,in->input);
+                                break;
+                        case 3:
+                                aln = read_sequences_from_swissprot(aln,in->input);
+                                break;
+                        case 4:
+                                aln = read_sequences_clustal(aln,in->input);
+                                break;
+                        case 5:
+                                aln = read_sequences_stockholm(aln,in->input);
+                                break;
+                        default:
+                                aln = read_sequences(aln,in->input);
+                                break;
+                        }
+                }
+        }
+        return OK;
+ERROR:
+        return FAIL;
+
+}
+
+
+int check_out_and_errors(struct align_io_buffer* b, struct parameters* param)
+{
+        int i;
+        int c;
+
+        int empty_file;
+        c = 0;
+
+        for(i = 0; i < param->num_infiles;i++){
+                if(b->in_buf[i]->input_numseq == 0){
+                        c++;
+                        empty_file = i;
+                }
+
+        }
+        if(c > 1){
+                ERROR_MSG("Multiple input files have no sequences!");
+        }
+        if(c == 1 && !param->outfile){
+                param->outfile = param->infile[empty_file];
+                if(!param->format){
+                        if (byg_start("msf",param->outfile) != -1){
+                                param->format = "msf";
+                        }else if (byg_start("clustal",param->outfile) != -1){
+                                param->format = "clustal";
+                        }else if (byg_start("aln",param->outfile) != -1){
+                                param->format = "clustal";
+                        }else if (byg_start("macsim",param->outfile) != -1){
+                                param->format = "macsim";
+                        }else{
+                                param->format = "fasta";
+                        }
+                        if(param->reformat){
+                                LOG_MSG("unaligned fasta format.");
+                        }else if(param->format){
+                                LOG_MSG("%s format.",param->format);
+                        }else{
+                                LOG_MSG("fasta format.");
+                        }
+                }
+        }
+
+        if(b->numseq < 2){
+                if(b->numseq){
+                        ERROR_MSG("No sequences found.");
+                }else{
+                        ERROR_MSG("Only one sequence found.");
+                }
+        }
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+int count_sequences_and_detect(struct align_io_buffer* b)
+{
+        int i;
+        struct infile_buffer* in = NULL;
+        ASSERT(b != NULL, "No buffer.");
+
+        for(i = 0; i < b->num_inputs;i++){
+                if(b->in_buf[i]->input){
+                        in = b->in_buf[i];
+                        if (byg_start("<macsim>",in->input) != -1){
+                                in->input_numseq = count_sequences_macsim(in->input);
+                                b->feature =1;
+                                in->input_type = 1;
+                        }else if (byg_start("<uniprot",in->input) != -1){
+                                in->input_numseq = count_sequences_uniprot(in->input);
+                                in->input_type = 2;
+                        }else if(byg_start("This SWISS-PROT",in->input) != -1){
+                                in->input_numseq = count_sequences_swissprot(in->input);
+                                in->input_type = 3;
+                        }else if (byg_start("This Swiss-Prot",in->input) != -1){
+                                in->input_numseq = count_sequences_swissprot(in->input);
+                                in->input_type = 3;
+                        }else if (byg_start("CLUSTAL W",in->input) != -1){
+                                in->input_numseq = count_sequences_clustalw(in->input);
+                                in->input_type = 4;
+                        }else if (byg_start("PileUp",in->input) != -1){
+                                in->input_numseq = count_sequences_clustalw(in->input);
+                                in->input_type = 4;
+                        }else if (byg_start("MSF:",in->input) != -1){
+                                in->input_numseq = count_sequences_clustalw(in->input);
+                                in->input_type = 4;
+                        }else if (byg_start("STOCKHOLM",in->input) != -1){
+                                in->input_numseq = count_sequences_stockholm(in->input);
+                                in->input_type = 5;
+                        }else{
+                                in->input_numseq  = count_sequences_fasta(in->input);
+                                in->input_type = 0;
+                        }
+                        if(in->input_numseq < 1){
+                                MFREE(in->input);
+                                in->input = NULL;
+                        }else{
+                                b->numseq += in->input_numseq;
+                        }
+                }
+        }
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+struct align_io_buffer* alloc_align_io_buffer(int num_infiles)
+{
+        struct align_io_buffer* b = NULL;
+        int i;
+        MMALLOC(b, sizeof(struct align_io_buffer));
+        b->num_inputs = num_infiles+1;
+        b->in_buf = NULL;
+        b->feature = 0;
+        b->numseq = 0;
+        MMALLOC(b->in_buf, sizeof(struct infile_buffer*)* b->num_inputs);
+        for(i = 0; i < b->num_inputs;i++){
+                b->in_buf[i] = NULL;
+                MMALLOC(b->in_buf[i], sizeof(struct infile_buffer));
+                b->in_buf[i]->input = NULL;
+                b->in_buf[i]->input_numseq = 0;
+                b->in_buf[i]->input_type = 0;
+        }
+        return b;
+ERROR:
+        free_align_io_buffer(b);
+        return NULL;
+}
+
+void free_align_io_buffer(struct align_io_buffer* b)
+{
+        int i;
+        if(b){
+                if(b->in_buf){
+                        if(b->in_buf[i]){
+                                if(b->in_buf[i]->input){
+                                        MFREE(b->in_buf[i]->input);
+                                }
+                                MFREE(b->in_buf[i]);
+                        }
+                        MFREE(b->in_buf);
+                }
+                MFREE(b);
         }
 }
