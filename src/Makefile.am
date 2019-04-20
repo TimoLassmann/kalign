@@ -39,6 +39,10 @@ parameters.h \
 parameters.c \
 align_io.h \
 align_io.c \
+alignment_parameters.h \
+alignment_parameters.c \
+tree_building.h \
+tree_building.c \
 misc.h \
 misc.c
 

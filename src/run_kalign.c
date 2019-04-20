@@ -1,6 +1,7 @@
 #include "global.h"
 #include "parameters.h"
 #include "align_io.h"
+#include "alignment_parameters.h"
 #include "misc.h"
 #include <getopt.h>
 
@@ -285,7 +286,7 @@ int main(int argc, char *argv[])
                 }
         }
         if(param->gap_inc < 0.0){
-                fprintf(stderr,"%s\n", usage);
+                //fprintf(stderr,"%s\n", usage);
                 fprintf(stderr,"Invalid parameter setting: gap_inc needs to be > 0 \n");
                 exit(1);
         }
@@ -325,6 +326,8 @@ int run_kalign(struct parameters* param)
 {
 
         struct alignment* aln = NULL;
+        struct aln_param* ap = NULL;
+
         int i,j;
         /* Step 1: read all input sequences & figure out output  */
         RUNP(aln = detect_and_read_sequences(param));
@@ -350,9 +353,14 @@ int run_kalign(struct parameters* param)
                 free_aln(aln);
                 return OK;
         }
+        /* allocate aln parameters  */
+        RUNP(ap = init_ap(param,aln->numseq));
+        /* build tree */
 
-/* Start alignment stuff */
+
+        /* Start alignment stuff */
         free_aln(aln);
+        free_ap(ap);
         return OK;
 ERROR:
         return FAIL;
