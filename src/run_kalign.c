@@ -1,18 +1,15 @@
 #include "global.h"
 #include "parameters.h"
+#include "align_io.h"
 #include <getopt.h>
+
+
+int run_kalign(struct parameters* param);
 
 int main(int argc, char *argv[])
 {
         int i,c;
         struct parameters* param = NULL;
-
-        static char  license[] = "\n\
-Kalign version 2.04, Copyright (C) 2004, 2005, 2006 Timo Lassmann\n\n\
-        Kalign is free software. You can redistribute it and/or modify\n\
-        it under the terms of the GNU General Public License as\n\
-        published by the Free Software Foundation.\n\n";
-
 
         RUNP(param = init_param());
 
@@ -301,10 +298,16 @@ Kalign version 2.04, Copyright (C) 2004, 2005, 2006 Timo Lassmann\n\n\
         //exit(0);
 
 
+
+
         if (param->num_infiles == 0){
                 fprintf(stderr,"%s\n", usage);
                 return EXIT_SUCCESS;
         }
+
+
+
+        RUN(run_kalign(param));
         free_parameters(param);
 
 
@@ -312,4 +315,22 @@ Kalign version 2.04, Copyright (C) 2004, 2005, 2006 Timo Lassmann\n\n\
 ERROR:
         free_parameters(param);
         return EXIT_FAILURE;
+}
+
+
+int run_kalign(struct parameters* param)
+{
+
+        struct alignment* aln = NULL;
+
+        /* Step 1: read all input sequences & figure out output  */
+        RUNP(aln = detect_and_read_sequences(param));
+
+        LOG_MSG("Detected: %d sequences.", aln->numseq);
+        LOG_MSG("Output is %s in format %s.", param->outfile,param->format);
+
+        free_aln(aln);
+        return OK;
+ERROR:
+        return FAIL;
 }

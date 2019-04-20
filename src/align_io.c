@@ -58,7 +58,7 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
 {
         struct alignment* aln = NULL;
         struct align_io_buffer* b = NULL;
-        int numseq = 0;
+
 
         int i = 0;
 
@@ -70,11 +70,11 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
 
         RUNP(b = alloc_align_io_buffer(param->num_infiles)); /* this will allocate and extra buffer for stdin (param->num_profiles) */
         /* read from stdin */
-        RUNP(b->in_buf[param->num_infiles]->input = get_input_into_string(NULL));
+        b->in_buf[param->num_infiles]->input = get_input_into_string(NULL);
         /* try to read in as much as possible  */
         for(i = 0; i < param->num_infiles;i++){
                 if(my_file_exists(param->infile[i])){
-                        RUNP(b->in_buf[i]->input = get_input_into_string(param->infile[i]));
+                RUNP(b->in_buf[i]->input = get_input_into_string(param->infile[i]));
                 }
         }
         /* count  */
@@ -87,7 +87,7 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
         /* read sequences */
         RUN(read_all_sequences(aln,b));
 
-        if(numseq < 2){
+        if(aln->numseq < 2){
                 ERROR_MSG("No sequences could be read.");
         }
         if(!param->format && param->outfile){
@@ -347,7 +347,6 @@ struct alignment* read_sequences_from_swissprot(struct alignment* aln,char* stri
                 aln->sl[c] = n;
                 c++;
         }
-        free(string);
         return aln;
 }
 
@@ -548,7 +547,6 @@ struct alignment* read_sequences_macsim_xml(struct alignment* aln,char* string)
 
                 c++;
         }
-        free(string);
         return aln;
 }
 
@@ -682,8 +680,8 @@ struct feature* read_ft(struct feature* ft,char* p)
 {
 
         int i,j;
-        struct feature *n = 0;
-        struct feature *old_n = 0;
+        struct feature *n = NULL;
+        struct feature *old_n = NULL;
         char tmp[10];
         char* p1 = 0;
         p1 = p;
@@ -694,16 +692,20 @@ struct feature* read_ft(struct feature* ft,char* p)
                         break;
                 }
 
-                n = malloc(sizeof(struct feature));
+                n = NULL;
+                MMALLOC(n,sizeof(struct feature));
                 n->next = 0;
                 n->color = -1;
+                n->type = NULL;
+                n->note = NULL;
+                n->next = NULL;
 
                 p1+=j;// p1 is at start of entry;
                 i = byg_end("<ftype>",p1);
                 p1 +=i; //p1 is at the end of the sequence name tag
                 j = byg_start("</ftype>",p1);
 
-                n->type = malloc(sizeof(char*)*(j+1));
+                MMALLOC(n->type,sizeof(char*)*(j+1));
                 for (i = 0; i < j;i++){
                         n->type[i] = p1[i];
                 }
@@ -730,7 +732,7 @@ struct feature* read_ft(struct feature* ft,char* p)
                 i = byg_end("<fnote>",p1);
                 p1+= i;
                 j = byg_start("</fnote>",p1);
-                n->note = malloc(sizeof(char*)*(j+1));
+                MMALLOC(n->note,sizeof(char*)*(j+1));
                 for (i = 0; i < j;i++){
                         n->note[i] = p1[i];
                 }
@@ -746,9 +748,11 @@ struct feature* read_ft(struct feature* ft,char* p)
                 }else{
                         ft = n;
                 }
-                n = 0;
+                n = NULL;
         }
         return ft;
+ERROR:
+        return NULL;
 }
 
 struct alignment* read_sequences_uniprot_xml(struct alignment* aln,char* string)
@@ -834,7 +838,6 @@ struct alignment* read_sequences_uniprot_xml(struct alignment* aln,char* string)
                 aln->sl[c] = n;
                 c++;
         }
-        free(string);
         return aln;
 }
 
@@ -1013,8 +1016,6 @@ struct alignment* read_sequences_stockholm(struct alignment* aln,char* string)
                         c++;
                 }
         }
-
-        free(string);
         return aln;
 }
 
@@ -1223,7 +1224,6 @@ struct alignment* read_sequences_clustal(struct alignment* aln,char* string)
         for (i = start; i < local_numseq+start;i++){
                 aln->s[i][aln->sl[i]] = 0;
         }
-        free(string);
         return aln;
 }
 
@@ -1472,8 +1472,6 @@ struct alignment* read_sequences(struct alignment* aln,char* string)
                 aln->seq[i][aln->sl[i]] = 0;
                 aln->sn[i][aln->lsn[i]] = 0;
         }
-
-        free(string);
         return aln;
 }
 
@@ -1656,9 +1654,13 @@ struct alignment* aln_alloc(int numseq)
         }
 
         for(i =0;i < numseq;i++){
+                aln->s[i] = NULL;
+                aln->seq[i] = NULL;
+                aln->ft[i] = NULL;
+                aln->si[i] = NULL;
+                aln->sn[i] = NULL;
                 aln->lsn[i] = 0;
-                aln->ft[i] = 0;
-                aln->si[i] = 0;
+
                 MMALLOC(aln->sip[i],sizeof(int));
                 aln->nsip[i] = 1;
                 aln->sip[i][0] = i;
@@ -1673,6 +1675,8 @@ ERROR:
 void free_aln(struct alignment* aln)
 {
         int i;
+        struct feature* tmp = NULL;
+        struct feature* next = NULL;
         if(aln){
                 for (i = aln->numseq;i--;){
 
@@ -1683,7 +1687,16 @@ void free_aln(struct alignment* aln)
 
                 if(aln->ft){
                         for(i = aln->numseq;i--;){
-                                MFREE(aln->ft[i]);
+                                if(aln->ft[i]){
+                                        tmp = aln->ft[i];
+                                        while(tmp){
+                                                next = tmp->next;
+                                                MFREE(tmp->type);
+                                                MFREE(tmp->note);
+                                                MFREE(tmp);
+                                                tmp = next;
+                                        }
+                                }
                         }
                         MFREE(aln->ft);
                 }
@@ -1752,13 +1765,14 @@ ERROR:
 
 
 int check_out_and_errors(struct align_io_buffer* b, struct parameters* param)
+
 {
         int i;
         int c;
 
         int empty_file;
         c = 0;
-
+        empty_file = -1;
         for(i = 0; i < param->num_infiles;i++){
                 if(b->in_buf[i]->input_numseq == 0){
                         c++;
@@ -1814,6 +1828,7 @@ int count_sequences_and_detect(struct align_io_buffer* b)
         for(i = 0; i < b->num_inputs;i++){
                 if(b->in_buf[i]->input){
                         in = b->in_buf[i];
+                        //fprintf(stdout,"%s",in->input);
                         if (byg_start("<macsim>",in->input) != -1){
                                 in->input_numseq = count_sequences_macsim(in->input);
                                 b->feature =1;
@@ -1840,15 +1855,19 @@ int count_sequences_and_detect(struct align_io_buffer* b)
                                 in->input_numseq = count_sequences_stockholm(in->input);
                                 in->input_type = 5;
                         }else{
+                                //fprintf(stdout,"Fasta\n");
                                 in->input_numseq  = count_sequences_fasta(in->input);
                                 in->input_type = 0;
+                                //fprintf(stdout,"Detected %d\n", in->input_numseq);
                         }
+
                         if(in->input_numseq < 1){
                                 MFREE(in->input);
                                 in->input = NULL;
                         }else{
                                 b->numseq += in->input_numseq;
                         }
+                        fprintf(stdout,"%d\n",b->numseq);
                 }
         }
         return OK;
@@ -1884,11 +1903,13 @@ void free_align_io_buffer(struct align_io_buffer* b)
         int i;
         if(b){
                 if(b->in_buf){
-                        if(b->in_buf[i]){
-                                if(b->in_buf[i]->input){
-                                        MFREE(b->in_buf[i]->input);
+                        for(i = 0;i< b->num_inputs;i++){
+                                if(b->in_buf[i]){
+                                        if(b->in_buf[i]->input){
+                                                MFREE(b->in_buf[i]->input);
+                                        }
+                                        MFREE(b->in_buf[i]);
                                 }
-                                MFREE(b->in_buf[i]);
                         }
                         MFREE(b->in_buf);
                 }
