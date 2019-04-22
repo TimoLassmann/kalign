@@ -12,13 +12,12 @@ AC_CONFIG_HEADERS([config.h])
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_INSTALL
+AC_PROG_RANLIB
 
 AC_CHECK_LIB([pthread], [main])
 
 # Checks for header files.
-AC_CHECK_HEADERS([stdlib.h unistd.h])
-
-
+AC_CHECK_HEADERS([float.h stdlib.h unistd.h])
 
 tldevel_check_f=$ac_abs_confdir/tldevel/README
 

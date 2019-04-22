@@ -143,7 +143,7 @@ int** hirschberg_alignment(struct alignment* aln, struct aln_param* ap)
                 hm->b[0].a = 0.0;
                 hm->b[0].ga =  -FLT_MAX;
                 hm->b[0].gb =  -FLT_MAX;
-                fprintf(stderr,"LENA:%d	LENB:%d	numseq:%d\n",len_a,len_b,numseq);
+                //fprintf(stderr,"LENA:%d	LENB:%d	numseq:%d\n",len_a,len_b,numseq);
                 if(a < numseq){
                         if(b < numseq){
                                 map[c] = hirsch_ss_dyn(ap,aln->s[a],aln->s[b],hm,map[c]);

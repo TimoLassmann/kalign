@@ -51,19 +51,16 @@ misc.h \
 misc.c
 
 
-#kalign_LDADD =  ${MYLIBDIRS}
 
 
+# TESTS =  kalign_ITEST
+# TESTS_ENVIRONMENT = \
+# 	$(VALGRIND)
 
-
-TESTS =  kalign_ITEST
-TESTS_ENVIRONMENT = \
-	$(VALGRIND)
-
-check_PROGRAMS = kalign_ITEST
-kalign_ITEST_SOURCES = $(KALIGNSOURCE)
-kalign_ITEST_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
-kalign_ITEST_LDADD = $(MYLIBDIRS)
+# check_PROGRAMS = kalign_ITEST
+# kalign_ITEST_SOURCES = $(KALIGNSOURCE)
+# kalign_ITEST_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
+# kalign_ITEST_LDADD = $(MYLIBDIRS)
 
 
 
