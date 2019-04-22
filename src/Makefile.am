@@ -43,6 +43,10 @@ alignment_parameters.h \
 alignment_parameters.c \
 tree_building.h \
 tree_building.c \
+alignment.h \
+alignment.c \
+weave_alignment.h \
+weave_alignment.c \
 misc.h \
 misc.c
 

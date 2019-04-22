@@ -160,6 +160,7 @@ int set_subm_gaps(struct parameters* param, struct aln_param* ap)
                 //vogt....
 
         }else{
+                LOG_MSG("DNA>>>>> %d", param->dna);
                 if(!param->dna){
                         // gpo:5.494941        gpe:0.852492        tgpe:0.442410       bonus: 3.408872     z-cutoff: 58.823309 -> 0.829257 accuracy on bb3
                         ap->gpo = 54.94941;

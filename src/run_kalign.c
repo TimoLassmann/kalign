@@ -4,6 +4,7 @@
 #include "alignment_parameters.h"
 #include "tree_building.h"
 #include "alignment.h"
+#include "weave_alignment.h"
 #include "misc.h"
 #include <getopt.h>
 
@@ -329,7 +330,7 @@ int run_kalign(struct parameters* param)
 
         struct alignment* aln = NULL;
         struct aln_param* ap = NULL;
-
+        int** map = NULL;       /* holds all alignment paths  */
         int i,j;
 
         DECLARE_TIMER(t1);
@@ -345,6 +346,7 @@ int run_kalign(struct parameters* param)
         LOG_MSG("Detected: %d sequences.", aln->numseq);
         LOG_MSG("Output is %s in format %s.", param->outfile,param->format);
         LOG_MSG("Is DNA: %d", aln->dna);
+        param->dna = aln->dna;
         /* If we just want to reformat end here */
         if(param->reformat){
                 for (i = 0 ;i < aln->numseq;i++){
@@ -360,23 +362,47 @@ int run_kalign(struct parameters* param)
         }
         /* allocate aln parameters  */
         RUNP(ap = init_ap(param,aln->numseq));
+        fprintf(stderr,"        %0.8f	gap open penalty\n",ap->gpo);
+        //fprintf(stderr,"        %0.8f	gap extension\n",(float)gpe/10);
+        fprintf(stderr,"        %0.8f	gap extension\n",ap->gpe);
+        //fprintf(stderr,"        %0.8f	terminal gap penalty\n",(float)tgpe/10);
+        fprintf(stderr,"        %0.8f	terminal gap penalty\n",ap->tgpe);
+        //fprintf(stderr,"        %0.8f	bonus\n",param->secret/10);
+        fprintf(stderr,"        %0.8f	bonus\n",param->secret);
+
         /* build tree */
-        START_TIMER(t1);
+
         LOG_MSG("Building guide tree.");
+        START_TIMER(t1);
         RUN(build_tree(aln,param,ap));
         STOP_TIMER(t1);
         LOG_MSG("Took %f sec.", GET_TIMING(t1));
 
         /* Start alignment stuff */
+        LOG_MSG("Aligning");
+        START_TIMER(t1);
+        RUNP(map = hirschberg_alignment(aln, ap));
+        STOP_TIMER(t1);
+        LOG_MSG("Took %f sec.", GET_TIMING(t1));
 
-        RUNP(align(aln, ap));
+        RUN(weave(aln , map, ap->tree));
 
+
+        RUN(output(aln, param));
+        /* clean up map */
+        for(i = 0; i < aln->num_profiles ;i++){
+                if(map[i]){
+                        MFREE(map[i]);
+                }
+        }
+        MFREE(map);
         free_aln(aln);
         free_ap(ap);
         return OK;
 ERROR:
         return FAIL;
 }
+
 
 int detect_dna(struct alignment* aln)
 {

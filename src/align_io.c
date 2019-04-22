@@ -2650,6 +2650,9 @@ struct names* names_alloc( int numseq)
         struct names* n = NULL;
 
         MMALLOC(n,sizeof(struct names));
+        n->start = NULL;
+        n->end = NULL;
+        n->len = NULL;
         MMALLOC(n->start,sizeof(int)*numseq);
         MMALLOC(n->end,sizeof(int)*numseq);
         MMALLOC(n->len,sizeof(int)*numseq);
