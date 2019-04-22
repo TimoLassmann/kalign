@@ -2,6 +2,7 @@
 #define TREE_BUILDING_H
 
 
+#include <float.h>
 #include "global.h"
 #include "alignment_parameters.h"
 #include "parameters.h"

@@ -357,6 +357,7 @@ int run_kalign(struct parameters* param)
         RUNP(ap = init_ap(param,aln->numseq));
         /* build tree */
 
+        RUN(build_tree(aln,param,ap));
 
         /* Start alignment stuff */
         free_aln(aln);
