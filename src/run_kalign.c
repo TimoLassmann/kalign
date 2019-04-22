@@ -2,6 +2,8 @@
 #include "parameters.h"
 #include "align_io.h"
 #include "alignment_parameters.h"
+#include "tree_building.h"
+#include "alignment.h"
 #include "misc.h"
 #include <getopt.h>
 
@@ -329,7 +331,10 @@ int run_kalign(struct parameters* param)
         struct aln_param* ap = NULL;
 
         int i,j;
+
+        DECLARE_TIMER(t1);
         /* Step 1: read all input sequences & figure out output  */
+        LOG_MSG("Reading input.");
         RUNP(aln = detect_and_read_sequences(param));
         /* copy dna parameter to alignment */
         aln->dna = param->dna;
@@ -356,10 +361,16 @@ int run_kalign(struct parameters* param)
         /* allocate aln parameters  */
         RUNP(ap = init_ap(param,aln->numseq));
         /* build tree */
-
+        START_TIMER(t1);
+        LOG_MSG("Building guide tree.");
         RUN(build_tree(aln,param,ap));
+        STOP_TIMER(t1);
+        LOG_MSG("Took %f sec.", GET_TIMING(t1));
 
         /* Start alignment stuff */
+
+        RUNP(align(aln, ap));
+
         free_aln(aln);
         free_ap(ap);
         return OK;

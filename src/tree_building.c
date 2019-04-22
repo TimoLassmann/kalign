@@ -157,7 +157,7 @@ float** protein_wu_distance(struct alignment* aln,struct parameters* param, int 
         }
 
         RUNP(dm = galloc(dm,i,i,0.0f));
-        fprintf(stderr,"Distance Calculation:\n");
+        //fprintf(stderr,"Distance Calculation:\n");
         b = (numseq*(numseq-1))/2;
         a = 1;
 
@@ -184,7 +184,7 @@ float** protein_wu_distance(struct alignment* aln,struct parameters* param, int 
                         //dm[i][j] /= min;
                         //dm[i][j] /= (si->sl[i] > si->sl[j]) ? si->sl[j] :si->sl[i];
                         dm[j][i] = dm[i][j];
-                        fprintf(stderr,"\r%8.0f percent done",(float)a /(float)b * 100);
+                        //fprintf(stderr,"\r%8.0f percent done",(float)a /(float)b * 100);
                         a++;
                 }
 
@@ -293,7 +293,7 @@ float** dna_distance(struct alignment* aln,struct parameters* param, int nj)
         numseq = aln->numseq;
         numprofiles = aln->num_profiles;
 
-        fprintf(stderr,"Distance Calculation:\n");
+        //fprintf(stderr,"Distance Calculation:\n");
 
 
         for (i = 0;i < 1024;i++){
@@ -332,7 +332,7 @@ float** dna_distance(struct alignment* aln,struct parameters* param, int nj)
                         dm[i][j] = dna_distance_calculation(hash,aln->s[j],aln->sl[j],aln->sl[j]+aln->sl[i],param->zlevel);
                         dm[i][j] /= (aln->sl[i] > aln->sl[j]) ?aln->sl[j] :aln->sl[i];
                         dm[j][i] = dm[i][j];
-                        fprintf(stderr,"\r%8.0f percent done",(float)a /(float)b * 100);
+                        //fprintf(stderr,"\r%8.0f percent done",(float)a /(float)b * 100);
                         a++;
                 }
 
