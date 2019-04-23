@@ -47,7 +47,7 @@
 
 ** Step 2: run tests
 
-   #+BEGIN_SRC sh :session one 
+   #+BEGIN_SRC sh :session onesh
      cd ~/data/bb3_release
      mkdir -p tmp_aln
      cd tmp_aln 
@@ -59,7 +59,7 @@
    |                                                             |
    | sh-4.4$ sh-4.4$ sh-4.4$ /home/user/data/bb3_release/tmp_aln |
 
-   #+BEGIN_SRC sh :session one :results raw 
+   #+BEGIN_SRC sh :session onesh :results raw 
      find ~/data -name "*.msf" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign %s %s/%s_%skalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_kalign.sh
 
      find ~/data -name "*.msf" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%skalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > score_kalign.sh
@@ -74,8 +74,26 @@
 
    run the tests 
 
-#+BEGIN_SRC sh :session one 
-  ./run_kalign.sh 
-  ./score_kalign.sh | grep auto > scores.csv
+   #+BEGIN_SRC sh :session onesh
+     ./run_kalign.sh 
+     ./score_kalign.sh | grep auto > scores.csv
 
-#+END_SRC
+   #+END_SRC
+
+
+** Step 3: plot scores 
+
+   #+BEGIN_SRC R :session  one 
+
+     library(tidyverse)
+     library(ggplot2)
+
+
+     mat <- read.table("scores.csv") 
+     colnames(mat) <- c("NA","NAME","SP","TC")
+     mat$NAME <- gsub("/home/user/data/bb3_release/tmp_aln/","", mat$NAME)
+     mat$NAME <- gsub("kalign.msf","", mat$NAME)
+
+   #+END_SRC
+
+   #+RESULTS:
