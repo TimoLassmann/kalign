@@ -1,0 +1,18 @@
+#+TITLE:  Plan
+#+AUTHOR: Timo Lassmann
+#+EMAIL:  timo.lassmann@telethonkids.org.au
+#+DATE:   2019-04-23
+#+LATEX_CLASS: report
+#+OPTIONS:  toc:nil
+#+OPTIONS: H:4
+#+LATEX_CMD: pdflatex
+* Introduction 
+  There are a number of improvements that can be made to the original kalign algorithm. 
+  1) heuristic tree building - speed 
+  2) estimate alignment parameters (ala delve) - accuracy  
+  3) run multiple MSA and combine using mumsa - accuracy
+
+
+
+
+
