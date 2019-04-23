@@ -6,7 +6,6 @@ AC_PROG_INSTALL
 AC_PROG_RANLIB
 AM_SILENT_RULES([no])
 
-AC_CONFIG_HEADERS([config.h])
 
 
 # Checks for programs.

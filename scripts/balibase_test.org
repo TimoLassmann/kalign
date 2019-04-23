@@ -1,0 +1,81 @@
+#+TITLE:  Test kalign on BAliBASE 
+#+AUTHOR: Timo Lassmann
+#+EMAIL:  timo.lassmann@telethonkids.org.au
+#+DATE:   2019-04-23
+#+LATEX_CLASS: report
+#+OPTIONS:  toc:nil
+#+OPTIONS: H:4
+#+LATEX_CMD: pdflatex
+* Introduction 
+  Let's run kalign on the core BAliBASE test alignments. 
+
+* Method 
+
+** Step 1: install balibase 
+
+   #+BEGIN_SRC sh
+     cd 
+     mkdir -p data
+     cd data
+     if [ ! -f BAliBASE_R1-5.tar.gz ]; then
+         wget http://www.lbgi.fr/balibase/BalibaseDownload/BAliBASE_R1-5.tar.gz
+         tar -zxvf  BAliBASE_R1-5.tar.gz
+     fi
+   #+END_SRC
+
+   #+RESULTS:
+
+   BAliBASE comes with a C program to score alignments. Unfortunately, something is wrong with the bundled expat library. To fix this install expat system and remove the links to the bundled library by editing the makefile: 
+
+   #+BEGIN_EXAMPLE makefile 
+   CC	= cc
+   CFLAGS  = -c -O #-I$(EXPAT_INC)
+   LFLAGS	= -O -lm -lexpat #-L$(EXPAT_LIB) -lexpat
+   EXPAT_LIB	= expat-1.95.2/lib
+   EXPAT_INC	= expat-1.95.2/include
+   #+END_EXAMPLE
+   
+   Then compile:
+
+   #+BEGIN_SRC sh 
+     cd ~/data/bb3_release/bali_score_src
+     make 
+   #+END_SRC
+
+   #+RESULTS:
+   : cc -o bali_score readxml.o init.o util.o bali_score.o -O -lm  -lexpat
+
+** Step 2: run tests
+
+   #+BEGIN_SRC sh :session one 
+     cd ~/data/bb3_release
+     mkdir -p tmp_aln
+     cd tmp_aln 
+     KALIGNOUTDIR=$PWD 
+     echo $KALIGNOUTDIR
+   #+END_SRC
+
+   #+RESULTS:
+   |                                                             |
+   | sh-4.4$ sh-4.4$ sh-4.4$ /home/user/data/bb3_release/tmp_aln |
+
+   #+BEGIN_SRC sh :session one :results raw 
+     find ~/data -name "*.msf" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign %s %s/%s_%skalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_kalign.sh
+
+     find ~/data -name "*.msf" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%skalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > score_kalign.sh
+
+
+     chmod 755 run_kalign.sh 
+     chmod 755 score_kalign.sh
+   #+END_SRC
+
+   #+RESULTS:
+
+
+   run the tests 
+
+#+BEGIN_SRC sh :session one 
+  ./run_kalign.sh 
+  ./score_kalign.sh | grep auto > scores.csv
+
+#+END_SRC

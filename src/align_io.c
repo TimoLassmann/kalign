@@ -109,7 +109,7 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
         if(aln->numseq < 2){
                 ERROR_MSG("No sequences could be read.");
         }
-        LOG_MSG("%s %s", param->outfile, param->format);
+        //LOG_MSG("%s %s", param->outfile, param->format);
         if(!param->format && param->outfile){
                 if (byg_start("msf",param->outfile) != -1){
                         param->format = "msf";
@@ -1888,7 +1888,7 @@ int count_sequences_and_detect(struct align_io_buffer* b)
                         }else{
                                 b->numseq += in->input_numseq;
                         }
-                        fprintf(stdout,"%d\n",b->numseq);
+                        //fprintf(stdout,"%d\n",b->numseq);
                 }
         }
         return OK;

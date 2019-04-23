@@ -276,10 +276,10 @@ int main(int argc, char *argv[])
                 }
         }
 
-        for (i = 0; i< param->num_infiles; i++){
+        /*for (i = 0; i< param->num_infiles; i++){
                 fprintf(stdout, "%d %s\n", i, param->infile[i]);
 
-        }
+                }*/
 
         //exit(0);
         if(!strncmp("pairwise", param->alignment_type, 8)){
@@ -345,7 +345,7 @@ int run_kalign(struct parameters* param)
         RUN(detect_dna(aln));
         LOG_MSG("Detected: %d sequences.", aln->numseq);
         LOG_MSG("Output is %s in format %s.", param->outfile,param->format);
-        LOG_MSG("Is DNA: %d", aln->dna);
+        //LOG_MSG("Is DNA: %d", aln->dna);
         param->dna = aln->dna;
         /* If we just want to reformat end here */
         if(param->reformat){
@@ -362,13 +362,13 @@ int run_kalign(struct parameters* param)
         }
         /* allocate aln parameters  */
         RUNP(ap = init_ap(param,aln->numseq));
-        fprintf(stderr,"        %0.8f	gap open penalty\n",ap->gpo);
+        //fprintf(stderr,"        %0.8f	gap open penalty\n",ap->gpo);
         //fprintf(stderr,"        %0.8f	gap extension\n",(float)gpe/10);
-        fprintf(stderr,"        %0.8f	gap extension\n",ap->gpe);
+        //fprintf(stderr,"        %0.8f	gap extension\n",ap->gpe);
         //fprintf(stderr,"        %0.8f	terminal gap penalty\n",(float)tgpe/10);
-        fprintf(stderr,"        %0.8f	terminal gap penalty\n",ap->tgpe);
+        //fprintf(stderr,"        %0.8f	terminal gap penalty\n",ap->tgpe);
         //fprintf(stderr,"        %0.8f	bonus\n",param->secret/10);
-        fprintf(stderr,"        %0.8f	bonus\n",param->secret);
+        //fprintf(stderr,"        %0.8f	bonus\n",param->secret);
 
         /* build tree */
 
