@@ -16,7 +16,7 @@ AC_PROG_RANLIB
 AC_CHECK_LIB([pthread], [main])
 
 # Checks for header files.
-AC_CHECK_HEADERS([float.h stdlib.h unistd.h])
+AC_CHECK_HEADERS([math.h float.h stdlib.h unistd.h])
 
 tldevel_check_f=$ac_abs_confdir/tldevel/README
 
