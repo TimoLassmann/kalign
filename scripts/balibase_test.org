@@ -83,16 +83,37 @@
 
      find ~/data/bb3_release -name "*.tfa"  | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "clustalo --dealign -i  %s --outfmt=msf -o %s/%s_%sclustalo.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_clustalo.sh
 
+find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/);
+printf "kalign %s -gpo 25 -gpe 2 -o %s/%s_%skalign_1.msf\n", $1,outdir,a[n-2],a[n-1] ;
+printf "kalign %s -gpo 35 -gpe 4 -o %s/%s_%skalign_2.msf\n", $1,outdir,a[n-2],a[n-1] ;
+printf "kalign %s -gpo 45 -gpe 6 -o %s/%s_%skalign_3.msf\n", $1,outdir,a[n-2],a[n-1] ;
+printf "kalign %s -gpo 55 -gpe 8 -o %s/%s_%skalign_4.msf\n", $1,outdir,a[n-2],a[n-1] ;
+printf "kalign %s -gpo 65 -gpe 10 -o %s/%s_%skalign_5.msf\n", $1,outdir,a[n-2],a[n-1] ;
+printf "kalign %s -gpo 75 -gpe 12 -o %s/%s_%skalign_6.msf\n", $1,outdir,a[n-2],a[n-1] ;
+printf "kalign %s -gpo 85 -xgpe 14 -o %s/%s_%skalign_7.msf\n", $1,outdir,a[n-2],a[n-1] ;
+printf "cmsa -a %s/%s_%skalign_*.msf -out %s/%s_%skalign_cmsa.msf -f msf \n",outdir,a[n-2],a[n-1],outdir,a[n-2],a[n-1] ;
+}' > run_kalign_cmsa.sh
 
-     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%skalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > alignment_scores.sh
-
-find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%sclustalo.msf\n", $1,outdir,a[n-2],a[n-1] }' >> alignment_scores.sh
+chmod 755 run_kalign_cmsa.sh 
 
 
      chmod 755 run_kalign.sh 
      chmod 755 run_clustalo.sh
-     chmod 755 alignment_scores.sh
+
    #+END_SRC
+
+   #+RESULTS:
+
+   #+BEGIN_SRC sh :session onesh :results raw 
+     
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%skalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > alignment_scores.sh
+
+find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%sclustalo.msf\n", $1,outdir,a[n-2],a[n-1] }' >> alignment_scores.sh
+
+find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%skalign_cmsa.msf\n", $1,outdir,a[n-2],a[n-1] }' >> alignment_scores.sh
+chmod 755 alignment_scores.sh
+   #+END_SRC
+
 
    #+RESULTS:
 
@@ -101,40 +122,44 @@ find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split 
    #+BEGIN_SRC sh :session onesh
      parallel --jobs 5 < ./run_kalign.sh 
      parallel --jobs 5 < ./run_clustalo.sh 
-     ./alignment_scores.sh | grep auto > scores.csv
+     ./alignment_scores.sh | grep auto > scores2.csv
 
    #+END_SRC
 
 
 ** Step 3: plot scores 
 
-   #+BEGIN_SRC R :session  one 
+   #+BEGIN_SRC R :session  one :results none :export none 
 
           library(tidyverse)
           library(ggplot2)
           library(stringi)
 
-          mat <- read.table("scores.csv") 
-          colnames(mat) <- c("NA","NAME","SP","TC")
-          mat$NAME <-   gsub("/home/user/data/bb3_release_tmp_aln/","", mat$NAME)
-          mat$NAME <- gsub("kalign.msf","", mat$NAME)
-          x = str_split(mat$NAME, "_", n = Inf, simplify = TRUE)
+          mat <- read.table("scores2.csv") 
+          colnames(mat) <- c("Type","Name","SP","TC")
+
+     mat$Type <- mat$Name
+          mat$Type <- sub(".*kalign[_]cmsa.*", "cmsa", mat$Type, ignore.case = TRUE)
+     mat$Type <- sub(".*kalign.msf", "kalign", mat$Type, ignore.case = TRUE)
+     mat$Type <- sub(".*clustalo.*", "clustalo", mat$Type, ignore.case = TRUE)
+
+
+     mat$Name <- sub(".*/" ,"", mat$Name)
+     mat$Name <- sub("[A-Z,_]*[.]{1}[A-Z]*$" ,"", mat$Name,ignore.case = TRUE)
+     mat <- as.tibble(mat)
+
+
+          x = str_split(mat$Name, "_", n = Inf, simplify = TRUE)
           mat$Group <- x[,1] 
-          summary(mat)
+
    #+END_SRC
 
-   #+RESULTS:
-   | auto:386 | Length:386       | Min.   :0.1050 | Min.   :0.0000 | Length:386       |
-   | nil      | Class :character | 1st Qu.:0.7730 | 1st Qu.:0.3300 | Class :character |
-   | nil      | Mode  :character | Median :0.8875 | Median :0.5700 | Mode  :character |
-   | nil      | nil              | Mean   :0.8365 | Mean   :0.5215 | nil              |
-   | nil      | nil              | 3rd Qu.:0.9460 | 3rd Qu.:0.7575 | nil              |
-   | nil      | nil              | Max.   :1.0000 | Max.   :1.0000 | nil              |
+
    
 
    #+BEGIN_SRC R :session one :results output graphics :file BalibaseSP_scores.jpeg :exports both :width 160 :height 80
-p <- ggplot(mat, aes(Group, SP))
-p <- p + geom_boxplot()
+f <- ggplot(mat, aes(Group, SP))
+f <- f + geom_boxplot(aes(colour = Type))
 
  filename <- "BalibaseSP_scores.jpeg"
 
@@ -148,9 +173,11 @@ p <- p + geom_boxplot()
 
    #+BEGIN_SRC R :session one :results output graphics :file BalibaseTC_scores.jpeg :exports both :width 160 :height 80
 p <- ggplot(mat, aes(Group, TC))
-p <- p + geom_boxplot()
+p <- p + geom_boxplot(aes(colour = Type))
 
  filename <- "BalibaseTC_scores.jpeg"
+
+
 
      ggsave(filename,p, dpi = 300,width = 160, height = 80, unit = "mm")
 

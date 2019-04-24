@@ -105,7 +105,6 @@ int build_tree(struct alignment* aln,struct parameters* param, struct aln_param*
         //print_tree(tree2,aln,param->print_tree);
         //}
 
-
         tree[0] = 1;
 
         if(param->ntree > 2){
@@ -119,9 +118,6 @@ int build_tree(struct alignment* aln,struct parameters* param, struct aln_param*
                 free(tree2->internal_lables);
                 free(tree2);
         }
-
-
-
         return OK;
 ERROR:
         return FAIL;
@@ -704,9 +700,7 @@ struct aln_tree_node* real_upgma(float **dm,int ntree,int numseq)
                 for ( i =2;i < (ntree+(ntree-1));i++){
                         tmp->links[i] = 0;
                         tmp->internal_lables[i] = 0;
-
                 }
-
 
                 tree[node_a] = tmp;
                 tree[node_b] = 0;
@@ -719,7 +713,7 @@ struct aln_tree_node* real_upgma(float **dm,int ntree,int numseq)
                 /*calculate new distances*/
                 for (j = numseq;j--;){
                         if (j != node_b){
-                                dm[node_a][j] = (dm[node_a][j] + dm[node_b][j])*0.5;
+                                dm[node_a][j] = (dm[node_a][j] + dm[node_b][j])*0.5f;
                         }
                 }
                 dm[node_a][node_a] = 0.0f;
