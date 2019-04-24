@@ -9,17 +9,19 @@
 /* need forward backward  */
 /* or be adventurous and use beam sampling with u =1 i.e. no threshold ... worth a try?  */
 
-struct point{
-        float M;
-        float X;
-        float Y;
-        float null;
-
-};
-
 struct phmm{
-        struct point* m;
-        int alloc_m;
+
+        float** fM ;
+        float** fX ;
+        float** fY ;
+
+        float** bM ;
+        float** bX ;
+        float** bY ;
+
+
+        int alloc_x;
+        int alloc_y;
 
         float emit_M[26][26];
         float emit_background[26];
@@ -36,14 +38,19 @@ struct phmm{
         float epsilon_e;         /* gap extension */
         float theta_e;          /* exit model */
         float eta_e;             /* exit random  */
+
+        float f_score;
+        float b_score;
 };
 
 int forward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b);
+int backward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b);
+
 
 int simple_init(struct phmm*phmm);
 /* memory functions */
-struct phmm* alloc_phmm(int x, int y);
-int realloc_phmm(struct phmm* phmm, int x, int y);
+struct phmm* alloc_phmm(int size);
+
 void free_phmm(struct phmm* phmm);
 
 int main(int argc, char *argv[])
@@ -55,8 +62,42 @@ int main(int argc, char *argv[])
         int len_a = 5;
         int len_b = 5;
 
-        RUNP(phmm = alloc_phmm(len_a,len_b));
+        int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
+
+        /* example from biological sequence analysis */
+
+        len_a = 7;
+        len_b = 10;
+        MMALLOC(seqa, sizeof(int) * len_a);
+        MMALLOC(seqb, sizeof(int) * len_b);
+
+        seqa[0] = aacode['P'-65];
+        seqa[1] = aacode['A'-65];
+        seqa[2] = aacode['W'-65];
+        seqa[3] = aacode['H'-65];
+        seqa[4] = aacode['E'-65];
+        seqa[5] = aacode['A'-65];
+        seqa[6] = aacode['E'-65];
+
+        seqb[0] = aacode['H'-65];
+        seqb[1] = aacode['E'-65];
+        seqb[2] = aacode['A'-65];
+        seqb[3] = aacode['G'-65];
+        seqb[4] = aacode['A'-65];
+        seqb[5] = aacode['W'-65];
+        seqb[6] = aacode['G'-65];
+        seqb[7] = aacode['H'-65];
+        seqb[8] = aacode['E'-65];
+        seqb[9] = aacode['E'-65];
+
+
+
+        RUNP(phmm = alloc_phmm(MACRO_MAX(len_a,len_b)));
         RUN(simple_init(phmm));
+
+        RUN(forward_phmm(phmm, seqa, seqb, len_a, len_b));
+        RUN(backward_phmm(phmm, seqa, seqb, len_a, len_b));
+        fprintf(stdout,"%f\tforward\n%f\tbackward\n",phmm->f_score, phmm->b_score);
         free_phmm(phmm);
         return EXIT_SUCCESS;
 ERROR:
@@ -66,8 +107,7 @@ ERROR:
 
 int forward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
 {
-        struct point* prev;
-        struct point* cur;
+
         int i,j;
         int* sa = seq_a -1;
         int* sb = seq_b -1;
@@ -79,71 +119,171 @@ int forward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
         const float XX = phmm->epsilon;
         const float YY = phmm->epsilon;
 
-        /*const tAA = prob2scaledprob(1.0f - scaledprob2prob(phmm->eta));
+
+        float** M = phmm->fM;
+        float** X = phmm->fX;
+        float** Y = phmm->fY;
+/*const tAA = prob2scaledprob(1.0f - scaledprob2prob(phmm->eta));
         const tBB = prob2scaledprob(1.0f - scaledprob2prob(phmm->eta));
         const tAM = phmm->eta;
         const tBM = phmm->eta;*/
 
-        cur = phmm->m;
-
-
-        prev = phmm->m;
-
-
-
         /* init first element  */
-        cur[0].M  = prob2scaledprob(1.0f);
-        cur[0].X = prob2scaledprob(0.0f);
-        cur[0].Y = prob2scaledprob(0.0f);
+        M[0][0] = prob2scaledprob(1.0f);
+        X[0][0] = prob2scaledprob(0.0f);
+        Y[0][0] = prob2scaledprob(0.0f);
 
-        for(j = 1;j <= len_b;j++){
-                cur[j].M = prob2scaledprob(0.0f);
-                cur[j].X =                  cur[j-1].M + MX;
-                cur[j].X = logsum(cur[j].X, cur[j-1].X + XX);
-                cur[j].X += phmm->emit_background[sb[j]];
-                cur[j].Y = prob2scaledprob(0.0f);
-                //phmm->m[j].M
+        for(j = 1; j<= len_b;j++){
+                M[0][j] = prob2scaledprob(0.0f);
 
+                X[0][j] = prob2scaledprob(0.0f);
+
+                Y[0][j] =                 M[0][j-1] + MY;
+                Y[0][j] = logsum(Y[0][j], Y[0][j-1] + YY);
+                Y[0][j] += phmm->emit_background[sb[j]];
         }
-
-        cur += len_b+1;
-        /* init top row
- */
 
         for(i = 1; i <= len_a;i++){
-                cur[0].M = prob2scaledprob(0.0f);
-                cur[0].X = prob2scaledprob(0.0f);
+                M[i][0] = prob2scaledprob(0.0f);
 
-                cur[0].Y = prev[0].M + MY;
-                cur[0].Y = logsum(cur[0].Y,  prev[0].Y + YY);
-                cur[0].Y += phmm->emit_background[sa[i]];
-                for(j = 1;j <= len_b;j++){
+                X[i][0] =                 M[i-1][0] + MX;
+                X[i][0] = logsum(X[i][0], X[i-1][0] + XX);
+                X[i][0] += phmm->emit_background[sa[i]];
 
-                        cur[j].M =                 prev[j-1].M + MM;
-                        cur[j].M = logsum(cur[j].M,prev[j-1].X + XM);
-                        cur[j].M = logsum(cur[j].M,prev[j-1].Y + YM);
-                        cur[j].M += phmm->emit_M[sa[i]][sb[j]];
+                Y[i][0] = prob2scaledprob(0.0f);
 
-                        cur[j].X =                  cur[j-1].M + MX;
-                        cur[j].X = logsum(cur[j].X, cur[j-1].X + XX);
-                        cur[j].X += phmm->emit_background[sb[j]];
+                for(j = 1; j<= len_b;j++){
+                        M[i][j] = M[i-1][j-1] + MM;
+                        M[i][j] = logsum(M[i][j], X[i-1][j-1] + XM);
+                        M[i][j] = logsum(M[i][j], Y[i-1][j-1] + YM);
+                        M[i][j] += phmm->emit_M[sa[i]][sb[j]];
 
-                        cur[j].Y =                   prev[j].M + MY;
-                        cur[j].Y = logsum(cur[j].Y,  prev[j].Y + YY);
-                        cur[j].Y += phmm->emit_background[sa[i]];
+                        X[i][j] =                 M[i-1][j] + MX;
+                        X[i][j] = logsum(X[i][j], X[i-1][j] + XX);
+                        X[i][j] += phmm->emit_background[sa[i]];
 
-
-                        //phmm->m[j].M
-
+                        Y[i][j] =                 M[i][j-1] + MY;
+                        Y[i][j] = logsum(Y[i][j], Y[i][j-1] + YY);
+                        Y[i][j] += phmm->emit_background[sb[j]];
                 }
-                prev =cur;
-                cur += len_b+1;
+
         }
 
-
+        phmm->f_score =                      M[len_a][len_b] + phmm->theta;
+        phmm->f_score = logsum(phmm->f_score,X[len_a][len_b] + phmm->theta);
+        phmm->f_score = logsum(phmm->f_score,Y[len_a][len_b] + phmm->theta);
 
         return OK;
 }
+
+
+int backward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
+{
+
+        int i,j;
+        int* sa = seq_a -1;
+        int* sb = seq_b -1;
+        const float MM = prob2scaledprob(1.0f - 2.0f * scaledprob2prob(phmm->delta) - scaledprob2prob(phmm->theta));
+        const float MX = phmm->delta;
+        const float MY = phmm->delta;
+        const float XM = prob2scaledprob(1.0 - scaledprob2prob(phmm->epsilon) - scaledprob2prob(phmm->theta));
+        const float YM = XM;
+        const float XX = phmm->epsilon;
+        const float YY = phmm->epsilon;
+
+
+        float** M = phmm->bM;
+        float** X = phmm->bX;
+        float** Y = phmm->bY;
+/*const tAA = prob2scaledprob(1.0f - scaledprob2prob(phmm->eta));
+        const tBB = prob2scaledprob(1.0f - scaledprob2prob(phmm->eta));
+        const tAM = phmm->eta;
+        const tBM = phmm->eta;*/
+
+        /* init first element  */
+        M[len_a][len_b] = phmm->theta + phmm->emit_M[sa[len_a]][sb[len_b]];
+        X[len_a][len_b] = phmm->theta + phmm->emit_background[sa[len_a]];
+        Y[len_a][len_b] = phmm->theta + phmm->emit_background[sb[len_b]];
+
+
+        for(j = len_b-1; j >= 1;j--){
+                M[len_a][j] = prob2scaledprob(0.0f);
+
+                X[len_a][j] = prob2scaledprob(0.0f);
+
+                Y[len_a][j] =                     M[len_a][j+1] + YM;
+                Y[len_a][j] = logsum(Y[len_a][j], Y[len_a][j+1] + YY);
+                Y[len_a][j] += phmm->emit_background[sb[j]];
+        }
+        /* top right corner */
+        M[len_a][0] = prob2scaledprob(0.0f);
+        X[len_a][0] = prob2scaledprob(0.0f);
+        Y[len_a][0] = prob2scaledprob(0.0f);
+
+
+        for(i = len_a-1; i >= 1;i--){
+
+                M[i][len_b] = X[i+1][len_b] + MX;
+                M[i][len_b] += phmm->emit_M[sa[i]][sb[len_b]];
+
+                X[i][len_b] = X[i+1][len_b] + XX;
+                X[i][len_b] += phmm->emit_background[sa[i]];
+
+                Y[i][len_a] =prob2scaledprob(0.0f);
+
+                for(j = len_b-1; j >=1;j--){
+
+                        M[i][j] = M[i+1][j+1] + MM;
+                        M[i][j] = logsum(M[i][j], X[i+1][j] + MX);
+                        M[i][j] = logsum(M[i][j], Y[i][j+1] + MY);
+                        M[i][j] += phmm->emit_M[sa[i]][sb[j]];
+
+
+                        X[i][j] =                 M[i+1][j+1] + XM;
+                        X[i][j] = logsum(X[i][j], X[i+1][j] + XX);
+                        X[i][j] += phmm->emit_background[sa[i]];
+
+                        Y[i][j] =                 M[i+1][j+1] + YM;
+                        Y[i][j] = logsum(Y[i][j], Y[i][j+1] + YY);
+                        Y[i][j] += phmm->emit_background[seq_b[j]];
+                }
+                M[i][0] = prob2scaledprob(0.0f);
+
+                X[i][0] =               M[i+1][j+1] + XM;
+                X[i][0] = logsum(X[i][j], X[i+1][j] + XX);
+                X[i][0] += phmm->emit_background[sa[i]];
+
+                Y[i][0] = prob2scaledprob(0.0f); /* dead end */
+        }
+
+        /* first column */
+        /* bottom right corner */
+
+        M[0][len_b] = prob2scaledprob(0.0f);
+        X[0][len_b] = prob2scaledprob(0.0f);
+        Y[0][len_b] = prob2scaledprob(0.0f);
+
+        for(j = len_b-1; j >=1;j--){
+
+
+                M[0][j] = prob2scaledprob(0.0f);
+
+                X[0][j] = prob2scaledprob(0.0f); /* dead end */
+
+                Y[0][j] =                 M[1][j+1] + YM;
+                Y[0][j] = logsum(Y[0][j], Y[0][j+1] + YY);
+                Y[0][j] += phmm->emit_background[seq_b[j]];
+        }
+
+        M[0][0] = M[1][1] + MM;
+        M[0][0] = logsum(M[0][0], X[1][0] + MX);
+        M[0][0] = logsum(M[0][0], Y[0][1] + MY);
+        phmm->b_score = M[0][0];
+
+        return OK;
+}
+
+
 
 int simple_init(struct phmm*phmm)
 {
@@ -188,7 +328,7 @@ int simple_init(struct phmm*phmm)
 
 
 
-struct phmm* alloc_phmm(int x, int y)
+struct phmm* alloc_phmm(int size)
 {
         struct phmm* phmm = NULL;
 
@@ -196,10 +336,23 @@ struct phmm* alloc_phmm(int x, int y)
 
         MMALLOC(phmm, sizeof(struct phmm));
 
-        phmm->m = NULL;
-        phmm->alloc_m = (x+2) * (y+2);
 
-        MMALLOC(phmm->m, sizeof(struct point) * phmm->alloc_m);
+
+        phmm->fM = NULL;
+        phmm->fX = NULL;
+        phmm->fY = NULL;
+
+        phmm->bM = NULL;
+        phmm->bX = NULL;
+        phmm->bY = NULL;
+
+        phmm->fM = galloc(phmm->fM,size+2, size+2,0.0f);
+        phmm->fX = galloc(phmm->fX,size+2, size+2,0.0f);
+        phmm->fY = galloc(phmm->fY,size+2, size+2,0.0f);
+
+        phmm->bM = galloc(phmm->bM,size+2, size+2,0.0f);
+        phmm->bX = galloc(phmm->bX,size+2, size+2,0.0f);
+        phmm->bY = galloc(phmm->bY,size+2, size+2,0.0f);
 
 
         return phmm;
@@ -208,25 +361,18 @@ ERROR:
         return NULL;
 }
 
-int realloc_phmm(struct phmm* phmm, int x, int y)
-{
-        int size = (x+2)*(y+2);
-        if(size > phmm->alloc_m){
-                phmm->alloc_m = size;
-                MREALLOC(phmm->m, sizeof(struct point) * phmm->alloc_m);
-        }
-        return OK;
-ERROR:
-
-        return FAIL;
-}
-
 void free_phmm(struct phmm* phmm)
 {
         if(phmm){
-                if(phmm->m){
-                        MFREE(phmm->m);
-                }
+
+                gfree(phmm->fM);
+                gfree(phmm->fX);
+                gfree(phmm->fY);
+
+                gfree(phmm->bM);
+                gfree(phmm->bX);
+                gfree(phmm->bY);
+
                 MFREE(phmm);
         }
 }
