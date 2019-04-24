@@ -16,7 +16,7 @@ MYLIBDIRS = ../tldevel/libtldevel.a
 MYINCDIRS = -I${top_builddir}/${LIB_TLDEVELDIR} \
             -I${top_srcdir}/${LIB_TLDEVELDIR}
 
-LIBS = ${MYLIBDIRS} $(HDF5_LDFLAGS)  $(HDF5_LIBS) -lpthread
+LIBS = ${MYLIBDIRS} $(HDF5_LDFLAGS)  $(HDF5_LIBS) -lpthread -lm
 
 
 #     AC_SUBST(HDF5_CFLAGS)
@@ -30,8 +30,10 @@ AM_CPPFLAGS=${MYINCDIRS} ${HDF5_CPPFLAGS}
 
 #LOGO_SOURCES = motif_logo.c motif_logo.h
 
-bin_PROGRAMS =  kalign
+bin_PROGRAMS =  kalign phmm
 
+phmm_SOURCES = phmm.h phmm.c
+phmm_LDADD = $(MYLIBDIRS)
 
 kalign_SOURCES = run_kalign.c \
 global.h \
