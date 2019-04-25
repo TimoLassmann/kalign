@@ -377,7 +377,11 @@ int collect_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
                         //M[i][j] = logsum(M[i][j], Y[i-1][j-1] + YM);
                         eTM = logsum(eTM,fY[i-1][j-1] + YM + bM[i][j] + phmm->emit_M[sa[i]][sb[j]] - score);
                         //M[i][j] += phmm->emit_M[sa[i]][sb[j]];
-                        phmm->emit_M_e[sa[i]][sb[j]] = logsum(phmm->emit_M_e[sa[i]][sb[j]], fM[i][j] + bM[i][i] - score);
+                        if(sa[i] < sb[j]){
+                                phmm->emit_M_e[sa[i]][sb[j]] = logsum(phmm->emit_M_e[sa[i]][sb[j]], fM[i][j] + bM[i][i] - score);
+                        }else{
+                                phmm->emit_M_e[sb[j]][sa[i]] = logsum(phmm->emit_M_e[sb[j]][sa[i]], fM[i][j] + bM[i][i] - score);
+                        }
 
 
                         //X[i][j] =                 M[i-1][j] + MX;
@@ -496,8 +500,12 @@ int re_estimate(struct phmm* phmm)
         }
 
         for(i = 0; i < L;i++){
-                for(j = 0; j < L;j++){
+                for(j = i+1; j < L;j++){
                         phmm->emit_M[i][j] = phmm->emit_M_e[i][j] - sum;
+                        phmm->emit_M[j][i] = phmm->emit_M[i][j];
+                        //fprintf(stdout,"%0.2f ",scaledprob2prob(phmm->emit_M[i][j]));
+                }
+                for(j = 0; j < L;j++){
                         fprintf(stdout,"%0.2f ",scaledprob2prob(phmm->emit_M[i][j]));
                 }
                 fprintf(stdout,"\n");
