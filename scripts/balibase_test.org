@@ -75,8 +75,8 @@
    #+END_SRC
 
    #+RESULTS:
-   |                                                                             |
-   | sh-4.4$ sh-4.4$ sh-4.4$ sh-4.4$ sh-4.4$ /home/user/data/bb3_release_tmp_aln |
+   |                                                                                     |
+   | sh-4.4$ sh-4.4$ sh-4.4$ sh-4.4$ sh-4.4$ sh-4.4$ /home/user/data/bb3_release_tmp_aln |
 
    #+BEGIN_SRC sh :session onesh :results raw 
      find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign %s -o %s/%s_%skalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_kalign.sh
@@ -131,39 +131,39 @@ chmod 755 alignment_scores.sh
 
    #+BEGIN_SRC R :session  one :results none :export none 
 
-          library(tidyverse)
-          library(ggplot2)
-          library(stringi)
+     library(tidyverse)
+     library(ggplot2)
+     library(stringi)
 
-          mat <- read.table("scores2.csv") 
-          colnames(mat) <- c("Type","Name","SP","TC")
+     readBaliscores <-function(file,name){
+       mat  <- read.table(file);
+       colnames(mat) <- c("Type","Name","SP","TC")
+       mat$Type <- name
+       mat$Name <- sub(".*/" ,"", mat$Name)
+       mat$Name <- sub("[A-Z,_]*[.]{1}[A-Z]*$" ,"", mat$Name,ignore.case = TRUE)
+       mat <- as.tibble(mat)
+       x = str_split(mat$Name, "_", n = Inf, simplify = TRUE)
+       mat$Group <- x[,1] 
+       return(mat)
 
-     mat$Type <- mat$Name
-          mat$Type <- sub(".*kalign[_]cmsa.*", "cmsa", mat$Type, ignore.case = TRUE)
-     mat$Type <- sub(".*kalign.msf", "kalign", mat$Type, ignore.case = TRUE)
-     mat$Type <- sub(".*clustalo.*", "clustalo", mat$Type, ignore.case = TRUE)
+     }
 
-
-     mat$Name <- sub(".*/" ,"", mat$Name)
-     mat$Name <- sub("[A-Z,_]*[.]{1}[A-Z]*$" ,"", mat$Name,ignore.case = TRUE)
-     mat <- as.tibble(mat)
-
-
-          x = str_split(mat$Name, "_", n = Inf, simplify = TRUE)
-          mat$Group <- x[,1] 
-
+     
    #+END_SRC
 
 
    
 
    #+BEGIN_SRC R :session one :results output graphics :file BalibaseSP_scores.jpeg :exports both :width 160 :height 80
-f <- ggplot(mat, aes(Group, SP))
-f <- f + geom_boxplot(aes(colour = Type))
+     mat <- readBaliscores("scores2.csv","oldkalign")
+     mat <- rbind(mat,readBaliscores("scores.csv","balikalign"))
 
- filename <- "BalibaseSP_scores.jpeg"
+     p <- ggplot(mat, aes(Group, SP))
+          p <- p + geom_boxplot(aes(colour = Type))
+p
+          filename <- "BalibaseSP_scores.jpeg"
 
-     ggsave(filename,p, dpi = 300,width = 160, height = 80, unit = "mm")
+          ggsave(filename,p, dpi = 300,width = 160, height = 80, unit = "mm")
 
    #+END_SRC
 

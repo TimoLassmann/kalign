@@ -115,16 +115,34 @@ int pair_fill(struct counts* ap, int*a,int*b,int len)
         int i;
         int state = 1;          /* match - 0 is a gap */
         int p_aln_len = 0;
+        int begin = 0;
+        int end = 0;
         for(i = 0;i < len;i++){
+                if(a[i] != -1 && b[i] != -1){ /* aligned residues  */
+                        begin = i;
+                        break;
+                }
+        }
+        for(i = len-1; i>= 0;i--){
+                if(a[i] != -1 && b[i] != -1){ /* aligned residues  */
+                        end = i;
+                        break;
+                }
+
+        }
+
+
+        for(i = begin;i < end;i++){
                 if(a[i] == -1 && b[i] == -1){ /* two gaps do nothing */
 
                 }else if(a[i] != -1 && b[i] != -1){ /* aligned residues  */
+
                         if(state == 0){
                                 ap->TM++;
                         }else{
                                 ap->MM++;
                         }
-                        if(a[i] < b[i]){
+                        if(a[i] > b[i]){
                                 ap->emit[a[i]][b[i]]++;
                         }else{
                                 ap->emit[b[i]][a[i]]++;
@@ -170,9 +188,9 @@ struct counts* init_counts(void)
         MMALLOC(ap, sizeof(struct counts));
 
         for(i = 0; i < 26;i++){
-                ap->back[i] = 0.0;
+                ap->back[i] = 1.0;
                 for(j = 0; j < 26;j++){
-                        ap->emit[i][j] = 0.0;
+                        ap->emit[i][j] = 1.0;
                 }
         }
         ap->MM = 0.0;
@@ -203,12 +221,12 @@ int normalize_counts(struct counts*ap)
         }
         sum = 0.0;
         for(i = 0; i < 26;i++){
-                for(j = i; j < 26;j++){
+                for(j = 0; j <= i;j++){
                         sum += ap->emit[i][j];
                 }
         }
         for(i = 0; i < 26;i++){
-                for(j = i; j < 26;j++){
+                for(j = 0; j <= i;j++){
                         ap->emit[i][j]/= sum;
                 }
         }
@@ -247,15 +265,6 @@ int normalize_counts(struct counts*ap)
 
         /* eta  */
 
-        ap->eta = 1.0 - 1.0 / (ap->eta / ap->num_seq);
-        sum = 0.0;
-
-        sum = -1.0 * log2( (ap->GPO * ap->TM) / ((ap->eta) * ap->MM));
-        fprintf(stdout,"GPO: %f\n", sum);
-        sum = -1.0 *log2(ap->GPE/(1.0 - ap->tau));
-        fprintf(stdout,"GPE: %f\n", sum);
-        sum = ap->MM / ((ap->eta)*(ap->eta));
-        fprintf(stdout,"%f\n",sum);
         return OK;
 }
 
@@ -264,35 +273,49 @@ int print_counts(struct counts* ap)
         int i,j;
 
         double sum = 0.0;
-        for(i = 0; i < 26;i++){
+
+        ap->eta = 1.0 - 1.0 / (ap->eta / ap->num_seq);
+        /*for(i = 0; i < 26;i++){
                 fprintf(stdout,"%*d ",3,i);
         }
         fprintf(stdout,"\n");
-
-        for(i = 0; i < 26;i++){
+        */
+        /*for(i = 0; i < 26;i++){
                 fprintf(stdout,"%*.2f ",3, ap->back[i]);
         }
         fprintf(stdout,"\n");
         fprintf(stdout,"\n");
+        */
+        fprintf(stdout,"float balimt[]={\n");
 
-
-        for(i = 0; i < 26;i++){
-                fprintf(stdout,"%d",i);
-                for(j = 0; j < 26;j++){
+        for(i = 0; i < 23;i++){
+                //fprintf(stdout,"%d",i);
+                for(j = 0; j <= i;j++){
                         sum = log2(ap->emit[i][j] / ( ap->back[i] * ap->back[j])) + log2(ap->MM/((ap->eta)*(ap->eta)));
-                        fprintf(stdout," %*.2f",3,sum);;
+                        fprintf(stdout," %f,",sum);;
                 }
                 fprintf(stdout,"\n");
         }
-        fprintf(stdout,"\n");
-        fprintf(stdout,"%f\tMM\n", ap->MM);
+        fprintf(stdout,"};\n");
+        /*fprintf(stdout,"%f\tMM\n", ap->MM);
         fprintf(stdout,"%f\tGPO\n", ap->GPO);
         fprintf(stdout,"%f\tGPE\n", ap->GPE);
-        fprintf(stdout,"%f\tTM\n", ap->TM);
+        fprintf(stdout,"%f\tTM\n", ap->TM);*/
         /* taushould be 1/ average length */
-        fprintf(stdout,"%f\ttau\n", ap->tau);
-        fprintf(stdout,"%f\teta\n", ap->eta);
+        /* fprintf(stdout,"%f\ttau\n", ap->tau); */
+        /* fprintf(stdout,"%f\teta\n", ap->eta); */
 
+
+        sum = 0.0;
+
+        sum = -1.0 * log2( (ap->GPO * ap->TM) / ((ap->eta) * ap->MM));
+        fprintf(stdout,"ap->gpo = %f;\n", sum);
+        sum = -1.0 *log2(ap->GPE/(1.0 - ap->tau));
+        fprintf(stdout,"ap->gpe =  %f;\n", sum);
+        fprintf(stdout,"ap->tgpe =  %f;\n", 0.0);
+        ;
+        //sum = ap->MM / ((ap->eta)*(ap->eta));
+        //fprintf(stdout,"%f\n",sum);
 
         return OK;
 }
