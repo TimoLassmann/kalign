@@ -3,9 +3,10 @@
 #include "phmm.h"
 
 
-
-
-
+#define INDEXMM 0
+#define INDEXGPO 1
+#define INDEXGPE 2
+#define INDEXTM 3
 /* need forward backward  */
 /* or be adventurous and use beam sampling with u =1 i.e. no threshold ... worth a try?  */
 
@@ -20,8 +21,6 @@ struct phmm{
         float** bY ;
 
 
-        int alloc_x;
-        int alloc_y;
 
         float emit_M[26][26];
         float emit_background[26];
@@ -29,24 +28,28 @@ struct phmm{
         float emit_M_e[26][26];
         float emit_background_e[26];
 
-        float delta;           /* gap open */
-        float epsilon;         /* gap extension */
-        float theta;          /* exit model */
-        float eta;             /* exit random  */
+        float transition[4];
+        float transition_e[4];
 
-        float delta_e;           /* gap open */
-        float epsilon_e;         /* gap extension */
-        float theta_e;          /* exit model */
-        float eta_e;             /* exit random  */
-
+        float tau;
+        float tau_e;
         float f_score;
         float b_score;
+
+        int alloc_x;
+        int alloc_y;
+        int L;                  /* alphabet len */
 };
 
 int forward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b);
 int backward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b);
+int collect_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b);
+int re_estimate(struct phmm* phmm);
 
+int phmm_transitions(struct phmm* phmm);
 int print_phmm(struct phmm* phmm,int len_a,int len_b);
+
+int clear_phmm_e(struct phmm* phmm);
 
 int simple_init(struct phmm*phmm);
 /* memory functions */
@@ -64,6 +67,7 @@ int main(int argc, char *argv[])
         int len_b = 5;
 
         int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
+
 
         /* example from biological sequence analysis */
 
@@ -96,18 +100,28 @@ int main(int argc, char *argv[])
         RUNP(phmm = alloc_phmm(MACRO_MAX(len_a,len_b)));
         RUN(simple_init(phmm));
 
+        RUN(clear_phmm_e(phmm));
+
+        //RUN(phmm_transitions(phmm));
+        for(int iter = 0;iter < 10;iter++){
+                RUN(forward_phmm(phmm, seqa, seqb, len_a, len_b));
+                RUN(backward_phmm(phmm, seqa, seqb, len_a, len_b));
 
 
-        RUN(forward_phmm(phmm, seqa, seqb, len_a, len_b));
-        RUN(backward_phmm(phmm, seqa, seqb, len_a, len_b));
-        print_phmm(phmm, len_a, len_b);
-        fprintf(stdout,"%f\tforward\n%f\tbackward\n",phmm->f_score, phmm->b_score);
+                RUN(collect_phmm(phmm, seqa, seqb, len_a, len_b));
+                RUN(re_estimate(phmm));
+
+                fprintf(stdout,"%f\tforward\n%f\tbackward\n",phmm->f_score, phmm->b_score);
+          
+        }
+        RUN(phmm_transitions(phmm));
+        //print_phmm(phmm, len_a, len_b);
         free_phmm(phmm);
+
         return EXIT_SUCCESS;
 ERROR:
         return EXIT_FAILURE;
 }
-
 
 int forward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
 {
@@ -115,13 +129,16 @@ int forward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
         int i,j;
         int* sa = seq_a -1;
         int* sb = seq_b -1;
-        const float MM = prob2scaledprob(1.0f - 2.0f * scaledprob2prob(phmm->delta) - scaledprob2prob(phmm->theta));
-        const float MX = phmm->delta;
-        const float MY = phmm->delta;
-        const float XM = prob2scaledprob(1.0 - scaledprob2prob(phmm->epsilon) - scaledprob2prob(phmm->theta));
-        const float YM = XM;
-        const float XX = phmm->epsilon;
-        const float YY = phmm->epsilon;
+        const float MM = phmm->transition[INDEXMM];
+        const float MX = phmm->transition[INDEXGPO];
+        const float MY = phmm->transition[INDEXGPO];
+        const float XX = phmm->transition[INDEXGPE];
+        const float XM = phmm->transition[INDEXTM];
+        const float YY = phmm->transition[INDEXGPE];
+        const float YM = phmm->transition[INDEXTM];
+
+
+
 
 
         float** M = phmm->fM;
@@ -137,7 +154,7 @@ int forward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
         X[0][0] = prob2scaledprob(0.0f);
         Y[0][0] = prob2scaledprob(0.0f);
 
-        for(j = 1; j<= len_b;j++){
+        for(j = 1; j <= len_b;j++){
                 M[0][j] = prob2scaledprob(0.0f);
 
                 X[0][j] = prob2scaledprob(0.0f);
@@ -172,11 +189,15 @@ int forward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
                 }
 
         }
-        fprintf(stdout,"%f %f %f\n", M[len_a][len_b]+phmm->theta, X[len_a][len_b] + phmm->theta, Y[len_a][len_b] + phmm->theta);
-        phmm->f_score =                      M[len_a][len_b] + phmm->theta;
-        phmm->f_score = logsum(phmm->f_score,X[len_a][len_b] + phmm->theta);
-        phmm->f_score = logsum(phmm->f_score,Y[len_a][len_b] + phmm->theta);
+        //fprintf(stdout,"%f %f %f\n", M[len_a][len_b]+phmm->theta, X[len_a][len_b] + phmm->theta, Y[len_a][len_b] + phmm->theta);
+        phmm->f_score =                      M[len_a][len_b] + phmm->tau;
+        phmm->f_score = logsum(phmm->f_score,X[len_a][len_b] + phmm->tau);
+        phmm->f_score = logsum(phmm->f_score,Y[len_a][len_b] + phmm->tau);
 
+//        LOG_MSG("Forward: %f\n",phmm->f_score);
+        /* zero length alignment */
+        //phmm->f_score = logsum(phmm->f_score, phmm->tau);
+        //LOG_MSG("Forward: %f\n",phmm->f_score);
         return OK;
 }
 
@@ -187,13 +208,13 @@ int backward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
         int i,j;
         int* sa = seq_a -1;
         int* sb = seq_b -1;
-        const float MM = prob2scaledprob(1.0f - 2.0f * scaledprob2prob(phmm->delta) - scaledprob2prob(phmm->theta));
-        const float MX = phmm->delta;
-        const float MY = phmm->delta;
-        const float XM = prob2scaledprob(1.0 - scaledprob2prob(phmm->epsilon) - scaledprob2prob(phmm->theta));
-        const float YM = XM;
-        const float XX = phmm->epsilon;
-        const float YY = phmm->epsilon;
+        const float MM = phmm->transition[INDEXMM];
+        const float MX = phmm->transition[INDEXGPO];
+        const float MY = phmm->transition[INDEXGPO];
+        const float XX = phmm->transition[INDEXGPE];
+        const float XM = phmm->transition[INDEXTM];
+        const float YY = phmm->transition[INDEXGPE];
+        const float YM = phmm->transition[INDEXTM];
 
 
         float** M = phmm->bM;
@@ -202,12 +223,13 @@ int backward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
 /*const tAA = prob2scaledprob(1.0f - scaledprob2prob(phmm->eta));
         const tBB = prob2scaledprob(1.0f - scaledprob2prob(phmm->eta));
         const tAM = phmm->eta;
-        const tBM = phmm->eta;*/
+        const
+tBM = phmm->eta;*/
 
         /* init first element  */
-        M[len_a][len_b] = phmm->theta;
-        X[len_a][len_b] = phmm->theta;
-        Y[len_a][len_b] = phmm->theta;
+        M[len_a][len_b] = phmm->tau;
+        X[len_a][len_b] = phmm->tau;
+        Y[len_a][len_b] = phmm->tau;
 
 
         for(j = len_b-1; j > 0;j--){
@@ -277,6 +299,228 @@ int backward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
 
         phmm->b_score = M[0][0];
 
+        /* zero length alignment */
+//phmm->b_score = logsum(phmm->b_score, phmm->tau);
+        return OK;
+}
+
+
+int collect_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
+{
+
+        int i,j;
+        int* sa = seq_a -1;
+        int* sb = seq_b -1;
+
+
+        const float MM = phmm->transition[INDEXMM];
+        const float MX = phmm->transition[INDEXGPO];
+        const float MY = phmm->transition[INDEXGPO];
+        const float XX = phmm->transition[INDEXGPE];
+        const float XM = phmm->transition[INDEXTM];
+        const float YY = phmm->transition[INDEXGPE];
+        const float YM = phmm->transition[INDEXTM];
+
+
+
+
+        float eMM = phmm->transition_e[INDEXMM];
+        float eGPO = phmm->transition_e[INDEXGPO];
+        float eGPE = phmm->transition_e[INDEXGPE];
+        float eTM = phmm->transition_e[INDEXTM];
+
+        float** fM = phmm->fM;
+        float** fX = phmm->fX;
+        float** fY = phmm->fY;
+
+        float** bM = phmm->bM;
+        float** bX = phmm->bX;
+        float** bY = phmm->bY;
+
+
+        float score = phmm->f_score;
+
+        /* init first element  */
+        //M[0][0] = prob2scaledprob(1.0f);
+        //X[0][0] = prob2scaledprob(0.0f);
+        //Y[0][0] = prob2scaledprob(0.0f);
+
+        for(j = 1; j<= len_b;j++){
+
+                //Y[0][j] =                 M[0][j-1] + MY;
+                eGPO = logsum(eGPO, fM[0][j-1] + MY + bY[0][j] + phmm->emit_background[sb[j]] - score);
+                //Y[0][j] = logsum(Y[0][j], Y[0][j-1] + YY);
+                eGPE = logsum(eGPE, fY[0][j-1] + YY + bY[0][j] + phmm->emit_background[sb[j]]- score);
+                //Y[0][j] += phmm->emit_background[sb[j]];
+                phmm->emit_background_e[sb[j]] = logsum(phmm->emit_background_e[sb[j]], fY[0][j] + bY[0][j]-score);
+        }
+
+        for(i = 1; i <= len_a;i++){
+                //X[i][0] =                 M[i-1][0] + MX;
+                eGPO = logsum(eGPO, fM[i-1][0] + MX + bX[i][0] + phmm->emit_background[sa[i]] - score);
+                //X[i][0] = logsum(X[i][0], X[i-1][0] + XX);
+                eGPE = logsum(eGPE, fX[i-1][0] + XX + bX[i][0] + phmm->emit_background[sa[i]] - score);
+
+
+
+                //X[i][0] += phmm->emit_background[sa[i]];
+                phmm->emit_background_e[sa[i]] = logsum(phmm->emit_background_e[sa[i]], fX[i][0]+ bX[i][0]-score);
+
+
+                for(j = 1; j<= len_b;j++){
+                        //M[i][j] = M[i-1][j-1] + MM;
+                        eMM = logsum(eMM,fM[i-1][j-1] + MM + bM[i][j] + phmm->emit_M[sa[i]][sb[j]] - score);
+
+
+                        //M[i][j] = logsum(M[i][j], X[i-1][j-1] + XM);
+                        eTM = logsum(eTM,fX[i-1][j-1] + XM + bM[i][j] + phmm->emit_M[sa[i]][sb[j]] - score);
+                        //M[i][j] = logsum(M[i][j], Y[i-1][j-1] + YM);
+                        eTM = logsum(eTM,fY[i-1][j-1] + YM + bM[i][j] + phmm->emit_M[sa[i]][sb[j]] - score);
+                        //M[i][j] += phmm->emit_M[sa[i]][sb[j]];
+                        phmm->emit_M_e[sa[i]][sb[j]] = logsum(phmm->emit_M_e[sa[i]][sb[j]], fM[i][j] + bM[i][i] - score);
+
+
+                        //X[i][j] =                 M[i-1][j] + MX;
+                        eGPO = logsum(eGPO, fM[i-1][j] + MX + bX[i][j] + phmm->emit_background[sa[i]] - score);
+                        //X[i][j] = logsum(X[i][j], X[i-1][j] + XX);
+                        eGPE = logsum(eGPE, fX[i-1][j] + XX + bX[i][j] + phmm->emit_background[sa[i]] - score);
+
+                        //X[i][j] += phmm->emit_background[sa[i]];
+                        phmm->emit_background_e[sa[i]] = logsum(phmm->emit_background_e[sa[i]], fX[i][j]+ bX[i][j]-score);
+
+                        //Y[i][j] =                 M[i][j-1] + MY;
+                        eGPO = logsum(eGPO, fM[i][j-1] + MY + bY[i][j] + phmm->emit_background[sb[j]] - score);
+                        //Y[i][j] = logsum(Y[i][j], Y[i][j-1] + YY);
+                        eGPE = logsum(eGPE, fY[i][j-1] + YY + bY[i][j] + phmm->emit_background[sb[j]] - score);
+                        //Y[i][j] += phmm->emit_background[sb[j]];
+                        phmm->emit_background_e[sb[j]] = logsum(phmm->emit_background_e[sb[j]], fY[i][j] + bY[i][j]-score);
+                }
+
+        }
+        //fprintf(stdout,"%f %f %f\n", M[len_a][len_b]+phmm->theta, X[len_a][len_b] + phmm->theta, Y[len_a][len_b] + phmm->theta);
+
+        //phmm->tau_e = logsum(phmm->tau_e, fM[len_a][len_b] + phmm->tau - score);
+        //phmm->tau_e = logsum(phmm->tau_e, fX[len_a][len_b] + phmm->tau - score);
+        //phmm->tau_e = logsum(phmm->tau_e, fY[len_a][len_b] + phmm->tau - score);
+//        phmm->tau_e = logsum(phmm->tau_e, phmm->tau - score);
+        phmm->transition_e[INDEXMM] = eMM;
+        phmm->transition_e[INDEXGPO] = eGPO;
+        phmm->transition_e[INDEXGPE] = eGPE;
+        phmm->transition_e[INDEXTM] = eTM;
+
+        return OK;
+}
+
+int re_estimate(struct phmm* phmm)
+{
+        int i,j;
+        int L;
+        float sum;
+        /* first for match state  */
+        /*  */
+        L = phmm->L;
+        /*fprintf(stdout,"Estimated:\n");
+        fprintf(stdout,"%f\tMM\n", scaledprob2prob(phmm->transition_e[INDEXMM]));
+        fprintf(stdout,"%f\tGPO\n",scaledprob2prob(phmm->transition_e[INDEXGPO]));
+        fprintf(stdout,"%f\tGPE\n",scaledprob2prob(phmm->transition_e[INDEXGPE]));
+        fprintf(stdout,"%f\tTM\n",scaledprob2prob(phmm->transition_e[INDEXTM]));
+        */
+
+
+        sum = phmm->transition_e[INDEXMM];
+        sum = logsum(sum, phmm->transition_e[INDEXGPO]);
+        sum = logsum(sum, phmm->transition_e[INDEXGPO]);
+        //sum = logsum(sum, phmm->tau_e);
+        phmm->transition[INDEXMM] = phmm->transition_e[INDEXMM] - sum;
+        phmm->transition[INDEXGPO] = phmm->transition_e[INDEXGPO] - sum;
+        /* add in tau */
+        sum = phmm->transition[INDEXMM];
+        sum = logsum(sum, phmm->transition[INDEXGPO]);
+        sum = logsum(sum, phmm->transition[INDEXGPO]);
+        sum = logsum(sum, phmm->tau);
+
+        phmm->transition[INDEXMM] = phmm->transition[INDEXMM] - sum;
+        phmm->transition[INDEXGPO] = phmm->transition[INDEXGPO] - sum;
+
+
+        /* sanity check */
+        sum = phmm->transition[INDEXMM];
+        sum = logsum(sum, phmm->transition[INDEXGPO]);
+        sum = logsum(sum, phmm->transition[INDEXGPO]);
+        sum = logsum(sum, phmm->tau);
+        //fprintf(stdout,"sanity: M: %f\n", scaledprob2prob(sum));
+
+        /* next delete state */
+        sum = phmm->transition_e[INDEXGPE];
+        sum = logsum(sum, phmm->transition_e[INDEXTM]);
+        //sum = logsum(sum, phmm->tau);
+        phmm->transition[INDEXGPE] =  phmm->transition_e[INDEXGPE] - sum;
+        phmm->transition[INDEXTM] =  phmm->transition_e[INDEXTM] - sum;
+        /* add in tau */
+        sum = phmm->transition[INDEXGPE];
+        sum = logsum(sum, phmm->transition[INDEXTM]);
+        sum = logsum(sum, phmm->tau);
+
+        phmm->transition[INDEXGPE] =  phmm->transition[INDEXGPE] - sum;
+        phmm->transition[INDEXTM] =  phmm->transition[INDEXTM] - sum;
+        
+
+        sum = phmm->transition[INDEXGPE];
+        sum = logsum(sum, phmm->transition[INDEXTM]);
+        sum = logsum(sum, phmm->tau);
+
+        //fprintf(stdout,"sanity: X/Y: %f\n", scaledprob2prob(sum));
+
+        sum = prob2scaledprob(0.0f);
+        for(i = 0; i < L;i++){
+
+                sum = logsum(sum, phmm->emit_background_e[i]);
+
+        }
+
+        for(i = 0; i < L;i++){
+                phmm->emit_background[i] = phmm->emit_background_e[i] -sum;
+                fprintf(stdout,"%d\t%f\n",i,scaledprob2prob(phmm->emit_background[i]));
+        }
+        sum = prob2scaledprob(0.0f);
+        for(i = 0; i < L;i++){
+                sum = logsum(sum, phmm->emit_background[i]);
+        }
+        //fprintf(stdout,"sanity:background: %f\n", scaledprob2prob(sum));
+
+        sum = prob2scaledprob(0.0f);
+        for(i = 0; i < L;i++){
+                for(j = 0; j < L;j++){
+                        sum = logsum(sum, phmm->emit_M_e[i][j]);
+                }
+        }
+
+        for(i = 0; i < L;i++){
+                for(j = 0; j < L;j++){
+                        phmm->emit_M[i][j] = phmm->emit_M_e[i][j] - sum;
+                        fprintf(stdout,"%0.2f ",scaledprob2prob(phmm->emit_M[i][j]));
+                }
+                fprintf(stdout,"\n");
+        }
+        fprintf(stdout,"\n");
+
+        sum = prob2scaledprob(0.0f);
+        for(i = 0; i < L;i++){
+                for(j = 0; j < L;j++){
+                        sum = logsum(sum, phmm->emit_M[i][j]);
+                }
+        }
+        //fprintf(stdout,"sanity:emit: %f\n", scaledprob2prob(sum));
+        clear_phmm_e(phmm);
+        return OK;
+}
+
+int phmm_transitions(struct phmm* phmm)
+{
+        fprintf(stdout,"%f\tMM\n", scaledprob2prob(phmm->transition[INDEXMM]));
+        fprintf(stdout,"%f\tGPO\n",scaledprob2prob(phmm->transition[INDEXGPO]));
+        fprintf(stdout,"%f\tGPE\n",scaledprob2prob(phmm->transition[INDEXGPE]));
+        fprintf(stdout,"%f\tTM\n",scaledprob2prob(phmm->transition[INDEXTM]));
         return OK;
 }
 
@@ -319,6 +563,7 @@ int simple_init(struct phmm*phmm)
 
         int i,j;
 
+        phmm->L = alphabet;
         for(i =0; i < alphabet;i++){
                 phmm->emit_background[i] = prob2scaledprob(1.0 / (float) alphabet);
                 phmm->emit_background_e[i] = prob2scaledprob(0.0f);
@@ -334,15 +579,6 @@ int simple_init(struct phmm*phmm)
                 }
 //                fprintf(stdout,"sanity check %d: %f\n",i, scaledprob2prob(sum));
         }
-        phmm->delta = prob2scaledprob(0.05f);
-        phmm->epsilon = prob2scaledprob(0.8f);
-        phmm->theta = prob2scaledprob(0.1f);
-        phmm->eta = prob2scaledprob(0.1f);
-
-        phmm->delta_e = prob2scaledprob(0.0f);
-        phmm->epsilon_e = prob2scaledprob(0.0f);
-        phmm->theta_e = prob2scaledprob(0.0f);
-        phmm->eta_e = prob2scaledprob(0.0f);
 
 
         int m_pos = 0;
@@ -412,13 +648,57 @@ int simple_init(struct phmm*phmm)
                 }
 
         }
-        fprintf(stdout,"emit sanity %f\n", scaledprob2prob(sum));
+        //fprintf(stdout,"emit sanity %f\n", scaledprob2prob(sum));
 
+        phmm->tau = prob2scaledprob(0.01f);
+        phmm->transition[INDEXMM] = prob2scaledprob(0.89f);
+        phmm->transition[INDEXGPO] = prob2scaledprob(0.05f);
+
+
+
+        sum = phmm->transition[INDEXMM];
+        sum = logsum(sum, phmm->transition[INDEXGPO]);
+        sum = logsum(sum, phmm->transition[INDEXGPO]);
+        sum = logsum(sum, phmm->tau);
+
+        //fprintf(stdout,"sanity: M: %f\n", scaledprob2prob(sum));
+
+
+        phmm->transition[INDEXGPE] = prob2scaledprob(0.09f);
+        phmm->transition[INDEXTM] = prob2scaledprob(0.90f);
+
+        sum = phmm->transition[INDEXGPE];
+        sum = logsum(sum, phmm->transition[INDEXTM]);
+        sum = logsum(sum, phmm->tau);
+
+        //fprintf(stdout,"sanity: X/Y: %f\n", scaledprob2prob(sum));
+        //exit(0);
         return OK;
 }
 
 
+int clear_phmm_e(struct phmm* phmm)
+{
+        int i,j;
 
+        phmm->transition_e[INDEXMM] = prob2scaledprob(1.0f);
+        phmm->transition_e[INDEXGPO] = prob2scaledprob(1.0f);
+        phmm->transition_e[INDEXGPE] = prob2scaledprob(1.0f);
+        phmm->transition_e[INDEXTM] = prob2scaledprob(1.0f);
+
+        for(i = 0;i < phmm->L;i++){
+                phmm->emit_background_e[i] = prob2scaledprob(1.0f);
+                for(j = 0; j < phmm->L;j++){
+                        if(i == j){
+                                phmm->emit_M_e[i][j] = prob2scaledprob(100.0f);
+                        }else{
+                                phmm->emit_M_e[i][j] = prob2scaledprob(1.0f);
+                        }
+                }
+        }
+
+        return OK;
+}
 
 
 
