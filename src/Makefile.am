@@ -30,7 +30,17 @@ AM_CPPFLAGS=${MYINCDIRS} ${HDF5_CPPFLAGS}
 
 #LOGO_SOURCES = motif_logo.c motif_logo.h
 
-bin_PROGRAMS =  kalign phmm
+bin_PROGRAMS =  kalign phmm get_param
+
+get_param_SOURCES = run_get_param.c \
+align_io.h \
+align_io.c \
+parameters.h \
+parameters.c \
+global.h \
+misc.h \
+misc.c
+
 
 phmm_SOURCES = phmm.h phmm.c
 phmm_LDADD = $(MYLIBDIRS)

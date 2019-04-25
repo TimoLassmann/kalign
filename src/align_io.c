@@ -1,6 +1,6 @@
 
 #include "global.h"
-#include "parameters.h"
+
 #include "align_io.h"
 
 #include "misc.h"
@@ -43,6 +43,8 @@ void names_free(struct names* n);
 
 struct align_io_buffer* alloc_align_io_buffer(int num_infiles);
 int read_all_sequences(struct alignment* aln, struct align_io_buffer* b);
+int read_all_aligned_sequences(struct alignment* aln, struct align_io_buffer* b);
+
 int count_sequences_and_detect(struct align_io_buffer* b);
 int check_out_and_errors(struct align_io_buffer* b, struct parameters* param);
 void free_align_io_buffer(struct align_io_buffer* b);
@@ -58,7 +60,7 @@ int count_sequences_stockholm(char* string);
 int count_sequences_clustalw(char* string);
 int count_sequences_fasta(char* string);
 
-struct alignment* read_alignment(struct alignment* aln,char* string);
+struct alignment* read_alignment_fasta(struct alignment* aln,char* string);
 struct alignment* read_alignment_from_swissprot(struct alignment* aln,char* string);
 struct alignment* read_alignment_macsim_xml(struct alignment* aln,char* string);
 struct alignment* read_alignment_uniprot_xml(struct alignment* aln,char* string);
@@ -74,6 +76,31 @@ struct alignment* read_sequences_from_swissprot(struct alignment* aln,char* stri
 struct alignment* read_sequences_uniprot_xml(struct alignment* aln,char* string);
 struct alignment* read_sequences_clustal(struct alignment* aln,char* string);
 struct alignment* read_sequences_stockholm(struct alignment* aln,char* string);
+
+
+struct alignment* read_alignment(char* infile)
+{
+        struct alignment* aln = NULL;
+        struct align_io_buffer* b = NULL;
+        ASSERT(infile!= NULL, "No infile");
+        RUNP(b = alloc_align_io_buffer(1)); /* this will allocate and extra buffer for stdin (param->num_profiles) */
+        if(!my_file_exists(infile)){
+                ERROR_MSG("File: %s does not exist.",infile);
+        }
+        RUNP(b->in_buf[0]->input = get_input_into_string(infile));
+        RUN(count_sequences_and_detect(b));
+        RUNP(aln = aln_alloc(b->numseq));
+
+        RUN(read_all_aligned_sequences(aln, b));
+
+        free_align_io_buffer(b);
+        return aln;
+ERROR:
+        free_align_io_buffer(b);
+        free_aln(aln);
+
+        return NULL;
+}
 
 struct alignment* detect_and_read_sequences(struct parameters* param)
 {
@@ -1497,7 +1524,7 @@ struct alignment* read_sequences(struct alignment* aln,char* string)
 }
 
 
-struct alignment* read_alignment(struct alignment* aln,char* string)
+struct alignment* read_alignment_fasta(struct alignment* aln,char* string)
 {
         int c = 0;
         int n = 0;
@@ -1781,8 +1808,48 @@ int read_all_sequences(struct alignment* aln, struct align_io_buffer* b)
         return OK;
 ERROR:
         return FAIL;
+}
+
+int read_all_aligned_sequences(struct alignment* aln, struct align_io_buffer* b)
+{
+        struct infile_buffer* in = NULL;
+        int i;
+        ASSERT(aln != NULL, "No alignment");
+        ASSERT(b != NULL, "No IO buffer");
+        for(i = 0; i < b->num_inputs;i++){
+                in = b->in_buf[i];
+                if(in->input){
+                        switch(in->input_type){
+                        case 0:
+                                aln = read_alignment_fasta(aln,in->input);
+                                break;
+                        case 1:
+                                aln = read_alignment_macsim_xml(aln,in->input);
+                                break;
+                        case 2:
+                                aln = read_alignment_uniprot_xml(aln,in->input);
+                                break;
+                        case 3:
+                                aln = read_alignment_from_swissprot(aln,in->input);
+                                break;
+                        case 4:
+                                aln = read_alignment_clustal(aln,in->input);
+                                break;
+                        case 5:
+                                aln = read_alignment_stockholm(aln,in->input);
+                                break;
+                        default:
+                                aln = read_alignment_fasta(aln,in->input);
+                                break;
+                        }
+                }
+        }
+        return OK;
+ERROR:
+        return FAIL;
 
 }
+
 
 
 int check_out_and_errors(struct align_io_buffer* b, struct parameters* param)
