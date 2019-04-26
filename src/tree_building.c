@@ -15,7 +15,7 @@ void big_print_nodes(struct bignode *n);
 
 /* distance calculation */
 float** dna_distance(struct alignment* aln,struct parameters* param, int nj);
-float dna_distance_calculation(struct bignode* hash[],int* p,int seqlen,int diagonals,float mode);
+float dna_distance_calculation(struct bignode* hash[], const int* p,const int seqlen,int diagonals,float mode);
 
 
 float** protein_wu_distance(struct alignment* aln,struct parameters* param, int nj);
@@ -278,7 +278,7 @@ float** dna_distance(struct alignment* aln,struct parameters* param, int nj)
 {
         struct bignode* hash[1024];
         float** dm = NULL;
-        int *p = 0;
+        int* p = NULL;
         int i,j,a;
         unsigned int hv;
         int numseq;
@@ -344,7 +344,7 @@ ERROR:
         return NULL;
 }
 
-float dna_distance_calculation(struct bignode* hash[],int* p,int seqlen,int diagonals,float mode)
+float dna_distance_calculation(struct bignode* hash[],const int* p,const int seqlen,int diagonals,float mode)
 {
 
         struct bignode* node_p;

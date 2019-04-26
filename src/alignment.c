@@ -38,7 +38,7 @@ int hirsch_mem_realloc(struct hirsch_mem* hm,int x);
 void hirsch_mem_free(struct hirsch_mem* hm);
 
 /* setting up fast data structures for alignment */
-float* make_profile(struct aln_param* ap, int* seq,int len);
+float* make_profile(struct aln_param* ap,const int* seq,const int len);
 int set_gap_penalties(float* prof,int len,int nsip);
 
 
@@ -2160,7 +2160,7 @@ ERROR:
 }
 
 
-float* make_profile(struct aln_param* ap, int* seq,int len)
+float* make_profile(struct aln_param* ap,const int* seq,const int len)
 {
         int i,j,c;
         float** subm = NULL;

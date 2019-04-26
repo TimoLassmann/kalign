@@ -28,7 +28,7 @@ ERROR:
 int clean_aln(struct alignment* aln)
 {
         int i,j;
-        int *p = NULL;
+        int* p = NULL;
         for (i = 0; i < aln->numseq;i++){
                 p = aln->s[i];
                 for (j = 0; j < aln->sl[i];j++){
