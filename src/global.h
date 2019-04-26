@@ -42,5 +42,4 @@ struct alignment{
         int num_profiles;
         int dna;
 };
-
 #endif

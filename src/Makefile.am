@@ -49,6 +49,8 @@ kalign_SOURCES = run_kalign.c \
 global.h \
 parameters.h \
 parameters.c \
+aln_data.h \
+aln_data.c \
 align_io.h \
 align_io.c \
 alignment_parameters.h \

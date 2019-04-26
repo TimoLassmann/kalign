@@ -1574,7 +1574,7 @@ struct alignment* read_alignment_fasta(struct alignment* aln,char* string)
         j = start;
 
         for (i =0;i < nbytes;i++){
-                if (string[i] == '>' && stop == 0){
+                if(string[i] == '>' && stop == 0){
                         stop = 1;
                         aln->sl[j] =c;
                         j++;
@@ -1656,11 +1656,9 @@ struct alignment* read_alignment_fasta(struct alignment* aln,char* string)
         }
         return aln;
 ERROR:
-
         free_aln(aln);
         return NULL;
 }
-
 
 struct alignment* aln_alloc(int numseq)
 {

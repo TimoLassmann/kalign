@@ -156,7 +156,8 @@ chmod 755 alignment_scores.sh
 
    #+BEGIN_SRC R :session one :results output graphics :file BalibaseSP_scores.jpeg :exports both :width 160 :height 80
      mat <- readBaliscores("scores2.csv","oldkalign")
-     mat <- rbind(mat,readBaliscores("scores.csv","balikalign"))
+     mat <- rbind(mat,readBaliscores("new_scores.csv","balikalign"))
+
 
      p <- ggplot(mat, aes(Group, SP))
           p <- p + geom_boxplot(aes(colour = Type))

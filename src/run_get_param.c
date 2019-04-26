@@ -22,6 +22,9 @@ int print_counts(struct counts* ap);
 int fill_counts(struct counts* ap, struct alignment* aln);
 int pair_fill(struct counts* ap, int*a,int*b,int len);
 
+int print_probabilies(struct counts*ap);
+
+
 int main(int argc, char *argv[])
 {
         struct alignment* aln = NULL;
@@ -78,6 +81,7 @@ int main(int argc, char *argv[])
         }
         normalize_counts(ap);
         print_counts(ap);
+        print_probabilies(ap);
 
         if(infile){
                 MFREE(infile);
@@ -228,6 +232,7 @@ int normalize_counts(struct counts*ap)
         for(i = 0; i < 26;i++){
                 for(j = 0; j <= i;j++){
                         ap->emit[i][j]/= sum;
+                        ap->emit[j][i] = ap->emit[i][j];
                 }
         }
 
@@ -268,6 +273,40 @@ int normalize_counts(struct counts*ap)
         return OK;
 }
 
+
+int print_probabilies(struct counts*ap)
+{
+
+        int i,j;
+        fprintf(stdout,"float prior_back[23] = {\n");
+        for(i = 0; i < 22;i++){
+                fprintf(stdout,"%f,\n", prob2scaledprob(ap->back[i]));
+        }
+        fprintf(stdout,"%f};\n", prob2scaledprob(ap->back[22]));
+
+        fprintf(stdout,"float prior_m[23][23] = {\n");
+        for(i = 0; i < 23;i++){
+                j = 0;
+                fprintf(stdout,"{%f", prob2scaledprob(ap->emit[i][j]));
+                for(j = 1; j < 23;j++){
+                        fprintf(stdout,",%f", prob2scaledprob(ap->emit[i][j]));
+                }
+                fprintf(stdout,"}");
+                if(i != 22){
+                        fprintf(stdout,",");
+                }
+                fprintf(stdout,"\n");
+        }
+        fprintf(stdout,"};\n");
+
+        fprintf(stdout,"float prior_MM = %f;\n",prob2scaledprob(ap->MM));
+        fprintf(stdout,"float prior_GPO = %f;\n",prob2scaledprob(ap->GPO));
+        fprintf(stdout,"float prior_GPE = %f;\n",prob2scaledprob(ap->GPE));
+        fprintf(stdout,"float prior_TM = %f;\n",prob2scaledprob(ap->TM ));
+
+
+        return OK;
+}
 int print_counts(struct counts* ap)
 {
         int i,j;
@@ -304,8 +343,6 @@ int print_counts(struct counts* ap)
         /* taushould be 1/ average length */
         /* fprintf(stdout,"%f\ttau\n", ap->tau); */
         /* fprintf(stdout,"%f\teta\n", ap->eta); */
-
-
         sum = 0.0;
 
         sum = -1.0 * log2( (ap->GPO * ap->TM) / ((ap->eta) * ap->MM));
@@ -316,6 +353,5 @@ int print_counts(struct counts* ap)
         ;
         //sum = ap->MM / ((ap->eta)*(ap->eta));
         //fprintf(stdout,"%f\n",sum);
-
         return OK;
 }
