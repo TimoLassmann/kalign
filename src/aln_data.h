@@ -5,7 +5,7 @@
 
 
 struct kalign_sequence{
-        int_fast8_t* s;
+        int* s;
         char* seq;
         int alloc_seq_len;
         int len;

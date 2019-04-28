@@ -2,6 +2,7 @@
 #include "parameters.h"
 #include "align_io.h"
 #include "alignment_parameters.h"
+#include "estimate_aln_param.h"
 #include "tree_building.h"
 #include "alignment.h"
 #include "weave_alignment.h"
@@ -327,7 +328,6 @@ ERROR:
 
 int run_kalign(struct parameters* param)
 {
-
         struct alignment* aln = NULL;
         struct aln_param* ap = NULL;
         int** map = NULL;       /* holds all alignment paths  */
@@ -371,7 +371,7 @@ int run_kalign(struct parameters* param)
         //fprintf(stderr,"        %0.8f	bonus\n",param->secret);
 
         /* build tree */
-
+        RUN(estimate_aln_param(aln, ap));
         LOG_MSG("Building guide tree.");
         START_TIMER(t1);
         RUN(build_tree(aln,param,ap));
@@ -391,7 +391,7 @@ int run_kalign(struct parameters* param)
         RUN(output(aln, param));
         /* clean up map */
         for(i = 0; i < aln->num_profiles ;i++){
-                if(map[i]){
+               if(map[i]){
                         MFREE(map[i]);
                 }
         }

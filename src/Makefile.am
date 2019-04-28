@@ -44,6 +44,7 @@ misc.c
 
 phmm_SOURCES = phmm.h phmm.c
 phmm_LDADD = $(MYLIBDIRS)
+phmm_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
 
 kalign_SOURCES = run_kalign.c \
 global.h \
@@ -55,6 +56,10 @@ align_io.h \
 align_io.c \
 alignment_parameters.h \
 alignment_parameters.c \
+estimate_aln_param.h \
+estimate_aln_param.c \
+phmm.h \
+phmm.c \
 tree_building.h \
 tree_building.c \
 alignment.h \

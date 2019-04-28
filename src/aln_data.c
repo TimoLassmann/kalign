@@ -72,7 +72,7 @@ struct kalign_sequence* kalign_seq_alloc(void)
         ks->s =NULL;
         ks->seq = NULL;
         ks->name = NULL;
-        MMALLOC(ks->s, sizeof(int_fast8_t) * ks->alloc_seq_len);
+        MMALLOC(ks->s, sizeof(int) * ks->alloc_seq_len);
         MMALLOC(ks->seq, sizeof(char) * ks->alloc_seq_len);
         MMALLOC(ks->name, sizeof(char) * BUFFER_LEN);
         return ks;
@@ -85,7 +85,7 @@ int kalign_seq_resize(struct kalign_sequence* ks)
 {
         ASSERT(ks != NULL,"No seq.");
         ks->alloc_seq_len = ks->alloc_seq_len << 1;
-        MREALLOC(ks->s, sizeof(int_fast8_t) * ks->alloc_seq_len);
+        MREALLOC(ks->s, sizeof(int) * ks->alloc_seq_len);
         MREALLOC(ks->seq, sizeof(char) * ks->alloc_seq_len);
         MREALLOC(ks->name, sizeof(char) * BUFFER_LEN);
         return OK;
