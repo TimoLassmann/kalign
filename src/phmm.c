@@ -92,7 +92,8 @@ int forward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
         const float XM = phmm->transition[INDEXTM];
         const float YY = phmm->transition[INDEXGPE];
         const float YM = phmm->transition[INDEXTM];
-
+        /* NEEDS to be changed later */
+        const float TGPE = phmm->transition[INDEXGPE];
 
 
 
@@ -100,7 +101,7 @@ int forward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
         float** M = phmm->fM;
         float** X = phmm->fX;
         float** Y = phmm->fY;
-/*const tAA = prob2scaledprob(1.0f - scaledprob2prob(phmm->eta));
+        /*const tAA = prob2scaledprob(1.0f - scaledprob2prob(phmm->eta));
         const tBB = prob2scaledprob(1.0f - scaledprob2prob(phmm->eta));
         const tAM = phmm->eta;
         const tBM = phmm->eta;*/
@@ -110,26 +111,29 @@ int forward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
         X[0][0] = prob2scaledprob(0.0f);
         Y[0][0] = prob2scaledprob(0.0f);
 
-        for(j = 1; j <= len_b;j++){
+        for(j = 1; j < len_b;j++){
                 M[0][j] = prob2scaledprob(0.0f);
 
                 X[0][j] = prob2scaledprob(0.0f);
 
                 Y[0][j] =                 M[0][j-1] + MY;
-                Y[0][j] = logsum(Y[0][j], Y[0][j-1] + YY);
+                Y[0][j] = logsum(Y[0][j], Y[0][j-1] + TGPE);
                 Y[0][j] += phmm->emit_background[sb[j]];
         }
+        M[0][len_b] = prob2scaledprob(0.0f);
+        X[0][len_b] = prob2scaledprob(0.0f);
+        Y[0][len_b] = prob2scaledprob(0.0f);
 
         for(i = 1; i <= len_a;i++){
                 M[i][0] = prob2scaledprob(0.0f);
 
                 X[i][0] =                 M[i-1][0] + MX;
-                X[i][0] = logsum(X[i][0], X[i-1][0] + XX);
+                X[i][0] = logsum(X[i][0], X[i-1][0] + TGPE);
                 X[i][0] += phmm->emit_background[sa[i]];
 
                 Y[i][0] = prob2scaledprob(0.0f);
 
-                for(j = 1; j<= len_b;j++){
+                for(j = 1; j< len_b;j++){
                         M[i][j] = M[i-1][j-1] + MM;
                         M[i][j] = logsum(M[i][j], X[i-1][j-1] + XM);
                         M[i][j] = logsum(M[i][j], Y[i-1][j-1] + YM);
@@ -144,8 +148,56 @@ int forward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
                         Y[i][j] += phmm->emit_background[sb[j]];
                 }
 
+                j = len_b;
+                M[i][j] = M[i-1][j-1] + MM;
+                M[i][j] = logsum(M[i][j], X[i-1][j-1] + XM);
+                M[i][j] = logsum(M[i][j], Y[i-1][j-1] + YM);
+                M[i][j] += phmm->emit_M[sa[i]][sb[j]];
+
+                X[i][j] =                 M[i-1][j] + MX;
+                X[i][j] = logsum(X[i][j], X[i-1][j] + TGPE);
+                X[i][j] += phmm->emit_background[sa[i]];
+
+                Y[i][j] = prob2scaledprob(0.0f);//                M[i][j-1] + MY;
+                //Y[i][j] = logsum(Y[i][j], Y[i][j-1] + YY);
+                //Y[i][j] += phmm->emit_background[sb[j]];
         }
-        //fprintf(stdout,"%f %f %f\n", M[len_a][len_b]+phmm->theta, X[len_a][len_b] + phmm->theta, Y[len_a][len_b] + phmm->theta);
+        i = len_a;
+        M[i][0] = prob2scaledprob(0.0f);
+        X[i][0] = prob2scaledprob(0.0f);
+        Y[i][0] = prob2scaledprob(0.0f);
+
+        for(j = 1; j < len_b;j++){
+                M[i][j] = M[i-1][j-1] + MM;
+                M[i][j] = logsum(M[i][j], X[i-1][j-1] + XM);
+                M[i][j] = logsum(M[i][j], Y[i-1][j-1] + YM);
+                M[i][j] += phmm->emit_M[sa[i]][sb[j]];
+
+                X[i][j] = prob2scaledprob(0.0f);//                 M[i-1][j] + MX;
+                //X[i][j] = logsum(X[i][j], X[i-1][j] + XX);
+                //X[i][j] += phmm->emit_background[sa[i]];
+
+                Y[i][j] =                 M[i][j-1] + MY;
+                Y[i][j] = logsum(Y[i][j], Y[i][j-1] + TGPE);
+                Y[i][j] += phmm->emit_background[sb[j]];
+        }
+        /* last cell */
+        j = len_b;
+        M[i][j] = M[i-1][j-1] + MM;
+        M[i][j] = logsum(M[i][j], X[i-1][j-1] + XM);
+        M[i][j] = logsum(M[i][j], Y[i-1][j-1] + YM);
+        M[i][j] += phmm->emit_M[sa[i]][sb[j]];
+
+        X[i][j] =                 M[i-1][j] + MX;
+        X[i][j] = logsum(X[i][j], X[i-1][j] + TGPE);
+        X[i][j] += phmm->emit_background[sa[i]];
+
+        Y[i][j] =                 M[i][j-1] + MY;
+        Y[i][j] = logsum(Y[i][j], Y[i][j-1] + TGPE);
+        Y[i][j] += phmm->emit_background[sb[j]];
+
+
+//fprintf(stdout,"%f %f %f\n", M[len_a][len_b]+phmm->theta, X[len_a][len_b] + phmm->theta, Y[len_a][len_b] + phmm->theta);
         phmm->f_score =                      M[len_a][len_b] + phmm->tau;
         phmm->f_score = logsum(phmm->f_score,X[len_a][len_b] + phmm->tau);
         phmm->f_score = logsum(phmm->f_score,Y[len_a][len_b] + phmm->tau);

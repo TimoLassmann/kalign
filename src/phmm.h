@@ -36,7 +36,7 @@ struct phmm{
         float tau_e;
         float f_score;
         float b_score;
-
+        float eta;
         int alloc_x;
         int alloc_y;
         int L;                  /* alphabet len */

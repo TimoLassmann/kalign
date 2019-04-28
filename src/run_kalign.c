@@ -372,6 +372,7 @@ int run_kalign(struct parameters* param)
 
         /* build tree */
         RUN(estimate_aln_param(aln, ap));
+
         LOG_MSG("Building guide tree.");
         START_TIMER(t1);
         RUN(build_tree(aln,param,ap));
