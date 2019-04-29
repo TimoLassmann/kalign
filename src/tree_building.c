@@ -125,7 +125,6 @@ ERROR:
 
 
 
-
 float** protein_wu_distance(struct alignment* aln,struct parameters* param, int nj)
 {
         struct bignode* hash[1024];

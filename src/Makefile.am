@@ -60,6 +60,8 @@ estimate_aln_param.h \
 estimate_aln_param.c \
 phmm.h \
 phmm.c \
+pick_anchor.h \
+pick_anchor.c \
 tree_building.h \
 tree_building.c \
 alignment.h \
