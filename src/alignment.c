@@ -1,5 +1,6 @@
 #include "alignment.h"
 
+#include "pick_anchor.h"
 #define MAX(a, b) (a > b ? a : b)
 #define MAX3(a,b,c) MAX(MAX(a,b),c)
 
@@ -44,7 +45,8 @@ int set_gap_penalties(float* prof,int len,int nsip);
 
 /* Main dyn programming functions */
 
-
+int hirsch_ss_dyn_score(const struct aln_param* ap, const int* seq1,const int* seq2,struct hirsch_mem* hm, int* hirsch_path,float* score);
+int hirsch_align_two_ss_vector_score(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm,int old_cor[],float* score);
 /* Align 2 sequences  */
 int hirsch_ss_dyn(const struct aln_param* ap, const int* seq1,const int* seq2,struct hirsch_mem* hm, int* hirsch_path);
 int hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[]);
@@ -69,6 +71,86 @@ int* add_gap_info_to_hirsch_path(int* hirsch_path,int len_a,int len_b);
 
 
 int update(const float* profa, const float* profb,float* newp,const int* path);
+int calc_seq_id(const int* path,int* a, int*b,float* dist);
+
+
+float** pair_aln_dist(struct alignment* aln, struct aln_param* ap)
+{
+        struct hirsch_mem* hm = NULL;
+        float** dm = NULL;
+        int* anchors = NULL;
+        int* map = NULL;
+        int num_anchors = 0;
+        int numseq;
+        int numprofiles;
+        int i,j,c;
+        int len_a;
+        int len_b;
+        int* a = NULL;
+        int* b = NULL;
+
+        ASSERT(aln != NULL,"No alignment");
+
+        numseq = aln->numseq;
+        numprofiles = aln->num_profiles;
+
+        RUNP(anchors = pick_anchor(aln, &num_anchors));
+
+        i = numseq;
+
+        RUNP(dm = galloc(dm,i,i,0.0f));
+
+        i  = aln->sl[anchors[0]] + 2;
+        RUNP(hm = hirsch_mem_alloc(i));
+
+
+        for(i = 0; i < aln->numseq;i++){
+                a = aln->s[i];
+                len_a = aln->sl[i];
+                for(j = i+1;j < aln->numseq;j++){
+
+                        b = aln->s[j];
+                        len_b = aln->sl[j];
+                        MMALLOC(map,sizeof(int) * (len_a+len_b+2));
+
+                        for (c = 0; c < (len_a+len_b+2);c++){
+                                map[c]= -1;
+                        }
+
+                        hm->starta = 0;
+                        hm->startb = 0;
+                        hm->enda = len_a;
+                        hm->endb = len_b;
+                        hm->len_a = len_a;
+                        hm->len_b = len_b;
+
+                        hm->f[0].a = 0.0;
+                        hm->f[0].ga =  -FLT_MAX;
+                        hm->f[0].gb = -FLT_MAX;
+                        hm->b[0].a = 0.0;
+                        hm->b[0].ga =  -FLT_MAX;
+                        hm->b[0].gb =  -FLT_MAX;
+                        hirsch_ss_dyn_score(ap,a,b,hm,map,&dm[i][j]);
+                        //map  = add_gap_info_to_hirsch_path(map,len_a,len_b);
+                        //calc_seq_id(map,a,b, &dm[i][j]);
+                        //                      fprintf(stdout,"ID: %f\n", dm[i][j]);
+                        //fprintf(stdout,"%f %d %d\n",dm[i][j],i,j);
+                        dm[i][j] = dm[i][j] / ((float)(len_a + len_b)/2.0f);
+                        dm[j][i] = dm[i][j];
+
+                        MFREE(map);
+//                        exit(0);
+                }
+        }
+        hirsch_mem_free(hm);
+        MFREE(anchors);
+        return dm;
+ERROR:
+        hirsch_mem_free(hm);
+        return NULL;
+}
+
+
 
 int** hirschberg_alignment(struct alignment* aln, struct aln_param* ap)
 {
@@ -237,6 +319,153 @@ int hirsch_ss_dyn(const struct aln_param* ap, const int* seq1,const int* seq2,st
         hirsch_align_two_ss_vector(ap,seq1,seq2,hm,hirsch_path,input_states,old_cor);
         return  OK;
 }
+
+int hirsch_ss_dyn_score(const struct aln_param* ap, const int* seq1,const int* seq2,struct hirsch_mem* hm, int* hirsch_path,float* score)
+{
+        int mid = ((hm->enda - hm->starta) / 2)+ hm->starta;
+        //float input_states[6] = {hm->f[0].a,hm->f[0].ga,hm->f[0].gb,hm->b[0].a,hm->b[0].ga,hm->b[0].gb};
+        int old_cor[5] = {hm->starta,hm->enda,hm->startb,hm->endb,mid};
+
+        if(hm->starta  >= hm->enda){
+                return OK;//hirsch_path;
+        }
+        if(hm->startb  >= hm->endb){
+                return OK;///hirsch_path;
+        }
+
+
+        hm->enda = mid;
+
+        //fprintf(stderr,"Forward:%d-%d	%d-%d\n",hm->starta,hm->enda,hm->startb,hm->endb);
+        foward_hirsch_ss_dyn(ap,seq1,seq2,hm);
+
+        hm->starta = mid;
+        hm->enda = old_cor[1];
+        //fprintf(stderr,"Backward:%d-%d	%d-%d\n",hm->starta,hm->enda,hm->startb,hm->endb);
+        backward_hirsch_ss_dyn(ap,seq1,seq2,hm);
+
+        hirsch_align_two_ss_vector_score(ap,seq1,seq2,hm,old_cor,score);
+
+
+        return  OK;
+}
+
+
+int hirsch_align_two_ss_vector_score(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm,int old_cor[],float* score)
+{
+        struct states* f = hm->f;
+        struct states* b = hm->b;
+        int i;
+
+        float gpo,gpe,tgpe;
+
+        gpo = ap->gpo;
+        gpe = ap->gpe;
+        tgpe = ap->tgpe;
+
+
+        //code:
+        // a -> a = 1
+        // a -> ga = 2
+        // a -> gb = 3
+        // ga ->ga = 4
+        // ga -> a = 5
+        //gb->gb = 6;
+        //gb->a = 7;
+
+        //int max = -FLT_MAX;
+        float max = -FLT_MAX;
+        //float middle =  (hm->endb - hm->startb)/2 + hm->startb;
+        float middle =  (old_cor[3] - old_cor[2])/2 + old_cor[2];
+        float sub = 0.0;
+
+        //i = hm->startb;
+        i = old_cor[2];
+        //c = -1;
+        //for(i = hm->startb; i < hm->endb;i++){
+        for(i = old_cor[2]; i < old_cor[3];i++){
+
+                sub = abs(middle -i);
+                sub /= 1000;
+                //	fprintf(stderr,"%d-%d	%f\n",hm->startb,hm->endb,sub);
+                if(f[i].a+b[i].a-sub > max){
+                        max = f[i].a+b[i].a-sub;
+                        //		fprintf(stderr,"aligned->aligned:%d + %d = %d\n",f[i].a,b[i].a,f[i].a+b[i].a);
+
+                        //              c = i;
+                }
+                if(f[i].a+b[i].ga-gpo-sub > max){
+                        max = f[i].a+b[i].ga-gpo-sub;
+                        //		fprintf(stderr,"aligned->gap_a:%d + %d +%d = %d\n",f[i].a,b[i].ga,prof1[27],f[i].a+b[i].ga+prof2[27]);
+
+                        //c = i;
+                }
+                if(f[i].a+b[i].gb -gpo-sub > max){
+                        max = f[i].a+b[i].gb - gpo-sub;
+                        //		fprintf(stderr,"aligned->gap_b:%d + %d +%d = %d\n",f[i].a,b[i].gb,prof1[27],f[i].a+b[i].gb+prof1[27]);
+
+                        //c = i;
+                }
+                if(f[i].ga+b[i].a - gpo-sub > max){
+                        max = f[i].ga+b[i].a - gpo-sub;
+                        //		fprintf(stderr,"gap_a->aligned:%d + %d + %d(gpo) = %d\n",f[i].ga,b[i].a,prof2[27],f[i].ga+b[i].a+prof2[27]);
+
+                        //c = i;
+                }
+
+
+                if(hm->startb == 0){
+                        if(f[i].gb+b[i].gb - tgpe-sub > max){
+                                max = f[i].gb+b[i].gb -tgpe-sub;
+                                //			fprintf(stderr,"gap_b->gap_b:%d + %d +%d(gpe) =%d \n",f[i].gb, b[i].gb, prof1[28],f[i].gb+b[i].gb+prof1[28]);
+
+                                //      c = i;
+                        }
+                }else{
+                        if(f[i].gb+b[i].gb - gpe -sub> max){
+                                max = f[i].gb+b[i].gb - gpe-sub;
+                                //			fprintf(stderr,"gap_b->gap_b:%d + %d +%d(gpe) =%d \n",f[i].gb, b[i].gb, prof1[28],f[i].gb+b[i].gb+prof1[28]);
+
+                                //c = i;
+                        }
+                }
+                if(f[i].gb+b[i].a - gpo-sub > max){
+                        max = f[i].gb+b[i].a - gpo-sub;
+                        //		fprintf(stderr,"gap_b->aligned:%d + %d + %d(gpo) = %d\n",f[i].gb,b[i].a,prof1[27],f[i].gb+b[i].a+prof1[27]);
+
+                        //c = i;
+                }
+        }
+        //i = hm->endb;
+        i = old_cor[3];
+        sub = abs(middle -i);
+        sub /= 1000;
+
+        if(f[i].a+b[i].gb-gpo-sub > max){
+                max = f[i].a+b[i].gb - gpo-sub;
+                //		fprintf(stderr,"aligned->gap_b:%d + %d +%d = %d\n",f[i].a,b[i].gb,prof1[27],f[i].a+b[i].gb+prof1[27]);
+
+                //c = i;
+        }
+        if(hm->endb == hm->len_b){
+                if(f[i].gb+b[i].gb -tgpe-sub > max){
+                        max = f[i].gb+b[i].gb - tgpe-sub;
+                        //			fprintf(stderr,"gap_b->gap_b:%d + %d +%d(gpe) =%d \n",f[i].gb, b[i].gb, prof1[28],f[i].gb+b[i].gb+prof1[28]);
+
+                        //c = i;
+                }
+        }else{
+                if(f[i].gb+b[i].gb - gpe-sub > max){
+                        max = f[i].gb+b[i].gb - gpe-sub;
+                        //			fprintf(stderr,"gap_b->gap_b:%d + %d +%d(gpe) =%d \n",f[i].gb, b[i].gb, prof1[28],f[i].gb+b[i].gb+prof1[28]);
+
+                        //c = i;
+                }
+        }
+        *score  = max;
+        return OK;
+}
+
 
 int hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[])
 {
@@ -2259,7 +2488,7 @@ int set_gap_penalties(float* prof,int len,int nsip)
 
 int update(const float* profa, const float* profb,float* newp,const int* path)
 {
-        int i,j,c;
+        int i,c;
         //float gpo,gpe,tgpe;
 
 
@@ -2321,6 +2550,57 @@ int update(const float* profa, const float* profb,float* newp,const int* path)
                 newp[i] =  profa[i] + profb[i];
         }
         newp -= (path[0]+1) *64;
+        return OK;
+}
+
+int calc_seq_id(const int* path,int* a, int*b,float* dist)
+{
+        int i,j,c;
+        float id = 0.0f;
+        float len = 0.0f;
+        //float gpo,gpe,tgpe;
+
+
+        //gpo = ap->gpo;
+        //gpe = ap->gpe;
+        //tgpe = ap->tgpe;
+        i = 0;
+        j = 0;
+        c = 1;
+
+        while(path[c] != 3){
+                //Idea: limit the 'virtual' number of residues of one type to x.
+                // i.e. only allow a maximum of 10 alanines to be registered in each column
+                // the penalty for aligning a 'G' to this column will stay stable even when many (>10) alanines are present.
+                // the difference in score between the 'correct' (all alanine) and incorrect (alanines + glycine) will not increase
+                // with the number of sequences. -> see Durbin pp 140
+                //
+
+
+                //fprintf(stdout,"%d\t%d",a[i],b[j]);
+                if (!path[c]){
+                        if(a[i] == b[j]){
+                                id++;
+                                //              fprintf(stdout,"\t%f",id);
+                        }
+
+                        i++;
+                        j++;
+                }
+
+                if (path[c] & 1){
+                        //fprintf(stderr,"Gap_A:%d\n",c);
+                        j++;
+                }
+                if (path[c] & 2){
+                        i++;
+                //fprintf(stderr,"Gap_B:%d\n",c);
+                }
+                len += 1.0f;
+                //fprintf(stdout,"\n");
+                c++;
+        }
+        *dist = id / len;
         return OK;
 }
 

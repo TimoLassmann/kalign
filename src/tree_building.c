@@ -1,5 +1,8 @@
 #include "tree_building.h"
 
+
+
+
 #define NODESIZE 16
 
 /* small hash implementation */
@@ -77,9 +80,12 @@ int build_tree(struct alignment* aln,struct parameters* param, struct aln_param*
 
         /* calculate distances  */
 
+        RUNP(dm = pair_aln_dist(aln, ap));
 
-
-        if(param->dna == 1){
+        /* https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-float-vector-sum-on-x86 */
+        /* fast vector sum.... (I think I can do 8 floats at a time..) */
+        /* https://software.intel.com/sites/landingpage/IntrinsicsGuide/#expand=5364,4616,2941,1884,3840,3847,5663,3404&cats=Load&text=loadu_ps */
+/*if(param->dna == 1){
                 if(byg_start(param->tree,"njNJ") != -1){
                         RUNP(dm =  dna_distance(aln,param,1));
                 }else{
@@ -91,11 +97,12 @@ int build_tree(struct alignment* aln,struct parameters* param, struct aln_param*
                 }else{
                         RUNP(dm =  protein_wu_distance(aln,param,0));
                 }
-        }
+                }*/
 
         if(byg_start(param->tree,"njNJ") != -1){
                 tree2 = real_nj(dm,param->ntree,aln->numseq);
         }else{
+
                 tree2 = real_upgma(dm,param->ntree,aln->numseq);
         }
 

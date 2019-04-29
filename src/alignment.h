@@ -8,4 +8,6 @@
 
 extern int** hirschberg_alignment(struct alignment* aln, struct aln_param* ap);
 
+
+extern float** pair_aln_dist(struct alignment* aln, struct aln_param* ap);
 #endif
