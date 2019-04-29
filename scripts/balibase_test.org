@@ -159,12 +159,19 @@ chmod 755 alignment_scores.sh
      mat <- rbind(mat,readBaliscores("new_scores.csv","balikalign"))
 
 
-     p <- ggplot(mat, aes(Group, SP))
-          p <- p + geom_boxplot(aes(colour = Type))
-p
-          filename <- "BalibaseSP_scores.jpeg"
+     mat <- rbind(mat,readBaliscores("scores_kalign_phmm3.csv","phmmkalign3"))
+     mat <- rbind(mat,readBaliscores("scores_kalign_phmm4.csv","RV20RV30phmmkalign4"))
+mat <- rbind(mat,readBaliscores("scores_kalign_fast.csv","kalignfast"))
+mat <- rbind(mat,readBaliscores("scores_kalign_fast2.csv","kalignfast2"))
 
-          ggsave(filename,p, dpi = 300,width = 160, height = 80, unit = "mm")
+
+
+     p <- ggplot(mat, aes(Group, SP))
+     p <- p + geom_boxplot(aes(colour = Type))
+     p
+     filename <- "BalibaseSP_scores.jpeg"
+
+     ggsave(filename,p, dpi = 300,width = 160, height = 80, unit = "mm")
 
    #+END_SRC
 

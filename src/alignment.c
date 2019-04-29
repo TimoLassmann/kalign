@@ -46,29 +46,29 @@ int set_gap_penalties(float* prof,int len,int nsip);
 
 
 /* Align 2 sequences  */
-int* hirsch_ss_dyn(const struct aln_param* ap, const int* seq1,const int* seq2,struct hirsch_mem* hm, int* hirsch_path);
-int* hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[]);
-struct states* foward_hirsch_ss_dyn(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm);
-struct states* backward_hirsch_ss_dyn(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm);
+int hirsch_ss_dyn(const struct aln_param* ap, const int* seq1,const int* seq2,struct hirsch_mem* hm, int* hirsch_path);
+int hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[]);
+int foward_hirsch_ss_dyn(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm);
+int backward_hirsch_ss_dyn(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm);
 
 /* Align one sequence to a profile */
-int* hirsch_ps_dyn(const struct aln_param* ap, const float* prof1,const int* seq2,struct hirsch_mem* hm, int* hirsch_path,int sip);
-int* hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,const int* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[],int sip);
-struct states* foward_hirsch_ps_dyn(const struct aln_param* ap,const float* prof1,const int* seq2,struct hirsch_mem* hm,int sip);
-struct states* backward_hirsch_ps_dyn(const struct aln_param* ap,const float* prof1,const int* seq2,struct hirsch_mem* hm,int sip);
+int hirsch_ps_dyn(const struct aln_param* ap, const float* prof1,const int* seq2,struct hirsch_mem* hm, int* hirsch_path,int sip);
+int hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,const int* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[],int sip);
+int foward_hirsch_ps_dyn(const struct aln_param* ap,const float* prof1,const int* seq2,struct hirsch_mem* hm,int sip);
+int backward_hirsch_ps_dyn(const struct aln_param* ap,const float* prof1,const int* seq2,struct hirsch_mem* hm,int sip);
 
 /* Align 2 profiles  */
-int* hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem* hm, int* hirsch_path);
-int* hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[]);
-struct states* foward_hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem* hm);
-struct states* backward_hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem* hm);
+int hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem* hm, int* hirsch_path);
+int hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[]);
+int foward_hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem* hm);
+int backward_hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem* hm);
 
 /* auxiliary dyn prog functions  */
 int* mirror_hirsch_path(int* hirsch_path,int len_a,int len_b);
 int* add_gap_info_to_hirsch_path(int* hirsch_path,int len_a,int len_b);
-float* update(const struct aln_param* ap,const float* profa, const float* profb,float* newp,int* path,int sipa,int sipb);
 
 
+int update(const float* profa, const float* profb,float* newp,const int* path);
 
 int** hirschberg_alignment(struct alignment* aln, struct aln_param* ap)
 {
@@ -77,6 +77,7 @@ int** hirschberg_alignment(struct alignment* aln, struct aln_param* ap)
         int len_a;
         int len_b;
         float** profile = NULL;
+
         int** map = NULL;
         int* tree = NULL;
         int numseq;
@@ -146,27 +147,27 @@ int** hirschberg_alignment(struct alignment* aln, struct aln_param* ap)
                 //fprintf(stderr,"LENA:%d	LENB:%d	numseq:%d\n",len_a,len_b,numseq);
                 if(a < numseq){
                         if(b < numseq){
-                                map[c] = hirsch_ss_dyn(ap,aln->s[a],aln->s[b],hm,map[c]);
+                                hirsch_ss_dyn(ap,aln->s[a],aln->s[b],hm,map[c]);
                         }else{
                                 hm->enda = len_b;
                                 hm->endb = len_a;
                                 hm->len_a = len_b;
                                 hm->len_b = len_a;
-                                map[c] = hirsch_ps_dyn(ap,profile[b],aln->s[a],hm,map[c],aln->nsip[b]);
+                                hirsch_ps_dyn(ap,profile[b],aln->s[a],hm,map[c],aln->nsip[b]);
                                 RUNP(map[c] = mirror_hirsch_path(map[c],len_a,len_b));
                         }
                 }else{
                         if(b < numseq){
-                                map[c] = hirsch_ps_dyn(ap,profile[a],aln->s[b],hm,map[c],aln->nsip[a]);
+                                hirsch_ps_dyn(ap,profile[a],aln->s[b],hm,map[c],aln->nsip[a]);
                         }else{
                                 if(len_a < len_b){
-                                        map[c] = hirsch_pp_dyn(profile[a],profile[b],hm,map[c]);
+                                        hirsch_pp_dyn(profile[a],profile[b],hm,map[c]);
                                 }else{
                                         hm->enda = len_b;
                                         hm->endb = len_a;
                                         hm->len_a = len_b;
                                         hm->len_b = len_a;
-                                        map[c] = hirsch_pp_dyn(profile[b],profile[a],hm,map[c]);
+                                        hirsch_pp_dyn(profile[b],profile[a],hm,map[c]);
                                         RUNP(map[c] = mirror_hirsch_path(map[c],len_a,len_b));
                                 }
                         }
@@ -175,8 +176,9 @@ int** hirschberg_alignment(struct alignment* aln, struct aln_param* ap)
                 map[c] = add_gap_info_to_hirsch_path(map[c],len_a,len_b);
 
                 if(i != numseq-2){
+                        //MREALLOC(profile_ptr, sizeof(float)*64*(map[c][0]+2));
                         MMALLOC(profile[c],sizeof(float)*64*(map[c][0]+2));
-                        profile[c] = update(ap,profile[a],profile[b],profile[c],map[c],aln->nsip[a],aln->nsip[b]);
+                        update(profile[a],profile[b],profile[c],map[c]);
                 }
 
                 aln->sl[c] = map[c][0];
@@ -193,10 +195,11 @@ int** hirschberg_alignment(struct alignment* aln, struct aln_param* ap)
                         g++;
                 }
 
+
                 MFREE(profile[a]);
                 MFREE(profile[b]);
-        }
 
+        }
         MFREE(profile);
 
         hirsch_mem_free(hm);
@@ -206,36 +209,36 @@ ERROR:
 }
 
 
-int* hirsch_ss_dyn(const struct aln_param* ap, const int* seq1,const int* seq2,struct hirsch_mem* hm, int* hirsch_path)
+int hirsch_ss_dyn(const struct aln_param* ap, const int* seq1,const int* seq2,struct hirsch_mem* hm, int* hirsch_path)
 {
         int mid = ((hm->enda - hm->starta) / 2)+ hm->starta;
         float input_states[6] = {hm->f[0].a,hm->f[0].ga,hm->f[0].gb,hm->b[0].a,hm->b[0].ga,hm->b[0].gb};
         int old_cor[5] = {hm->starta,hm->enda,hm->startb,hm->endb,mid};
 
         if(hm->starta  >= hm->enda){
-                return hirsch_path;
+                return OK;//hirsch_path;
         }
         if(hm->startb  >= hm->endb){
-                return hirsch_path;
+                return OK;///hirsch_path;
         }
 
 
         hm->enda = mid;
 
         //fprintf(stderr,"Forward:%d-%d	%d-%d\n",hm->starta,hm->enda,hm->startb,hm->endb);
-        hm->f = foward_hirsch_ss_dyn(ap,seq1,seq2,hm);
+        foward_hirsch_ss_dyn(ap,seq1,seq2,hm);
 
         hm->starta = mid;
         hm->enda = old_cor[1];
         //fprintf(stderr,"Backward:%d-%d	%d-%d\n",hm->starta,hm->enda,hm->startb,hm->endb);
-        hm->b = backward_hirsch_ss_dyn(ap,seq1,seq2,hm);
+        backward_hirsch_ss_dyn(ap,seq1,seq2,hm);
 
 
-        hirsch_path = hirsch_align_two_ss_vector(ap,seq1,seq2,hm,hirsch_path,input_states,old_cor);
-        return hirsch_path;
+        hirsch_align_two_ss_vector(ap,seq1,seq2,hm,hirsch_path,input_states,old_cor);
+        return  OK;
 }
 
-int* hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[])
+int hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[])
 {
         struct states* f = hm->f;
         struct states* b = hm->b;
@@ -375,7 +378,7 @@ int* hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const
                 hm->startb = old_cor[2];
                 hm->endb = c-1;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
+                hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
 
                 //backward:
                 hm->starta = old_cor[4]+1;
@@ -390,7 +393,7 @@ int* hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const
                 hm->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d  what:%d-%d	%d-%d\n",c+1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
+                hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
                 break;
         case 2:// a -> ga = 2
 
@@ -411,7 +414,7 @@ int* hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const
                 hm->startb = old_cor[2];
                 hm->endb = c-1;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
+                hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
 
 
                 //backward:
@@ -427,7 +430,7 @@ int* hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const
                 hm->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d  what:%d-%d	%d-%d\n",c+1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
+                hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
                 break;
         case 3:// a -> gb = 3
 
@@ -447,7 +450,7 @@ int* hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const
                 hm->startb = old_cor[2];
                 hm->endb = c-1;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
+                hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
                 //backward:
                 hm->starta = old_cor[4]+1;
                 hm->enda = old_cor[1];
@@ -461,7 +464,7 @@ int* hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const
                 hm->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d\n",c+1);
-                hirsch_path = hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
+                hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
                 break;
         case 5://ga -> a = 5
                 hirsch_path[old_cor[4]+1] = c+1;
@@ -481,7 +484,7 @@ int* hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const
                 hm->startb = old_cor[2];
                 hm->endb = c-1;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
+                hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
 
                 //backward:
                 hm->starta = old_cor[4]+1;
@@ -496,7 +499,7 @@ int* hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const
                 hm->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d\n",c+1);
-                hirsch_path = hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
+                hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
                 break;
         case 6://gb->gb = 6;
 
@@ -513,7 +516,7 @@ int* hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const
                 hm->startb = old_cor[2];
                 hm->endb = c;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
+                hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
 
                 //backward:
                 hm->starta = old_cor[4]+1;
@@ -528,7 +531,7 @@ int* hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const
                 hm->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d\n",c+1);
-                hirsch_path = hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
+                hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
                 break;
         case 7://gb->a = 7;
 
@@ -547,7 +550,7 @@ int* hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const
                 hm->startb = old_cor[2];
                 hm->endb = c;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
+                hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
 
                 //backward:
                 hm->starta = old_cor[4]+1;
@@ -562,18 +565,18 @@ int* hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const
                 hm->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d\n",c+1);
-                hirsch_path = hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
+                hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
                 break;
         }
 
-        return hirsch_path;
+        return OK;//hirsch_path;
 //ERROR:
         //      return NULL;
 }
 
 
 
-struct states* foward_hirsch_ss_dyn(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm)
+int foward_hirsch_ss_dyn(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm)
 {
         struct states* s = hm->f;
         float *subp = 0;
@@ -670,10 +673,10 @@ struct states* foward_hirsch_ss_dyn(const struct aln_param* ap,const int* seq1,c
                 }
 
         }
-        return s;
+        return OK;
 }
 
-struct states* backward_hirsch_ss_dyn(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm)
+int backward_hirsch_ss_dyn(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm)
 {
 
         struct states* s = hm->b;
@@ -788,11 +791,11 @@ struct states* backward_hirsch_ss_dyn(const struct aln_param* ap,const int* seq1
 
 
         }
-        return s;
+        return OK;
 }
 
 
-int* hirsch_ps_dyn(const struct aln_param* ap, const float* prof1,const int* seq2,struct hirsch_mem* hm, int* hirsch_path,int sip)
+int hirsch_ps_dyn(const struct aln_param* ap, const float* prof1,const int* seq2,struct hirsch_mem* hm, int* hirsch_path,int sip)
 {
         int mid = ((hm->enda - hm->starta) / 2)+ hm->starta;
         float input_states[6] = {hm->f[0].a,hm->f[0].ga,hm->f[0].gb,hm->b[0].a,hm->b[0].ga,hm->b[0].gb};
@@ -800,14 +803,14 @@ int* hirsch_ps_dyn(const struct aln_param* ap, const float* prof1,const int* seq
 
 
         if(hm->starta  >= hm->enda){
-                return hirsch_path;
+                return OK;
         }
         if(hm->startb  >= hm->endb){
-                return hirsch_path;
+                return OK;
         }
 
         hm->enda = mid;
-        hm->f = foward_hirsch_ps_dyn(ap,prof1,seq2,hm,sip);
+        foward_hirsch_ps_dyn(ap,prof1,seq2,hm,sip);
 
         /*int i;
           fprintf(stderr,"FOWARD\n");
@@ -817,20 +820,20 @@ int* hirsch_ps_dyn(const struct aln_param* ap, const float* prof1,const int* seq
 
         hm->starta = mid;
         hm->enda = old_cor[1];
-        hm->b = backward_hirsch_ps_dyn(ap,prof1,seq2,hm,sip);
+        backward_hirsch_ps_dyn(ap,prof1,seq2,hm,sip);
 
         /*fprintf(stderr,"BaCKWARD\n");
           for (i = hm->startb; i <= hm->endb;i++){
           fprintf(stderr,"%d	%d	%d\n",hm->b[i].a,hm->b[i].ga,hm->b[i].gb);
           }*/
 
-        hirsch_path = hirsch_align_two_ps_vector(ap,prof1,seq2,hm,hirsch_path,input_states,old_cor,sip);
-        return hirsch_path;
+        hirsch_align_two_ps_vector(ap,prof1,seq2,hm,hirsch_path,input_states,old_cor,sip);
+        return OK;
 }
 
 
 
-int* hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,const int* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[],int sip)
+int hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,const int* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[],int sip)
 {
         struct states* f = hm->f;
         struct states* b = hm->b;
@@ -970,7 +973,7 @@ int* hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,co
                 hm->startb = old_cor[2];
                 hm->endb = c-1;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
+                hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
 
                 //backward:
                 hm->starta = old_cor[4]+1;
@@ -985,7 +988,7 @@ int* hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,co
                 hm->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d  what:%d-%d	%d-%d\n",c+1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
+                hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
                 break;
         case 2:// a -> ga = 2
 
@@ -1006,7 +1009,7 @@ int* hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,co
                 hm->startb = old_cor[2];
                 hm->endb = c-1;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
+                hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
 
                 //backward:
                 hm->starta = old_cor[4];
@@ -1021,7 +1024,7 @@ int* hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,co
                 hm->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d  what:%d-%d	%d-%d\n",c+1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
+                hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
                 break;
         case 3:// a -> gb = 3
 
@@ -1041,7 +1044,7 @@ int* hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,co
                 hm->startb = old_cor[2];
                 hm->endb = c-1;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
+                hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
 
                 //backward:
                 hm->starta = old_cor[4]+1;
@@ -1056,7 +1059,7 @@ int* hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,co
                 hm->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d\n",c+1);
-                hirsch_path = hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
+                hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
                 break;
         case 5://ga -> a = 5
 
@@ -1077,7 +1080,7 @@ int* hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,co
                 hm->startb = old_cor[2];
                 hm->endb = c-1;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
+                hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
 
                 //backward:
                 hm->starta = old_cor[4]+1;
@@ -1092,7 +1095,7 @@ int* hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,co
                 hm->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d\n",c+1);
-                hirsch_path = hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
+                hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
                 break;
         case 6://gb->gb = 6;
 
@@ -1109,7 +1112,7 @@ int* hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,co
                 hm->startb = old_cor[2];
                 hm->endb = c;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
+                hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
 
 
                 //backward:
@@ -1125,7 +1128,7 @@ int* hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,co
                 hm->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d\n",c+1);
-                hirsch_path = hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
+                hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
                 break;
         case 7://gb->a = 7;
 
@@ -1144,7 +1147,7 @@ int* hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,co
                 hm->startb = old_cor[2];
                 hm->endb = c;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
+                hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
 
                 //backward:
                 hm->starta = old_cor[4]+1;
@@ -1159,14 +1162,14 @@ int* hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,co
                 hm->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d\n",c+1);
-                hirsch_path = hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
+                hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
                 break;
         }
 
-        return hirsch_path;
+        return OK;
 }
 
-struct states* foward_hirsch_ps_dyn(const struct aln_param* ap,const float* prof1,const int* seq2,struct hirsch_mem* hm,int sip)
+int foward_hirsch_ps_dyn(const struct aln_param* ap,const float* prof1,const int* seq2,struct hirsch_mem* hm,int sip)
 {
         struct states* s = hm->f;
 
@@ -1274,10 +1277,10 @@ struct states* foward_hirsch_ps_dyn(const struct aln_param* ap,const float* prof
 
         }
         prof1 -= hm->enda << 6;
-        return s;
+        return OK;
 }
 
-struct states* backward_hirsch_ps_dyn(const struct aln_param* ap,const float* prof1,const int* seq2,struct hirsch_mem* hm,int sip)
+int backward_hirsch_ps_dyn(const struct aln_param* ap,const float* prof1,const int* seq2,struct hirsch_mem* hm,int sip)
 {
         struct states* s = hm->b;
         register float pa = 0;
@@ -1378,10 +1381,10 @@ struct states* backward_hirsch_ps_dyn(const struct aln_param* ap,const float* pr
                 }
 
         }
-        return s;
+        return OK;
 }
 
-int* hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem* hm, int* hirsch_path)
+int hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem* hm, int* hirsch_path)
 {
         int mid = ((hm->enda - hm->starta) / 2)+ hm->starta;
         float input_states[6] = {hm->f[0].a,hm->f[0].ga,hm->f[0].gb,hm->b[0].a,hm->b[0].ga,hm->b[0].gb};
@@ -1392,14 +1395,14 @@ int* hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem* hm, 
 
 
         if(hm->starta  >= hm->enda){
-                return hirsch_path;
+                return OK;
         }
         if(hm->startb  >= hm->endb){
-                return hirsch_path;
+                return OK;
         }
 
         hm->enda = mid;
-        hm->f = foward_hirsch_pp_dyn(prof1,prof2,hm);
+        foward_hirsch_pp_dyn(prof1,prof2,hm);
         /*int i;
           fprintf(stderr,"FOWARD\n");
           for (i = hm->startb; i <= hm->endb;i++){
@@ -1408,20 +1411,20 @@ int* hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem* hm, 
 
         hm->starta = mid;
         hm->enda = old_cor[1];
-        hm->b = backward_hirsch_pp_dyn(prof1,prof2,hm);
+        backward_hirsch_pp_dyn(prof1,prof2,hm);
         /*fprintf(stderr,"BaCKWARD\n");
 
           for (i = hm->startb; i <= hm->endb;i++){
           fprintf(stderr,"%d	%d	%d\n",hm->b[i].a,hm->b[i].ga,hm->b[i].gb);
           }*/
 
-        hirsch_path = hirsch_align_two_pp_vector(prof1,prof2,hm,hirsch_path,input_states,old_cor);
-        return hirsch_path;
+        hirsch_align_two_pp_vector(prof1,prof2,hm,hirsch_path,input_states,old_cor);
+        return OK;
 }
 
 
 
-int* hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[])
+int hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[])
 {
         struct states* f = hm->f;
         struct states* b = hm->b;
@@ -1566,7 +1569,7 @@ int* hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hir
                 hm->startb = old_cor[2];
                 hm->endb = c-1;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
+                hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
 
                 //backward:
                 hm->starta = old_cor[4]+1;
@@ -1581,7 +1584,7 @@ int* hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hir
                 hm->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d  what:%d-%d	%d-%d\n",c+1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
+                hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
                 break;
         case 2:// a -> ga = 2
 
@@ -1602,7 +1605,7 @@ int* hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hir
                 hm->startb = old_cor[2];
                 hm->endb = c-1;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
+                hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
 
                 //backward:
                 hm->starta = old_cor[4];
@@ -1617,7 +1620,7 @@ int* hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hir
                 hm->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d  what:%d-%d	%d-%d\n",c+1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
+                hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
                 break;
         case 3:// a -> gb = 3
 
@@ -1637,7 +1640,7 @@ int* hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hir
                 hm->startb = old_cor[2];
                 hm->endb = c-1;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
+                hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
 
                 //backward:
                 hm->starta = old_cor[4]+1;
@@ -1652,7 +1655,7 @@ int* hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hir
                 hm->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d\n",c+1);
-                hirsch_path = hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
+                hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
                 break;
         case 5://ga -> a = 5
                 hirsch_path[old_cor[4]+1] = c+1;
@@ -1672,7 +1675,7 @@ int* hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hir
                 hm->startb = old_cor[2];
                 hm->endb = c-1;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
+                hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
 
                 //backward:
                 hm->starta = old_cor[4]+1;
@@ -1687,7 +1690,7 @@ int* hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hir
                 hm->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d\n",c+1);
-                hirsch_path = hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
+                hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
                 break;
         case 6://gb->gb = 6;
 
@@ -1704,7 +1707,7 @@ int* hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hir
                 hm->startb = old_cor[2];
                 hm->endb = c;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
+                hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
 
                 //backward:
                 hm->starta = old_cor[4]+1;
@@ -1719,7 +1722,7 @@ int* hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hir
                 hm->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d\n",c+1);
-                hirsch_path = hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
+                hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
                 break;
         case 7://gb->a = 7;
 
@@ -1738,7 +1741,7 @@ int* hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hir
                 hm->startb = old_cor[2];
                 hm->endb = c;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,hm->starta,hm->enda,hm->startb,hm->endb);
-                hirsch_path = hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
+                hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
 
                 //backward:
                 hm->starta = old_cor[4]+1;
@@ -1753,16 +1756,16 @@ int* hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hir
                 hm->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d\n",c+1);
-                hirsch_path = hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
+                hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
                 break;
         }
 
-        return hirsch_path;
+        return OK;
 }
 
-struct states* foward_hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem* hm)
+int foward_hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem* hm)
 {
-        unsigned int freq[26];
+        unsigned int freq[23];
 
         struct states* s = hm->f;
         register float pa = 0;
@@ -1777,6 +1780,7 @@ struct states* foward_hirsch_pp_dyn(const float* prof1,const float* prof2,struct
         register int j = 0;
         register int c = 0;
 
+        register int f = 0;
         prof1 += (hm->starta) << 6;
         prof2 +=  (hm->startb) << 6;
         s[hm->startb].a = s[0].a;
@@ -1809,14 +1813,16 @@ struct states* foward_hirsch_pp_dyn(const float* prof1,const float* prof2,struct
 
         for (i = hm->starta;i < hm->enda;i++){
                 prof1 += 64;
-                c = 1;
-                for (j = 0;j < 26; j++){
+                //c = 1;
+                f = 0;
+                for (j = 0;j < 23; j++){
                         if(prof1[j]){
-                                freq[c] = j;
-                                c++;
+                                freq[f] = j;
+                                f++;
                         }
                 }
-                freq[0] = c;
+                f--;
+                //freq[0] = c;
 
                 pa = s[hm->startb].a;
                 pga = s[hm->startb].ga;
@@ -1840,7 +1846,9 @@ struct states* foward_hirsch_pp_dyn(const float* prof1,const float* prof2,struct
                         pa = MAX3(pa,pga + prof2[-37],pgb + prof1[-37]);
 
                         prof2 += 32;
-                        for (c = 1;c < freq[0];c++){
+                        for (c = f;c >= 0;c--){
+                                //for (c = 0;c < f;c++){
+                                //for (c = 1;c < freq[0];c++){
                                 pa += prof1[freq[c]]*prof2[freq[c]];
                         }
                         prof2 -= 32;
@@ -1868,7 +1876,8 @@ struct states* foward_hirsch_pp_dyn(const float* prof1,const float* prof2,struct
                 pa = MAX3(pa,pga + prof2[-37],pgb + prof1[-37]);
 
                 prof2 += 32;
-                for (c = 1;c < freq[0];c++){
+                for (c = f;c >= 0;c--){
+                        //for (c = 0;c < f;c++){
                         pa += prof1[freq[c]]*prof2[freq[c]];
                 }
                 prof2 -= 32;
@@ -1886,12 +1895,12 @@ struct states* foward_hirsch_pp_dyn(const float* prof1,const float* prof2,struct
 
         }
         prof1 -=  (hm->enda) << 6;
-        return s;
+        return OK;
 }
 
-struct states* backward_hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem* hm)
+int backward_hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem* hm)
 {
-        unsigned int freq[26];
+        unsigned int freq[23];
         struct states* s = hm->b;
         register float pa = 0;
         register float pga = 0;
@@ -1905,6 +1914,7 @@ struct states* backward_hirsch_pp_dyn(const float* prof1,const float* prof2,stru
         register int j = 0;
         register int c = 0;
 
+        register int f = 0;
         prof1 += (hm->enda+1) << 6;
         prof2 += (hm->endb+1) << 6;
         s[hm->endb].a = s[0].a;
@@ -1936,14 +1946,16 @@ struct states* backward_hirsch_pp_dyn(const float* prof1,const float* prof2,stru
         while(i--){
                 prof1 -= 64;
 
-                c = 1;
-                for (j = 0;j < 26; j++){
+                //c = 1;
+                f = 0;
+                for (j = 0;j < 23; j++){
                         if(prof1[j]){
-                                freq[c] = j;
-                                c++;
+                                freq[f] = j;
+                                f++;
                         }
                 }
-                freq[0] = c;
+                f--;
+                //freq[0] = c;
 
                 pa = s[hm->endb].a;
                 pga = s[hm->endb].ga;
@@ -1968,7 +1980,9 @@ struct states* backward_hirsch_pp_dyn(const float* prof1,const float* prof2,stru
                         pa = MAX3(pa,pga + prof2[91],pgb + prof1[91]);
 
                         prof2 += 32;
-                        for (c = 1;c < freq[0];c++){
+                        for (c = f;c >= 0;c--){
+                                //for (c = 0;c < f;c++){
+                                //for (c = 1;c < freq[0];c++){
                                 pa += prof1[freq[c]]*prof2[freq[c]];
                         }
                         prof2 -= 32;
@@ -1993,7 +2007,8 @@ struct states* backward_hirsch_pp_dyn(const float* prof1,const float* prof2,stru
 
                 pa = MAX3(pa,pga + prof2[91],pgb + prof1[91]);
                 prof2 += 32;
-                for (c = 1;c < freq[0];c++){
+                for (c = f;c >= 0;c--){
+                        //for (c = 0;c < f;c++){
                         pa += prof1[freq[c]]*prof2[freq[c]];
                 }
                 prof2 -= 32;
@@ -2011,7 +2026,7 @@ struct states* backward_hirsch_pp_dyn(const float* prof1,const float* prof2,stru
 
                 //pa = ca;
         }
-        return s;
+        return OK;
 }
 
 
@@ -2242,15 +2257,15 @@ int set_gap_penalties(float* prof,int len,int nsip)
         return OK;
 }
 
-float* update(const struct aln_param* ap,  const float* profa, const float* profb,float* newp,int* path,int sipa,int sipb)
+int update(const float* profa, const float* profb,float* newp,const int* path)
 {
         int i,j,c;
-        float gpo,gpe,tgpe;
+        //float gpo,gpe,tgpe;
 
 
-        gpo = ap->gpo;
-        gpe = ap->gpe;
-        tgpe = ap->tgpe;
+        //gpo = ap->gpo;
+        //gpe = ap->gpe;
+        //tgpe = ap->tgpe;
 
 
         for (i = 64; i--;){
@@ -2288,53 +2303,6 @@ float* update(const struct aln_param* ap,  const float* profa, const float* prof
                                 newp[i] = profb[i];
                         }
                         profb += 64;
-#ifndef SIMPLE
-                        if(!(path[c] & 20)){
-                                if(path[c] & 32){
-                                        newp[25] += sipa;//1;
-                                        i = tgpe*sipa;
-                                }else{
-                                        newp[24] += sipa;//1;
-                                        i = gpe*sipa;
-                                }
-
-                                for (j = 32; j < 55;j++){
-                                        newp[j] -=i;
-                                }
-                        }else{
-                                if (path[c] & 16){
-                                        //			fprintf(stderr,"close_open");
-                                        if(path[c] & 32){
-                                                newp[25] += sipa;//1;
-                                                i = tgpe*sipa;
-                                                newp[23] += sipa;//1;
-                                                i += gpo*sipa;
-                                        }else{
-                                                newp[23] += sipa;//1;
-                                                i = gpo*sipa;
-                                        }
-
-                                        for (j = 32; j < 55;j++){
-                                                newp[j] -=i;
-                                        }
-                                }
-                                if (path[c] & 4){
-                                        //			fprintf(stderr,"Gap_open");
-                                        if(path[c] & 32){
-                                                newp[25] += sipa;//1;
-                                                i = tgpe*sipa;
-                                                newp[23] += sipa;//1;
-                                                i += gpo*sipa;
-                                        }else{
-                                                newp[23] += sipa;//1;
-                                                i = gpo*sipa;
-                                        }
-                                        for (j = 32; j < 55;j++){
-                                                newp[j] -=i;
-                                        }
-                                }
-                        }
-#endif
 
 
                 }
@@ -2345,53 +2313,6 @@ float* update(const struct aln_param* ap,  const float* profa, const float* prof
                                 newp[i] = profa[i];
                         }
                         profa+=64;
-#ifndef SIMPLE
-                        if(!(path[c] & 20)){
-                                if(path[c] & 32){
-                                        newp[25] += sipb;//1;
-                                        i = tgpe*sipb;
-                                }else{
-                                        newp[24] += sipb;//1;
-                                        i = gpe*sipb;
-                                }
-                                for (j = 32; j < 55;j++){
-                                        newp[j] -=i;
-                                }
-                        }else{
-                                if (path[c] & 16){
-                                        //			fprintf(stderr,"close_open");
-                                        if(path[c] & 32){
-                                                newp[25] += sipb;//1;
-                                                i =  tgpe*sipb;
-                                                newp[23] += sipb;//1;
-                                                i +=  gpo*sipb;
-                                        }else{
-                                                newp[23] += sipb;//1;
-                                                i =  gpo*sipb;
-                                        }
-                                        for (j = 32; j < 55;j++){
-                                                newp[j] -=i;
-                                        }
-                                }
-                                if (path[c] & 4){
-                                        //			fprintf(stderr,"Gap_open");
-                                        if(path[c] & 32){
-                                                newp[25] += sipb;//1;
-                                                i = tgpe*sipb;
-                                                newp[23] += sipb;//1;
-                                                i += gpo*sipb;
-                                        }else{
-                                                newp[23] += sipb;//1;
-                                                i = gpo*sipb;
-                                        }
-
-                                        for (j = 32; j < 55;j++){
-                                                newp[j] -=i;
-                                        }
-                                }
-                        }
-#endif
-
                 }
                 newp += 64;
                 c++;
@@ -2400,7 +2321,7 @@ float* update(const struct aln_param* ap,  const float* profa, const float* prof
                 newp[i] =  profa[i] + profb[i];
         }
         newp -= (path[0]+1) *64;
-        return newp;
+        return OK;
 }
 
 

@@ -62,11 +62,11 @@ struct alignment* make_seq(struct alignment* aln,int a,int b,int* path)
                 if (!path[c]){
                         posa++;
                         posb++;
-                }
+                }else
                 if (path[c] & 1){
                         gap_a[posa] += 1;
                         posb++;
-                }
+                }else
                 if (path[c] & 2){
                         gap_b[posb] += 1;
                         posa++;

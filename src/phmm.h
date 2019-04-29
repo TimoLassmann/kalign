@@ -13,6 +13,11 @@
 #include "tldevel.h"
 
 
+#define INDEXMM 0
+#define INDEXGPO 1
+#define INDEXGPE 2
+#define INDEXTM 3
+
 struct phmm{
 
         float** fM ;

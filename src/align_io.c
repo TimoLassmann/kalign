@@ -150,7 +150,7 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
                         WARNING_MSG("Output file extension not recognised: %s", param->outfile);
                         param->format = "fasta";//param->reformat;
                 }
-                fprintf(stderr,"Output file: %s, in %s format.\n",param->outfile,param->format);
+                //fprintf(stderr,"Output file: %s, in %s format.\n",param->outfile,param->format);
         }
         free_align_io_buffer(b);
         return aln;
@@ -1847,8 +1847,6 @@ ERROR:
         return FAIL;
 
 }
-
-
 
 int check_out_and_errors(struct align_io_buffer* b, struct parameters* param)
 {

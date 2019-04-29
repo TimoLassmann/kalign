@@ -134,6 +134,19 @@ int pair_fill(struct counts* ap, int*a,int*b,int len)
                 }
 
         }
+        double sim = 0;
+        for(i = begin;i < end;i++){
+                if(a[i] != -1 && b[i] != -1){
+                        if(a[i] == b[i]){
+                                sim += 1.0;
+                        }
+                }
+        }
+
+        sim = sim / (double) (end - begin);
+        sim = sim * sim * sim * sim;
+        sim = 1.0;
+        fprintf(stdout,"Sim :%f\n", sim);
 
 
         for(i = begin;i < end;i++){
@@ -142,25 +155,25 @@ int pair_fill(struct counts* ap, int*a,int*b,int len)
                 }else if(a[i] != -1 && b[i] != -1){ /* aligned residues  */
 
                         if(state == 0){
-                                ap->TM++;
+                                ap->TM += sim;
                         }else{
-                                ap->MM++;
+                                ap->MM += sim;
                         }
                         if(a[i] > b[i]){
-                                ap->emit[a[i]][b[i]]++;
+                                ap->emit[a[i]][b[i]] += sim;
                         }else{
-                                ap->emit[b[i]][a[i]]++;
+                                ap->emit[b[i]][a[i]] += sim;
                         }
 
-                        ap->back[a[i]]++;
-                        ap->back[b[i]]++;
+                        ap->back[a[i]] += sim;
+                        ap->back[b[i]] += sim;
                         p_aln_len++;
                         state = 1;
                 }else if(a[i] != -1 && b[i] == -1){
                         if(state == 0){
-                                ap->GPE++;
+                                ap->GPE += sim;
                         }else{
-                                ap->GPO++;
+                                ap->GPO += sim;
                         }
                         ap->back[a[i]]++;
                         p_aln_len++;
@@ -169,11 +182,11 @@ int pair_fill(struct counts* ap, int*a,int*b,int len)
 
                 }else if(a[i] == -1 && b[i] != -1){
                         if(state == 0){
-                                ap->GPE++;
+                                ap->GPE += sim;
                         }else{
-                                ap->GPO++;
+                                ap->GPO += sim;
                         }
-                        ap->back[b[i]]++;
+                        ap->back[b[i]]+= sim;
                         p_aln_len++;
                         state = 0;
                 }
@@ -214,6 +227,7 @@ int normalize_counts(struct counts*ap)
 {
         int i,j;
         double sum;
+
 
         sum = 0.0;
 
@@ -341,8 +355,8 @@ int print_counts(struct counts* ap)
         fprintf(stdout,"%f\tGPE\n", ap->GPE);
         fprintf(stdout,"%f\tTM\n", ap->TM);*/
         /* taushould be 1/ average length */
-        /* fprintf(stdout,"%f\ttau\n", ap->tau); */
-        /* fprintf(stdout,"%f\teta\n", ap->eta); */
+        fprintf(stdout,"%f\ttau\n", ap->tau);
+        fprintf(stdout,"%f\teta\n", ap->eta);
         sum = 0.0;
 
         sum = -1.0 * log2( (ap->GPO * ap->TM) / ((ap->eta) * ap->MM));
@@ -350,7 +364,7 @@ int print_counts(struct counts* ap)
         sum = -1.0 *log2(ap->GPE/(1.0 - ap->tau));
         fprintf(stdout,"ap->gpe =  %f;\n", sum);
         fprintf(stdout,"ap->tgpe =  %f;\n", 0.0);
-        ;
+        //;
         //sum = ap->MM / ((ap->eta)*(ap->eta));
         //fprintf(stdout,"%f\n",sum);
         return OK;

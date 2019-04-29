@@ -335,7 +335,7 @@ int run_kalign(struct parameters* param)
 
         DECLARE_TIMER(t1);
         /* Step 1: read all input sequences & figure out output  */
-        LOG_MSG("Reading input.");
+        //LOG_MSG("Reading input.");
         RUNP(aln = detect_and_read_sequences(param));
         /* copy dna parameter to alignment */
         aln->dna = param->dna;
@@ -343,8 +343,8 @@ int run_kalign(struct parameters* param)
                 param->ntree = aln->numseq;
         }
         RUN(detect_dna(aln));
-        LOG_MSG("Detected: %d sequences.", aln->numseq);
-        LOG_MSG("Output is %s in format %s.", param->outfile,param->format);
+        //LOG_MSG("Detected: %d sequences.", aln->numseq);
+        //LOG_MSG("Output is %s in format %s.", param->outfile,param->format);
         //LOG_MSG("Is DNA: %d", aln->dna);
         param->dna = aln->dna;
         /* If we just want to reformat end here */
@@ -370,21 +370,20 @@ int run_kalign(struct parameters* param)
         //fprintf(stderr,"        %0.8f	bonus\n",param->secret/10);
         //fprintf(stderr,"        %0.8f	bonus\n",param->secret);
 
-        /* build tree */
-        RUN(estimate_aln_param(aln, ap));
+        //RUN(estimate_aln_param(aln, ap));
 
-        LOG_MSG("Building guide tree.");
-        START_TIMER(t1);
+        //LOG_MSG("Building guide tree.");
+        //START_TIMER(t1);
         RUN(build_tree(aln,param,ap));
-        STOP_TIMER(t1);
-        LOG_MSG("Took %f sec.", GET_TIMING(t1));
+        //STOP_TIMER(t1);
+        //LOG_MSG("Took %f sec.", GET_TIMING(t1));
 
         /* Start alignment stuff */
-        LOG_MSG("Aligning");
-        START_TIMER(t1);
+        //LOG_MSG("Aligning");
+        //START_TIMER(t1);
         RUNP(map = hirschberg_alignment(aln, ap));
-        STOP_TIMER(t1);
-        LOG_MSG("Took %f sec.", GET_TIMING(t1));
+        //STOP_TIMER(t1);
+        //LOG_MSG("Took %f sec.", GET_TIMING(t1));
 
         RUN(weave(aln , map, ap->tree));
 

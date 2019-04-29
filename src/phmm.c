@@ -3,10 +3,6 @@
 #include "phmm.h"
 
 
-#define INDEXMM 0
-#define INDEXGPO 1
-#define INDEXGPE 2
-#define INDEXTM 3
 /* need forward backward  */
 /* or be adventurous and use beam sampling with u =1 i.e. no threshold ... worth a try?  */
 
@@ -56,7 +52,7 @@ int main(int argc, char *argv[])
         RUN(simple_init(phmm));
 
         RUN(clear_phmm_e(phmm));
-        RUN(add_pseudocounts(phmm, 20));
+        //RUN(add_pseudocounts(phmm, 20));
 
         //RUN(phmm_transitions(phmm));
         for(int iter = 0;iter < 50;iter++){
@@ -93,8 +89,7 @@ int forward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
         const float YY = phmm->transition[INDEXGPE];
         const float YM = phmm->transition[INDEXTM];
         /* NEEDS to be changed later */
-        const float TGPE = phmm->transition[INDEXGPE];
-
+        const float TGPE = phmm->eta;// phmm->transition[INDEXGPE];
 
 
 
@@ -224,6 +219,8 @@ int backward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
         const float YY = phmm->transition[INDEXGPE];
         const float YM = phmm->transition[INDEXTM];
 
+        const float TGPE = phmm->eta;//
+        //const float TGPE = phmm->transition[INDEXGPE];
 
         float** M = phmm->bM;
         float** X = phmm->bX;
@@ -246,23 +243,24 @@ tBM = phmm->eta;*/
                 X[len_a][j] = prob2scaledprob(0.0f);
 
                 //Y[len_a][j] =                     M[len_a][j+1] + YM + phmm->emit_M[sa[len_a]][sb[j+1]];
-                Y[len_a][j] = Y[len_a][j+1] + YY + phmm->emit_background[sb[j+1]];
+                Y[len_a][j] = Y[len_a][j+1] + TGPE + phmm->emit_background[sb[j+1]];
 
         }
         M[len_a][0] = prob2scaledprob(0.0f);
         X[len_a][0] = prob2scaledprob(0.0f);
         Y[len_a][0] = prob2scaledprob(0.0f);
+
         for(i = len_a-1; i >= 1;i--){
 
                 M[i][len_b] = X[i+1][len_b] + MX + phmm->emit_background[sa[i+1]];
 
 
-                X[i][len_b] = X[i+1][len_b] + XX + phmm->emit_background[sa[i+1]];
+                X[i][len_b] = X[i+1][len_b] + TGPE + phmm->emit_background[sa[i+1]];
 
 
                 Y[i][len_b] = prob2scaledprob(0.0f);
 
-                for(j = len_b-1; j >=0;j--){
+                for(j = len_b-1; j >=1;j--){
 
                         M[i][j] = M[i+1][j+1] + MM +phmm->emit_M[sa[i+1]][sb[j+1]];
 
@@ -277,6 +275,19 @@ tBM = phmm->eta;*/
                         Y[i][j] =                 M[i+1][j+1] + YM+ phmm->emit_M[sa[i+1]][sb[j+1]];
                         Y[i][j] = logsum(Y[i][j], Y[i][j+1] + YY+ phmm->emit_background[sb[j+1]]);
                 }
+                j = 0;
+                M[i][j] = prob2scaledprob(0.0f);//  M[i+1][j+1] + MM +phmm->emit_M[sa[i+1]][sb[j+1]];
+
+                //M[i][j] = logsum(M[i][j], X[i+1][j] + MX + phmm->emit_background[sa[i+1]]);
+                //M[i][j] = logsum(M[i][j], Y[i][j+1] + MY + phmm->emit_background[sb[j+1]]);
+
+
+                X[i][j] =                 M[i+1][j+1] + XM +phmm->emit_M[sa[i+1]][sb[j+1]];
+                X[i][j] = logsum(X[i][j], X[i+1][j] + TGPE + phmm->emit_background[sa[i+1]]);
+
+
+                Y[i][j] = prob2scaledprob(0.0f);//                 M[i+1][j+1] + YM+ phmm->emit_M[sa[i+1]][sb[j+1]];
+                //Y[i][j] = logsum(Y[i][j], Y[i][j+1] + YY+ phmm->emit_background[sb[j+1]]);
 
         }
         i = 0;
@@ -295,8 +306,8 @@ tBM = phmm->eta;*/
                 //      X[i][j] = logsum(X[i][j], X[i+1][j] + XX + phmm->emit_background[sa[i+1]]);
 
 
-                Y[i][j] =                 M[i+1][j+1] + YM+ phmm->emit_M[sa[i+1]][sb[j+1]];
-                Y[i][j] = logsum(Y[i][j], Y[i][j+1] + YY+ phmm->emit_background[sb[j+1]]);
+                Y[i][j] =                 M[i+1][j+1] + YM + phmm->emit_M[sa[i+1]][sb[j+1]];
+                Y[i][j] = logsum(Y[i][j], Y[i][j+1] + TGPE + phmm->emit_background[sb[j+1]]);
         }
 
         i = 0;
@@ -358,7 +369,7 @@ int collect_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
                 //Y[0][j] =                 M[0][j-1] + MY;
                 eGPO = logsum(eGPO, fM[0][j-1] + MY + bY[0][j] + phmm->emit_background[sb[j]] - score);
                 //Y[0][j] = logsum(Y[0][j], Y[0][j-1] + YY);
-                eGPE = logsum(eGPE, fY[0][j-1] + YY + bY[0][j] + phmm->emit_background[sb[j]]- score);
+//                eGPE = logsum(eGPE, fY[0][j-1] + YY + bY[0][j] + phmm->emit_background[sb[j]]- score);
                 //Y[0][j] += phmm->emit_background[sb[j]];
                 phmm->emit_background_e[sb[j]] = logsum(phmm->emit_background_e[sb[j]], fY[0][j] + bY[0][j]-score);
         }
@@ -367,7 +378,7 @@ int collect_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
                 //X[i][0] =                 M[i-1][0] + MX;
                 eGPO = logsum(eGPO, fM[i-1][0] + MX + bX[i][0] + phmm->emit_background[sa[i]] - score);
                 //X[i][0] = logsum(X[i][0], X[i-1][0] + XX);
-                eGPE = logsum(eGPE, fX[i-1][0] + XX + bX[i][0] + phmm->emit_background[sa[i]] - score);
+                //eGPE = logsum(eGPE, fX[i-1][0] + XX + bX[i][0] + phmm->emit_background[sa[i]] - score);
 
 
 
@@ -375,7 +386,7 @@ int collect_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
                 phmm->emit_background_e[sa[i]] = logsum(phmm->emit_background_e[sa[i]], fX[i][0]+ bX[i][0]-score);
 
 
-                for(j = 1; j<= len_b;j++){
+                for(j = 1; j < len_b;j++){
                         //M[i][j] = M[i-1][j-1] + MM;
                         eMM = logsum(eMM,fM[i-1][j-1] + MM + bM[i][j] + phmm->emit_M[sa[i]][sb[j]] - score);
 
@@ -385,12 +396,12 @@ int collect_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
                         //M[i][j] = logsum(M[i][j], Y[i-1][j-1] + YM);
                         eTM = logsum(eTM,fY[i-1][j-1] + YM + bM[i][j] + phmm->emit_M[sa[i]][sb[j]] - score);
                         //M[i][j] += phmm->emit_M[sa[i]][sb[j]];
-                        if(sa[i] < sb[j]){
-                                phmm->emit_M_e[sa[i]][sb[j]] = logsum(phmm->emit_M_e[sa[i]][sb[j]], fM[i][j] + bM[i][i] - score);
+                        if(sa[i] > sb[j]){
+                                phmm->emit_M_e[sa[i]][sb[j]] = logsum(phmm->emit_M_e[sa[i]][sb[j]], fM[i][j] + bM[i][j] - score);
                         }else{
-                                phmm->emit_M_e[sb[j]][sa[i]] = logsum(phmm->emit_M_e[sb[j]][sa[i]], fM[i][j] + bM[i][i] - score);
+                                phmm->emit_M_e[sb[j]][sa[i]] = logsum(phmm->emit_M_e[sb[j]][sa[i]], fM[i][j] + bM[i][j] - score);
                         }
-
+                        //fprintf(stdout," %d -%d : %f\n", sa[i],sb[j],fM[i][j] + bM[i][j] - score);
 
                         //X[i][j] =                 M[i-1][j] + MX;
                         eGPO = logsum(eGPO, fM[i-1][j] + MX + bX[i][j] + phmm->emit_background[sa[i]] - score);
@@ -407,6 +418,37 @@ int collect_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
                         //Y[i][j] += phmm->emit_background[sb[j]];
                         phmm->emit_background_e[sb[j]] = logsum(phmm->emit_background_e[sb[j]], fY[i][j] + bY[i][j]-score);
                 }
+                j = len_b;
+                            //M[i][j] = M[i-1][j-1] + MM;
+                eMM = logsum(eMM,fM[i-1][j-1] + MM + bM[i][j] + phmm->emit_M[sa[i]][sb[j]] - score);
+
+
+                //M[i][j] = logsum(M[i][j], X[i-1][j-1] + XM);
+                eTM = logsum(eTM,fX[i-1][j-1] + XM + bM[i][j] + phmm->emit_M[sa[i]][sb[j]] - score);
+                //M[i][j] = logsum(M[i][j], Y[i-1][j-1] + YM);
+                eTM = logsum(eTM,fY[i-1][j-1] + YM + bM[i][j] + phmm->emit_M[sa[i]][sb[j]] - score);
+                //M[i][j] += phmm->emit_M[sa[i]][sb[j]];
+                if(sa[i] > sb[j]){
+                        phmm->emit_M_e[sa[i]][sb[j]] = logsum(phmm->emit_M_e[sa[i]][sb[j]], fM[i][j] + bM[i][j] - score);
+                }else{
+                        phmm->emit_M_e[sb[j]][sa[i]] = logsum(phmm->emit_M_e[sb[j]][sa[i]], fM[i][j] + bM[i][j] - score);
+                }
+
+
+                //X[i][j] =                 M[i-1][j] + MX;
+                eGPO = logsum(eGPO, fM[i-1][j] + MX + bX[i][j] + phmm->emit_background[sa[i]] - score);
+                //X[i][j] = logsum(X[i][j], X[i-1][j] + XX);
+                //eGPE = logsum(eGPE, fX[i-1][j] + XX + bX[i][j] + phmm->emit_background[sa[i]] - score);
+
+                //X[i][j] += phmm->emit_background[sa[i]];
+                phmm->emit_background_e[sa[i]] = logsum(phmm->emit_background_e[sa[i]], fX[i][j]+ bX[i][j]-score);
+
+                //Y[i][j] =                 M[i][j-1] + MY;
+                eGPO = logsum(eGPO, fM[i][j-1] + MY + bY[i][j] + phmm->emit_background[sb[j]] - score);
+                //Y[i][j] = logsum(Y[i][j], Y[i][j-1] + YY);
+                //eGPE = logsum(eGPE, fY[i][j-1] + YY + bY[i][j] + phmm->emit_background[sb[j]] - score);
+                //Y[i][j] += phmm->emit_background[sb[j]];
+                phmm->emit_background_e[sb[j]] = logsum(phmm->emit_background_e[sb[j]], fY[i][j] + bY[i][j]-score);
 
         }
         //fprintf(stdout,"%f %f %f\n", M[len_a][len_b]+phmm->theta, X[len_a][len_b] + phmm->theta, Y[len_a][len_b] + phmm->theta);
@@ -502,23 +544,32 @@ int re_estimate(struct phmm* phmm)
 
         sum = prob2scaledprob(0.0f);
         for(i = 0; i < L;i++){
-                for(j = 0; j < L;j++){
+                for(j = 0; j <= i;j++){
+//                        fprintf(stdout," %0.2f",phmm->emit_M_e[i][j]);
                         sum = logsum(sum, phmm->emit_M_e[i][j]);
                 }
+                //fprintf(stdout,"\n");
         }
 
+        //fprintf(stdout,"\n");fprintf(stdout,"SUM:%f\n",sum);
+
         for(i = 0; i < L;i++){
-                for(j = i+1; j < L;j++){
+                for(j = 0; j <= i;j++){
                         phmm->emit_M[i][j] = phmm->emit_M_e[i][j] - sum;
                         phmm->emit_M[j][i] = phmm->emit_M[i][j];
+                        //              fprintf(stdout," %0.2f",scaledprob2prob(phmm->emit_M[i][j])*100.0);
                         //fprintf(stdout,"%0.2f ",scaledprob2prob(phmm->emit_M[i][j]));
+
                 }
+//                fprintf(stdout,"\n");
 /*                for(j = 0; j < L;j++){
                         fprintf(stdout,"%0.2f ",scaledprob2prob(phmm->emit_M[i][j]));
                 }
                 fprintf(stdout,"\n");*/
         }
-        //fprintf(stdout,"\n");
+        //      fprintf(stdout,"\n");
+        //    exit(0);
+//fprintf(stdout,"\n");
 
         sum = prob2scaledprob(0.0f);
         for(i = 0; i < L;i++){
@@ -652,10 +703,12 @@ int simple_init(struct phmm*phmm)
         for(i = 0 ; i < alphabet;i++){
                 for(j = 0; j < alphabet;j++){
                         phmm->emit_M[i][j] = prob2scaledprob(phmm->emit_M[i][j] / sum);
-
+                        //      fprintf(stdout," %0.1f", phmm->emit_M[i][j]);
                 }
+                //      fprintf(stdout,"\n");
 
         }
+        //fprintf(stdout,"\n");
 
         sum = prob2scaledprob(0.0);
         for(i = 0 ; i < alphabet;i++){
@@ -688,6 +741,7 @@ int simple_init(struct phmm*phmm)
         sum = logsum(sum, phmm->transition[INDEXTM]);
         sum = logsum(sum, phmm->tau);
 
+        phmm->eta = prob2scaledprob(0.997738);
         //fprintf(stdout,"sanity: X/Y: %f\n", scaledprob2prob(sum));
         //exit(0);
         return OK;
@@ -705,12 +759,9 @@ int clear_phmm_e(struct phmm* phmm)
 
         for(i = 0;i < phmm->L;i++){
                 phmm->emit_background_e[i] = prob2scaledprob(1.0f);
+
                 for(j = 0; j < phmm->L;j++){
-                        if(i == j){
-                                phmm->emit_M_e[i][j] = prob2scaledprob(100.0f);
-                        }else{
-                                phmm->emit_M_e[i][j] = prob2scaledprob(1.0f);
-                        }
+                        phmm->emit_M_e[i][j] = prob2scaledprob(1.0f);
                 }
         }
 
