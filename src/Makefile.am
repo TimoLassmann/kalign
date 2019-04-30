@@ -30,7 +30,13 @@ AM_CPPFLAGS=${MYINCDIRS} ${HDF5_CPPFLAGS}
 
 #LOGO_SOURCES = motif_logo.c motif_logo.h
 
-bin_PROGRAMS =  kalign phmm get_param
+bin_PROGRAMS =  kalign phmm get_param edist
+
+edist_SOURCES = \
+euclidean_dist.h \
+euclidean_dist.c 
+edist_CPPFLAGS = $(AM_CPPFLAGS) -mavx
+
 
 get_param_SOURCES = run_get_param.c \
 align_io.h \
