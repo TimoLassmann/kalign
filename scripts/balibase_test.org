@@ -157,13 +157,12 @@ chmod 755 alignment_scores.sh
    #+BEGIN_SRC R :session one :results output graphics :file BalibaseSP_scores.jpeg :exports both :width 160 :height 80
           mat <- readBaliscores("scores2.csv","oldkalign")
           mat <- rbind(mat,readBaliscores("new_scores.csv","balikalign"))
-mat <- rbind(mat, readBaliscores("scores_kalign_full_tree.csv","kalign_fill"))
-mat <- rbind(mat, readBaliscores("scores_kalign_full_tree2.csv","kalign_fill2"))
 
           mat <- rbind(mat,readBaliscores("scores_kalign_phmm3.csv","phmmkalign3"))
           mat <- rbind(mat,readBaliscores("scores_kalign_phmm4.csv","RV20RV30phmmkalign4"))
      mat <- rbind(mat,readBaliscores("scores_kalign_fast.csv","kalignfast"))
      mat <- rbind(mat,readBaliscores("scores_kalign_fast2.csv","kalignfast2"))
+     mat <- rbind(mat,readBaliscores("scores_kalign_fast4.csv","kalignpair"))
 
 
 

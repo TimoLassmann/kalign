@@ -1,5 +1,8 @@
+
 AC_INIT([kalign], [m4_esyscmd_s([./version.sh])])
 AC_CONFIG_AUX_DIR([.])
+
+
 AM_INIT_AUTOMAKE
 AC_PROG_CC
 AC_PROG_INSTALL
@@ -120,7 +123,10 @@ ac_configure_args="$ac_configure_args PACKAGE_VERSION=$PACKAGE_VERSION   PACKAGE
 
 AC_CONFIG_FILES([Makefile
 src/Makefile dev/Makefile])
+
+AC_CONFIG_HEADER([src/config.h])
 AC_CONFIG_SUBDIRS([tldevel])
+
 
 AC_OUTPUT
 

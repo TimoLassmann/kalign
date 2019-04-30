@@ -36,7 +36,8 @@ bin_PROGRAMS =  kalign phmm get_param edist
 edist_SOURCES = \
 euclidean_dist.h \
 euclidean_dist.c 
-edist_CPPFLAGS = $(AM_CPPFLAGS) -mavx
+
+edist_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
 
 
 get_param_SOURCES = run_get_param.c \
@@ -71,6 +72,10 @@ pick_anchor.h \
 pick_anchor.c \
 tree_building.h \
 tree_building.c \
+bisectingKmeans.h \
+bisectingKmeans.c \
+euclidean_dist.h \
+euclidean_dist.c \
 alignment.h \
 alignment.c \
 weave_alignment.h \

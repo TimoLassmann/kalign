@@ -1,8 +1,4 @@
 
-
-
-
-
 #include "euclidean_dist.h"
 
 #include <xmmintrin.h>
@@ -14,8 +10,7 @@ float hsum256_ps_avx(__m256 v);
 float hsum_ps_sse3(__m128 v);
 
 
-int edist_256(const float* a,const float* b, int len, float* ret);
-int edist_serial(float* a,float* b, int len, float* ret);
+#ifdef ITEST
 int main(int argc, char *argv[])
 {
         struct drand48_data randBuffer;
@@ -96,8 +91,11 @@ ERROR:
         return EXIT_FAILURE;
 }
 
+#endif
 
-int edist_serial(float* a,float* b, int len, float* ret)
+
+
+int edist_serial(const float* a,const float* b,const int len, float* ret)
 {
         int i;
         float d = 0.0f;
@@ -114,7 +112,7 @@ int edist_serial(float* a,float* b, int len, float* ret)
 
 
 
-int edist_256(const float* a,const float* b, int len, float* ret)
+int edist_256(const float* a,const float* b, const int len, float* ret)
 {
 
         float d = 0.0f;
@@ -141,6 +139,7 @@ int edist_256(const float* a,const float* b, int len, float* ret)
 }
 
 
+#ifdef HAVE_AVX2
 
 float hsum256_ps_avx(__m256 v)
 {
@@ -159,3 +158,5 @@ float hsum_ps_sse3(__m128 v)
         sums        = _mm_add_ss(sums, shuf);
         return        _mm_cvtss_f32(sums);
 }
+
+#endif

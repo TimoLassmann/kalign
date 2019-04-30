@@ -19,7 +19,7 @@ int* pick_anchor(struct alignment* aln, int* n)
         int i,j;
         ASSERT(aln != NULL, "No alignment.");
 
-        num_anchor = MACRO_MAX(MACRO_MIN(1, aln->numseq), (int) log((double) aln->numseq));
+        num_anchor = MACRO_MAX(MACRO_MIN(8, aln->numseq), (int) log((double) aln->numseq));
         RUNP(anchors = select_seqs(aln, num_anchor));
         *n = num_anchor;
         return anchors;
@@ -50,8 +50,8 @@ int* select_seqs(struct alignment* aln, int num_anchor)
         //fprintf(stdout,"%d\t seeds\n", num_anchor);
 
         MMALLOC(anchors, sizeof(int) * num_anchor);
-        stride = (int) round((double)  aln->numseq /(double) num_anchor);
-        //fprintf(stdout,"%d\tstride\n", stride);
+        stride = (int) floor((double)  aln->numseq /(double) num_anchor);
+        fprintf(stdout,"%d\tstride\n", stride);
         c = 0;
         for(i = 0;i < aln->numseq;i++){
                 if((i % stride) ==0){
@@ -62,7 +62,7 @@ int* select_seqs(struct alignment* aln, int num_anchor)
                         }
                 }
         }
-        ASSERT(c == num_anchor,"Cound not select all anchors");
+        ASSERT(c == num_anchor,"Cound not select all anchors\nc:%d\tnum_anchor:%d\t numseq:%d",c,num_anchor,aln->numseq);
 
         for(i = 0; i < aln->numseq;i++){
                 MFREE(seq_sort[i]);

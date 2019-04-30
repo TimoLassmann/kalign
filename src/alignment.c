@@ -1,9 +1,9 @@
+#include <xmmintrin.h>
 #include "alignment.h"
 
 #include "pick_anchor.h"
 #define MAX(a, b) (a > b ? a : b)
 #define MAX3(a,b,c) MAX(MAX(a,b),c)
-
 
 struct states{
         float a;
@@ -74,13 +74,13 @@ int update(const float* profa, const float* profb,float* newp,const int* path);
 int calc_seq_id(const int* path,int* a, int*b,float* dist);
 
 
-float** pair_aln_dist(struct alignment* aln, struct aln_param* ap)
+float** pair_aln_dist(struct alignment* aln, struct aln_param* ap, int* num_anchors)
 {
         struct hirsch_mem* hm = NULL;
         float** dm = NULL;
         int* anchors = NULL;
         int* map = NULL;
-        int num_anchors = 0;
+
         int numseq;
         int numprofiles;
         int i,j,c;
@@ -94,11 +94,20 @@ float** pair_aln_dist(struct alignment* aln, struct aln_param* ap)
         numseq = aln->numseq;
         numprofiles = aln->num_profiles;
 
-        RUNP(anchors = pick_anchor(aln, &num_anchors));
+        RUNP(anchors = pick_anchor(aln, num_anchors));
 
         i = numseq;
 
-        RUNP(dm = galloc(dm,i,i,0.0f));
+        //RUNP(dm = galloc(dm,i,i,0.0f));
+
+        MMALLOC(dm, sizeof(float*)* numseq);
+
+        for(i = 0; i < numseq;i++){
+                dm[i] = NULL;
+                dm[i] = _mm_malloc(sizeof(float)* *num_anchors,32);
+        }
+
+        
 
         i  = aln->sl[anchors[0]] + 2;
         RUNP(hm = hirsch_mem_alloc(i));
@@ -107,10 +116,10 @@ float** pair_aln_dist(struct alignment* aln, struct aln_param* ap)
         for(i = 0; i < aln->numseq;i++){
                 a = aln->s[i];
                 len_a = aln->sl[i];
-                for(j = i+1;j < aln->numseq;j++){
+                for(j = 0;j < *num_anchors;j++){
 
-                        b = aln->s[j];
-                        len_b = aln->sl[j];
+                        b = aln->s[anchors[j]];
+                        len_b = aln->sl[anchors[j]];
                         MMALLOC(map,sizeof(int) * (len_a+len_b+2));
 
                         for (c = 0; c < (len_a+len_b+2);c++){
@@ -130,13 +139,15 @@ float** pair_aln_dist(struct alignment* aln, struct aln_param* ap)
                         hm->b[0].a = 0.0;
                         hm->b[0].ga =  -FLT_MAX;
                         hm->b[0].gb =  -FLT_MAX;
-                        hirsch_ss_dyn_score(ap,a,b,hm,map,&dm[i][j]);
-                        //map  = add_gap_info_to_hirsch_path(map,len_a,len_b);
-                        //calc_seq_id(map,a,b, &dm[i][j]);
-                        //                      fprintf(stdout,"ID: %f\n", dm[i][j]);
-                        //fprintf(stdout,"%f %d %d\n",dm[i][j],i,j);
-                        dm[i][j] = dm[i][j] / ((float)(len_a + len_b)/2.0f);
-                        dm[j][i] = dm[i][j];
+                        hirsch_ss_dyn(ap,a,b,hm,map);
+                        //fprintf(stdout,"%d %d %f\n",i,anchors[j],dm[i][j]);
+                        map  = add_gap_info_to_hirsch_path(map,len_a,len_b);
+                        calc_seq_id(map,a,b, &dm[i][j]);
+                        dm[i][j] =  1.0f - dm[i][j];
+
+
+//                    fprintf(stdout,"ID: %f\n", dm[i][j]);
+                        //fprintf(stdout,"%f %d %d %d\n",dm[i][j],i,j, anchors[j]);
 
                         MFREE(map);
 //                        exit(0);
