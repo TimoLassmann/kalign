@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
         float d1,d2;
         int i,j,c;
         int max_iter = 1000;
-        int num_element = 16;
+        int num_element = 128;
 //        mat = galloc(mat,1000,8,0.0);
 //void* _mm_malloc (size_t size, size_t align)
 

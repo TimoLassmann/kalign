@@ -8,6 +8,21 @@ AM_SILENT_RULES([no])
 
 
 
+AC_CONFIG_MACRO_DIR([m4])
+
+
+
+# M4 macros for checking of CPU features.
+m4_include([m4/ax_gcc_x86_avx_xgetbv.m4])
+m4_include([m4/ax_gcc_x86_cpuid.m4])
+m4_include([m4/ax_check_compile_flag.m4])
+m4_include([m4/ax_ext.m4])
+AX_EXT
+
+
+AC_SUBST(SIMD_FLAGS)
+# AC_SUBST(CPUEXT_FLAGS)
+
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_INSTALL
@@ -101,7 +116,6 @@ AC_MSG_RESULT($opt_valgrind_tests)
 
 
 
-
 ac_configure_args="$ac_configure_args PACKAGE_VERSION=$PACKAGE_VERSION   PACKAGE_NAME=$PACKAGE_NAME"
 
 AC_CONFIG_FILES([Makefile
@@ -109,3 +123,16 @@ src/Makefile dev/Makefile])
 AC_CONFIG_SUBDIRS([tldevel])
 
 AC_OUTPUT
+
+AC_MSG_NOTICE([---------------------------------------------------------])
+AC_MSG_NOTICE([Configuration complete - $PACKAGE_NAME-$PACKAGE_VERSION])
+AC_MSG_NOTICE([])
+AC_MSG_NOTICE([General Information:])
+AC_MSG_NOTICE([               Version: $VERSION])
+AC_MSG_NOTICE([         Configured on: $DATE])
+AC_MSG_NOTICE([         Configured by: $USER])
+AC_MSG_NOTICE([           Host system: $host_cpu-$host_vendor-$host_os])
+AC_MSG_NOTICE([     Uname information: $UNAME_INFO])
+AC_MSG_NOTICE([    Installation point: $prefix])
+AC_MSG_NOTICE([    Installation point: $SIMD_FLAGS])
+AC_MSG_NOTICE([---------------------------------------------------------])
