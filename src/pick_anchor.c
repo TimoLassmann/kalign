@@ -50,19 +50,13 @@ int* select_seqs(struct alignment* aln, int num_anchor)
         //fprintf(stdout,"%d\t seeds\n", num_anchor);
 
         MMALLOC(anchors, sizeof(int) * num_anchor);
-        stride = (int) floor((double)  aln->numseq /(double) num_anchor);
-        fprintf(stdout,"%d\tstride\n", stride);
-        c = 0;
-        for(i = 0;i < aln->numseq;i++){
-                if((i % stride) ==0){
-                        anchors[c] = seq_sort[i]->id;
-                        c++;
-                        if(c == num_anchor){
-                                break;
-                        }
-                }
+        stride = aln->numseq / num_anchor;
+//        fprintf(stdout,"%d\tstride\n", stride);
+        //c = 0;
+        for(i = 0; i < num_anchor;i++){
+                anchors[i] = seq_sort[i*stride]->id;
         }
-        ASSERT(c == num_anchor,"Cound not select all anchors\nc:%d\tnum_anchor:%d\t numseq:%d",c,num_anchor,aln->numseq);
+        ASSERT(i == num_anchor,"Cound not select all anchors\nc:%d\tnum_anchor:%d\t numseq:%d",c,num_anchor,aln->numseq);
 
         for(i = 0; i < aln->numseq;i++){
                 MFREE(seq_sort[i]);
@@ -72,7 +66,6 @@ int* select_seqs(struct alignment* aln, int num_anchor)
 ERROR:
         return NULL;
 }
-
 
 int sort_by_len(const void *a, const void *b)
 {

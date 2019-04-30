@@ -40,11 +40,17 @@ int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln
         srand48_r(time(NULL), &randBuffer);
 
         tree = ap->tree;
+
         numseq = aln->numseq;
+        DECLARE_TIMER(t1);
+
+        START_TIMER(t1);
+
+
         LOG_MSG("Pair_dist");
         RUNP(dm = pair_aln_dist(aln, ap, &num_anchors));
-
-        LOG_MSG("done");
+        STOP_TIMER(t1);
+        LOG_MSG("Took %f sec.", GET_TIMING(t1));
         /*for(i = 0; i < aln->numseq;i++){
                 fprintf(stdout,"%d",i);
                 for(j = 0; j <  num_anchors;j++){
@@ -59,9 +65,14 @@ int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln
         }
 
         RUNP(root = alloc_node());
+
+
+
         LOG_MSG("bi");
+        START_TIMER(t1);
         RUNP(root = bisecting_kmeans(root, dm, samples, numseq, num_anchors, numseq, &randBuffer));
-        LOG_MSG("Done");
+        STOP_TIMER(t1);
+        LOG_MSG("Took %f sec.", GET_TIMING(t1));
         label_internal(root, numseq);
         //printTree(root, 0);
 

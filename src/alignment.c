@@ -96,23 +96,29 @@ float** pair_aln_dist(struct alignment* aln, struct aln_param* ap, int* num_anch
 
         RUNP(anchors = pick_anchor(aln, num_anchors));
 
-        i = numseq;
+
 
         //RUNP(dm = galloc(dm,i,i,0.0f));
 
         MMALLOC(dm, sizeof(float*)* numseq);
 
+        c = *num_anchors / 8;
+        if( *num_anchors%8){
+                c++;
+        }
+        c = c << 3;
+
         for(i = 0; i < numseq;i++){
                 dm[i] = NULL;
-                dm[i] = _mm_malloc(sizeof(float)* *num_anchors,32);
-        }
+                dm[i] = _mm_malloc(sizeof(float) * c,32);
+                for(j = 0; j < c;j++){
+                        dm[i][j] = 0.0f;
+                }
 
-        
+        }
 
         i  = aln->sl[anchors[0]] + 2;
         RUNP(hm = hirsch_mem_alloc(i));
-
-
         for(i = 0; i < aln->numseq;i++){
                 a = aln->s[i];
                 len_a = aln->sl[i];
