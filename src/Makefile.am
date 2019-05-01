@@ -31,7 +31,12 @@ AM_CPPFLAGS=${MYINCDIRS} ${HDF5_CPPFLAGS}
 
 #LOGO_SOURCES = motif_logo.c motif_logo.h
 
-bin_PROGRAMS =  kalign phmm get_param edist
+bin_PROGRAMS =  kalign phmm get_param edist alphabet
+
+alphabet_SOURCES = \
+alphabet.h \
+alphabet.c
+alphabet_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
 
 edist_SOURCES = \
 euclidean_dist.h \
@@ -62,6 +67,8 @@ aln_data.h \
 aln_data.c \
 align_io.h \
 align_io.c \
+alphabet.h \
+alphabet.c \
 alignment_parameters.h \
 alignment_parameters.c \
 estimate_aln_param.h \
@@ -74,6 +81,8 @@ tree_building.h \
 tree_building.c \
 bisectingKmeans.h \
 bisectingKmeans.c \
+sequence_distance.h \
+sequence_distance.c \
 euclidean_dist.h \
 euclidean_dist.c \
 alignment.h \

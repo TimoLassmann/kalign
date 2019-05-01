@@ -1,12 +1,13 @@
 #include <xmmintrin.h>
 
 
+#include "sequence_distance.h"
 #include "bisectingKmeans.h"
 
 #include "euclidean_dist.h"
 
 #include "alignment.h"
-
+#include "pick_anchor.h"
 struct node{
         struct node* left;
         struct node* right;
@@ -21,6 +22,11 @@ int label_internal(struct node*n, int label);
 int* readbitree(struct node* p,int* tree);
 void printTree(struct node* curr,int depth);
 struct node* bisecting_kmeans(struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct drand48_data* randBuffer);
+
+float** pair_wu_fast_dist(struct alignment* aln, struct aln_param* ap, int* num_anchors);
+
+int unit_zero(float** d, int len_a, int len_b);
+
 int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln_param* ap)
 {
         struct drand48_data randBuffer;
@@ -31,7 +37,7 @@ int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln
         int num_anchors;
         int numseq;
 
-        int i,j;
+        int i;
 
         ASSERT(aln != NULL, "No alignment.");
         ASSERT(param != NULL, "No input parameters.");
@@ -42,15 +48,38 @@ int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln
         tree = ap->tree;
 
         numseq = aln->numseq;
-        DECLARE_TIMER(t1);
 
-        START_TIMER(t1);
+        dm = pair_wu_fast_dist(aln, ap, &num_anchors);
 
 
-        LOG_MSG("Pair_dist");
-        RUNP(dm = pair_aln_dist(aln, ap, &num_anchors));
-        STOP_TIMER(t1);
-        LOG_MSG("Took %f sec.", GET_TIMING(t1));
+        unit_zero(dm, aln->numseq, num_anchors);
+
+        /*int j;
+        double r;
+        float sum = 0.0;
+        for(i = 0; i < aln->numseq;i++){
+                sum = 0.0;
+                for(j = 0; j < num_anchors;j++){
+                        //drand48_r(&randBuffer, &r);
+                        sum += dm[i][j];
+                        //fprintf(stdout,"%f ",dm[i][j]);
+
+                }
+                if(sum == 0.0){
+                        sum = 1.0;
+                }
+                for(j = 0; j < num_anchors;j++){
+                        //drand48_r(&randBuffer, &r);
+                        dm[i][j] = dm[i][j] / sum;
+                        fprintf(stdout,"%f ",dm[i][j]);
+
+                }
+                fprintf(stdout,"\n");
+                }
+
+        */
+        //RUNP(dm = pair_aln_dist(aln, ap, &num_anchors));
+
         /*for(i = 0; i < aln->numseq;i++){
                 fprintf(stdout,"%d",i);
                 for(j = 0; j <  num_anchors;j++){
@@ -68,11 +97,9 @@ int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln
 
 
 
-        LOG_MSG("bi");
-        START_TIMER(t1);
+
         RUNP(root = bisecting_kmeans(root, dm, samples, numseq, num_anchors, numseq, &randBuffer));
-        STOP_TIMER(t1);
-        LOG_MSG("Took %f sec.", GET_TIMING(t1));
+
         label_internal(root, numseq);
         //printTree(root, 0);
 
@@ -95,6 +122,65 @@ int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln
         return OK;
 ERROR:
         return FAIL;
+}
+
+int unit_zero(float** d, int len_a, int len_b)
+{
+
+        float sum;
+        float sq_sum;
+        float mean;
+        float variance;
+
+        int i,j;
+
+        for(j = 0; j < len_b;j++){
+                sum = 0.0f;
+                sq_sum = 0.0f;
+                for(i = 0; i < len_a;i++){
+                        sum += d[i][j];
+                        sq_sum += d[i][j] * d[i][j];
+                }
+                mean = sum / (float) len_a;
+                variance = sq_sum / (float) len_a - mean * mean;
+                //fprintf(stdout,"%d %f %f \n",j,mean,variance);
+                if(variance){
+                for(i = 0; i < len_a;i++){
+                        d[i][j] = (d[i][j] - mean) / variance;
+                }
+                }
+                /*sum = 0.0f;
+                sq_sum = 0.0f;
+                for(i = 0; i < len_a;i++){
+                        sum += d[i][j];
+                        sq_sum += d[i][j] * d[i][j];
+                }
+                mean = sum / (float) len_a;
+                variance = sq_sum / (float) len_a - mean * mean;
+                fprintf(stdout,"%d %f %f \n",j,mean,variance);*/
+        }
+        return OK;
+}
+
+float** pair_wu_fast_dist(struct alignment* aln, struct aln_param* ap, int* num_anchors)
+{
+        float** dm = NULL;
+        int* anchors = NULL;
+        ASSERT(aln != NULL,"No alignment");
+
+
+
+
+        RUNP(anchors = pick_anchor(aln, num_anchors));
+
+        //dm = protein_wu_distance(aln, 59.0,0, anchors, *num_anchors);
+
+        dm = kmer_distance(aln,  anchors, *num_anchors,6);
+        /* normalize  */
+        MFREE(anchors);
+        return dm;
+ERROR:
+        return NULL;
 }
 
 
@@ -128,17 +214,23 @@ struct node* bisecting_kmeans(struct node* n, float** dm,int* samples,int numseq
                 return n;
 
         }
-        w = _mm_malloc(sizeof(float)*num_anchors,32);
-        wr = _mm_malloc(sizeof(float) *num_anchors,32);
-        wl = _mm_malloc(sizeof(float) *num_anchors,32);
+        s = num_anchors / 8;
+        if( num_anchors%8){
+                s++;
+        }
+        s = s << 3;
 
-        cr = _mm_malloc(sizeof(float) *num_anchors,32);
-        cl = _mm_malloc(sizeof(float) *num_anchors,32);
+        w = _mm_malloc(sizeof(float)*s,32);
+        wr = _mm_malloc(sizeof(float) *s,32);
+        wl = _mm_malloc(sizeof(float) *s,32);
+
+        cr = _mm_malloc(sizeof(float) *s,32);
+        cl = _mm_malloc(sizeof(float) *s,32);
 
         MMALLOC(sl, sizeof(int) * num_samples);
         MMALLOC(sr, sizeof(int) * num_samples);
 
-        for(i = 0; i < num_anchors;i++){
+        for(i = 0; i < s;i++){
                 w[i] = 0.0f;
                 wr[i] = 0.0f;
                 wl[i] = 0.0f;
@@ -156,9 +248,9 @@ struct node* bisecting_kmeans(struct node* n, float** dm,int* samples,int numseq
         }
 
 
-        lrand48_r(randBuffer, &r);
-        r = r % num_samples;
-        s = samples[r];
+        //lrand48_r(randBuffer, &r);
+        //r = r % num_samples;
+        s = samples[0];
         //LOG_MSG("Selected %d\n",s);
         for(j = 0; j < num_anchors;j++){
                 cl[j] = dm[s][j];
@@ -170,17 +262,23 @@ struct node* bisecting_kmeans(struct node* n, float** dm,int* samples,int numseq
         }
 
 
-        _mm_free(w);
+
         /* check if cr == cl - we have identical sequences  */
         s = 0;
+        //LOG_MSG("COMP");
         for(j = 0; j < num_anchors;j++){
-                if(cl[j] != cr[j]){
+                //fprintf(stdout,"%d\t%f %f  %f %d %e\n",j, cl[j],cr[j],w[j],s,cl[j] - cr[j]);
+                //if(cl[j] != cr[j]){
+                //fprintf(stdout," diff: %e  cutoff %e\n",fabsf(cl[j]-cr[j]),1.0E-5);
+                if(fabsf(cl[j]-cr[j]) >  1.0E-6){
                         s = 1;
                         break;
                 }
-                //      fprintf(stdout,"%f %f  %f\n", cl[j],cr[j],w[j]);
+
         }
+        _mm_free(w);
         if(!s){
+                //      LOG_MSG("Identical!!!");
                 num_l = 0;
                 num_r = 0;
                 sl[num_l] = samples[0];
@@ -190,6 +288,11 @@ struct node* bisecting_kmeans(struct node* n, float** dm,int* samples,int numseq
                         sr[num_r] = samples[i];
                         num_r++;
                 }
+                _mm_free(wr);
+                _mm_free(wl);
+                _mm_free(cr);
+                _mm_free(cl);
+
                 MFREE(samples);
                 n->left = alloc_node();
                 RUNP(n->left = bisecting_kmeans(n->left, dm, sl, numseq, num_anchors, num_l,randBuffer));
@@ -201,7 +304,7 @@ struct node* bisecting_kmeans(struct node* n, float** dm,int* samples,int numseq
         w = NULL;
         while(1){
                 stop++;
-                if(stop == 100){
+                if(stop == 10000){
                         ERROR_MSG("Failed.");
                 }
                 num_l = 0;
@@ -227,6 +330,10 @@ struct node* bisecting_kmeans(struct node* n, float** dm,int* samples,int numseq
                 fprintf(stdout,"\n");*/
                 for(i = 0; i < num_samples;i++){
                         s = samples[i];
+
+                        //edist_serial(dm[s], cl, num_anchors, &dl);
+                        //edist_serial(dm[s], cr, num_anchors, &dr);
+
                         edist_256(dm[s], cl, num_anchors, &dl);
                         edist_256(dm[s], cr, num_anchors, &dr);
                         //fprintf(stdout,"Dist: %f %f\n",dl,dr);

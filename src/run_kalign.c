@@ -17,7 +17,7 @@ int detect_dna(struct alignment* aln);
 
 int main(int argc, char *argv[])
 {
-        int i,c;
+        int c;
         struct parameters* param = NULL;
 
         RUNP(param = init_param());
@@ -315,7 +315,7 @@ int main(int argc, char *argv[])
         }
 
 
-
+        log_command_line(argc, argv);
         RUN(run_kalign(param));
         free_parameters(param);
 
@@ -331,7 +331,7 @@ int run_kalign(struct parameters* param)
 {
         struct alignment* aln = NULL;
         struct aln_param* ap = NULL;
-        float** dm;
+        //float** dm;
         int** map = NULL;       /* holds all alignment paths  */
         int i,j;
 
@@ -376,13 +376,15 @@ int run_kalign(struct parameters* param)
 
         LOG_MSG("Building guide tree.");
         START_TIMER(t1);
-        RUN(build_tree(aln,param,ap));
+
+        //RUN(build_tree(aln,param,ap));
+        RUN(build_tree_kmeans(aln,param,ap));
         STOP_TIMER(t1);
         LOG_MSG("Took %f sec.", GET_TIMING(t1));
 
-        LOG_MSG("Building guide tree.");
+        //LOG_MSG("Building guide tree.");
         //START_TIMER(t1);
-        RUN(build_tree_kmeans(aln,param,ap));
+
         //STOP_TIMER(t1);
         //LOG_MSG("Took %f sec.", GET_TIMING(t1));
 

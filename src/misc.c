@@ -129,3 +129,184 @@ int byg_start(char* pattern,char*text)
         }
         return -1;
 }
+
+
+
+unsigned long int bpm(const unsigned char* t,const unsigned char* p,int n,int m)
+{
+	register unsigned long int i;//,c;
+	unsigned long int diff;
+	unsigned long int B[5];
+	if(m > 64){
+		m = 64;
+	}
+
+	unsigned long int k = m;
+	//static int counter = 0;
+	register unsigned long int VP,VN,D0,HN,HP,X;
+
+	long int MASK = 0;
+	//c = 0;
+
+	diff = m;
+
+	for(i = 0; i < 5;i++){
+		B[i] = 0;
+	}
+
+	for(i = 0; i < m;i++){
+		B[(int)(p[i] & 0x3)] |= (1ul << i);
+	}
+
+	//c = 0;
+	VP = 0xFFFFFFFFFFFFFFFFul;
+	VN = 0ul;
+	m--;
+	MASK = 1ul << m;
+	for(i = 0; i < n;i++){
+		X = (B[(int)(t[i] &0x3)  ] | VN);
+		D0 = ((VP+(X&VP)) ^ VP) | X ;
+		HN = VP & D0;
+		HP = VN | ~(VP | D0);
+		X = HP << 1ul;
+		VN = X & D0;
+		VP = (HN << 1ul) | ~(X | D0);
+		diff += (HP & MASK) >> m;
+		diff -= (HN & MASK) >> m;
+		if(diff < k){
+			k = diff;
+
+		}
+	}
+	return k;
+}
+int validate_bpm_sse(struct qs_struct* qs,int* assignment,unsigned char* t,int n,int num,long int offset)
+{
+	int i,j;
+	int len = 0;
+	struct seq_info* si = 0;
+	unsigned long int new;
+	unsigned int _MM_ALIGN16 nuc[16];
+	int _MM_ALIGN16 positions[4];
+	int _MM_ALIGN16 errors[4];
+
+	unsigned int _MM_ALIGN16 lengths[4];
+
+	__m128i VP,VN,D0,HN,HP,X,MASK,K,NOTONE,POS,diff,zero,one;
+	__m128i* nuc_p;
+	__m128i xmm1,xmm2;
+	//long int MASK = 0;
+
+	for(i = 0; i < 16;i++){
+		nuc[i] = 0ul;
+	}
+
+	for(i = 0; i < num;i++){
+		si = qs->seq_info[abs(assignment[i])];
+		len = si->len;
+		if(len > 31){
+			len = 31;
+		}
+
+		lengths[i] = len;
+
+
+		if(assignment[i] >= 0){
+			for(j = 0; j < len;j++){
+				nuc[((int)(si->seq[j] & 0x3u) << 2) + i] |=  (1ul << (unsigned long int)(len-1-j));
+	//			fprintf(stderr,"%c",si->seq[j]+65);
+			}
+		}else{
+			for(j = 0; j < len;j++){
+				nuc[((int)(si->reverse_seq[j] & 0x3u) << 2) + i] |=  (1ul << (unsigned long int)(len-1-j));
+	//			fprintf(stderr,"%c",si->reverse_seq[j] + 65);
+			}
+		}
+	//	fprintf(stderr,"\n" );
+	}
+	nuc_p = (__m128i*) nuc;
+	//S = _mm_set1_epi32(0);
+	zero = _mm_set1_epi32(0);
+	one = _mm_set1_epi32(1);
+	diff =  _mm_load_si128 ( (__m128i*) lengths );  // _mm_set1_epi32(m);
+	VP =  _mm_set1_epi32(0xFFFFFFFFu);
+	VN =  _mm_set1_epi32(0);
+	NOTONE =  _mm_set1_epi32(0xFFFFFFFF);
+	K =  _mm_set1_epi32(0x7FFFFFFF);
+	POS = _mm_set1_epi32(0);
+
+	//VP = 0xFFFFFFFFFFFFFFFFul;
+	//VN = 0ul;
+
+	for(i = 0; i< 4;i++){
+		lengths[i]--;
+		lengths[i] = 1 << lengths[i];
+	//	fprintf(stderr,"%d	%d	LEN:%d\n",i,num,lengths[i]);
+	}
+
+	// m--;
+	MASK =  _mm_load_si128 ( (__m128i*) lengths ); //  _mm_set1_epi32(1ul << m);
+	for(i = 0; i < n ;i++){
+		//fprintf(stderr,"%c",*t + 65);
+		X = _mm_or_si128 (*(nuc_p +( (int)(*t)  & 0x3u) ) , VN);
+		//X = (B[(int) *t] | VN);
+		xmm1 = _mm_and_si128(X, VP);
+		xmm2 = _mm_add_epi32(VP ,xmm1);
+		xmm1 = _mm_xor_si128 (xmm2, VP);
+		D0 = _mm_or_si128(xmm1, X);
+		//D0 = ((VP+(X&VP)) ^ VP) | X ;
+		HN = _mm_and_si128(VP, D0);
+		//HN = VP & D0;
+		xmm1 = _mm_or_si128(VP, D0);
+		xmm2 = _mm_andnot_si128 (xmm1,NOTONE);
+		HP = _mm_or_si128(VN, xmm2);
+		//HP = VN | ~(VP | D0);
+		X = _mm_slli_epi32(HP,1);
+		//X = HP << 1ul;
+		VN = _mm_and_si128(X, D0);
+		//VN = X & D0;
+		xmm1 = _mm_slli_epi32(HN,1);
+		xmm2 = _mm_or_si128(X, D0);
+		xmm2 = _mm_andnot_si128 (xmm2,NOTONE);
+		VP = _mm_or_si128(xmm1, xmm2);
+		//VP = (HN << 1ul) | ~(X | D0);
+		xmm1 = _mm_and_si128(HP, MASK);
+		xmm2 = _mm_cmpgt_epi32(xmm1, zero);
+		diff = _mm_add_epi32(diff , _mm_and_si128( xmm2, one));
+		//diff += (HP & MASK) >> m;
+		xmm1 = _mm_and_si128(HN, MASK);
+		xmm2 = _mm_cmpgt_epi32(xmm1, zero);
+		diff = _mm_sub_epi32(diff,  _mm_and_si128( xmm2, one));
+		//diff -= (HN & MASK) >> m;
+		xmm1 = _mm_cmplt_epi32(diff, K);
+		xmm2 = _mm_and_si128(xmm1, diff);
+		K = _mm_or_si128(xmm2, _mm_andnot_si128  (xmm1,K));
+		xmm2 = _mm_and_si128(xmm1, _mm_set1_epi32(i));
+		POS = _mm_or_si128(xmm2, _mm_andnot_si128  (xmm1,POS));
+		t--;
+	}
+	//fprintf(stderr,"\n");
+	_mm_store_si128 ((__m128i*) positions, POS);
+	//fprintf(stderr,"%d	%d	%d	%d	",out1[0],out1[1],out1[2],out1[3]);
+	_mm_store_si128 ((__m128i*) errors, K);
+	//fprintf(stderr,"%d	%d	%d	%d\n",out2[0],out2[1],out2[2],out2[3]);
+
+	for(i = 0; i < num;i++){
+		si = qs->seq_info[abs(assignment[i])];
+		//len = si->len;
+		//lengths[i] = len;
+	//	fprintf(stderr,"%d	%d	%d	%d	%d\n",  assignment[i] , si->len,num,out2[i],out1[i] + offset);
+		if(assignment[i] >= 0){
+			new = ((unsigned long int)(si->len - errors[i])) << 56ul;
+			new |= ((unsigned long int) ((unsigned long int)offset - (unsigned long int) positions[i]) << 1ul);
+			BinaryInsertionSortOne(si->match_units,LIST_STORE_SIZE ,new);
+		}else{
+			new = ((unsigned long int)(si->len - errors[i])) << 56ul;
+			new |= ((unsigned long int) ((unsigned long int) offset - (unsigned long int) positions[i]) << 1ul);
+			new |= 1ul ;
+			BinaryInsertionSortOne(si->match_units,LIST_STORE_SIZE ,new);
+		}
+
+	}
+	return 1;
+}

@@ -74,6 +74,7 @@ int update(const float* profa, const float* profb,float* newp,const int* path);
 int calc_seq_id(const int* path,int* a, int*b,float* dist);
 
 
+
 float** pair_aln_dist(struct alignment* aln, struct aln_param* ap, int* num_anchors)
 {
         struct hirsch_mem* hm = NULL;
@@ -116,7 +117,7 @@ float** pair_aln_dist(struct alignment* aln, struct aln_param* ap, int* num_anch
                 }
 
         }
-
+        //fprintf(stdout,"%d C \n",c);
         i  = aln->sl[anchors[0]] + 2;
         RUNP(hm = hirsch_mem_alloc(i));
         for(i = 0; i < aln->numseq;i++){
@@ -145,11 +146,12 @@ float** pair_aln_dist(struct alignment* aln, struct aln_param* ap, int* num_anch
                         hm->b[0].a = 0.0;
                         hm->b[0].ga =  -FLT_MAX;
                         hm->b[0].gb =  -FLT_MAX;
-                        hirsch_ss_dyn(ap,a,b,hm,map);
+                        hirsch_ss_dyn_score(ap, a, b, hm, map, &dm[i][j]);
+                        //hirsch_ss_dyn(ap,a,b,hm,map);
                         //fprintf(stdout,"%d %d %f\n",i,anchors[j],dm[i][j]);
-                        map  = add_gap_info_to_hirsch_path(map,len_a,len_b);
-                        calc_seq_id(map,a,b, &dm[i][j]);
-                        dm[i][j] =  1.0f - dm[i][j];
+                        //map  = add_gap_info_to_hirsch_path(map,len_a,len_b);
+                        //calc_seq_id(map,a,b, &dm[i][j]);
+                        //dm[i][j] =  1.0f - dm[i][j];
 
 
 //                    fprintf(stdout,"ID: %f\n", dm[i][j]);
@@ -166,7 +168,6 @@ ERROR:
         hirsch_mem_free(hm);
         return NULL;
 }
-
 
 
 int** hirschberg_alignment(struct alignment* aln, struct aln_param* ap)

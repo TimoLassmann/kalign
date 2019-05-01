@@ -1,28 +1,14 @@
 #include "tree_building.h"
 
+#include "sequence_distance.h"
 
 
 
-#define NODESIZE 16
 
-/* small hash implementation */
-struct bignode{
-        struct bignode *next;
-        unsigned int pos[NODESIZE];
-        unsigned int num;
-};
-
-struct bignode* big_insert_hash(struct bignode *n,const unsigned int pos);
-void big_remove_nodes(struct bignode *n);
-void big_print_nodes(struct bignode *n);
 
 /* distance calculation */
-float** dna_distance(struct alignment* aln,struct parameters* param, int nj);
-float dna_distance_calculation(struct bignode* hash[], const int* p,const int seqlen,int diagonals,float mode);
 
 
-float** protein_wu_distance(struct alignment* aln,struct parameters* param, int nj);
-float protein_wu_distance_calculation(struct bignode* hash[],const int* seq,const int seqlen,const int diagonals,const float mode);
 
 /* tree building stuff */
 
@@ -86,16 +72,16 @@ int build_tree(struct alignment* aln,struct parameters* param, struct aln_param*
         /* https://software.intel.com/sites/landingpage/IntrinsicsGuide/#expand=5364,4616,2941,1884,3840,3847,5663,3404&cats=Load&text=loadu_ps */
         if(param->dna == 1){
                 if(byg_start(param->tree,"njNJ") != -1){
-                        RUNP(dm =  dna_distance(aln,param,1));
+                        RUNP(dm =  dna_distance(aln,param->zlevel,1));
 
                 }else{
-                        RUNP(dm =  dna_distance(aln,param,0));
+                        RUNP(dm =  dna_distance(aln,param->zlevel,0));
                 }
         }else{
                 if(byg_start(param->tree,"njNJ") != -1){
-                        RUNP(dm =  protein_wu_distance(aln,param,1));
+                        RUNP(dm =  protein_wu_distance(aln,param->zlevel,1,NULL,0));
                 }else{
-                        RUNP(dm =  protein_wu_distance(aln,param,0));
+                        RUNP(dm =  protein_wu_distance(aln,param->zlevel,0,NULL,0));
                 }
         }
 
@@ -132,364 +118,12 @@ ERROR:
 
 
 
-float** protein_wu_distance(struct alignment* aln,struct parameters* param, int nj)
-{
-        struct bignode* hash[1024];
-        float** dm = NULL;
-        int*p =0;
-        int i,j,a;
-        unsigned int hv;
-        int numseq;
-        int numprofiles;
-        float min;
-        float cutoff;
-
-        ASSERT(aln != NULL,"No alignment");
-
-        numseq = aln->numseq;
-        numprofiles = aln->num_profiles;
-
-        for (i = 0;i < 1024;i++){
-                hash[i] = 0;
-        }
-
-        i = numseq;
-        if (nj){
-                i = numprofiles;
-        }
-
-        RUNP(dm = galloc(dm,i,i,0.0f));
-        //fprintf(stderr,"Distance Calculation:\n");
-        //b = (numseq*(numseq-1))/2;
-        a = 1;
-
-        for (i = 0; i < numseq-1;i++){
-                p = aln->s[i];
-
-                for (j = aln->sl[i]-2;j--;){
-                        //for(j = 0; j < si->sl[i]-2;j++){
-                        //hv = (p[j+1] << 5) + p[j+2];
-                        //hash[hv] = big_insert_hash(hash[hv],j);
-                        hv = (p[j] << 5) + p[j+1];
-                        hash[hv] = big_insert_hash(hash[hv],j);
-                        hv = (p[j] << 5) + p[j+2];
-                        hash[hv] = big_insert_hash(hash[hv],j);
-                }
-                for (j = i+1; j < numseq;j++){
-                        min =  (aln->sl[i] > aln->sl[j]) ? aln->sl[j] :aln->sl[i];
-                        cutoff = param->internal_gap_weight *min + param->zlevel;
-                        //cutoff = param->zlevel;
-                        p = aln->s[j];
-                        dm[i][j] = protein_wu_distance_calculation(hash,p,aln->sl[j],aln->sl[j]+aln->sl[i],cutoff);
-                        //fprintf(stderr,"%d-%d:%f\n",i,j,dm[i][j]);
-                        //exit(0);
-                        //dm[i][j] /= min;
-                        //dm[i][j] /= (si->sl[i] > si->sl[j]) ? si->sl[j] :si->sl[i];
-                        dm[j][i] = dm[i][j];
-                        //fprintf(stderr,"\r%8.0f percent done",(float)a /(float)b * 100);
-                        a++;
-                }
-
-
-                for (j = 1024;j--;){
-                        if (hash[j]){
-                                big_remove_nodes(hash[j]);
-                                hash[j] = 0;
-                        }
-                }
-        }
-        return dm;
-ERROR:
-        return NULL;
-}
-
-
-float protein_wu_distance_calculation(struct bignode* hash[],const int* seq,const int seqlen,const int diagonals,const float mode)
-{
-
-        struct bignode* node_p;
-        unsigned int* d = NULL;
-        unsigned int* tmp = NULL;
-        float out = 0.0;
-        register int i,j;
-        register int c;
-        register int num;
-        register unsigned int hv;
-
-        d = malloc(sizeof(unsigned int)*diagonals);
-        //for (i = diagonals;i--;){
-        for (i = 0;i < diagonals;i++){
-                d[i] = 0;
-        }
-        for (i = seqlen-2;i--;){
-                //for(i = 0; i < seqlen-2;i++){
-                /*hv = (seq[i+1] << 5) + seq[i+2];
-
-                  node_p = hash[hv];
-                  while(node_p){
-                  tmp = node_p->pos;
-                  for(j = 0;j < node_p->num;j++){
-                  d[tmp[j]]++;
-                  }
-                  node_p = node_p->next;
-                  }*/
-                hv = (seq[i] << 5) + seq[i+1];
-                //printf("3:%d\n",hv);
-                node_p = hash[hv];
-                while(node_p){
-                        tmp = node_p->pos;
-                        num = node_p->num;
-                        for(j = 0;j < num;j++){
-                                c = tmp[j];
-                                d[c]++;
-                                c++;
-                                d[c]++;
-                        }
-                        node_p = node_p->next;
-                }
-                hv = (seq[i] << 5) + seq[i+2];
-
-                node_p = hash[hv];
-
-                while(node_p){
-                        tmp = node_p->pos;
-                        num = node_p->num;
-                        for(j = 0;j < num;j++){
-                                c = tmp[j];
-                                d[c]++;
-                        }
-                        node_p = node_p->next;
-                }
-                d++;
-        }
-        //exit(0);
-        d -= (seqlen-2);
-
-        for (i = diagonals;i--;){
-                //d[i] /= minlen;
-
-                //fprintf(stderr,"%d ",d[i]);
-                if(d[i] > mode){
-                        out += d[i];
-                        //	printf("%f	%d\n",d[i]/ minlen,d[i]);
-                }
-        }
-        free(d);
-        return out;
-}
 
 
 
-float** dna_distance(struct alignment* aln,struct parameters* param, int nj)
-{
-        struct bignode* hash[1024];
-        float** dm = NULL;
-        int* p = NULL;
-        int i,j,a;
-        unsigned int hv;
-        int numseq;
-        int numprofiles;
-
-        ASSERT(aln != NULL,"No alignment");
-
-        numseq = aln->numseq;
-        numprofiles = aln->num_profiles;
-
-        //fprintf(stderr,"Distance Calculation:\n");
-
-
-        for (i = 0;i < 1024;i++){
-                hash[i] = 0;
-        }
-
-        i = numseq;
-        if (nj){
-                i = numprofiles;
-        }
-
-        RUNP(dm = galloc(dm,i,i,0.0f));
-
-
-        //b = (numseq*(numseq-1))/2;
-        a = 1;
-
-        for (i = 0; i < numseq-1;i++){
-                p = aln->s[i];
-                for (j = aln->sl[i]-5;j--;){
-                        hv = ((p[j]&3)<<8) + ((p[j+1]&3)<<6) + ((p[j+2]&3)<<4)  + ((p[j+3]&3)<<2) + (p[j+4]&3);//ABCDE
-                        hash[hv] = big_insert_hash(hash[hv],j);
-                        hv = ((p[j]&3)<<8) + ((p[j+1]&3)<<6) + ((p[j+2]&3)<<4)  + ((p[j+3]&3)<<2) + (p[j+5]&3);//ABCDF
-                        hash[hv] = big_insert_hash(hash[hv],j);
-                        hv = ((p[j]&3)<<8) + ((p[j+1]&3)<<6) + ((p[j+2]&3)<<4)  + ((p[j+4]&3)<<2) + (p[j+5]&3);//ABCEF
-                        hash[hv] = big_insert_hash(hash[hv],j);
-                        hv = ((p[j]&3)<<8) + ((p[j+1]&3)<<6) + ((p[j+3]&3)<<4)  + ((p[j+4]&3)<<2) + (p[j+5]&3);//ABDEF
-                        hash[hv] = big_insert_hash(hash[hv],j);
-                        hv = ((p[j]&3)<<8) + ((p[j+2]&3)<<6) + ((p[j+3]&3)<<4) + ((p[j+4]&3)<<2) + (p[j+5]&3);//ACDEF
-                        hash[hv] = big_insert_hash(hash[hv],j);
-                }
-                for (j = i+1; j < numseq;j++){
-
-
-                        //min =  (aln->sl[i] > aln->sl[j]) ?aln->sl[j] :aln->sl[i];
-                        dm[i][j] = dna_distance_calculation(hash,aln->s[j],aln->sl[j],aln->sl[j]+aln->sl[i],param->zlevel);
-                        dm[i][j] /= (aln->sl[i] > aln->sl[j]) ?aln->sl[j] :aln->sl[i];
-                        dm[j][i] = dm[i][j];
-                        //fprintf(stderr,"\r%8.0f percent done",(float)a /(float)b * 100);
-                        a++;
-                }
-
-                for (j = 1024;j--;){
-                        if (hash[j]){
-                                big_remove_nodes(hash[j]);
-                                hash[j] = 0;
-                        }
-                }
-        }
-        return dm;
-ERROR:
-        return NULL;
-}
-
-float dna_distance_calculation(struct bignode* hash[],const int* p,const int seqlen,int diagonals,float mode)
-{
-
-        struct bignode* node_p;
-        float out = 0.0;
-        unsigned int* tmp = NULL;
-        unsigned int* d = NULL;
-        int i,j;
-        unsigned int hv;
-
-        d = malloc(sizeof(int)*diagonals);
-        for (i = 0;i < diagonals;i++){
-                d[i] = 0;
-        }
-        for (i = seqlen-5;i--;){
-
-                hv = ((p[i]&3)<<8) + ((p[i+1]&3)<<6) + ((p[i+2]&3)<<4)  + ((p[i+3]&3)<<2) + (p[i+4]&3);//ABCDE
-                if (hash[hv]){
-                        node_p = hash[hv];
-                        while(node_p){
-                                tmp = node_p->pos;
-                                for(j = 0;j < node_p->num;j++){
-                                        d[tmp[j]]++;
-                                }
-                                node_p = node_p->next;
-                        }
-                }
-
-
-                hv = ((p[i]&3)<<8) + ((p[i+1]&3)<<6) + ((p[i+2]&3)<<4)  + ((p[i+3]&3)<<2) + (p[i+5]&3);//ABCDF
-                if (hash[hv]){
-                        node_p = hash[hv];
-                        while(node_p){
-                                tmp = node_p->pos;
-                                for(j = 0;j < node_p->num;j++){
-                                        d[tmp[j]]++;
-                                }
-                                node_p = node_p->next;
-                        }
-                }
-                hv = ((p[i]&3)<<8) + ((p[i+1]&3)<<6) + ((p[i+2]&3)<<4)  + ((p[i+4]&3)<<2) + (p[i+5]&3);//ABCEF
-                if (hash[hv]){
-                        node_p = hash[hv];
-                        while(node_p){
-                                tmp = node_p->pos;
-                                for(j = 0;j < node_p->num;j++){
-                                        d[tmp[j]]++;
-                                }
-                                node_p = node_p->next;
-                        }
-                }
-                hv = ((p[i]&3)<<8) + ((p[i+1]&3)<<6) + ((p[i+3]&3)<<4)  + ((p[i+4]&3)<<2) + (p[i+5]&3);//ABDEF
-                if (hash[hv]){
-                        node_p = hash[hv];
-                        while(node_p){
-                                tmp = node_p->pos;
-                                for(j = 0;j < node_p->num;j++){
-                                        d[tmp[j]]++;
-                                }
-                                node_p = node_p->next;
-                        }
-                }
-                hv = ((p[i]&3)<<8) + ((p[i+2]&3)<<6) + ((p[i+3]&3)<<4) + ((p[i+4]&3)<<2) + (p[i+5]&3);//ACDEF
-                if (hash[hv]){
-                        node_p = hash[hv];
-                        while(node_p){
-                                tmp = node_p->pos;
-                                for(j = 0;j < node_p->num;j++){
-                                        d[tmp[j]]++;
-                                }
-                                node_p = node_p->next;
-                        }
-                }
-
-                d++;
-        }
-        //exit(0);
-        d -= (seqlen-5);
-
-        for (i = diagonals;i--;){
-                //d[i] /= minlen;
-
-                //printf("%d ",d[i]);
-
-                if(d[i] > mode){
-                        //fprintf(stderr,"%f	%d\n",d[i]/ minlen,d[i]);
-                        out += d[i];
-                }
-        }
-        free(d);
-        return out;
-}
 
 
 
-struct bignode* big_insert_hash(struct bignode *n,const unsigned int pos)
-{
-        struct bignode* p = NULL;
-        if(n){
-                if(n->num < NODESIZE){
-                        n->pos[n->num] = pos;
-                        n->num++;
-                        return n;
-                }else{
-                        MMALLOC(p, sizeof(struct bignode));
-                        p->pos[0] = pos;
-                        p->num = 1;
-                        p->next = n;
-                }
-        }else{
-                MMALLOC(p, sizeof(struct bignode));
-                p->pos[0] = pos;
-                p->num = 1;
-                p->next = n;
-        }
-        return p;
-ERROR:
-        return NULL;
-}
-
-void big_remove_nodes(struct bignode *n)
-{
-        struct bignode* p = NULL;
-        while(n){
-                p = n;
-                n = n->next;
-                MFREE(p);
-        }
-}
-
-void big_print_nodes(struct bignode *n)
-{
-        int i;
-        while(n){
-                for (i = 0; i < n->num;i++){
-                        fprintf(stderr,"%d ",n->pos[i]);
-                }
-                n = n->next;
-        }
-}
 
 
 
