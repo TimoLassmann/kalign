@@ -20,7 +20,7 @@ struct counts* init_counts(void);
 int normalize_counts(struct counts*ap);
 int print_counts(struct counts* ap);
 int fill_counts(struct counts* ap, struct alignment* aln);
-int pair_fill(struct counts* ap, int*a,int*b,int len);
+int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len);
 
 int print_probabilies(struct counts*ap);
 
@@ -32,10 +32,10 @@ int main(int argc, char *argv[])
         struct counts* ap = NULL;
 
         int i;
-        int num_infiles;
+        int num_infiles = 0;
         char** infile = NULL;
         int c = 0;
-        int help = 0;
+        //int help = 0;
         while (1){
                 static struct option long_options[] ={
                         {"help",0,0,'h'},
@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
                 }
                 switch(c) {
                 case 'h':
-                        help = 1;
+                        //help = 1;
                         break;
                 default:
                         ERROR_MSG("not recognized");
@@ -114,7 +114,7 @@ ERROR:
         return FAIL;
 }
 
-int pair_fill(struct counts* ap, int*a,int*b,int len)
+int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len)
 {
         int i;
         int state = 1;          /* match - 0 is a gap */

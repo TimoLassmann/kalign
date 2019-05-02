@@ -1035,8 +1035,6 @@ int backward_hirsch_ss_dyn(const struct aln_param* ap,const uint8_t* seq1,const 
                 }else{
                         s[j].gb = MAX(s[j].gb,ca)-tgpe;
                 }
-
-
         }
         return OK;
 }

@@ -126,14 +126,13 @@ chmod 755 alignment_scores.sh
 
    #+END_SRC
 
-
 ** Step 3: plot scores 
 
    #+BEGIN_SRC R :session  one :results none :export none 
 
      library(tidyverse)
      library(ggplot2)
-     library(stringi)
+     library(straingi)
 
      readBaliscores <-function(file,name){
        mat  <- read.table(file);
@@ -155,18 +154,15 @@ chmod 755 alignment_scores.sh
    
 
    #+BEGIN_SRC R :session one :results output graphics :file BalibaseSP_scores.jpeg :exports both :width 160 :height 80
-          mat <- readBaliscores("scores_old_kalign.csv","oldkalign")
-          mat <- rbind(mat,readBaliscores("scores_new_kalign.csv","newkalign"))
-         mat <- rbind(mat,readBaliscores("scores_new_bi.csv","bisecting"));
-mat <- rbind(mat,readBaliscores("scores_new_bi_unit.csv","bisecting_unit"));
-mat <- rbind(mat,readBaliscores("scores_new_kmer.csv","bikmer"));
+               mat <- readBaliscores("scores_old_kalign.csv","oldkalign")
+     mat <- rbind(mat,readBaliscores("scores_new_kmer.csv","bikmer"));
 
-          p <- ggplot(mat, aes(Group, SP))
-          p <- p + geom_boxplot(aes(colour = Type))
-          p
-          filename <- "BalibaseSP_scores.jpeg"
+               p <- ggplot(mat, aes(Group, SP))
+               p <- p + geom_boxplot(aes(colour = Type))
+               p
+               filename <- "BalibaseSP_scores.jpeg"
 
-          ggsave(filename,p, dpi = 300,width = 160, height = 80, unit = "mm")
+               ggsave(filename,p, dpi = 300,width = 160, height = 80, unit = "mm")
 
 
 

@@ -91,9 +91,9 @@ esac
 
 if test "$enable_debugging" != "no"; then
 AC_DEFINE(DEBUG,1,[Defines debugging .])
-CFLAGS="-ggdb -Wall -std=gnu11 -fdata-sections -ffunction-sections"
+CFLAGS="-ggdb -pedantic -Wall -std=gnu11 -fdata-sections -ffunction-sections"
 else
-CFLAGS="-O3 -funroll-loops -Wall -std=gnu11 -fdata-sections -ffunction-sections"
+CFLAGS="-O3 -pedantic -funroll-loops -Wall -std=gnu11 -fdata-sections -ffunction-sections"
 DEBUG=0
 fi
 
