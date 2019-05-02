@@ -2,6 +2,51 @@
 
 #include "misc.h"
 
+
+#ifdef ITEST_MISC
+
+#include "alphabet.h"
+int main(int argc, char *argv[])
+{
+        struct alphabet* a = NULL;
+        unsigned short hash = 0;
+        unsigned short rolling = 0;
+        int kmer_len = 10;
+        int len = 0;
+        int i;
+        int* internal = NULL;
+
+        RUNP(a = create_alphabet(defPROTEIN));
+
+        char seq[] = "GKGDPKKPRGKMSSYAFFVQTSREEHKKKHPDASVNFSEFSKKCSERWKTMSAKEKGKFEDMAKADKARYEREMKTYIPPKGE";
+
+        len = strlen(seq);
+        MMALLOC(internal , sizeof(int) * len) ;
+
+        for(i = 0;i < len;i++){
+                internal[i] = a->to_internal[(int)seq[i]];
+                fprintf(stdout,"%c %d\n", seq[i], internal[i]);
+        }
+        fprintf(stdout,"LEN: %d\n", len);
+
+        hash = circ_hash(internal , kmer_len);
+        rolling = hash;
+        for(i = 1; i < len - kmer_len;i++){
+                rolling =circ_hash_next(internal+i, kmer_len, internal[i-1], rolling);
+                hash = circ_hash(internal+i , kmer_len);
+                fprintf(stdout,"%d %d\n", hash, rolling);
+        }
+
+
+        MFREE(internal);
+        return EXIT_SUCCESS;
+ERROR:
+        return EXIT_FAILURE;
+}
+
+
+#endif
+
 int byg_detect(int* text,int n)
 {
         int Tc;
@@ -131,7 +176,7 @@ int byg_start(char* pattern,char*text)
 }
 
 
-
+/*
 unsigned long int bpm(const unsigned char* t,const unsigned char* p,int n,int m)
 {
 	register unsigned long int i;//,c;
@@ -309,4 +354,44 @@ int validate_bpm_sse(struct qs_struct* qs,int* assignment,unsigned char* t,int n
 
 	}
 	return 1;
+}
+*/
+
+
+// (c) 2017 Johannes Soeding & Martin Steinegger, Gnu Public License version 3
+// Rotate left macro: left circular shift by numbits within 16 bits
+#define RoL(val, numbits) (val << numbits) ^ (val >> (16 - numbits))
+
+
+// Transform each letter x[i] to a fixed random number RAND[x[i]]
+// to ensure instantaneous mixing into the 16 bits
+// Do XOR with RAND[x[i]] and 5-bit rotate left for each i from 1 to k
+unsigned circ_hash(const int * x, unsigned length)
+{
+        short unsigned RAND[21] = {0x4567, 0x23c6, 0x9869, 0x4873, 0xdc51, 0x5cff, 0x944a, 0x58ec,
+                                   0x1f29, 0x7ccd, 0x58ba, 0xd7ab, 0x41f2, 0x1efb, 0xa9e3, 0xe146,
+                                   0x007c, 0x62c2, 0x0854, 0x27f8, 0x231b};// 16 bit random numbers
+        short unsigned h = 0x0;
+        h = h^ RAND[x[0]];// XOR h and ki
+        for (int i = 1; i < length; ++i){
+                h = RoL(h, 5);
+                h ^= RAND[x[i]];// XOR h and ki
+        }
+        return h;
+}
+
+// Rolling hash variant for previous hash function:
+// Computes hash value for next key x[0:length-1] from previous hash value
+// hash( x[-1:length-2] ) and x_first = x[-1]
+unsigned circ_hash_next(const int * x, unsigned length, int x_first, short unsigned h)
+{
+        short unsigned RAND[21] = {0x4567, 0x23c6, 0x9869, 0x4873, 0xdc51, 0x5cff, 0x944a, 0x58ec,
+                                   0x1f29, 0x7ccd, 0x58ba, 0xd7ab, 0x41f2, 0x1efb, 0xa9e3, 0xe146,
+                                   0x007c, 0x62c2, 0x0854, 0x27f8, 0x231b};// 16 bit random numbers
+// undo INITIAL_VALUE and first letter x[0] of old key
+        h ^= RoL(RAND[x_first], (5*(length-1)) % 16);
+// circularly permute all letters x[1:length-1] to 5 positions to left
+        h =  RoL(h, 5);// add new, last letter of new key x[1:length]
+        h ^= RAND[x[length-1]];
+        return h;
 }

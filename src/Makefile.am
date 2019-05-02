@@ -31,7 +31,20 @@ AM_CPPFLAGS=${MYINCDIRS} ${HDF5_CPPFLAGS}
 
 #LOGO_SOURCES = motif_logo.c motif_logo.h
 
-bin_PROGRAMS =  kalign phmm get_param edist alphabet
+bin_PROGRAMS =  kalign phmm get_param edist alphabet heap_test misc_test
+
+misc_test_SOURCES = \
+misc.h \
+misc.c \
+alphabet.h \
+alphabet.c
+
+misc_test_CPPFLAGS = $(AM_CPPFLAGS) -DITEST_MISC
+
+heap_test_SOURCES = \
+heap.h \
+heap.c
+heap_test_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
 
 alphabet_SOURCES = \
 alphabet.h \

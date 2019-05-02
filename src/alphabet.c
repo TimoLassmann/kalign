@@ -19,8 +19,8 @@ int main(int argc, char *argv[])
 
         print_alphabet(a);
         MFREE(a);
-
-        RUN(a = create_alphabet(redPROTEIN));
+        a = NULL;
+        RUNP(a = create_alphabet(redPROTEIN));
 
         print_alphabet(a);
         MFREE(a);
@@ -76,6 +76,9 @@ struct alphabet* create_alphabet(int type)
         RUN(clean_and_set_to_extern(a));
         return a;
 ERROR:
+        if(a){
+                MFREE(a);
+        }
         return NULL;
 }
 
@@ -89,7 +92,7 @@ int create_default_protein(struct alphabet* a)
         int i;
         code = 0;
         for(i = 0; i < 20;i++){
-                fprintf(stdout,"%c %d CODE: %d\n", aacode[i], (int) aacode[i], code);
+                //fprintf(stdout,"%c %d CODE: %d\n", aacode[i], (int) aacode[i], code);
                 a->to_internal[(int) aacode[i]] = code;
 
                 code++;
@@ -99,9 +102,8 @@ int create_default_protein(struct alphabet* a)
 
         a->to_internal[(int) 'B'] = code;
 
-        code++;
-
         a->to_internal[(int) 'Z'] = code;
+        a->to_internal[(int) 'X'] = code;
 
         code++;
         return OK;
