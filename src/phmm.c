@@ -11,8 +11,8 @@
 int main(int argc, char *argv[])
 {
         struct phmm* phmm = NULL;
-        int* seqa = NULL;
-        int* seqb = NULL;
+        uint8_t* seqa = NULL;
+        uint8_t* seqb = NULL;
 
         int len_a = 5;
         int len_b = 5;
@@ -24,8 +24,8 @@ int main(int argc, char *argv[])
 
         len_a = 7;
         len_b = 10;
-        MMALLOC(seqa, sizeof(int) * len_a);
-        MMALLOC(seqb, sizeof(int) * len_b);
+        MMALLOC(seqa, sizeof(uint8_t) * len_a);
+        MMALLOC(seqb, sizeof(uint8_t) * len_b);
 
         seqa[0] = aacode['P'-65];
         seqa[1] = aacode['A'-65];
@@ -75,12 +75,12 @@ ERROR:
 }
 
 #endif
-int forward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
+int forward_phmm(struct phmm* phmm, uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b)
 {
 
         int i,j;
-        int* sa = seq_a -1;
-        int* sb = seq_b -1;
+        uint8_t* sa = seq_a -1;
+        uint8_t* sb = seq_b -1;
         const float MM = phmm->transition[INDEXMM];
         const float MX = phmm->transition[INDEXGPO];
         const float MY = phmm->transition[INDEXGPO];
@@ -205,12 +205,12 @@ int forward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
 }
 
 
-int backward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
+int backward_phmm(struct phmm* phmm,uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b)
 {
 
         int i,j;
-        int* sa = seq_a -1;
-        int* sb = seq_b -1;
+        uint8_t* sa = seq_a -1;
+        uint8_t* sb = seq_b -1;
         const float MM = phmm->transition[INDEXMM];
         const float MX = phmm->transition[INDEXGPO];
         const float MY = phmm->transition[INDEXGPO];
@@ -324,12 +324,12 @@ tBM = phmm->eta;*/
 }
 
 
-int collect_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b)
+int collect_phmm(struct phmm* phmm,uint8_t* seq_a,uint8_t* seq_b, int len_a,int len_b)
 {
 
         int i,j;
-        int* sa = seq_a -1;
-        int* sb = seq_b -1;
+        uint8_t* sa = seq_a -1;
+        uint8_t* sb = seq_b -1;
 
 
         const float MM = phmm->transition[INDEXMM];

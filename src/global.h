@@ -35,8 +35,9 @@ struct alignment{
         unsigned int* nsip;
         unsigned int* sl;
         unsigned int* lsn;
-        int** s;
-        char**seq;
+        uint8_t** s;
+        int** gaps;
+        char** seq;
         char** sn;
         int numseq;
         int num_profiles;

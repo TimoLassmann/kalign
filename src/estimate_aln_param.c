@@ -1,3 +1,4 @@
+
 #include "estimate_aln_param.h"
 
 #include "phmm.h"
@@ -19,7 +20,7 @@ int estimate_aln_param(struct alignment*aln, struct aln_param*ap)
 
 
 
-        RUNP(anchors = pick_anchors(aln, &num_anchor));
+        RUNP(anchors = pick_anchor(aln, &num_anchor));
         i = aln->sl[anchors[0]] + 2;
         RUNP(phmm = alloc_phmm(i));
 
@@ -29,8 +30,8 @@ int estimate_aln_param(struct alignment*aln, struct aln_param*ap)
         RUN(add_pseudocounts(phmm, 1 * aln->numseq * num_anchor));
         RUN(phmm_transitions(phmm));
 
-        int* seqa = NULL;
-        int* seqb = NULL;
+        uint8_t* seqa = NULL;
+        uint8_t* seqb = NULL;
         int len_a,len_b;
         DECLARE_TIMER(t1);
         for(int iter = 0;iter < 5;iter++){
@@ -78,7 +79,8 @@ int create_subm(struct aln_param* ap,struct phmm* phmm)
         int i,j;
         double sum;
 
-
+        ASSERT(phmm!= NULL, "No phmm");
+        ASSERT(ap != NULL, "No param");
         sum = prob2scaledprob(0.0);
 
         for(i = 0; i < phmm->L;i++){

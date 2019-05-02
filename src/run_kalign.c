@@ -301,7 +301,7 @@ int main(int argc, char *argv[])
         }
         //fprintf(stderr,"%s", license);
         if (param->help_flag){
-                fprintf(stderr,"%s\n", usage);
+                //fprintf(stderr,"%s\n", usage);
                 exit(1);
         }
         //exit(0);
@@ -310,7 +310,7 @@ int main(int argc, char *argv[])
 
 
         if (param->num_infiles == 0){
-                fprintf(stderr,"%s\n", usage);
+                //fprintf(stderr,"%s\n", usage);
                 return EXIT_SUCCESS;
         }
 
@@ -377,8 +377,8 @@ int run_kalign(struct parameters* param)
         LOG_MSG("Building guide tree.");
         START_TIMER(t1);
 
-        //RUN(build_tree(aln,param,ap));
-        RUN(build_tree_kmeans(aln,param,ap));
+        RUN(build_tree(aln,param,ap));
+        //RUN(build_tree_kmeans(aln,param,ap));
         STOP_TIMER(t1);
         LOG_MSG("Took %f sec.", GET_TIMING(t1));
 

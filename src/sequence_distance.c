@@ -4,13 +4,14 @@
 #include "alphabet.h"
 #include "alignment.h"
 
-
+#include "misc.h"
 #define NODESIZE 16
 
 struct kmer{
         uint64_t kmer;
         int32_t seq;
         int32_t pos;
+        int32_t hash;
 };
 
 /* small hash implementation */
@@ -24,30 +25,34 @@ struct bignode* big_insert_hash(struct bignode *n,const unsigned int pos);
 void big_remove_nodes(struct bignode *n);
 void big_print_nodes(struct bignode *n);
 
-float protein_wu_distance_calculation(struct bignode* hash[],const int* seq,const int seqlen,const int diagonals,const float mode);
+float protein_wu_distance_calculation(struct bignode* hash[],const uint8_t* seq,const int seqlen,const int diagonals,const float mode);
 
-float dna_distance_calculation(struct bignode* hash[], const int* p,const int seqlen,int diagonals,float mode);;
+float dna_distance_calculation(struct bignode* hash[], const uint8_t * p,const int seqlen,int diagonals,float mode);;
 
 int sort_by_kmer_then_seq(const void *a, const void *b);
+int sort_by_hash(const void *a, const void *b);
 
 float** kmer_distance(struct alignment* aln, int* seeds, int num_seeds, int kmer_len)
 {
         struct alphabet* alphabet = NULL;
         struct kmer** kmer_list = NULL;
+        int kmer_idx;
+        int kmer_old_idx;
         float** dm = NULL;
         uint8_t* s = NULL;
         int_fast8_t* t = NULL;
         void *p;
         int64_t code;
         int64_t mask;
+        uint16_t hash;
         int len;
         int numseq;
-        int numprofiles;
+        //int numprofiles;
         int i,j,a;
         ASSERT(aln != NULL,"No alignment");
 
         numseq = aln->numseq;
-        numprofiles = aln->num_profiles;
+        //numprofiles = aln->num_profiles;
 
         alphabet =  create_alphabet( redPROTEIN);
         t = alphabet->to_internal;
@@ -92,51 +97,48 @@ float** kmer_distance(struct alignment* aln, int* seeds, int num_seeds, int kmer
         /* read in seeds  */
         LOG_MSG("len:%d",len);
         int g = 0;
-        for(i = 0; i<  num_seeds;i++){
-                code = 0;
-                s = (uint8_t*)aln->seq[seeds[i]];
-                len = aln->sl[seeds[i]];
-                for(j = 0; j < kmer_len-1;j++){
-                        code = code << 4L;
-                        code |= t[s[j]];
-
-                }
-                for(j = kmer_len-1; j < len;j++){
-                        code = code << 4L;
-                        code |= t[s[j]];
-
-                        //                fprintf(stdout,"pattern: %d %d %*lx (%c %d)\n", i,j, kmer_len, code & mask,(char) s[j], t[s[j]]);
-                        kmer_list[g]->kmer = code & mask;
-                        kmer_list[g]->pos = j;
-                        kmer_list[g]->seq = i | 0x80000000;
-                        g++;
-                }
-
-        }
+        kmer_idx = 0;
         for(i = 0; i < aln->numseq;i++){
+                kmer_old_idx = kmer_idx;
                 code = 0;
                 s = (uint8_t*)aln->seq[i];
+
                 len = aln->sl[i];
-                for(j = 0; j < kmer_len-1;j++){
+                for(j = 0; j < kmer_len;j++){
                         code = code << 4L;
                         code |= t[s[j]];
 
                 }
-                for(j = kmer_len-1; j < len;j++){
+                hash = circ_hash(s, kmer_len);
+                fprintf(stdout,"%d HASH!!\n",hash);
+                kmer_list[kmer_idx]->kmer = code & mask;
+                kmer_list[kmer_idx]->pos = 0;
+                kmer_list[kmer_idx]->seq = i;
+                kmer_list[kmer_idx]->hash = hash;
+                kmer_idx++;
+
+                for(j = 1; j < len- kmer_len;j++){
+                        hash = circ_hash_next( s+j, kmer_len, s[j-1], hash);
+                        fprintf(stdout,"%d %d",hash, s[j-1]);
                         code = code << 4L;
-                        code |= t[s[j]];
+                        code |= t[s[j+kmer_len]];
 
                         //                fprintf(stdout,"pattern: %d %d %*lx (%c %d)\n", i,j, kmer_len, code & mask,(char) s[j], t[s[j]]);
-                        kmer_list[g]->kmer = code & mask;
-                        kmer_list[g]->pos = j;
-                        kmer_list[g]->seq = i;
-                        g++;
-
+                        kmer_list[kmer_idx]->kmer = code & mask;
+                        kmer_list[kmer_idx]->pos = j;
+                        kmer_list[kmer_idx]->seq = i;
+                        kmer_list[kmer_idx]->hash = hash;
+                        kmer_idx++;
                 }
-
+                LOG_MSG("Sorting for seq %d between %d and %d",i, kmer_old_idx, kmer_idx);
+                qsort(kmer_list + kmer_old_idx, kmer_idx - kmer_old_idx, sizeof(struct kmer*), sort_by_hash);
+                for(j = 0; j < 20;j++){
+                        fprintf(stdout,"%d %d: %d %*lx %d %d SEED\n", i,j,kmer_list[j]->hash, kmer_len, kmer_list[j]->kmer, kmer_list[j]->seq,kmer_list[j]->pos);
+                }
 
         }
         LOG_MSG("len:%d",g);
+        exit(0);
 
         qsort(kmer_list, g, sizeof(struct kmer*), sort_by_kmer_then_seq);
 
@@ -219,18 +221,29 @@ int sort_by_kmer_then_seq(const void *a, const void *b)
         }
 }
 
+int sort_by_hash(const void *a, const void *b)
+{
+        struct kmer* const *one = a;
+        struct kmer* const *two = b;
+        if((*one)->hash < (*two)->hash){
+                return -1;
+        }else{
+                return 1;
+        }
+}
+
 
 
 float** protein_wu_distance(struct alignment* aln, float zlevel, int nj, int* seeds, int num_anchors)
 {
         struct bignode* hash[1024];
         float** dm = NULL;
-        int*p =0;
+        uint8_t*p =0;
         int i,j,a;
         unsigned int hv;
         int numseq;
         int numprofiles;
-        float min;
+        //float min;
         float cutoff;
 
         ASSERT(aln != NULL,"No alignment");
@@ -314,7 +327,7 @@ float** protein_wu_distance(struct alignment* aln, float zlevel, int nj, int* se
                                 hash[hv] = big_insert_hash(hash[hv],j);
                         }
                         for (j = i+1; j < numseq;j++){
-                                min =  (aln->sl[i] > aln->sl[j]) ? aln->sl[j] :aln->sl[i];
+                                //min =  (aln->sl[i] > aln->sl[j]) ? aln->sl[j] :aln->sl[i];
                                 cutoff = zlevel;
                                 //cutoff = param->zlevel;
                                 p = aln->s[j];
@@ -342,7 +355,7 @@ ERROR:
 }
 
 
-float protein_wu_distance_calculation(struct bignode* hash[],const int* seq,const int seqlen,const int diagonals,const float mode)
+float protein_wu_distance_calculation(struct bignode* hash[],const uint8_t* seq,const int seqlen,const int diagonals,const float mode)
 {
 
         struct bignode* node_p;
@@ -429,7 +442,7 @@ float** dna_distance(struct alignment* aln, float zlevel, int nj)
 {
         struct bignode* hash[1024];
         float** dm = NULL;
-        int* p = NULL;
+        uint8_t* p = NULL;
         int i,j,a;
         unsigned int hv;
         int numseq;
@@ -495,7 +508,7 @@ ERROR:
         return NULL;
 }
 
-float dna_distance_calculation(struct bignode* hash[],const int* p,const int seqlen,int diagonals,float mode)
+float dna_distance_calculation(struct bignode* hash[],const uint8_t * p,const int seqlen,int diagonals,float mode)
 {
 
         struct bignode* node_p;

@@ -168,6 +168,9 @@ mat <- rbind(mat,readBaliscores("scores_new_kmer.csv","bikmer"));
 
           ggsave(filename,p, dpi = 300,width = 160, height = 80, unit = "mm")
 
+
+
+
    #+END_SRC
 
    #+RESULTS:

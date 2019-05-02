@@ -39,25 +39,25 @@ int hirsch_mem_realloc(struct hirsch_mem* hm,int x);
 void hirsch_mem_free(struct hirsch_mem* hm);
 
 /* setting up fast data structures for alignment */
-float* make_profile(struct aln_param* ap,const int* seq,const int len);
+float* make_profile(struct aln_param* ap,const uint8_t* seq,const int len);
 int set_gap_penalties(float* prof,int len,int nsip);
 
 
 /* Main dyn programming functions */
 
-int hirsch_ss_dyn_score(const struct aln_param* ap, const int* seq1,const int* seq2,struct hirsch_mem* hm, int* hirsch_path,float* score);
-int hirsch_align_two_ss_vector_score(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm,int old_cor[],float* score);
+int hirsch_ss_dyn_score(const struct aln_param* ap, const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm, int* hirsch_path,float* score);
+int hirsch_align_two_ss_vector_score(const struct aln_param* ap,const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm,int old_cor[],float* score);
 /* Align 2 sequences  */
-int hirsch_ss_dyn(const struct aln_param* ap, const int* seq1,const int* seq2,struct hirsch_mem* hm, int* hirsch_path);
-int hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[]);
-int foward_hirsch_ss_dyn(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm);
-int backward_hirsch_ss_dyn(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm);
+int hirsch_ss_dyn(const struct aln_param* ap, const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm, int* hirsch_path);
+int hirsch_align_two_ss_vector(const struct aln_param* ap,const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[]);
+int foward_hirsch_ss_dyn(const struct aln_param* ap,const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm);
+int backward_hirsch_ss_dyn(const struct aln_param* ap,const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm);
 
 /* Align one sequence to a profile */
-int hirsch_ps_dyn(const struct aln_param* ap, const float* prof1,const int* seq2,struct hirsch_mem* hm, int* hirsch_path,int sip);
-int hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,const int* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[],int sip);
-int foward_hirsch_ps_dyn(const struct aln_param* ap,const float* prof1,const int* seq2,struct hirsch_mem* hm,int sip);
-int backward_hirsch_ps_dyn(const struct aln_param* ap,const float* prof1,const int* seq2,struct hirsch_mem* hm,int sip);
+int hirsch_ps_dyn(const struct aln_param* ap, const float* prof1,const uint8_t* seq2,struct hirsch_mem* hm, int* hirsch_path,int sip);
+int hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,const uint8_t* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[],int sip);
+int foward_hirsch_ps_dyn(const struct aln_param* ap,const float* prof1,const uint8_t* seq2,struct hirsch_mem* hm,int sip);
+int backward_hirsch_ps_dyn(const struct aln_param* ap,const float* prof1,const uint8_t* seq2,struct hirsch_mem* hm,int sip);
 
 /* Align 2 profiles  */
 int hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem* hm, int* hirsch_path);
@@ -87,8 +87,8 @@ float** pair_aln_dist(struct alignment* aln, struct aln_param* ap, int* num_anch
         int i,j,c;
         int len_a;
         int len_b;
-        int* a = NULL;
-        int* b = NULL;
+        uint8_t* a = NULL;
+        uint8_t* b = NULL;
 
         ASSERT(aln != NULL,"No alignment");
 
@@ -309,7 +309,7 @@ ERROR:
 }
 
 
-int hirsch_ss_dyn(const struct aln_param* ap, const int* seq1,const int* seq2,struct hirsch_mem* hm, int* hirsch_path)
+int hirsch_ss_dyn(const struct aln_param* ap, const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm, int* hirsch_path)
 {
         int mid = ((hm->enda - hm->starta) / 2)+ hm->starta;
         float input_states[6] = {hm->f[0].a,hm->f[0].ga,hm->f[0].gb,hm->b[0].a,hm->b[0].ga,hm->b[0].gb};
@@ -338,7 +338,7 @@ int hirsch_ss_dyn(const struct aln_param* ap, const int* seq1,const int* seq2,st
         return  OK;
 }
 
-int hirsch_ss_dyn_score(const struct aln_param* ap, const int* seq1,const int* seq2,struct hirsch_mem* hm, int* hirsch_path,float* score)
+int hirsch_ss_dyn_score(const struct aln_param* ap, const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm, int* hirsch_path,float* score)
 {
         int mid = ((hm->enda - hm->starta) / 2)+ hm->starta;
         //float input_states[6] = {hm->f[0].a,hm->f[0].ga,hm->f[0].gb,hm->b[0].a,hm->b[0].ga,hm->b[0].gb};
@@ -369,7 +369,7 @@ int hirsch_ss_dyn_score(const struct aln_param* ap, const int* seq1,const int* s
 }
 
 
-int hirsch_align_two_ss_vector_score(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm,int old_cor[],float* score)
+int hirsch_align_two_ss_vector_score(const struct aln_param* ap,const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm,int old_cor[],float* score)
 {
         struct states* f = hm->f;
         struct states* b = hm->b;
@@ -485,7 +485,7 @@ int hirsch_align_two_ss_vector_score(const struct aln_param* ap,const int* seq1,
 }
 
 
-int hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[])
+int hirsch_align_two_ss_vector(const struct aln_param* ap,const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[])
 {
         struct states* f = hm->f;
         struct states* b = hm->b;
@@ -823,7 +823,7 @@ int hirsch_align_two_ss_vector(const struct aln_param* ap,const int* seq1,const 
 
 
 
-int foward_hirsch_ss_dyn(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm)
+int foward_hirsch_ss_dyn(const struct aln_param* ap,const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm)
 {
         struct states* s = hm->f;
         float *subp = 0;
@@ -923,7 +923,7 @@ int foward_hirsch_ss_dyn(const struct aln_param* ap,const int* seq1,const int* s
         return OK;
 }
 
-int backward_hirsch_ss_dyn(const struct aln_param* ap,const int* seq1,const int* seq2,struct hirsch_mem* hm)
+int backward_hirsch_ss_dyn(const struct aln_param* ap,const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm)
 {
 
         struct states* s = hm->b;
@@ -1042,7 +1042,7 @@ int backward_hirsch_ss_dyn(const struct aln_param* ap,const int* seq1,const int*
 }
 
 
-int hirsch_ps_dyn(const struct aln_param* ap, const float* prof1,const int* seq2,struct hirsch_mem* hm, int* hirsch_path,int sip)
+int hirsch_ps_dyn(const struct aln_param* ap, const float* prof1,const uint8_t* seq2,struct hirsch_mem* hm, int* hirsch_path,int sip)
 {
         int mid = ((hm->enda - hm->starta) / 2)+ hm->starta;
         float input_states[6] = {hm->f[0].a,hm->f[0].ga,hm->f[0].gb,hm->b[0].a,hm->b[0].ga,hm->b[0].gb};
@@ -1080,7 +1080,7 @@ int hirsch_ps_dyn(const struct aln_param* ap, const float* prof1,const int* seq2
 
 
 
-int hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,const int* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[],int sip)
+int hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,const uint8_t* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[],int sip)
 {
         struct states* f = hm->f;
         struct states* b = hm->b;
@@ -1416,7 +1416,7 @@ int hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,con
         return OK;
 }
 
-int foward_hirsch_ps_dyn(const struct aln_param* ap,const float* prof1,const int* seq2,struct hirsch_mem* hm,int sip)
+int foward_hirsch_ps_dyn(const struct aln_param* ap,const float* prof1,const uint8_t* seq2,struct hirsch_mem* hm,int sip)
 {
         struct states* s = hm->f;
 
@@ -1527,7 +1527,7 @@ int foward_hirsch_ps_dyn(const struct aln_param* ap,const float* prof1,const int
         return OK;
 }
 
-int backward_hirsch_ps_dyn(const struct aln_param* ap,const float* prof1,const int* seq2,struct hirsch_mem* hm,int sip)
+int backward_hirsch_ps_dyn(const struct aln_param* ap,const float* prof1,const uint8_t* seq2,struct hirsch_mem* hm,int sip)
 {
         struct states* s = hm->b;
         register float pa = 0;
@@ -2422,7 +2422,7 @@ ERROR:
 }
 
 
-float* make_profile(struct aln_param* ap,const int* seq,const int len)
+float* make_profile(struct aln_param* ap,const uint8_t* seq,const int len)
 {
         int i,j,c;
         float** subm = NULL;

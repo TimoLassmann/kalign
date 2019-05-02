@@ -4,7 +4,7 @@
 #include "align_io.h"
 
 #include "misc.h"
-
+#include "alphabet.h"
 
 struct infile_buffer{
         char* input;
@@ -152,6 +152,15 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
                 }
                 //fprintf(stderr,"Output file: %s, in %s format.\n",param->outfile,param->format);
         }
+        int max_len = 0;
+        for(i = 0; i < aln->numseq;i++){
+                if(aln->sl[i] > max_len){
+                        max_len = aln->sl[i];
+                }
+
+        }
+        aln->gaps = galloc(aln->gaps,aln->numseq,max_len+1,0);
+        /* translate to internal */
         free_align_io_buffer(b);
         return aln;
 ERROR:
@@ -1666,6 +1675,7 @@ struct alignment* aln_alloc(int numseq)
         struct alignment* aln = NULL;
 
         MMALLOC(aln, sizeof(struct alignment));
+        aln->gaps = NULL;
         aln->s = NULL;
         aln->seq = NULL;
         aln->ft = NULL;
@@ -1724,6 +1734,7 @@ void free_aln(struct alignment* aln)
         struct feature* tmp = NULL;
         struct feature* next = NULL;
         if(aln){
+                gfree(aln->gaps);
                 for (i = aln->numseq;i--;){
 
                         MFREE(aln->s[i]);
@@ -2006,7 +2017,7 @@ int make_dna(struct alignment* aln)
 
         //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
         int i,j;
-        int* p;
+        uint8_t* p;
 
         for(i = 0;i < aln->numseq;i++){
                 p = aln->s[i];
@@ -2119,14 +2130,14 @@ int macsim_output(struct alignment* aln,char* outfile,char* infile)
                 fprintf(fout,"<seq-data>\n");
 
                 for (j = 0; j < aln->sl[f];j++){
-                        tmp = aln->s[f][j];
+                        tmp = aln->gaps[f][j];
                         while (tmp){
                                 fprintf(fout,"-");
                                 tmp--;
                         }
                         fprintf(fout,"%c",aln->seq[f][j]);
                 }
-                tmp =aln->s[f][aln->sl[f]];
+                tmp =aln->gaps[f][aln->sl[f]];
                 while (tmp){
                         fprintf(fout,"-");
                         tmp--;
@@ -2159,7 +2170,7 @@ int msf_output(struct alignment* aln,char* outfile)
 
         aln_len = 0;
         for (j = 0; j <= aln->sl[0];j++){
-                aln_len+= aln->s[0][j];
+                aln_len+= aln->gaps[0][j];
         }
         aln_len += aln->sl[0];
 
@@ -2173,7 +2184,7 @@ int msf_output(struct alignment* aln,char* outfile)
 
                 c = 0;
                 for (j = 0; j < aln->sl[i];j++){
-                        tmp = aln->s[i][j];
+                        tmp = aln->gaps[i][j];
                         while (tmp){
                                 linear_seq[i][c] ='-';
                                 c++;
@@ -2183,7 +2194,7 @@ int msf_output(struct alignment* aln,char* outfile)
                         c++;
                 }
 
-                tmp =aln->s[i][aln->sl[i]];
+                tmp =aln->gaps[i][aln->sl[i]];
                 while (tmp){
                         linear_seq[i][c] ='-';
                         c++;
@@ -2309,7 +2320,7 @@ int clustal_output(struct alignment* aln,char* outfile)
         aln_len = 0;
 
         for (j = 0; j <= aln->sl[0];j++){
-                aln_len+= aln->s[0][j];
+                aln_len+= aln->gaps[0][j];
         }
 
         aln_len += aln->sl[0];
@@ -2323,7 +2334,7 @@ int clustal_output(struct alignment* aln,char* outfile)
         for (i =0;i < aln->numseq;i++){
                 c = 0;
                 for (j = 0; j < aln->sl[i];j++){
-                        tmp = aln->s[i][j];
+                        tmp = aln->gaps[i][j];
                         while (tmp){
                                 linear_seq[i][c] ='-';
                                 c++;
@@ -2333,7 +2344,7 @@ int clustal_output(struct alignment* aln,char* outfile)
                         c++;
                 }
 
-                tmp =aln->s[i][aln->sl[i]];
+                tmp =aln->gaps[i][aln->sl[i]];
                 while (tmp){
                         linear_seq[i][c] ='-';
                         c++;
@@ -2450,7 +2461,7 @@ int aln_output(struct alignment* aln,struct parameters* param)
 
         aln_len = 0;
         for (j = 0; j <= aln->sl[0];j++){
-                aln_len+= aln->s[0][j];
+                aln_len+= aln->gaps[0][j];
         }
         aln_len += aln->sl[0];
 
@@ -2465,7 +2476,7 @@ int aln_output(struct alignment* aln,struct parameters* param)
 
                 c = 0;
                 for (j = 0; j < aln->sl[i];j++){
-                        tmp = aln->s[i][j];
+                        tmp = aln->gaps[i][j];
                         while (tmp){
                                 linear_seq[i][c] ='-';
                                 c++;
@@ -2475,7 +2486,7 @@ int aln_output(struct alignment* aln,struct parameters* param)
                         c++;
                 }
 
-                tmp =aln->s[i][aln->sl[i]];
+                tmp =aln->gaps[i][aln->sl[i]];
                 while (tmp){
                         linear_seq[i][c] ='-';
                         c++;
@@ -2665,7 +2676,7 @@ int fasta_output(struct alignment* aln,char* outfile)
                 fprintf(fout,">%s\n",aln->sn[f]);
                 c = 0;
                 for (j = 0; j < aln->sl[f];j++){
-                        tmp = aln->s[f][j];
+                        tmp = aln->gaps[f][j];
                         while (tmp){
                                 fprintf(fout,"-");
                                 c++;
@@ -2682,7 +2693,7 @@ int fasta_output(struct alignment* aln,char* outfile)
                                 c = 0;
                         }
                 }
-                tmp = aln->s[f][aln->sl[f]];
+                tmp = aln->gaps[f][aln->sl[f]];
                 while (tmp){
                         fprintf(fout,"-");
                         c++;

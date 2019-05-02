@@ -186,7 +186,7 @@ ERROR:
 
 struct node* bisecting_kmeans(struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct drand48_data* randBuffer)
 {
-        long int r;
+        //long int r;
         int* sl = NULL;
         int* sr = NULL;
         int num_l,num_r;

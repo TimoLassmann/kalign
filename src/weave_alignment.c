@@ -30,8 +30,8 @@ int clean_aln(struct alignment* aln)
         int i,j;
         int* p = NULL;
         for (i = 0; i < aln->numseq;i++){
-                p = aln->s[i];
-                for (j = 0; j < aln->sl[i];j++){
+                p = aln->gaps[i];
+                for (j = 0; j <= aln->sl[i];j++){
                         p[j] = 0;
                 }
         }
@@ -74,10 +74,10 @@ struct alignment* make_seq(struct alignment* aln,int a,int b,int* path)
                 c++;
         }
         for (i = aln->nsip[a];i--;){
-                RUN(update_gaps(aln->sl[aln->sip[a][i]],aln->s[aln->sip[a][i]],path[0],gap_a));
+                RUN(update_gaps(aln->sl[aln->sip[a][i]],aln->gaps[aln->sip[a][i]],path[0],gap_a));
         }
         for (i = aln->nsip[b];i--;){
-                RUN(update_gaps(aln->sl[aln->sip[b][i]],aln->s[aln->sip[b][i]],path[0],gap_b));
+                RUN(update_gaps(aln->sl[aln->sip[b][i]],aln->gaps[aln->sip[b][i]],path[0],gap_b));
         }
         MFREE(gap_a);
         MFREE(gap_b);

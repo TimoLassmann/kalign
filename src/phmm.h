@@ -47,9 +47,9 @@ struct phmm{
         int L;                  /* alphabet len */
 };
 
-int forward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b);
-int backward_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b);
-int collect_phmm(struct phmm* phmm,int* seq_a,int* seq_b, int len_a,int len_b);
+int forward_phmm(struct phmm* phmm,uint8_t* seq_a,uint8_t* seq_b, int len_a,int len_b);
+int backward_phmm(struct phmm* phmm,uint8_t* seq_a,uint8_t* seq_b, int len_a,int len_b);
+int collect_phmm(struct phmm* phmm,uint8_t* seq_a,uint8_t* seq_b, int len_a,int len_b);
 int re_estimate(struct phmm* phmm);
 
 int phmm_transitions(struct phmm* phmm);
