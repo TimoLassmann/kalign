@@ -1,12 +1,182 @@
-
+#include <immintrin.h>
 
 #include "misc.h"
+#include  <stdalign.h>
 
+static __m256i bitShiftLeft256ymm (__m256i *data, int count);
+
+static __m256i bitShiftRight256ymm (__m256i *data, int count);
 
 #ifdef ITEST_MISC
 
 #include "alphabet.h"
+
+
+
+/*
+__m256i shift_right256(__m256i A,const int N)
+{
+        if     ( N ==  0 ) return A;
+        else if( N <  16 ) return _mm256_alignr_epi8(_mm256_permute2x128_si256(A, A, _MM_SHUFFLE(2, 0, 0, 1)), A, N);
+        else if( N == 16 ) return                    _mm256_permute2x128_si256(A, A, _MM_SHUFFLE(2, 0, 0, 1));
+        else               return _mm256_srli_si256 (_mm256_permute2x128_si256(A, A, _MM_SHUFFLE(2, 0, 0, 1)), N - 16);
+}
+
+ __m256i shift_left256(__m256i A,const  int N)
+{
+        if     ( N ==  0 ) return A;
+        else if( N <  16 ) return _mm256_alignr_epi8(A, _mm256_permute2x128_si256(A, A, _MM_SHUFFLE(0, 0, 2, 0)), (uint8_t)(16 - N));
+        else if( N == 16 ) return                       _mm256_permute2x128_si256(A, A, _MM_SHUFFLE(0, 0, 2, 0));
+        else               return _mm256_slli_si256 (   _mm256_permute2x128_si256(A, A, _MM_SHUFFLE(0, 0, 2, 0)), (uint8_t)(N - 16));
+}
+*/
+
+static __m256i bitShiftLeft256ymm (__m256i *data, int count);
+//----------------------------------------------------------------------------
+// bit shift left a 256-bit value using ymm registers
+//          __m256i *data - data to shift
+//          int count     - number of bits to shift
+// return:  __m256i       - carry out bit(s)
+
+static __m256i bitShiftLeft256ymm (__m256i *data, int count)
+{
+        __m256i innerCarry, carryOut, rotate;
+
+        innerCarry = _mm256_srli_epi64 (*data, 64 - count);                        // carry outs in bit 0 of each qword
+        rotate     = _mm256_permute4x64_epi64 (innerCarry, 0x93);                  // rotate ymm left 64 bits
+        innerCarry = _mm256_blend_epi32 (_mm256_setzero_si256 (), rotate, 0xFC);   // clear lower qword
+        *data    = _mm256_slli_epi64 (*data, count);                               // shift all qwords left
+        *data    = _mm256_or_si256 (*data, innerCarry);                            // propagate carrys from low qwords
+        carryOut   = _mm256_xor_si256 (innerCarry, rotate);                        // clear all except lower qword
+        return carryOut;
+}
+
+static __m256i bitShiftRight256ymm (__m256i *data, int count)
+{
+        __m256i innerCarry, carryOut, rotate;
+
+
+        innerCarry = _mm256_slli_epi64(*data, 64 - count);
+
+        rotate =  _mm256_permute4x64_epi64 (innerCarry, 0x39);
+
+        innerCarry = _mm256_blend_epi32 (_mm256_setzero_si256 (), rotate, 0x3F);
+
+        *data = _mm256_srli_epi64(*data, count);
+
+        *data = _mm256_or_si256(*data,  innerCarry);
+
+        carryOut   = _mm256_xor_si256 (innerCarry, rotate);                        // clear all except lower qword
+        return carryOut;
+}
+
+
+
+int hash_test(void);
+int bpm_test(void);
+int  mutate_seq(uint8_t* s, int len,int k,int L, struct drand48_data* b);
+uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m);
 int main(int argc, char *argv[])
+{
+        int a = 2345;
+
+        RUN(hash_test());
+        RUN(bpm_test());
+        return EXIT_SUCCESS;
+ERROR:
+        return EXIT_FAILURE;
+}
+
+int bpm_test(void)
+{
+
+        /* idea: start with identical sequences add errors run bpm */
+        struct alphabet* alphabet = NULL;
+        struct drand48_data randBuffer;
+        long int r;
+        int len = 0;
+        int i,j,c;
+        uint_fast8_t* a = NULL;
+        uint_fast8_t* b = NULL;
+
+        srand48_r(time(NULL), &randBuffer);
+
+        RUNP(alphabet = create_alphabet(defPROTEIN));
+
+        char seq[] = "GKGDPKKPRGKMSSYAFFVQTSREEHKKKHPDASVNFSEFSKKCSERWKTMSAKEKGKFEDMAKADKARYEREMKTYIPPKGE";
+
+        len = strlen(seq);
+        MMALLOC(a , sizeof(uint_fast8_t) * len) ;
+        MMALLOC(b , sizeof(uint_fast8_t) * len) ;
+
+        for(i = 0;i < len;i++){
+                a[i] = alphabet->to_internal[(int)seq[i]];
+                b[i] =a[i];
+                fprintf(stdout,"%d %d\n", a[i],b[i]);
+        }
+        fprintf(stdout,"LEN: %d\n", len);
+
+        bpm_256(a,b,len,len);
+        exit(0);
+        len = 8;
+        uint64_t res= 0;
+
+        for(i = 0; i < 10;i++){
+                RUN(mutate_seq(b,len,i,alphabet->L,&randBuffer));
+                res= 0;
+                for(j = 0; j < len;j++){
+                        if(a[j] != b[j]){
+                                res++;
+                        }
+                }
+                fprintf(stdout,"%d\tdiff:%ld",i,res);
+                res= bpm(a,b,len,len);
+                fprintf(stdout,"\t%ld\n",res);
+                for(j = 0; j < len;j++){
+                        fprintf(stdout,"%*d",3,a[j]);
+                }
+
+
+                fprintf(stdout,"\n");
+                for(j = 0; j < len;j++){
+                        fprintf(stdout,"%*d",3,b[j]);
+                }
+                fprintf(stdout,"\n");
+
+                /* restore seq */
+                for(j = 0;j < len;j++){
+                        b[j] = a[j];
+                }
+        }
+                //lrand48_r(randBuffer, &r);
+        //r = r % num_samples;
+
+        MFREE(a);
+        MFREE(b);
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+
+int  mutate_seq(uint8_t* s, int len,int k,int L, struct drand48_data* b)
+{
+        int i,j;
+        long int r;
+
+        for(i = 0; i < k;i++){
+                lrand48_r(b, &r);
+                r = r % len;
+                j = r;
+                lrand48_r(b, &r);
+                r = r % L;
+                s[j] = r;
+        }
+        return OK;
+
+}
+
+int hash_test(void)
 {
         struct alphabet* a = NULL;
         unsigned short hash = 0;
@@ -39,11 +209,10 @@ int main(int argc, char *argv[])
 
 
         MFREE(internal);
-        return EXIT_SUCCESS;
+        return OK;
 ERROR:
-        return EXIT_FAILURE;
+        return FAIL;
 }
-
 
 #endif
 
@@ -176,59 +345,205 @@ int byg_start(char* pattern,char*text)
 }
 
 
-/*
-unsigned long int bpm(const unsigned char* t,const unsigned char* p,int n,int m)
+
+uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m)
 {
-	register unsigned long int i;//,c;
-	unsigned long int diff;
-	unsigned long int B[5];
-	if(m > 64){
-		m = 64;
-	}
+        register uint64_t VP,VN,D0,HN,HP,X;
+        register uint64_t i;//,c;
+        uint64_t MASK = 0;
+        uint64_t diff;
+        uint64_t B[21];
+        uint8_t k = m;
 
-	unsigned long int k = m;
-	//static int counter = 0;
-	register unsigned long int VP,VN,D0,HN,HP,X;
+        if(m > 64){
+                m = 64;
+        }
+        diff = m;
 
-	long int MASK = 0;
-	//c = 0;
+        for(i = 0; i < 21;i++){
+                B[i] = 0;
+        }
 
-	diff = m;
+        for(i = 0; i < m;i++){
+                B[p[i]] |= (1ul << i);
+        }
 
-	for(i = 0; i < 5;i++){
-		B[i] = 0;
-	}
+        VP = 0xFFFFFFFFFFFFFFFFul;
+        VN = 0ul;
+        m--;
+        MASK = 1ul << m;
+        for(i = 0; i < n;i++){
+                X = (B[t[i]] | VN);
+                D0 = ((VP+(X&VP)) ^ VP) | X ;
+                HN = VP & D0;
+                HP = VN | ~(VP | D0);
+                X = HP << 1ul;
+                VN = X & D0;
+                VP = (HN << 1ul) | ~(X | D0);
+                diff += (HP & MASK) >> m;
+                diff -= (HN & MASK) >> m;
+                if(diff < k){
+                        k = diff;
 
-	for(i = 0; i < m;i++){
-		B[(int)(p[i] & 0x3)] |= (1ul << i);
-	}
-
-	//c = 0;
-	VP = 0xFFFFFFFFFFFFFFFFul;
-	VN = 0ul;
-	m--;
-	MASK = 1ul << m;
-	for(i = 0; i < n;i++){
-		X = (B[(int)(t[i] &0x3)  ] | VN);
-		D0 = ((VP+(X&VP)) ^ VP) | X ;
-		HN = VP & D0;
-		HP = VN | ~(VP | D0);
-		X = HP << 1ul;
-		VN = X & D0;
-		VP = (HN << 1ul) | ~(X | D0);
-		diff += (HP & MASK) >> m;
-		diff -= (HN & MASK) >> m;
-		if(diff < k){
-			k = diff;
-
-		}
-	}
-	return k;
+                }
+        }
+        return k;
 }
+
+
+
+uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
+{
+        //sss__m256i VP,VN,D0,HN,HP,X;
+        int i,j,diff,k,c;
+
+        __m256i MASK;
+
+        __m256i B[21];
+
+
+
+
+        alignas(32)  uint32_t f[21][8];
+        //int ALIGNED_(64) f[8];
+        if(m > 256){
+                m = 256;
+        }
+        m = 10;
+        for(i = 0; i < 21;i++){
+                for(j = 0;j < 8;j++){
+                        f[i][j] =0u;
+                }
+
+        }
+
+        for(i = 0; i < m;i++){
+
+
+                fprintf(stdout,"pos:%d %*d,",i,3,p[i]);
+                fprintf(stdout,"\tb: %d\t",f[p[i]][i/32]);
+                f[p[i]][i/32] |= (1 << (i % 32));
+                fprintf(stdout,"set bit %d in arr %d[%d]", i%32,p[i],i/32);
+                fprintf(stdout,"\ta: %d\n",f[p[i]][i/32]);
+        }
+        fprintf(stdout,"\n");
+        for(i = 0; i < 21;i++){
+                fprintf(stdout,"Letter: %d ",i);
+                for(j = 0;j < 8;j++){
+                        for(c = 0; c < 32;c++){
+                                if(f[i][j] & (1 << c)){
+                                        fprintf(stdout,"%d(%d),",c,j);
+                                }
+
+                        }
+                }
+                fprintf(stdout,"\n");
+
+        }
+        diff = m;
+
+        for(i = 0; i < 21;i++){
+
+                //B[i] = _mm256_setzero_si256();
+                B[i] = _mm256_load_si256((__m256i const*) &f[i]);
+                /*B[i] = _mm256_set_epi32(f[i][0],
+                                 f[i][1],
+                                 f[i][2],
+                                 f[i][3],
+                                 f[i][4],
+                                 f[i][5],
+                                 f[i][6],
+                                 f[i][7]     );*/
+        }
+
+
+        for(i = 0; i < 21;i++){
+                for(j = 0; j < 8;j++){
+                        f[i][j] = 0;
+
+                }
+        }
+        for(i = 0; i < 21;i++){
+                //left_shift_by_one_256(B[i]);
+                //bitShiftLeft256ymm
+                //B[i] = shift_left256(B[i],1);
+                for(j = 0; j < 137;j++){
+                        bitShiftLeft256ymm(&B[i],1);
+                }
+
+                for(j = 0; j < 137;j++){
+                        bitShiftRight256ymm(&B[i],1);
+                }
+
+
+        }
+
+        for(i = 0; i< 21;i++){
+                _mm256_store_si256((__m256i*) &f[0],B[i]);
+                fprintf(stdout,"Letter %d: ",i);
+                for(j = 7;j >= 0;j--){
+                        //fprintf(stdout,"%x,",f[0][j]);
+                        for(c =0;c < 32;c++){
+                                if(f[0][j] & (1 << c)){
+                                        fprintf(stdout,"%d(%d),",c,j);
+                                }else{
+                                        //fprintf(stdout,"----");
+                                }
+                                }
+                }
+                fprintf(stdout,"\n");
+        }
+
+
+/*
+        rintf(stderr,"%c",*t + 65);
+		X = _mm_or_si128 (*(nuc_p +( (int)(*t)  & 0x3u) ) , VN);
+		//X = (B[(int) *t] | VN);
+		xmm1 = _mm_and_si128(X, VP);
+		xmm2 = _mm_add_epi32(VP ,xmm1);
+		xmm1 = _mm_xor_si128 (xmm2, VP);
+		D0 = _mm_or_si128(xmm1, X);
+		//D0 = ((VP+(X&VP)) ^ VP) | X ;
+		HN = _mm_and_si128(VP, D0);
+		//HN = VP & D0;
+		xmm1 = _mm_or_si128(VP, D0);
+		xmm2 = _mm_andnot_si128 (xmm1,NOTONE);
+		HP = _mm_or_si128(VN, xmm2);
+		//HP = VN | ~(VP | D0);
+		X = _mm_slli_epi32(HP,1);
+		//X = HP << 1ul;
+		VN = _mm_and_si128(X, D0);
+		//VN = X & D0;
+		xmm1 = _mm_slli_epi32(HN,1);
+		xmm2 = _mm_or_si128(X, D0);
+		xmm2 = _mm_andnot_si128 (xmm2,NOTONE);
+		VP = _mm_or_si128(xmm1, xmm2);
+		//VP = (HN << 1ul) | ~(X | D0);
+		xmm1 = _mm_and_si128(HP, MASK);
+		xmm2 = _mm_cmpgt_epi32(xmm1, zero);
+		diff = _mm_add_epi32(diff , _mm_and_si128( xmm2, one));
+		//diff += (HP & MASK) >> m;
+		xmm1 = _mm_and_si128(HN, MASK);
+		xmm2 = _mm_cmpgt_epi32(xmm1, zero);
+		diff = _mm_sub_epi32(diff,  _mm_and_si128( xmm2, one));
+		//diff -= (HN & MASK) >> m;
+		xmm1 = _mm_cmplt_epi32(diff, K);
+		xmm2 = _mm_and_si128(xmm1, diff);
+		K = _mm_or_si128(xmm2, _mm_andnot_si128  (xmm1,K));
+		xmm2 = _mm_and_si128(xmm1, _mm_set1_epi32(i));
+		POS = _mm_or_si128(xmm2, _mm_andnot_si128  (xmm1,POS));
+		t--;*/
+
+
+        return OK;
+}
+
+/*
 int validate_bpm_sse(struct qs_struct* qs,int* assignment,unsigned char* t,int n,int num,long int offset)
 {
 	int i,j;
 	int len = 0;
+
 	struct seq_info* si = 0;
 	unsigned long int new;
 	unsigned int _MM_ALIGN16 nuc[16];
@@ -332,7 +647,8 @@ int validate_bpm_sse(struct qs_struct* qs,int* assignment,unsigned char* t,int n
 	}
 	//fprintf(stderr,"\n");
 	_mm_store_si128 ((__m128i*) positions, POS);
-	//fprintf(stderr,"%d	%d	%d	%d	",out1[0],out1[1],out1[2],out1[3]);
+	//fprintf(stderr,"%d	%d
+	%d	%d	",out1[0],out1[1],out1[2],out1[3]);
 	_mm_store_si128 ((__m128i*) errors, K);
 	//fprintf(stderr,"%d	%d	%d	%d\n",out2[0],out2[1],out2[2],out2[3]);
 

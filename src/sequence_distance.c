@@ -27,7 +27,7 @@ void big_print_nodes(struct bignode *n);
 
 float protein_wu_distance_calculation(struct bignode* hash[],const uint8_t* seq,const int seqlen,const int diagonals,const float mode);
 
-float dna_distance_calculation(struct bignode* hash[], const uint8_t * p,const int seqlen,int diagonals,float mode);;
+float dna_distance_calculation(struct bignode* hash[], const uint8_t * p,const int seqlen,int diagonals,float mode);
 
 int sort_by_kmer_then_seq(const void *a, const void *b);
 int sort_by_hash(const void *a, const void *b);
@@ -86,6 +86,7 @@ float** kmer_distance(struct alignment* aln, int* seeds, int num_seeds, int kmer
         MMALLOC(kmer_list, sizeof(struct kmer*) * len);
         p = NULL;
         MMALLOC(p, sizeof(struct kmer) * len);
+
 
         for(i = 0;i <len;i++){
                 kmer_list[i] = p;

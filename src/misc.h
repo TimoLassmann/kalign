@@ -19,6 +19,8 @@ extern int byg_end(char* pattern,char*text);
 extern int byg_count(char* pattern,char*text);
 
 
+uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m);
+
 /* The following two hash functions are taken from the supplementary of: */
 
 /* Steinegger, Martin, and Johannes Söding. "Clustering huge protein sequence sets in linear time." Nature communications 9.1 (2018): 2542. */
