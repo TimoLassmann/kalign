@@ -394,11 +394,10 @@ uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m)
 
 uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
 {
-        //sss__m256i VP,VN,D0,HN,HP,X;
+        __m256i VP,VN,D0,HN,HP,X;
         int i,j,diff,k,c;
 
         __m256i MASK;
-
         __m256i B[21];
 
 
@@ -467,11 +466,11 @@ uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
                 //left_shift_by_one_256(B[i]);
                 //bitShiftLeft256ymm
                 //B[i] = shift_left256(B[i],1);
-                for(j = 0; j < 137;j++){
+                for(j = 0; j < 251;j++){
                         bitShiftLeft256ymm(&B[i],1);
                 }
 
-                for(j = 0; j < 137;j++){
+                for(j = 0; j < 251;j++){
                         bitShiftRight256ymm(&B[i],1);
                 }
 
@@ -494,6 +493,30 @@ uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
                 fprintf(stdout,"\n");
         }
 
+        VP = _mm256_set1_epi64x(0xFFFFFFFFFFFFFFFFul);
+        //        VP =          0xFFFFFFFFFFFFFFFFul;
+        VN = _mm256_setzero_si256();
+        MASK=  _mm256_set_epi64x (0ul,0ul,0ul,1ul);
+
+        m--;
+        bitShiftLeft256ymm(&MASK,m);
+
+        //MASK = 1ul << m;
+        /*for(i = 0; i < n;i++){
+                X = (B[t[i]] | VN);
+                D0 = ((VP+(X&VP)) ^ VP) | X ;
+                HN = VP & D0;
+                HP = VN | ~(VP | D0);
+                X = HP << 1ul;
+                VN = X & D0;
+                VP = (HN << 1ul) | ~(X | D0);
+                diff += (HP & MASK) >> m;
+                diff -= (HN & MASK) >> m;
+                if(diff < k){
+                        k = diff;
+
+                }
+                }*/
 
 /*
         rintf(stderr,"%c",*t + 65);
