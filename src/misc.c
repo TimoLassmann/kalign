@@ -166,16 +166,22 @@ int bpm_test(void)
         uint_fast8_t* a = NULL;
         uint_fast8_t* b = NULL;
 
+        int test_iter = 100;
+
+        int calc_errors = 0;
+        int total_calc = 0;
+        int dyn_score,bpm_score;
+
         srand48_r(time(NULL), &randBuffer);
 
         RUNP(alphabet = create_alphabet(defPROTEIN));
 
         char seq[] = "MLLRNSFISQDENDDQLSPTQLGRAAIASSLPPEASLAIFEDLNSASRAIALDTELHMLYLVYFYKNSRAQIIQKIFKIYSIFILKKFKNLEPKFKKKISENITVHITNSIRKKQHFWHVTPINVSVWQECDWHHLFSIFSKLPSDHKRIAKLVGVSEKFILDQLQGRRNDKLLQIHIRFFSALALFDLISEMSIYEVSHKYRIPRGCLQTLQSQSATYAAMIVAFCLRLGWTYLKALLDGFATRLLFGVRSELSELVAIEGIDGQRARILHERGVTCLSHLSACDSSKLAHFLTLAVPYSSSNSNDGLGEWLFGEPRMRVDVAARTLKERARKVLIRRVQELGISVELPKFEENEENIQESCDSGLPDSCEGMEDELEEKENIVKMEEMTKSVTEMSLTDNTISFKSEDDLFKKEIKVEEDEVFIKKEIDEDEEEIVEETVIECLETSLLKLKASTDEVFLRRLSQTFSPIGRSRSILNNSLLEDSFDRPVPRSSIPILNFITPKRESPTPYFEDSFDRPIPGSLPISSSRRKSVLTNIANLDSSRRESINSNASDNNSFDVFVTPPTKSAKEEKRRIAVKHPRVGNIIYSPLTSSPVIKHPKLEINHFYLKDVCHDHNAWNLWTKSSTSTSSCSIRVSDDYTGIAIRTDAGNTFIPLLETFGGENSVPQFFKNISNFYVLKMPLKIFWKQPSPASKYFESFSKCIIPLNTRLEFLKTLAVTVEMYISSMEDAFLIFEKFGIKIFRLKVVRIAAYLNNVIDVEQEENSNFLPILMDRYSILDPEIRKTCSSSLHKAAVEVYSLKPIFEKMCCSGASLQLEMESCQTVLNIFYSGIVFDQALCNSFIYKIRKQIENLEENIWRLAYGKFNIHSSNEVANVLFYRLGLIYPETSGCKPKLRHLPTNKLILEQMNTQHPIVGKILEYRQIQHTLTQCLMPLAKFIGRIHCWFEMCTSTGRILTSVPNLQNVPKRISSDGMSARQLFIANSENLLIGADYKQLELRVLAHLSNDSNLVNLITSDRDLFEELSIQWNFPRDAVKQLCYGLIYGMGAKSLSELTRMSIEDAEKMLKAFFAMFPGVRSYINETKEKVCKEEPISTIIGRRTIIKASGIGEERARIERVAVNYTIQGSASEIFKTAIVDIESKIKEFGAQIVLTIHDEVLVECPEIHVAAASESIENCMQNALSHLLRVPMRVSMKTGRSWADLK";
-
         len = strlen(seq);
-        if(len > 255){
-                len = 255;
+        if(len > 256){
+                len = 256;
         }
+
         MMALLOC(a , sizeof(uint_fast8_t) * len) ;
         MMALLOC(b , sizeof(uint_fast8_t) * len) ;
 
@@ -185,29 +191,26 @@ int bpm_test(void)
                 fprintf(stdout,"%d %d\n", a[i],b[i]);
         }
         fprintf(stdout,"LEN: %d\n", len);
+
+
         LOG_MSG("Testing correctness of serial bpm.");
-
-        len = 10;
-        int test_iter = 1;
-
-        int calc_errors = 0;
-        int total_calc = 0;
-        int dyn_score,bpm_score;
+//        len = 63;
         calc_errors = 0;
         total_calc = 0;
-        for(i = 0; i < 1;i++){
+        len =63; //could fix;
+        for(i = 0; i < 10;i++){
                 for (j =0 ; j < test_iter; j++){
                         RUN(mutate_seq(b,len,i,alphabet->L,&randBuffer));
-                        dyn_score = dyn_256(a,b,len,len-5);
-                        bpm_score = bpm(a,b,len,len-5);
+                        dyn_score = dyn_256(a,b,len,len);
+                        bpm_score = bpm(a,b,len,len);
 
-                        if( abs( dyn_score - bpm_score) > -1){
+                        if( abs( dyn_score - bpm_score) != 0){
                                 fprintf(stdout,"Scores differ: %d (dyn) %d (bpm) (%d out of %d)\n", dyn_score,bpm_score, calc_errors , total_calc);
 
 
-                                dyn_256_print(a,b,len,len);
+                                //dyn_256_print(a,b,len,len);
 
-                                for(c = 0; c < len;c++){
+                                /*for(c = 0; c < len;c++){
                                         fprintf(stdout,"%*d",3,a[c]);
                                 }
 
@@ -221,16 +224,65 @@ int bpm_test(void)
                                         }
                                 }
                                 fprintf(stdout,"\n");
-                                for(c = 0; c < len;c++){
+                                for(c = 0; c < len-5;c++){
                                         fprintf(stdout,"%*d",3,b[c]);
                                 }
                                 fprintf(stdout,"\n");
 
-                                fprintf(stdout,"\n");
+                                fprintf(stdout,"\n");*/
                                 calc_errors++;
-                                //if(calc_errors == 3){
-                                        //        ERROR_MSG("Too many errors.");
-                                        //}
+                        }
+                        /* restore sequence b */
+                        for(c = 0;c < len;c++){
+                                b[c] = a[c];
+                        }
+
+                        total_calc++;
+                }
+
+        }
+        fprintf(stdout,"%d errors out of %d\n", calc_errors , total_calc);
+        LOG_MSG("Testing correctness of AVX bpm.");
+        len = strlen(seq);
+        if(len > 255){
+                len = 255;
+        }
+//        len = 63;
+        calc_errors = 0;
+        total_calc = 0;
+        for(i = 0; i < 10;i++){
+                for (j =0 ; j < test_iter; j++){
+                        RUN(mutate_seq(b,len,i,alphabet->L,&randBuffer));
+                        dyn_score = dyn_256(a,b,len,len);
+                        bpm_score = bpm_256(a,b,len,len);
+
+                        if( abs( dyn_score - bpm_score) != 0){
+                                fprintf(stdout,"Scores differ: %d (dyn) %d (bpm) (%d out of %d)\n", dyn_score,bpm_score, calc_errors , total_calc);
+
+
+                                //dyn_256_print(a,b,len,len);
+
+                                /*for(c = 0; c < len;c++){
+                                        fprintf(stdout,"%*d",3,a[c]);
+                                }
+
+
+                                fprintf(stdout,"\n");
+                                for(c = 0; c < len;c++){
+                                        if(a[c] == b[c]){
+                                                fprintf(stdout,"  |");
+                                        }else{
+                                                fprintf(stdout,"   ");
+                                        }
+                                }
+                                fprintf(stdout,"\n");
+                                for(c = 0; c < len-5;c++){
+                                        fprintf(stdout,"%*d",3,b[c]);
+                                }
+                                fprintf(stdout,"\n");
+
+                                fprintf(stdout,"\n");*/
+                                calc_errors++;
                         }
                         /* restore sequence b */
                         for(c = 0;c < len;c++){
@@ -243,6 +295,7 @@ int bpm_test(void)
         }
         fprintf(stdout,"%d errors out of %d\n", calc_errors , total_calc);
 
+
         len = strlen(seq);
         if(len > 255){
                 len = 255;
@@ -253,9 +306,9 @@ int bpm_test(void)
 
         double dyn_timing;
         double bpm_timing;
-        int timing_iter = 10000;
+        int timing_iter = 100;
         DECLARE_TIMER(t);
-        for(i = 50; i < 75;i++){
+        for(i = 0; i < 100;i+=5){
                 RUN(mutate_seq(b,len,i,alphabet->L,&randBuffer));
                 START_TIMER(t);
                 for(j = 0; j < timing_iter;j++){
@@ -265,7 +318,7 @@ int bpm_test(void)
                 dyn_timing = GET_TIMING(t);
                 //fprintf(stdout,"%f\tdyn\n", GET_TIMING(t));
                 //fprintf(stdout,"\t%ld\n",res);
-                fprintf(stdout,"DYN:\t%d\tdiff:%ld\n",i,res);
+                //fprintf(stdout,"DYN:\t%d\tdiff:%ld\n",i,res);
 
                 //res= bpm(a,b,len,len);
                 //fprintf(stdout,"BPM:\t%d\tdiff:%ld\n",i,res);
@@ -280,7 +333,7 @@ int bpm_test(void)
 //fprintf(stdout,"\t%ld\n",res);
                 ASSERT(dyn_score == bpm_score, "Scores differ: %d %d.",dyn_score, bpm_score);
                 fprintf(stdout,"timing:\t%f\t%f\t%f\n",dyn_timing,bpm_timing,  dyn_timing / bpm_timing);
-                fprintf(stdout,"%d: %d %d\n",i, dyn_score, bpm_score);
+                //fprintf(stdout,"%d: %d %d\n",i, dyn_score, bpm_score);
 
                 /*for(j = 0; j < len;j++){
                   fprintf(stdout,"%*d",3,a[j]);
@@ -516,7 +569,7 @@ uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m)
         }
 
         for(i = 0; i < m;i++){
-                B[p[i]] |= (1ul << (i+1));
+                B[p[i]] |= (1ul << i);
         }
         /*for(i = 0; i < 21;i++){
                 fprintf(stdout,"Letter: %d ",i);
@@ -528,12 +581,12 @@ uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m)
                 fprintf(stdout,"\n");
                 }*/
 
-        VP = (1ul << (m+1))-1 ;//0xFFFFFFFFFFFFFFFFul;
+        VP = (1ul << (m))-1 ;//0xFFFFFFFFFFFFFFFFul;
         //VP = 0xFFFFFFFFFFFFFFFFul;
 
         VN = 0ul;
 
-
+        m--;
         MASK = 1ul << (m);
 
         //fprintf(stdout,"BEGINNING\t%lu %lu\n",VN,VP);
@@ -562,8 +615,8 @@ uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m)
                         k = diff;
 
                 }
-                fprintf(stdout,"%lu ", diff);
-                fprintf(stdout,"\n");
+                //fprintf(stdout,"%lu ", diff);
+                //fprintf(stdout,"\n");
 
         }
         return k;
@@ -593,22 +646,37 @@ uint8_t dyn_256(const uint8_t* t,const uint8_t* p,int n,int m)
         prev = tmp;
 
         for(i = 1; i <= n;i++){
-                cur[0] = prev[0] +1;
+                cur[0] = prev[0];
                 //fprintf(stdout,"%d ", cur[0]);
-                for(j = 1; j <= m;j++){
-
+                for(j = 1; j < m;j++){
+                        c = 1;
                         if(t[i-1] == p[j-1]){
-                                cur[j] = prev[j-1];
-                        }else{
-                                cur[j] = 1 + MACRO_MIN(MACRO_MIN(prev[j], cur[j-1]), prev[j-1]);
+                                c = 0;
 
                         }
+                        cur[j] = prev[j-1] +c ;
+
+                        cur[j] = MACRO_MIN(cur[j], prev[j]+1);
+                        cur[j] = MACRO_MIN(cur[j], cur[j-1]+1);
+
+
 
                         //cur[j] = prev[j-1] + c;
                         //cur[j] = MACRO_MIN(cur[j], cur[j-1] +1);
                         //cur[j] = MACRO_MIN(cur[j], prev[j] +1);
                         //fprintf(stdout,"%d ", cur[j]);
                 }
+                j = m;
+
+                c = 1;
+                if(t[i-1] == p[j-1]){
+                        c = 0;
+
+                }
+                cur[j] = prev[j-1] +c ;
+
+                cur[j] = MACRO_MIN(cur[j], prev[j]);
+                cur[j] = MACRO_MIN(cur[j], cur[j-1]+1);
                 //fprintf(stdout,"\n");
                 tmp  = cur;
                 cur = prev;
@@ -646,22 +714,44 @@ uint8_t dyn_256_print(const uint8_t* t,const uint8_t* p,int n,int m)
         prev = tmp;
 
         for(i = 1; i <= n;i++){
-                cur[0] = prev[0] +1;
-                //fprintf(stdout,"%d ", cur[0]);
-                for(j = 1; j <= m;j++){
-
+                cur[0] = prev[0];
+                fprintf(stdout,"%d ", cur[0]);
+                for(j = 1; j < m;j++){
+                        c = 1;
                         if(t[i-1] == p[j-1]){
-                                cur[j] = prev[j-1];
-                        }else{
-                                cur[j] = 1 + MACRO_MIN(MACRO_MIN(prev[j], cur[j-1]), prev[j-1]);
+                                c = 0;
 
                         }
+                        cur[j] = prev[j-1] +c ;
+
+                        cur[j] = MACRO_MIN(cur[j], prev[j]+1);
+                        cur[j] = MACRO_MIN(cur[j], cur[j-1]+1);
+
+
+
+
+
 
                         //cur[j] = prev[j-1] + c;
                         //cur[j] = MACRO_MIN(cur[j], cur[j-1] +1);
                         //cur[j] = MACRO_MIN(cur[j], prev[j] +1);
                         fprintf(stdout,"%d ", cur[j]);
                 }
+                j =m;
+                c = 1;
+                if(t[i-1] == p[j-1]){
+                        c = 0;
+
+                }
+                cur[j] = prev[j-1] +c ;
+
+                cur[j] = MACRO_MIN(cur[j], prev[j]);
+                cur[j] = MACRO_MIN(cur[j], cur[j-1]+1);
+
+
+
+                fprintf(stdout,"%d ", cur[j]);
+
                 fprintf(stdout,"\n");
                 tmp  = cur;
                 cur = prev;
@@ -772,6 +862,12 @@ uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
         k = m;
         //K = _mm256_set_epi64x (0ul,0ul,0ul,m);
         VP     = _mm256_set1_epi64x(0xFFFFFFFFFFFFFFFFul);
+        /*i = (256 -m ) / 64;
+        while(i){
+                bitShiftRight256ymm(&VP,64);
+                i--;
+        }
+        bitShiftRight256ymm(&VP, (256-(m-1))%64);*/
         VN     = _mm256_setzero_si256();
         NOTONE = _mm256_set1_epi64x(0xFFFFFFFFFFFFFFFFul);
         MASK   = _mm256_set_epi64x (0ul,0ul,0ul,1);
@@ -798,7 +894,7 @@ uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
                 //print_256(X);
                 xmm1 = _mm256_and_si256(X, VP);
 
-                xmm2 = add256(1, VP, xmm1);
+                xmm2 = add256(0, VP, xmm1);
                 //xmm2 = _mm256_add_epi64(VP, xmm1);
                 xmm1 = _mm256_xor_si256(xmm2, VP);
                 D0 = _mm256_or_si256(xmm1, X);
