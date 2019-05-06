@@ -1,7 +1,7 @@
 # Build the library in the hand subdirectory first.
 LIB_TLDEVELDIR = @LIB_TLDEVELDIR@
 
-AM_CFLAGS =@SIMD_FLAGS@ 
+AM_CFLAGS =@SIMD_FLAGS@
 
 CLEANFILES = ihmm_seq_itest_read_test.fa test_model_file.txt test.lfa test_dna.lfa libhdf5gluetest_exp.h5 libhdf5gluetest.h5 model_at_*h5 test1.h5 test2.h5
 
@@ -31,7 +31,14 @@ AM_CPPFLAGS=${MYINCDIRS} ${HDF5_CPPFLAGS}
 
 #LOGO_SOURCES = motif_logo.c motif_logo.h
 
-bin_PROGRAMS =  kalign phmm get_param edist alphabet heap_test misc_test
+bin_PROGRAMS =  kalign phmm get_param edist alphabet heap_test misc_test bpm_test
+
+bpm_test_SOURCES = \
+bpm.h \
+bpm.c \
+alphabet.h \
+alphabet.c
+bpm_test_CPPFLAGS = $(AM_CPPFLAGS) -DBPM_UTEST
 
 misc_test_SOURCES = \
 misc.h \

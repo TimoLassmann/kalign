@@ -1,12 +1,10 @@
-#include <immintrin.h>
+#include "bpm.h"
 
-#include "misc.h"
+#include <immintrin.h>
 #include  <stdalign.h>
 
 __m256i BROADCAST_MASK[16];
 
-void print_256(__m256i X);
-void print_256_all(__m256i X);
 
 
 __m256i bitShiftLeft256ymm (__m256i *data, int count);
@@ -16,122 +14,27 @@ __m256i bitShiftRight256ymm (__m256i *data, int count);
  __m256i add256(uint32_t carry, __m256i A, __m256i B);
 
 
-void print_256(__m256i X)
-{
-        alignas(32) uint64_t debug[4];
-        _mm256_store_si256( (__m256i*)& debug,X);
-        fprintf(stdout,"%lu ", debug[0]);
-}
-
-
-void print_256_all(__m256i X)
-{
-        alignas(32) uint64_t debug[4];
-        _mm256_store_si256( (__m256i*)& debug,X);
-        int i;
-        for(i = 0; i < 4;i++){
-                fprintf(stdout,"%lu ", debug[i]);
-        }
-        fprintf(stdout,"\n");
-}
-
-
-void set_broadcast_mask(void)
-
-{
-        BROADCAST_MASK[0] =  _mm256_set_epi64x(0x8000000000000000, 0x8000000000000000, 0x8000000000000000, 0x8000000000000000);
-        BROADCAST_MASK[1] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000000, 0x8000000000000000, 0x8000000000000001);
-        BROADCAST_MASK[2] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000000, 0x8000000000000001, 0x8000000000000000);
-        BROADCAST_MASK[3] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000000, 0x8000000000000001, 0x8000000000000001);
-        BROADCAST_MASK[4] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000001, 0x8000000000000000, 0x8000000000000000);
-        BROADCAST_MASK[5] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000001, 0x8000000000000000, 0x8000000000000001);
-        BROADCAST_MASK[6] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000001, 0x8000000000000001, 0x8000000000000000);
-        BROADCAST_MASK[7] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000001, 0x8000000000000001, 0x8000000000000001);
-        BROADCAST_MASK[8] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000000, 0x8000000000000000, 0x8000000000000000);
-        BROADCAST_MASK[9] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000000, 0x8000000000000000, 0x8000000000000001);
-        BROADCAST_MASK[10] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000000, 0x8000000000000001, 0x8000000000000000);
-        BROADCAST_MASK[11] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000000, 0x8000000000000001, 0x8000000000000001);
-        BROADCAST_MASK[12] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000001, 0x8000000000000000, 0x8000000000000000);
-        BROADCAST_MASK[13] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000001, 0x8000000000000000, 0x8000000000000001);
-        BROADCAST_MASK[14] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000001, 0x8000000000000001, 0x8000000000000000);
-        BROADCAST_MASK[15] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000001, 0x8000000000000001, 0x8000000000000001);
-
-
-}
-
-uint8_t dyn_256(const uint8_t* t,const uint8_t* p,int n,int m);
-uint8_t dyn_256_print(const uint8_t* t,const uint8_t* p,int n,int m);
-#ifdef ITEST_MISC
+#ifdef BPM_UTEST
 
 #include "alphabet.h"
 
-
-
-__m256i add256(uint32_t carry, __m256i A, __m256i B)
-{
-        A = _mm256_xor_si256(A, _mm256_set1_epi64x(0x8000000000000000));
-        __m256i s = _mm256_add_epi64(A, B);
-        __m256i cv = _mm256_cmpgt_epi64(A, s);
-        __m256i mv = _mm256_cmpeq_epi64(s, _mm256_set1_epi64x(0x7fffffffffffffff));
-        uint32_t c = _mm256_movemask_pd(_mm256_castsi256_pd(cv));
-        uint32_t m = _mm256_movemask_pd(_mm256_castsi256_pd(mv));
-
-        {
-                c = m + 2*c; //  lea
-                carry += c;
-                m ^= carry;
-                carry >>= 4;
-                m &= 0x0f;
-        }
-        return _mm256_add_epi64(s, BROADCAST_MASK[m]);
-}
-
-
-//----------------------------------------------------------------------------
-// bit shift left a 256-bit value using ymm registers
-//          __m256i *data - data to shift
-//          int count     - number of bits to shift
-// return:  __m256i       - carry out bit(s)
-
-__m256i bitShiftLeft256ymm (__m256i *data, int count)
-{
-        __m256i innerCarry, carryOut, rotate;
-
-        innerCarry = _mm256_srli_epi64 (*data, 64 - count);                        // carry outs in bit 0 of each qword
-        rotate     = _mm256_permute4x64_epi64 (innerCarry, 0x93);                  // rotate ymm left 64 bits
-        innerCarry = _mm256_blend_epi32 (_mm256_setzero_si256 (), rotate, 0xFC);   // clear lower qword
-        *data    = _mm256_slli_epi64 (*data, count);                               // shift all qwords left
-        *data    = _mm256_or_si256 (*data, innerCarry);                            // propagate carrys from low qwords
-        carryOut   = _mm256_xor_si256 (innerCarry, rotate);                        // clear all except lower qword
-        return carryOut;
-}
-
-__m256i bitShiftRight256ymm (__m256i *data, int count)
-{
-        __m256i innerCarry, carryOut, rotate;
-
-
-        innerCarry = _mm256_slli_epi64(*data, 64 - count);
-        rotate =  _mm256_permute4x64_epi64 (innerCarry, 0x39);
-        innerCarry = _mm256_blend_epi32 (_mm256_setzero_si256 (), rotate, 0x3F);
-        *data = _mm256_srli_epi64(*data, count);
-        *data = _mm256_or_si256(*data,  innerCarry);
-
-        carryOut   = _mm256_xor_si256 (innerCarry, rotate);                        //FIXME: not sure if this is correct!!!
-        return carryOut;
-}
-
-
-
-int hash_test(void);
-int bpm_test(void);
+/* Functions needed for the unit test*/
+uint8_t dyn_256(const uint8_t* t,const uint8_t* p,int n,int m);
+uint8_t dyn_256_print(const uint8_t* t,const uint8_t* p,int n,int m);
 int  mutate_seq(uint8_t* s, int len,int k,int L, struct drand48_data* b);
-uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m);
+
+/* For debugging */
+void print_256(__m256i X);
+void print_256_all(__m256i X);
+
+/* The actual test.  */
+int bpm_test(void);
+
 int main(int argc, char *argv[])
 {
-        //int a = 2345;
+
+        /* Important set_broadcast_mask has to be called before using bpm_256!!! */
         set_broadcast_mask();
-        RUN(hash_test());
         RUN(bpm_test());
         return EXIT_SUCCESS;
 ERROR:
@@ -286,11 +189,11 @@ int bpm_test(void)
         }
 
 
-        uint64_t res= 0;
+
 
         double dyn_timing;
         double bpm_timing;
-        int timing_iter = 100;
+        int timing_iter = 10000;
         DECLARE_TIMER(t);
         for(i = 0; i < 100;i+=5){
                 RUN(mutate_seq(b,len,i,alphabet->L,&randBuffer));
@@ -336,8 +239,6 @@ int bpm_test(void)
                         b[j] = a[j];
                 }
         }
-        //lrand48_r(randBuffer, &r);
-        //r = r % num_samples;
 
         MFREE(a);
         MFREE(b);
@@ -345,7 +246,6 @@ int bpm_test(void)
 ERROR:
         return FAIL;
 }
-
 
 int  mutate_seq(uint8_t* s, int len,int k,int L, struct drand48_data* b)
 {
@@ -362,248 +262,6 @@ int  mutate_seq(uint8_t* s, int len,int k,int L, struct drand48_data* b)
         }
         return OK;
 
-}
-
-int hash_test(void)
-{
-        struct alphabet* a = NULL;
-        unsigned short hash = 0;
-        unsigned short rolling = 0;
-        int kmer_len = 10;
-        int len = 0;
-        int i;
-        uint_fast8_t* internal = NULL;
-
-        RUNP(a = create_alphabet(defPROTEIN));
-
-        char seq[] = "GKGDPKKPRGKMSSYAFFVQTSREEHKKKHPDASVNFSEFSKKCSERWKTMSAKEKGKFEDMAKADKARYEREMKTYIPPKGE";
-
-        len = strlen(seq);
-        MMALLOC(internal , sizeof(uint_fast8_t) * len) ;
-
-        for(i = 0;i < len;i++){
-                internal[i] = a->to_internal[(int)seq[i]];
-                //fprintf(stdout,"%c %d\n", seq[i], internal[i]);
-        }
-        fprintf(stdout,"LEN: %d\n", len);
-
-        hash = circ_hash(internal , kmer_len);
-        rolling = hash;
-        for(i = 1; i < len - kmer_len;i++){
-                rolling =circ_hash_next(internal+i, kmer_len, internal[i-1], rolling);
-                hash = circ_hash(internal+i , kmer_len);
-                //fprintf(stdout,"%d %d\n", hash, rolling);
-        }
-
-
-        MFREE(internal);
-        return OK;
-ERROR:
-        return FAIL;
-}
-
-#endif
-
-int byg_detect(uint8_t* text,int n)
-{
-        int Tc;
-        int i  = 0;
-        int s = 0;
-        int T[256];
-        for (i = 0;i < 256;i++){
-                T[i] = 0;
-        }
-        int mb = 1;
-        //char *unique_aa = "EFILPQXZ";//permissiv
-        //ABCDEFGHIJKLMNOPQRSTUVWXYZ
-        char *unique_aa = "BDEFHIJKLMNOPQRSVWYZ";//restrictive
-        int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
-        for (i= 0;i < 20;i++){
-                T[(int)aacode[unique_aa[i]-65]] |= 1;
-        }
-        for (i = 0;i < n;i++){
-                //	fprintf(stderr,"%d\n",text[i]);
-                if(text[i] != -1){
-                        s <<= 1;
-                        s |= 1;
-                        Tc = T[text[i]];
-                        s &= Tc;
-                        if(s & mb){
-                                return 0;
-                        }
-                }
-        }
-        return 1;
-}
-
-
-int byg_count(char* pattern,char*text)
-{
-        int Tc;
-        int count = 0;
-        int i  = 0;
-        int s = 0;
-        int T[256];
-        for (i = 0;i < 256;i++){
-                T[i] = 0;
-        }
-
-        int m = strlen(pattern);
-        int n = strlen (text);
-        int mb = (1 << (m-1));
-
-        for (i= 0;i < m;i++){
-                T[(int)pattern[i]] |= (1 << i);
-        }
-
-        for (i = 0;i < n;i++){
-                s <<= 1;
-                s |= 1;
-                Tc = T[(int)text[i]];
-                s &= Tc;
-                if(s & mb){
-                        count++;
-                }
-        }
-        return count;
-}
-
-int byg_end(char* pattern,char*text)
-{
-        int Tc;
-        int i  = 0;
-        int s = 0;
-        int T[256];
-        for (i = 0;i < 256;i++){
-                T[i] = 0;
-        }
-
-        int m = strlen(pattern);
-        int n = strlen (text);
-        int mb = (1 << (m-1));
-
-        for (i= 0;i < m;i++){
-                T[(int)pattern[i]] |= (1 << i);
-        }
-
-        for (i = 0;i < n;i++){
-                s <<= 1;
-                s |= 1;
-                if(!text[i]){
-                        return -1;
-                }
-                Tc = T[(int)text[i]];
-                s &= Tc;
-                if(s & mb){
-                        return i+1;
-                }
-        }
-        return -1;
-}
-
-
-int byg_start(char* pattern,char*text)
-{
-        int Tc;
-        int i  = 0;
-        int s = 0;
-        int T[256];
-        for (i = 0;i < 256;i++){
-                T[i] = 0;
-        }
-
-        int m = strlen(pattern);
-        int n = strlen(text);
-        int mb = (1 << (m-1));
-
-        for (i= 0;i < m;i++){
-                T[(int)pattern[i]] |= (1 << i);
-        }
-
-        for (i = 0;i < n;i++){
-                s <<= 1;
-                s |= 1;
-                Tc = T[(int)text[i]];
-                s &= Tc;
-                if(s & mb){
-                        return i-m+1;
-                }
-        }
-        return -1;
-}
-
-
-
-uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m)
-{
-        register uint64_t VP,VN,D0,HN,HP,X;
-        register uint64_t i;//,c;
-        uint64_t MASK = 0;
-        int64_t diff;
-        uint64_t B[21];
-        int8_t k;
-
-        if(m > 63){
-                m = 63;
-        }
-        diff = m;
-        k = m;
-        for(i = 0; i < 21;i++){
-                B[i] = 0;
-        }
-
-        for(i = 0; i < m;i++){
-                B[p[i]] |= (1ul << i);
-        }
-        /*for(i = 0; i < 21;i++){
-                fprintf(stdout,"Letter: %d ",i);
-                for(int c = 0; c < 32;c++){
-                        if(B[i] & (1 << c)){
-                                fprintf(stdout,"%d,",c);
-                        }
-                }
-                fprintf(stdout,"\n");
-                }*/
-
-        VP = (1ul << (m))-1 ;//0xFFFFFFFFFFFFFFFFul;
-        //VP = 0xFFFFFFFFFFFFFFFFul;
-
-        VN = 0ul;
-
-        m--;
-        MASK = 1ul << (m);
-
-        //fprintf(stdout,"BEGINNING\t%lu %lu\n",VN,VP);
-        for(i = 0; i < n;i++){
-                //        fprintf(stdout,"%lu:\t",i);
-                X = (B[t[i]] | VN);
-                //fprintf(stdout,"%lu ", X);
-                D0 = ((VP+(X&VP)) ^ VP) | X ;
-                //fprintf(stdout,"%lu ", D0);
-                HN = VP & D0;
-                //fprintf(stdout,"%lu ", HN);
-                HP = VN | (~(VP | D0));
-                //fprintf(stdout,"%lu ", HP);
-                X = HP << 1ul;
-                //fprintf(stdout,"%lu ", X);
-                VN = X & D0;
-                //fprintf(stdout,"%lu ", VN);
-
-                VP = (HN << 1ul) | (~(X | D0));
-                //fprintf(stdout,"%lu ", VP);
-
-
-                diff += (HP & MASK)? 1 : 0;// >> m;
-                diff -= (HN & MASK)? 1 : 0;// >> m;
-                if(diff < k){
-                        k = diff;
-
-                }
-                //fprintf(stdout,"%lu ", diff);
-                //fprintf(stdout,"\n");
-
-        }
-        return k;
 }
 
 
@@ -751,10 +409,102 @@ ERROR:
 
 }
 
+void print_256(__m256i X)
+{
+        alignas(32) uint64_t debug[4];
+        _mm256_store_si256( (__m256i*)& debug,X);
+        fprintf(stdout,"%lu ", debug[0]);
+}
+
+
+void print_256_all(__m256i X)
+{
+        alignas(32) uint64_t debug[4];
+        _mm256_store_si256( (__m256i*)& debug,X);
+        int i;
+        for(i = 0; i < 4;i++){
+                fprintf(stdout,"%lu ", debug[i]);
+        }
+        fprintf(stdout,"\n");
+}
+
+#endif
+
+
+uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m)
+{
+        register uint64_t VP,VN,D0,HN,HP,X;
+        register uint64_t i;//,c;
+        uint64_t MASK = 0;
+        int64_t diff;
+        uint64_t B[21];
+        int8_t k;
+
+        if(m > 63){
+                m = 63;
+        }
+        diff = m;
+        k = m;
+        for(i = 0; i < 21;i++){
+                B[i] = 0;
+        }
+
+        for(i = 0; i < m;i++){
+                B[p[i]] |= (1ul << i);
+        }
+        /*for(i = 0; i < 21;i++){
+                fprintf(stdout,"Letter: %d ",i);
+                for(int c = 0; c < 32;c++){
+                        if(B[i] & (1 << c)){
+                                fprintf(stdout,"%d,",c);
+                        }
+                }
+                fprintf(stdout,"\n");
+                }*/
+
+        VP = (1ul << (m))-1 ;//0xFFFFFFFFFFFFFFFFul;
+        //VP = 0xFFFFFFFFFFFFFFFFul;
+
+        VN = 0ul;
+
+        m--;
+        MASK = 1ul << (m);
+
+        //fprintf(stdout,"BEGINNING\t%lu %lu\n",VN,VP);
+        for(i = 0; i < n;i++){
+                //        fprintf(stdout,"%lu:\t",i);
+                X = (B[t[i]] | VN);
+                //fprintf(stdout,"%lu ", X);
+                D0 = ((VP+(X&VP)) ^ VP) | X ;
+                //fprintf(stdout,"%lu ", D0);
+                HN = VP & D0;
+                //fprintf(stdout,"%lu ", HN);
+                HP = VN | (~(VP | D0));
+                //fprintf(stdout,"%lu ", HP);
+                X = HP << 1ul;
+                //fprintf(stdout,"%lu ", X);
+                VN = X & D0;
+                //fprintf(stdout,"%lu ", VN);
+
+                VP = (HN << 1ul) | (~(X | D0));
+                //fprintf(stdout,"%lu ", VP);
+
+
+                diff += (HP & MASK)? 1 : 0;// >> m;
+                diff -= (HN & MASK)? 1 : 0;// >> m;
+                if(diff < k){
+                        k = diff;
+
+                }
+                //fprintf(stdout,"%lu ", diff);
+                //fprintf(stdout,"\n");
+
+        }
+        return k;
+}
 
 uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
 {
-
         __m256i VP,VN,D0,HN,HP,X,NOTONE;
         __m256i xmm1,xmm2;
         __m256i MASK;
@@ -972,41 +722,78 @@ for(i = 0; i < 8;i++){
 }
 
 
-// (c) 2017 Johannes Soeding & Martin Steinegger, Gnu Public License version 3
-// Rotate left macro: left circular shift by numbits within 16 bits
-#define RoL(val, numbits) (val << numbits) ^ (val >> (16 - numbits))
 
-
-// Transform each letter x[i] to a fixed random number RAND[x[i]]
-// to ensure instantaneous mixing into the 16 bits
-// Do XOR with RAND[x[i]] and 5-bit rotate left for each i from 1 to k
-uint16_t circ_hash(const uint_fast8_t* x, const uint_fast8_t length)
+/* Must be called before BPM_256 is!!!  */
+void set_broadcast_mask(void)
 {
-        const uint16_t RAND[21] = {0x4567, 0x23c6, 0x9869, 0x4873, 0xdc51, 0x5cff, 0x944a, 0x58ec,
-                                   0x1f29, 0x7ccd, 0x58ba, 0xd7ab, 0x41f2, 0x1efb, 0xa9e3, 0xe146,
-                                   0x007c, 0x62c2, 0x0854, 0x27f8, 0x231b};// 16 bit random numbers
-        register uint16_t h = 0x0;
-        h = h^ RAND[x[0]];// XOR h and ki
-        for (register uint_fast8_t i = 1; i < length; ++i){
-                h = RoL(h, 5);
-                h ^= RAND[x[i]];// XOR h and ki
-        }
-        return h;
+        BROADCAST_MASK[0] =  _mm256_set_epi64x(0x8000000000000000, 0x8000000000000000, 0x8000000000000000, 0x8000000000000000);
+        BROADCAST_MASK[1] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000000, 0x8000000000000000, 0x8000000000000001);
+        BROADCAST_MASK[2] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000000, 0x8000000000000001, 0x8000000000000000);
+        BROADCAST_MASK[3] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000000, 0x8000000000000001, 0x8000000000000001);
+        BROADCAST_MASK[4] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000001, 0x8000000000000000, 0x8000000000000000);
+        BROADCAST_MASK[5] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000001, 0x8000000000000000, 0x8000000000000001);
+        BROADCAST_MASK[6] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000001, 0x8000000000000001, 0x8000000000000000);
+        BROADCAST_MASK[7] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000001, 0x8000000000000001, 0x8000000000000001);
+        BROADCAST_MASK[8] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000000, 0x8000000000000000, 0x8000000000000000);
+        BROADCAST_MASK[9] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000000, 0x8000000000000000, 0x8000000000000001);
+        BROADCAST_MASK[10] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000000, 0x8000000000000001, 0x8000000000000000);
+        BROADCAST_MASK[11] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000000, 0x8000000000000001, 0x8000000000000001);
+        BROADCAST_MASK[12] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000001, 0x8000000000000000, 0x8000000000000000);
+        BROADCAST_MASK[13] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000001, 0x8000000000000000, 0x8000000000000001);
+        BROADCAST_MASK[14] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000001, 0x8000000000000001, 0x8000000000000000);
+        BROADCAST_MASK[15] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000001, 0x8000000000000001, 0x8000000000000001);
 }
 
-// Rolling hash variant for previous hash function:
-// Computes hash value for next key x[0:length-1] from previous hash value
-// hash( x[-1:length-2] ) and x_first = x[-1]
-
-uint16_t circ_hash_next(const uint_fast8_t * x,const uint_fast8_t length,const uint_fast8_t x_first, uint16_t h)
+__m256i add256(uint32_t carry, __m256i A, __m256i B)
 {
-        const uint16_t RAND[21] = {0x4567, 0x23c6, 0x9869, 0x4873, 0xdc51, 0x5cff, 0x944a, 0x58ec,
-                                   0x1f29, 0x7ccd, 0x58ba, 0xd7ab, 0x41f2, 0x1efb, 0xa9e3, 0xe146,
-                                   0x007c, 0x62c2, 0x0854, 0x27f8, 0x231b};// 16 bit random numbers
-// undo INITIAL_VALUE and first letter x[0] of old key
-        h ^= RoL(RAND[x_first], (5*(length-1)) % 16);
-// circularly permute all letters x[1:length-1] to 5 positions to left
-        h =  RoL(h, 5);// add new, last letter of new key x[1:length]
-        h ^= RAND[x[length-1]];
-        return h;
+        A = _mm256_xor_si256(A, _mm256_set1_epi64x(0x8000000000000000));
+        __m256i s = _mm256_add_epi64(A, B);
+        __m256i cv = _mm256_cmpgt_epi64(A, s);
+        __m256i mv = _mm256_cmpeq_epi64(s, _mm256_set1_epi64x(0x7fffffffffffffff));
+        uint32_t c = _mm256_movemask_pd(_mm256_castsi256_pd(cv));
+        uint32_t m = _mm256_movemask_pd(_mm256_castsi256_pd(mv));
+
+        {
+                c = m + 2*c; //  lea
+                carry += c;
+                m ^= carry;
+                carry >>= 4;
+                m &= 0x0f;
+        }
+        return _mm256_add_epi64(s, BROADCAST_MASK[m]);
+}
+
+
+//----------------------------------------------------------------------------
+// bit shift left a 256-bit value using ymm registers
+//          __m256i *data - data to shift
+//          int count     - number of bits to shift
+// return:  __m256i       - carry out bit(s)
+
+__m256i bitShiftLeft256ymm (__m256i *data, int count)
+{
+        __m256i innerCarry, carryOut, rotate;
+
+        innerCarry = _mm256_srli_epi64 (*data, 64 - count);                        // carry outs in bit 0 of each qword
+        rotate     = _mm256_permute4x64_epi64 (innerCarry, 0x93);                  // rotate ymm left 64 bits
+        innerCarry = _mm256_blend_epi32 (_mm256_setzero_si256 (), rotate, 0xFC);   // clear lower qword
+        *data    = _mm256_slli_epi64 (*data, count);                               // shift all qwords left
+        *data    = _mm256_or_si256 (*data, innerCarry);                            // propagate carrys from low qwords
+        carryOut   = _mm256_xor_si256 (innerCarry, rotate);                        // clear all except lower qword
+        return carryOut;
+}
+
+__m256i bitShiftRight256ymm (__m256i *data, int count)
+{
+        __m256i innerCarry, carryOut, rotate;
+
+
+        innerCarry = _mm256_slli_epi64(*data, 64 - count);
+        rotate =  _mm256_permute4x64_epi64 (innerCarry, 0x39);
+        innerCarry = _mm256_blend_epi32 (_mm256_setzero_si256 (), rotate, 0x3F);
+        *data = _mm256_srli_epi64(*data, count);
+        *data = _mm256_or_si256(*data,  innerCarry);
+
+        carryOut   = _mm256_xor_si256 (innerCarry, rotate);                        //FIXME: not sure if this is correct!!!
+        return carryOut;
 }
