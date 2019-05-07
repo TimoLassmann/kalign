@@ -83,7 +83,7 @@ float** pair_aln_dist(struct alignment* aln, struct aln_param* ap, int* num_anch
         int* map = NULL;
 
         int numseq;
-        int numprofiles;
+        //int numprofiles;
         int i,j,c;
         int len_a;
         int len_b;
@@ -93,7 +93,7 @@ float** pair_aln_dist(struct alignment* aln, struct aln_param* ap, int* num_anch
         ASSERT(aln != NULL,"No alignment");
 
         numseq = aln->numseq;
-        numprofiles = aln->num_profiles;
+        //numprofiles = aln->num_profiles;
 
         RUNP(anchors = pick_anchor(aln, num_anchors));
 

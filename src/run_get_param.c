@@ -4,6 +4,8 @@
 #include <getopt.h>
 #include "align_io.h"
 
+#include "alphabet.h"
+
 struct counts{
         double emit[26][26];
         double back[26];
@@ -75,7 +77,7 @@ int main(int argc, char *argv[])
         for(i = 0; i < num_infiles;i++){
                 fprintf(stdout,"%s\n",infile[i]);
                 RUNP(aln = read_alignment(infile[i]));
-
+                RUN(convert_alignment_to_internal(aln, defPROTEIN));
                 RUN(fill_counts(ap, aln));
                 free_aln(aln);
         }
@@ -136,7 +138,7 @@ int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len)
         }
         double sim = 0;
         for(i = begin;i < end;i++){
-                if(a[i] != -1 && b[i] != -1){
+                if(a[i] != 255 && b[i] != 255){
                         if(a[i] == b[i]){
                                 sim += 1.0;
                         }
@@ -144,22 +146,25 @@ int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len)
         }
 
         sim = sim / (double) (end - begin);
-        sim = sim * sim * sim * sim;
-        sim = 1.0;
-        fprintf(stdout,"Sim :%f\n", sim);
+        //sim = sim * sim * sim * sim;
+        //sim = 1.0;
+        //fprintf(stdout,"Sim :%f\n", sim);
 
+        sim = 1.0;
 
         for(i = begin;i < end;i++){
-                if(a[i] == -1 && b[i] == -1){ /* two gaps do nothing */
+                if(a[i] == 255 && b[i] == 255){ /* two gaps do nothing */
 
-                }else if(a[i] != -1 && b[i] != -1){ /* aligned residues  */
+                }else if(a[i] != 255 && b[i] != 255){ /* aligned residues  */
 
                         if(state == 0){
                                 ap->TM += sim;
                         }else{
                                 ap->MM += sim;
                         }
-                        if(a[i] > b[i]){
+                        if(a[i] == b[i]){
+                                ap->emit[a[i]][b[i]] += sim + sim;
+                        }else if(a[i] > b[i]){
                                 ap->emit[a[i]][b[i]] += sim;
                         }else{
                                 ap->emit[b[i]][a[i]] += sim;
@@ -169,7 +174,7 @@ int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len)
                         ap->back[b[i]] += sim;
                         p_aln_len++;
                         state = 1;
-                }else if(a[i] != -1 && b[i] == -1){
+                }else if(a[i] != 255 && b[i] == 255){
                         if(state == 0){
                                 ap->GPE += sim;
                         }else{
@@ -180,7 +185,7 @@ int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len)
 
                         state = 0;
 
-                }else if(a[i] == -1 && b[i] != -1){
+                }else if(a[i] == 255 && b[i] != 255){
                         if(state == 0){
                                 ap->GPE += sim;
                         }else{

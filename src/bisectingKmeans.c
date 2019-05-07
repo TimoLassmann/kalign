@@ -52,7 +52,7 @@ int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln
         dm = pair_wu_fast_dist(aln, ap, &num_anchors);
 
 
-        unit_zero(dm, aln->numseq, num_anchors);
+        //unit_zero(dm, aln->numseq, num_anchors);
 
         /*int j;
         double r;
@@ -175,7 +175,7 @@ float** pair_wu_fast_dist(struct alignment* aln, struct aln_param* ap, int* num_
 
         //dm = protein_wu_distance(aln, 59.0,0, anchors, *num_anchors);
 
-        dm = kmer_distance(aln,  anchors, *num_anchors,6);
+        dm = kmer_distance(aln,  anchors, *num_anchors,10);
         /* normalize  */
         MFREE(anchors);
         return dm;
@@ -186,7 +186,7 @@ ERROR:
 
 struct node* bisecting_kmeans(struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct drand48_data* randBuffer)
 {
-        //long int r;
+        long int r;
         int* sl = NULL;
         int* sr = NULL;
         int num_l,num_r;
@@ -248,9 +248,9 @@ struct node* bisecting_kmeans(struct node* n, float** dm,int* samples,int numseq
         }
 
 
-        //lrand48_r(randBuffer, &r);
-        //r = r % num_samples;
-        s = samples[0];
+        lrand48_r(randBuffer, &r);
+        r = r % num_samples;
+        s = samples[r];
         //LOG_MSG("Selected %d\n",s);
         for(j = 0; j < num_anchors;j++){
                 cl[j] = dm[s][j];

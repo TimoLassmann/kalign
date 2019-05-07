@@ -512,20 +512,20 @@ uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
 
         int i,j, k,diff;
 
-        alignas(32)  uint32_t f[21][8];
+        alignas(32)  uint32_t f[23][8];
         //int ALIGNED_(64) f[8];
         if(m > 255){
                 m = 255;
         }
 
-        for(i = 0; i < 21;i++){
+        for(i = 0; i < 23;i++){
                 for(j = 0;j < 8;j++){
                         f[i][j] =0u;
                 }
         }
 
         for(i = 0; i < m;i++){
-                //fprintf(stdout,"pos:%d %*d,",i,3,p[i]);
+                //fprintf(stdout,"pos:%d %*d\n",i,3,p[i]);
                 //fprintf(stdout,"\tb: %d\t",f[p[i]][i/32]);
                 f[p[i]][i/32] |= (1 << (i % 32));
                 //fprintf(stdout,"set bit %d in arr %d[%d]", i%32,p[i],i/32);

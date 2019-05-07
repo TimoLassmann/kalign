@@ -72,7 +72,10 @@ parameters.h \
 parameters.c \
 global.h \
 misc.h \
-misc.c
+misc.c \
+alphabet.h \
+alphabet.c
+
 
 
 phmm_SOURCES = phmm.h phmm.c
@@ -110,8 +113,9 @@ alignment.c \
 weave_alignment.h \
 weave_alignment.c \
 misc.h \
-misc.c
-
+misc.c \
+bpm.h \
+bpm.c
 
 
 

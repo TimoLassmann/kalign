@@ -106,9 +106,8 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
 {
         struct alignment* aln = NULL;
         struct align_io_buffer* b = NULL;
-
-
         int i = 0;
+
 
         ASSERT(param!= NULL, "No parameters");
         /* if profile do something else... */
@@ -132,6 +131,13 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
         RUNP(aln = aln_alloc(b->numseq));
         /* read sequences */
         RUN(read_all_sequences(aln,b));
+
+
+        /* convert to internal format  */
+
+
+        RUN(convert_alignment_to_internal(aln, defPROTEIN));
+
 
         if(aln->numseq < 2){
                 ERROR_MSG("No sequences could be read.");
@@ -167,6 +173,33 @@ ERROR:
         free_align_io_buffer(b);
         free_aln(aln);
         return NULL;
+}
+
+int convert_alignment_to_internal(struct alignment* aln, int type)
+{
+        struct alphabet* a = NULL;
+
+        int_fast8_t* t = NULL;
+        int i,j;
+
+        RUNP(a = create_alphabet(type));
+
+        t = a->to_internal;
+        aln->L = a->L;
+        for(i = 0; i < aln->numseq;i++){
+                for(j =0 ; j < aln->sl[i];j++){
+                        //fprintf(stdout,"%c %d\n", aln->seq[i][j], );
+                        aln->s[i][j] = t[(int) aln->seq[i][j]];
+                }
+                //fprintf(stdout,"\n");
+        }
+        MFREE(a);
+        return OK;
+ERROR:
+        if(a){
+                MFREE(a);
+        }
+        return FAIL;
 }
 
 int count_sequences_macsim(char* string)
@@ -337,7 +370,7 @@ ERROR:
 struct alignment* read_sequences_from_swissprot(struct alignment* aln,char* string)
 {
         //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,-1,13,14,15,16,17,-1,18,19,20,21,22};
-        int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
+        //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
         int i,j,c,n;
         char* p = 0;
         p = string;
@@ -394,7 +427,7 @@ struct alignment* read_sequences_from_swissprot(struct alignment* aln,char* stri
                 n = 0;
                 for (i = 0;i < j;i++){
                         if(isalpha((int)p[i])){
-                                aln->s[c][n] = aacode[toupper(p[i])-65];
+                                //aln->s[c][n] = aacode[toupper(p[i])-65];
                                 aln->seq[c][n] = p[i];
                                 n++;
                         }
@@ -411,7 +444,7 @@ struct alignment* read_sequences_from_swissprot(struct alignment* aln,char* stri
 struct alignment* read_alignment_from_swissprot(struct alignment* aln,char* string)
 {
         //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,-1,13,14,15,16,17,-1,18,19,20,21,22};
-        int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
+        //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
         int i,j,c,n;
         char* p = 0;
         p = string;
@@ -468,11 +501,11 @@ struct alignment* read_alignment_from_swissprot(struct alignment* aln,char* stri
                 n = 0;
                 for (i = 0;i < j;i++){
                         if((int)p[i] > 32){
-                                if(isalpha((int)p[i])){
+                                /*if(isalpha((int)p[i])){
                                         aln->s[c][n] = aacode[toupper(p[i])-65];
                                 }else{
                                         aln->s[c][n] = -1;
-                                }
+                                        }*/
                                 fprintf(stderr,"%c",p[i]);
                                 aln->seq[c][n] = p[i];
                                 n++;
@@ -500,7 +533,7 @@ struct alignment* read_sequences_macsim_xml(struct alignment* aln,char* string)
         char *p = 0;
         int max = 0;
 
-        int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
+        //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
         //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,-1,13,14,15,16,17,-1,18,19,20,21,22};
 
         /*aln = (struct alignment*) malloc(sizeof(struct alignment));
@@ -592,7 +625,8 @@ struct alignment* read_sequences_macsim_xml(struct alignment* aln,char* string)
                         n = 0;
                         for (i = 0;i < j;i++){
                                 if(isalpha((int)p[i])){
-                                        aln->s[c][n] = aacode[toupper(p[i])-65];
+                                        //aln->s[c][n] = aacode[toupper(p[i])-65];
+                                        //fprintf(stdout,"%c %d %d \n",p[i],c,n);
                                         aln->seq[c][n] = p[i];
                                         n++;
                                 }
@@ -604,6 +638,7 @@ struct alignment* read_sequences_macsim_xml(struct alignment* aln,char* string)
 
                 c++;
         }
+        //fprintf(stdout,"\n");
         return aln;
 }
 
@@ -617,7 +652,7 @@ struct alignment* read_alignment_macsim_xml(struct alignment* aln,char* string)
         char *p = 0;
         int max = 0;
 
-        int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
+        //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
         //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,-1,13,14,15,16,17,-1,18,19,20,21,22};
 
         /*aln = (struct alignment*) malloc(sizeof(struct alignment));
@@ -710,11 +745,11 @@ struct alignment* read_alignment_macsim_xml(struct alignment* aln,char* string)
                         n = 0;
                         for (i = 0;i < j;i++){
                                 if((int)p[i]>32){
-                                        if(isalpha((int)p[i])){
+                                        /*if(isalpha((int)p[i])){
                                                 aln->s[c][n] = aacode[toupper(p[i])-65];
                                         }else{
                                                 aln->s[c][n] = -1;
-                                        }
+                                                }*/
                                         aln->seq[c][n] = p[i];
                                         n++;
                                 }
@@ -820,7 +855,7 @@ struct alignment* read_sequences_uniprot_xml(struct alignment* aln,char* string)
         int j = 0;
         char *p1 = 0;
 
-        int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
+        //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
         //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,-1,13,14,15,16,17,-1,18,19,20,21,22};
 
         /*aln = (struct alignment *) malloc(sizeof(struct alignment));
@@ -885,7 +920,7 @@ struct alignment* read_sequences_uniprot_xml(struct alignment* aln,char* string)
                 n = 0;
                 for (i = 0;i < j;i++){
                         if(isalpha((int)p1[i])){
-                                aln->s[c][n] = aacode[toupper(p1[i])-65];
+                                //aln->s[c][n] = aacode[toupper(p1[i])-65];
                                 aln->seq[c][n] = p1[i];
                                 n++;
                         }
@@ -908,7 +943,7 @@ struct alignment* read_alignment_uniprot_xml(struct alignment* aln,char* string)
         int j = 0;
         char *p1 = 0;
 
-        int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
+        //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
         //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,-1,13,14,15,16,17,-1,18,19,20,21,22};
 
         /*aln = (struct alignment *) malloc(sizeof(struct alignment));
@@ -967,11 +1002,11 @@ struct alignment* read_alignment_uniprot_xml(struct alignment* aln,char* string)
                 n = 0;
                 for (i = 0;i < j;i++){
                         if((int)p1[i] > 32){
-                                if(isalpha((int)p1[i])){
+                                /*if(isalpha((int)p1[i])){
                                         aln->s[c][n] = aacode[toupper(p1[i])-65];
                                 }else{
                                         aln->s[c][n] = -1;
-                                }
+                                        }*/
                                 aln->seq[c][n] = p1[i];
                                 n++;
                         }
@@ -995,7 +1030,7 @@ struct alignment* read_sequences_stockholm(struct alignment* aln,char* string)
         int j = 0;
         char *p1 = 0;
 
-        int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
+        //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
         //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,-1,13,14,15,16,17,-1,18,19,20,21,22};
 
         /*aln = (struct alignment*) malloc(sizeof(struct alignment));
@@ -1062,7 +1097,7 @@ struct alignment* read_sequences_stockholm(struct alignment* aln,char* string)
                         n = 0;
                         for (i = 0;i < j;i++){
                                 if(isalpha((int)p1[i])){
-                                        aln->s[c][n] = aacode[toupper(p1[i])-65];
+                                        //aln->s[c][n] = aacode[toupper(p1[i])-65];
                                         aln->seq[c][n] = p1[i];
                                         n++;
                                 }
@@ -1084,7 +1119,7 @@ struct alignment* read_alignment_stockholm(struct alignment* aln,char* string)
         int j = 0;
         char *p1 = 0;
 
-        int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
+        //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
         //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,-1,13,14,15,16,17,-1,18,19,20,21,22};
 
         /*aln = (struct alignment*) malloc(sizeof(struct alignment));
@@ -1151,11 +1186,11 @@ struct alignment* read_alignment_stockholm(struct alignment* aln,char* string)
                         n = 0;
                         for (i = 0;i < j;i++){
                                 if((int)p1[i] > 32){
-                                        if(isalpha((int)p1[i])){
+                                        /*if(isalpha((int)p1[i])){
                                                 aln->s[c][n] = aacode[toupper(p1[i])-65];
                                         }else{
                                                 aln->s[c][n] = -1;
-                                        }
+                                                }*/
                                         aln->seq[c][n] = p1[i];
                                         n++;
                                 }
@@ -1184,7 +1219,7 @@ struct alignment* read_sequences_clustal(struct alignment* aln,char* string)
         char *p1 = 0;
         int local_numseq = 0;
 
-        int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
+        //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
         //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,-1,13,14,15,16,17,-1,18,19,20,21,22};
 
 
@@ -1265,7 +1300,7 @@ struct alignment* read_sequences_clustal(struct alignment* aln,char* string)
                         }
                         for (i = j;i < n;i++){
                                 if(isalpha((int)p1[i])){
-                                        aln->s[c][aln->sl[c]] = aacode[toupper(p1[i])-65];
+                                        //aln->s[c][aln->sl[c]] = aacode[toupper(p1[i])-65];
                                         aln->seq[c][aln->sl[c]] = p1[i];
                                         aln->sl[c]++;
                                 }
@@ -1296,7 +1331,7 @@ struct alignment* read_alignment_clustal(struct alignment* aln,char* string)
         char *p1 = 0;
         int local_numseq = 0;
 
-        int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
+        //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
         //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,-1,13,14,15,16,17,-1,18,19,20,21,22};
 
 
@@ -1377,11 +1412,11 @@ struct alignment* read_alignment_clustal(struct alignment* aln,char* string)
                         }
                         for (i = j;i < n;i++){
                                 if((int)p1[i] > 32){
-                                        if(isalpha((int)p1[i])){
+                                        /*if(isalpha((int)p1[i])){
                                                 aln->s[c][aln->sl[c]] = aacode[toupper(p1[i])-65];
                                         }else{
                                                 aln->s[c][aln->sl[c]] = -1;
-                                        }
+                                                }*/
                                         aln->seq[c][aln->sl[c]] = p1[i];
                                         aln->sl[c]++;
                                 }
@@ -1414,7 +1449,7 @@ struct alignment* read_sequences(struct alignment* aln,char* string)
         int start = 0;
         int nbytes;
         int local_numseq = 0;				// O	12				//U17
-        int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
+        //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
         nbytes = strlen(string);
 
         //aln = (struct alignment*) malloc(sizeof(struct alignment));
@@ -1517,7 +1552,7 @@ struct alignment* read_sequences(struct alignment* aln,char* string)
                 }
                 if (stop == 0 && string[i] != '\n' && string[i] != 0 ){
                         if(isalpha((int)string[i])){
-                                aln->s[j-1][c] = aacode[toupper(string[i])-65];
+                                //aln->s[j-1][c] = aacode[toupper(string[i])-65];
                                 aln->seq[j-1][c] = string[i];
                                 c++;
                         }
@@ -1543,7 +1578,7 @@ struct alignment* read_alignment_fasta(struct alignment* aln,char* string)
         int start = 0;
         int nbytes;
         int local_numseq = 0;				// O	12				//U17
-        int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
+        //int aacode[26] = {0,1,2,3,4,5,6,7,8,-1,9,10,11,12,23,13,14,15,16,17,17,18,19,20,21,22};
         nbytes = strlen(string);
 
         //aln = (struct alignment*) malloc(sizeof(struct alignment));
@@ -1647,11 +1682,11 @@ struct alignment* read_alignment_fasta(struct alignment* aln,char* string)
                 }
                 if (stop == 0 && string[i] != '\n' && string[i] != 0 ){
                         if((int) string[i] > 32 ){
-                                if(isalpha((int)string[i])){
+                                /*if(isalpha((int)string[i])){
                                         aln->s[j-1][c] = aacode[toupper(string[i])-65];
                                 }else{
                                         aln->s[j-1][c] = -1;
-                                }
+                                        }*/
                                 aln->seq[j-1][c] = string[i];
                                 c++;
                         }
@@ -1688,7 +1723,7 @@ struct alignment* aln_alloc(int numseq)
         aln->numseq = numseq;
         aln->num_profiles = (numseq << 1) - 1;
         aln->dna = -1;
-
+        aln->L = 0;
 
         MMALLOC(aln->s,sizeof(int*) * numseq);
         MMALLOC(aln->seq,sizeof(char*) * numseq);
@@ -1734,7 +1769,9 @@ void free_aln(struct alignment* aln)
         struct feature* tmp = NULL;
         struct feature* next = NULL;
         if(aln){
-                gfree(aln->gaps);
+                if(aln->gaps){
+                        gfree(aln->gaps);
+                }
                 for (i = aln->numseq;i--;){
 
                         MFREE(aln->s[i]);

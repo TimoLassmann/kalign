@@ -82,6 +82,36 @@ ERROR:
         return NULL;
 }
 
+int switch_alphabet(struct alphabet* a, int type)
+{
+        int i;
+        for(i = 0; i < 128;i++){
+                a->to_internal[i] = -1;
+
+
+        }
+        for(i = 0; i < 32;i++){
+                a->to_external[i] = -1;
+        }
+
+        switch (type) {
+        case defPROTEIN : {
+                create_default_protein(a);
+                break;
+        }
+        case redPROTEIN : {
+                create_reduced_protein(a);
+                break;
+        }
+        default:
+                break;
+        }
+
+        RUN(clean_and_set_to_extern(a));
+        return OK;
+ERROR:
+        return FAIL;
+}
 
 
 int create_default_protein(struct alphabet* a)
@@ -128,6 +158,9 @@ int create_reduced_protein(struct alphabet* a)
         code++;
 
         a->to_internal[(int) 'Z'] = code;
+        code++;
+
+        a->to_internal[(int) 'X'] = code;
         code++;
 
         /* From  Clustering huge protein sequence sets in linear time

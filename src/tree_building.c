@@ -43,6 +43,7 @@ int build_tree(struct alignment* aln,struct parameters* param, struct aln_param*
         ASSERT(param != NULL, "No input parameters.");
         ASSERT(ap != NULL, "No alignment parameters.");
 
+
         tree = ap->tree;
         numseq = aln->numseq;
 
@@ -70,7 +71,7 @@ int build_tree(struct alignment* aln,struct parameters* param, struct aln_param*
         /* https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-float-vector-sum-on-x86 */
         /* fast vector sum.... (I think I can do 8 floats at a time..) */
         /* https://software.intel.com/sites/landingpage/IntrinsicsGuide/#expand=5364,4616,2941,1884,3840,3847,5663,3404&cats=Load&text=loadu_ps */
-        if(param->dna == 1){
+        /*if(param->dna == 1){
                 if(byg_start(param->tree,"njNJ") != -1){
                         RUNP(dm =  dna_distance(aln,param->zlevel,1));
 
@@ -83,8 +84,10 @@ int build_tree(struct alignment* aln,struct parameters* param, struct aln_param*
                 }else{
                         RUNP(dm =  protein_wu_distance(aln,param->zlevel,0,NULL,0));
                 }
-        }
+        }*/
 
+        //RUNP(dm=  kmer_bpm_distance(aln, 10, 100));
+        RUNP(dm = bpm_distance(aln));
         if(byg_start(param->tree,"njNJ") != -1){
                 tree2 = real_nj(dm,param->ntree,aln->numseq);
         }else{
@@ -304,12 +307,12 @@ struct aln_tree_node* real_upgma(float **dm,int ntree,int numseq)
         }
 
         while (cnode != numprofiles){
-                max = -FLT_MAX;
+                max = FLT_MAX;
                 for (i = 0;i < numseq-1; i++){
                         if (as[i]){
                                 for ( j = i + 1;j < numseq;j++){
                                         if (as[j]){
-                                                if (dm[i][j] > max){
+                                                if (dm[i][j] < max){
                                                         max = dm[i][j];
                                                         node_a = i;
                                                         node_b = j;

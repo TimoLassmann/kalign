@@ -3,8 +3,11 @@
 
 #include "alphabet.h"
 #include "alignment.h"
+#include "align_io.h"
 
 #include "misc.h"
+#include "bpm.h"
+
 #define NODESIZE 16
 
 struct kmer{
@@ -40,25 +43,24 @@ float** kmer_distance(struct alignment* aln, int* seeds, int num_seeds, int kmer
         int kmer_old_idx;
         float** dm = NULL;
         uint8_t* s = NULL;
-        int_fast8_t* t = NULL;
-        void *p;
+        //int_fast8_t* t = NULL;
+        struct kmer*p;
         int64_t code;
         int64_t mask;
         uint16_t hash;
         int len;
         int numseq;
         //int numprofiles;
-        int i,j,a;
+        int i,j,a,c;
         ASSERT(aln != NULL,"No alignment");
 
+        set_broadcast_mask();
         numseq = aln->numseq;
         //numprofiles = aln->num_profiles;
 
-        alphabet =  create_alphabet( redPROTEIN);
-        t = alphabet->to_internal;
+        //alphabet =  create_alphabet( redPROTEIN);
+        //t = alphabet->to_internal;
         MMALLOC(dm, sizeof(float*)* numseq);
-
-        mask = (1LL << (kmer_len *4)) - 1LL;
         //fprintf(stdout,"MASK: %lx\n", mask);
         a = num_seeds / 8;
         if( num_seeds%8){
@@ -72,8 +74,30 @@ float** kmer_distance(struct alignment* aln, int* seeds, int num_seeds, int kmer
                 for(j = 0; j < a;j++){
                         dm[i][j] = 0.0f;
                 }
-
         }
+        uint8_t* seq_a;
+        uint8_t* seq_b;
+        uint8_t dist;
+        int len_a;
+        int len_b;
+
+        for(i = 0; i < numseq;i++){
+                seq_a = aln->s[i];
+                len_a = aln->sl[i];
+                for(j = 0; j < num_seeds;j++){
+                        seq_b = aln->s[seeds[j]];
+                        len_b = aln->sl[seeds[j]];
+                        if(len_a >= len_b){
+                                dist = bpm_256(seq_a,seq_b, len_a, len_b);
+                                dm[i][j] = dist;//((float) MACRO_MIN(len_b, 255) - (float) dist);
+                        }else{
+                                dist = bpm_256(seq_b,seq_a, len_b, len_a);
+                                dm[i][j] = dist;//((float) MACRO_MIN(len_a, 255) - (float) dist);
+                        }
+
+                }
+        }
+        return dm;
         /* allocate kmerlist */
         len = 0;
         for(i = 0; i<  num_seeds;i++){
@@ -90,28 +114,29 @@ float** kmer_distance(struct alignment* aln, int* seeds, int num_seeds, int kmer
 
         for(i = 0;i <len;i++){
                 kmer_list[i] = p;
-                p+= sizeof(struct kmer);
+                p+= 1;//sizeof(struct kmer);
         }
 
-        p-= sizeof(struct kmer)* len;
+        p-= len;
 
         /* read in seeds  */
-        LOG_MSG("len:%d",len);
-        int g = 0;
+        LOG_MSG("len:%d L:%d",len, aln->L);
+        ASSERT(aln->L <= 21, "alphabetmismatch");
+
         kmer_idx = 0;
         for(i = 0; i < aln->numseq;i++){
                 kmer_old_idx = kmer_idx;
                 code = 0;
-                s = (uint8_t*)aln->seq[i];
+                s = aln->s[i];
 
                 len = aln->sl[i];
                 for(j = 0; j < kmer_len;j++){
                         code = code << 4L;
-                        code |= t[s[j]];
+                        code |= s[j];
 
                 }
                 hash = circ_hash(s, kmer_len);
-                fprintf(stdout,"%d HASH!!\n",hash);
+                //fprintf(stdout,"%d HASH!!\n",hash);
                 kmer_list[kmer_idx]->kmer = code & mask;
                 kmer_list[kmer_idx]->pos = 0;
                 kmer_list[kmer_idx]->seq = i;
@@ -120,9 +145,9 @@ float** kmer_distance(struct alignment* aln, int* seeds, int num_seeds, int kmer
 
                 for(j = 1; j < len- kmer_len;j++){
                         hash = circ_hash_next( s+j, kmer_len, s[j-1], hash);
-                        fprintf(stdout,"%d %d",hash, s[j-1]);
+                        //fprintf(stdout,"%d %d",hash, s[j-1]);
                         code = code << 4L;
-                        code |= t[s[j+kmer_len]];
+                        code |= s[j+kmer_len];
 
                         //                fprintf(stdout,"pattern: %d %d %*lx (%c %d)\n", i,j, kmer_len, code & mask,(char) s[j], t[s[j]]);
                         kmer_list[kmer_idx]->kmer = code & mask;
@@ -133,65 +158,39 @@ float** kmer_distance(struct alignment* aln, int* seeds, int num_seeds, int kmer
                 }
                 LOG_MSG("Sorting for seq %d between %d and %d",i, kmer_old_idx, kmer_idx);
                 qsort(kmer_list + kmer_old_idx, kmer_idx - kmer_old_idx, sizeof(struct kmer*), sort_by_hash);
-                for(j = 0; j < 20;j++){
+                /*for(j = 0; j < 20;j++){
                         fprintf(stdout,"%d %d: %d %*lx %d %d SEED\n", i,j,kmer_list[j]->hash, kmer_len, kmer_list[j]->kmer, kmer_list[j]->seq,kmer_list[j]->pos);
-                }
+                        }*/
+                kmer_idx = kmer_old_idx + 20;
 
         }
-        LOG_MSG("len:%d",g);
-        exit(0);
-
-        qsort(kmer_list, g, sizeof(struct kmer*), sort_by_kmer_then_seq);
+        LOG_MSG("len:%d",kmer_idx);
+        qsort(kmer_list, kmer_idx, sizeof(struct kmer*), sort_by_kmer_then_seq);
 
         code = 0UL;
-        int c,f;
 
 
-        for(i = 0; i < g;i++){
+
+        for(i = 0; i < kmer_idx;i++){
                 if(kmer_list[i]->kmer != code){
                         code = kmer_list[i]->kmer;
                         j = i;
                         while(kmer_list[j]->kmer == code){
                                 j++;
-                                if(j == g){
+                                if(j == kmer_idx){
                                         break;
                                 }
                         }
                         if(j-i > 1){
-                                if(kmer_list[i]->seq & 0x80000000){
-
-
-                                        /*fprintf(stdout,"BLOCK %d-%d\n",i,j);
-                                        for(c = i; c < j;c++){
-                                                if(kmer_list[c]->seq &0x80000000){
-                                                        fprintf(stdout,"%d: %*lx %d %d SEED\n", c, kmer_len, kmer_list[c]->kmer, kmer_list[c]->seq & 0x7FFFFFFF,kmer_list[c]->pos);
-                                                }else{
-                                                        fprintf(stdout,"%d: %*lx %d %d\n", c, kmer_len, kmer_list[c]->kmer, kmer_list[c]->seq,kmer_list[c]->pos);
-                                                }
-                                        }
-
-
-                                        fprintf(stdout,"PAIRS: %d-%d\n",i,j);*/
-                                        for(c = i; c < j-1;c++){
-                                                if(kmer_list[c]->seq & 0x80000000){
-                                                        for(f = c+1;f < j;f++){
-                                                                if(!(kmer_list[f]->seq & 0x80000000)){
-                                                                        //fprintf(stdout,"%d %d\n", kmer_list[c]->seq &0x7FFFFFFF,kmer_list[f]->seq );
-
-                                                                        dm[kmer_list[f]->seq] [kmer_list[c]->seq &0x7FFFFFFF] += 1.0f / (float) (abs( kmer_list[f]->pos - kmer_list[c]->pos)+1.0f);
-                                                                }
-                                                        }
-                                                }
-                                        }
+                                for(c = i; c < j;c++){
+                                        fprintf(stdout," %d: %*lx %d %d SEED\n",c, kmer_len, kmer_list[c]->kmer, kmer_list[c]->seq,kmer_list[c]->pos);
                                 }
                         }
                         i =j-1;
-
-
                 }
 
         }
-
+        exit(0);
 
         MFREE(p);
         MFREE(kmer_list);
@@ -233,7 +232,316 @@ int sort_by_hash(const void *a, const void *b)
         }
 }
 
+float** kmer_bpm_distance(struct alignment* aln, int kmer_len, int num_seeds)
+{
+        struct kmer** kmer_list = NULL;
+        int kmer_idx;
+        int kmer_old_idx;
+        float** dm = NULL;
+        uint8_t* s = NULL;
 
+        struct kmer* p = NULL;
+        int64_t code;
+        int64_t mask;
+        uint16_t hash;
+        uint8_t dist;
+        int len;
+        int len_a;
+        int len_b;
+        int numseq;
+        //int numprofiles;
+        int i,j,a,b,c,f;
+        ASSERT(aln != NULL,"No alignment");
+
+        /* Very important to call before bpm_256 */
+        set_broadcast_mask();
+
+        numseq = aln->numseq;
+        //numprofiles = aln->num_profiles;
+
+        RUN(convert_alignment_to_internal(aln, redPROTEIN));
+
+        i = numseq;
+
+        RUNP(dm = galloc(dm,i,i,0.0f));
+
+
+
+        for(i = 0; i <numseq;i++){
+
+                for(j = 0; j < numseq;j++){
+                        if(i < j){
+                                dm[i][j] = FLT_MAX;
+                        }else{
+                                dm[i][j] = -FLT_MAX;
+                        }
+                }
+        }
+
+        mask = (1LL << (kmer_len *4)) - 1LL;
+        //fprintf(stdout,"MASK: %lx\n", mask);
+
+
+        /* allocate kmerlist */
+        len = 0;
+        for(i = 0; i < aln->numseq;i++){
+
+                if(aln->sl[i] > len){
+                        len = aln->sl[i];
+                }
+        }
+
+        len += num_seeds * aln->numseq;
+
+
+
+        MMALLOC(kmer_list, sizeof(struct kmer*) * len);
+        p = NULL;
+        MMALLOC(p, sizeof(struct kmer) * len);
+
+        for(i = 0;i <len;i++){
+                kmer_list[i] = p;
+                p+= 1;
+        }
+
+        p-= len;
+
+        /* read in seeds  */
+
+        kmer_idx = 0;
+        for(i = 0; i < aln->numseq;i++){
+                kmer_old_idx = kmer_idx;
+                code = 0;
+                s = aln->s[i];
+
+                len = aln->sl[i];
+                for(j = 0; j < kmer_len;j++){
+                        code = code << 4L;
+                        code |= s[j];
+
+                }
+                hash = circ_hash(s, kmer_len);
+                //fprintf(stdout,"%d HASH!!\n",hash);
+                kmer_list[kmer_idx]->kmer = code & mask;
+                kmer_list[kmer_idx]->pos = 0;
+                kmer_list[kmer_idx]->seq = i;
+                kmer_list[kmer_idx]->hash = hash;
+                kmer_idx++;
+
+                for(j = 1; j < len- kmer_len;j++){
+                        hash = circ_hash_next( s+j, kmer_len, s[j-1], hash);
+                        //fprintf(stdout,"%d %d",hash, s[j-1]);
+                        code = code << 4L;
+                        code |= s[j+kmer_len];
+
+                        //                fprintf(stdout,"pattern: %d %d %*lx (%c %d)\n", i,j, kmer_len, code & mask,(char) s[j], t[s[j]]);
+                        kmer_list[kmer_idx]->kmer = code & mask;
+                        kmer_list[kmer_idx]->pos = j;
+                        kmer_list[kmer_idx]->seq = i;
+                        kmer_list[kmer_idx]->hash = hash;
+                        kmer_idx++;
+                }
+                //LOG_MSG("Sorting for seq %d between %d and %d",i, kmer_old_idx, kmer_idx);
+                qsort(kmer_list + kmer_old_idx, kmer_idx - kmer_old_idx, sizeof(struct kmer*), sort_by_hash);
+                /*for(j = 0; j < 20;j++){
+                  fprintf(stdout,"%d %d: %d %*lx %d %d SEED\n", i,j,kmer_list[j]->hash, kmer_len, kmer_list[j]->kmer, kmer_list[j]->seq,kmer_list[j]->pos);
+                  }*/
+                kmer_idx = kmer_old_idx + num_seeds;
+
+        }
+        //LOG_MSG("len:%d",kmer_idx);
+        qsort(kmer_list, kmer_idx, sizeof(struct kmer*), sort_by_kmer_then_seq);
+
+        code = 0UL;
+
+
+
+        for(i = 0; i < kmer_idx;i++){
+                if(kmer_list[i]->kmer != code){
+                        code = kmer_list[i]->kmer;
+                        j = i;
+                        while(kmer_list[j]->kmer == code){
+                                j++;
+                                if(j == kmer_idx){
+                                        break;
+                                }
+                        }
+                        if(j-i > 1){
+                                for(c = i; c < j;c++){
+                                        //fprintf(stdout," %d: %*lx %d %d SEED\n",c, kmer_len, kmer_list[c]->kmer, kmer_list[c]->seq,kmer_list[c]->pos);
+                                        float cur_d;
+
+                                        for(f = i+1;f < j;f++){
+                                                a = kmer_list[c]->seq;
+                                                b = kmer_list[f]->seq;
+
+                                                cur_d = fabsf(dm[a][b] - dm[b][a]);
+                                                if(abs( kmer_list[c]->pos - kmer_list[c]->pos) < cur_d){
+                                                        dm[a][b] = kmer_list[c]->pos;
+                                                        dm[b][a] = kmer_list[f]->pos;
+                                                }
+
+                                        }
+                                }
+                        }
+                        i =j-1;
+                }
+
+        }
+
+        for(i = 0; i < numseq;i++){
+                for(j = i+1; j < numseq;j++){
+                        /*if(dm[i][j] != FLT_MAX){
+                                //fprintf(stdout,"%d %d: %f %f : %f\n", i,j, dm[i][j],dm[j][i],fabsf(dm[i][j] - dm[j][i]));
+
+
+                                a = dm[i][j];
+                                b = dm[j][i];
+
+                                //fprintf(stdout,"Start in seqa: %d\n", a - kmer_len - 255);
+                                //fprintf(stdout,"Start in seqb: %d\n", b - kmer_len - 255);
+                                a = a -kmer_len - (255-kmer_len)/2;
+                                b = b -kmer_len -  (255-kmer_len)/2;
+                                //len_a = 255;
+                                //len_b = 255;
+                                if(a < 0){
+                                        //len_a = len_a + a;
+                                        a = 0;
+                                }
+                                if(b < 0){
+                                        //len_b = len_b + b;
+                                        b = 0;
+                                }
+                                len_a = MACRO_MIN(aln->sl[i]-a, 255);
+                                len_b = MACRO_MIN(aln->sl[j]-b, 255);
+
+
+                                //fprintf(stdout,"Aligning:\na: %d (%d) to\nb: %d (%d)\n", a,len_a,b,len_b);
+                                if(len_a >= len_b){
+                                        dist = bpm_256(aln->s[i]+a, aln->s[j]+b, len_a, len_b);
+                                        dm[i][j] =((float) MACRO_MIN(len_b, 255) - (float) dist);
+                                }else{
+                                        dist = bpm_256(aln->s[j]+b, aln->s[i]+a, len_b, len_a);
+                                        dm[i][j] = ((float) MACRO_MIN(len_a, 255) - (float) dist);
+                                }
+
+
+
+                                dm[j][i] = dm[i][j];
+
+
+                        }else{*/
+
+                                len_a = MACRO_MIN(aln->sl[i], 255);
+                                len_b = MACRO_MIN(aln->sl[j], 255);
+                                if(len_a >= len_b){
+                                        dist = bpm_256(aln->s[i], aln->s[j], len_a, len_b);
+                                        dm[i][j] =((float) MACRO_MIN(len_b, 255) - (float) dist);
+                                }else{
+                                        dist = bpm_256(aln->s[j], aln->s[i], len_b, len_a);
+                                        dm[i][j] = ((float) MACRO_MIN(len_a, 255) - (float) dist);
+                                }
+
+                                dm[j][i] = dm[i][j];
+
+
+
+                                //dm[i][j] = 0.0f;
+                                //dm[j][i] = 0.0f;
+                                //}
+
+                        //fprintf(stdout,"%f ",dm[i][j]);
+                        //fprintf(stdout,"%d %d: %f %f : %f\n", i,j, dm[i][j],dm[j][i],fabsf(dm[i][j] - dm[j][i]));
+
+                }
+                //fprintf(stdout,"\n");
+        }
+        //fprintf(stdout,"\n");
+        //exit(0);
+
+        for(i = 0; i < numseq;i++){
+                for(j = 0; j < numseq;j++){
+                        dm[i][j] = dm[i][j] * dm[i][j]*100.0f;
+                }
+        }
+
+        RUN(convert_alignment_to_internal(aln, defPROTEIN));
+
+        MFREE(p);
+        MFREE(kmer_list);
+
+
+
+
+        return dm;
+ERROR:
+        return NULL;
+}
+
+
+float** bpm_distance(struct alignment* aln)
+{
+        float** dm = NULL;
+
+
+        uint8_t* seq_a;
+        uint8_t* seq_b;
+
+        uint8_t dist;
+
+        int len_a;
+        int len_b;
+
+        int i,j, numseq;
+        ASSERT(aln != NULL, "No alignment");
+
+
+
+        numseq = aln->numseq;
+
+        //RUN(convert_alignment_to_internal(aln, redPROTEIN));
+/* Very important to call before bpm_256 */
+        set_broadcast_mask();
+
+        i = numseq;
+
+        RUNP(dm = galloc(dm,i,i,0.0f));
+        for(i = 0; i < numseq;i++){
+                seq_a = aln->s[i];
+                len_a = aln->sl[i];
+                for(j = i;j < numseq;j++){
+                        //fprintf(stdout, "Working on %d %d\n", i,j);
+
+                        seq_b = aln->s[j];
+                        len_b = aln->sl[j];
+
+
+
+                        /*dm[i][j] = MACRO_MIN(len_a, len_b) - MACRO_MIN(
+                                bpm_256(seq_a, seq_b, len_a, len_b),
+                                bpm_256(seq_b, seq_a, len_b, len_a)
+                                );*/
+                        if(len_a > len_b){
+                                dist = bpm_256(seq_a, seq_b, len_a, len_b);
+                                //   dm[i][j] =((float) MACRO_MIN(len_b, 255) - (float) dist) ;/// (float) MACRO_MIN(len_b, 255);
+                        }else{
+                                dist = bpm_256(seq_b, seq_a, len_b, len_a);
+                                //dm[i][j] = ((float) MACRO_MIN(len_a, 255) - (float) dist);// / (float) MACRO_MIN(len_a, 255);
+                        }
+                        dm[i][j] = dist;
+                        //dm[i][j] = dm[i][j] * dm[i][j];
+                        dm[j][i] = dm[i][j];
+                        //fprintf(stdout,"%f ",dm[i][j]);
+                }
+                //fprintf(stdout,"\n");
+        }
+
+        //RUN(convert_alignment_to_internal(aln, defPROTEIN));
+        return dm;
+ERROR:
+        return NULL;
+
+}
 
 float** protein_wu_distance(struct alignment* aln, float zlevel, int nj, int* seeds, int num_anchors)
 {

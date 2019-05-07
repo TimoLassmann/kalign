@@ -83,18 +83,18 @@
 
      find ~/data/bb3_release -name "*.tfa"  | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "clustalo --dealign -i  %s --outfmt=msf -o %s/%s_%sclustalo.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_clustalo.sh
 
-find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/);
-printf "kalign %s -gpo 25 -gpe 2 -o %s/%s_%skalign_1.msf\n", $1,outdir,a[n-2],a[n-1] ;
-printf "kalign %s -gpo 35 -gpe 4 -o %s/%s_%skalign_2.msf\n", $1,outdir,a[n-2],a[n-1] ;
-printf "kalign %s -gpo 45 -gpe 6 -o %s/%s_%skalign_3.msf\n", $1,outdir,a[n-2],a[n-1] ;
-printf "kalign %s -gpo 55 -gpe 8 -o %s/%s_%skalign_4.msf\n", $1,outdir,a[n-2],a[n-1] ;
-printf "kalign %s -gpo 65 -gpe 10 -o %s/%s_%skalign_5.msf\n", $1,outdir,a[n-2],a[n-1] ;
-printf "kalign %s -gpo 75 -gpe 12 -o %s/%s_%skalign_6.msf\n", $1,outdir,a[n-2],a[n-1] ;
-printf "kalign %s -gpo 85 -xgpe 14 -o %s/%s_%skalign_7.msf\n", $1,outdir,a[n-2],a[n-1] ;
-printf "cmsa -a %s/%s_%skalign_*.msf -out %s/%s_%skalign_cmsa.msf -f msf \n",outdir,a[n-2],a[n-1],outdir,a[n-2],a[n-1] ;
-}' > run_kalign_cmsa.sh
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/);
+     printf "kalign %s -gpo 25 -gpe 2 -o %s/%s_%skalign_1.msf\n", $1,outdir,a[n-2],a[n-1] ;
+     printf "kalign %s -gpo 35 -gpe 4 -o %s/%s_%skalign_2.msf\n", $1,outdir,a[n-2],a[n-1] ;
+     printf "kalign %s -gpo 45 -gpe 6 -o %s/%s_%skalign_3.msf\n", $1,outdir,a[n-2],a[n-1] ;
+     printf "kalign %s -gpo 55 -gpe 8 -o %s/%s_%skalign_4.msf\n", $1,outdir,a[n-2],a[n-1] ;
+     printf "kalign %s -gpo 65 -gpe 10 -o %s/%s_%skalign_5.msf\n", $1,outdir,a[n-2],a[n-1] ;
+     printf "kalign %s -gpo 75 -gpe 12 -o %s/%s_%skalign_6.msf\n", $1,outdir,a[n-2],a[n-1] ;
+     printf "kalign %s -gpo 85 -xgpe 14 -o %s/%s_%skalign_7.msf\n", $1,outdir,a[n-2],a[n-1] ;
+     printf "cmsa -a %s/%s_%skalign_*.msf -out %s/%s_%skalign_cmsa.msf -f msf \n",outdir,a[n-2],a[n-1],outdir,a[n-2],a[n-1] ;
+     }' > run_kalign_cmsa.sh
 
-chmod 755 run_kalign_cmsa.sh 
+     chmod 755 run_kalign_cmsa.sh 
 
 
      chmod 755 run_kalign.sh 
@@ -105,13 +105,13 @@ chmod 755 run_kalign_cmsa.sh
    #+RESULTS:
 
    #+BEGIN_SRC sh :session onesh :results raw 
-     
+
      find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%skalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > alignment_scores.sh
 
-find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%sclustalo.msf\n", $1,outdir,a[n-2],a[n-1] }' >> alignment_scores.sh
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%sclustalo.msf\n", $1,outdir,a[n-2],a[n-1] }' >> alignment_scores.sh
 
-find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%skalign_cmsa.msf\n", $1,outdir,a[n-2],a[n-1] }' >> alignment_scores.sh
-chmod 755 alignment_scores.sh
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%skalign_cmsa.msf\n", $1,outdir,a[n-2],a[n-1] }' >> alignment_scores.sh
+     chmod 755 alignment_scores.sh
    #+END_SRC
 
 
@@ -132,7 +132,7 @@ chmod 755 alignment_scores.sh
 
      library(tidyverse)
      library(ggplot2)
-     library(straingi)
+     library(stringi)
 
      readBaliscores <-function(file,name){
        mat  <- read.table(file);
@@ -147,22 +147,22 @@ chmod 755 alignment_scores.sh
 
      }
 
-     
+
    #+END_SRC
 
 
    
 
    #+BEGIN_SRC R :session one :results output graphics :file BalibaseSP_scores.jpeg :exports both :width 160 :height 80
-               mat <- readBaliscores("scores_old_kalign.csv","oldkalign")
+     mat <- readBaliscores("scores_old_kalign.csv","oldkalign")
      mat <- rbind(mat,readBaliscores("scores_new_kmer.csv","bikmer"));
+     mat <- rbind(mat,readBaliscores("scores_kalign_bpm.csv","kalign_bpm"));
+     p <- ggplot(mat, aes(Group, SP))
+     p <- p + geom_boxplot(aes(colour = Type))
+     p
+     filename <- "BalibaseSP_scores.jpeg"
 
-               p <- ggplot(mat, aes(Group, SP))
-               p <- p + geom_boxplot(aes(colour = Type))
-               p
-               filename <- "BalibaseSP_scores.jpeg"
-
-               ggsave(filename,p, dpi = 300,width = 160, height = 80, unit = "mm")
+     ggsave(filename,p, dpi = 300,width = 160, height = 80, unit = "mm")
 
 
 
@@ -174,10 +174,10 @@ chmod 755 alignment_scores.sh
 
 
    #+BEGIN_SRC R :session one :results output graphics :file BalibaseTC_scores.jpeg :exports both :width 160 :height 80
-p <- ggplot(mat, aes(Group, TC))
-p <- p + geom_boxplot(aes(colour = Type))
+     p <- ggplot(mat, aes(Group, TC))
+     p <- p + geom_boxplot(aes(colour = Type))
 
- filename <- "BalibaseTC_scores.jpeg"
+     filename <- "BalibaseTC_scores.jpeg"
 
 
 

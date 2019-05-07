@@ -42,5 +42,6 @@ struct alignment{
         int numseq;
         int num_profiles;
         int dna;
+        int L;
 };
 #endif

@@ -15,8 +15,8 @@ struct alphabet{
         int L;
 };
 
-struct alphabet* create_alphabet(int type);
-
+extern struct alphabet* create_alphabet(int type);
+extern int switch_alphabet(struct alphabet* a, int type);
 
 
 
