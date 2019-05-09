@@ -8,6 +8,7 @@
 
 int create_subm(struct aln_param* ap,struct phmm* phmm);
 
+
 int estimate_aln_param(struct alignment*aln, struct aln_param*ap)
 {
         struct phmm* phmm = NULL;
@@ -23,19 +24,36 @@ int estimate_aln_param(struct alignment*aln, struct aln_param*ap)
         RUNP(anchors = pick_anchor(aln, &num_anchor));
         i = aln->sl[anchors[0]] + 2;
         RUNP(phmm = alloc_phmm(i));
+        phmm->L = aln->L;
+        //RUN(simple_init(phmm));
 
-        RUN(simple_init(phmm));
+
+        RUN(add_pseudocounts(phmm, 1));
+        RUN(re_estimate(phmm));
+        RUN(phmm_transitions(phmm));
 
         RUN(clear_phmm_e(phmm));
-        RUN(add_pseudocounts(phmm, 1 * aln->numseq * num_anchor));
-        RUN(phmm_transitions(phmm));
+        RUN(add_pseudocounts(phmm, 1));
+
+        /* set  eta  */
+        LOG_MSG("%f eta", scaledprob2prob(phmm->eta));
+        phmm->eta = 0.0;
+        for(i = 0; i < aln->numseq;i++){
+                phmm->eta += aln->sl[i];
+
+        }
+
+        phmm->eta = 1.0  - 1.0 / (phmm->eta / aln->numseq);
+        phmm->eta = prob2scaledprob(phmm->eta);
+        LOG_MSG("%f eta", scaledprob2prob(phmm->eta));
+//exit(0);
 
         uint8_t* seqa = NULL;
         uint8_t* seqb = NULL;
         int len_a,len_b;
-        DECLARE_TIMER(t1);
-        for(int iter = 0;iter < 5;iter++){
-                START_TIMER(t1);
+        //DECLARE_TIMER(t1);
+        for(int iter = 0;iter < 50;iter++){
+                //START_TIMER(t1);
                 for(i = 0; i < aln->numseq;i++){
                         seqa = aln->s[i];
                         len_a = aln->sl[i];
@@ -50,8 +68,8 @@ int estimate_aln_param(struct alignment*aln, struct aln_param*ap)
                         }
                 }
                 RUN(re_estimate(phmm));
-                RUN(add_pseudocounts(phmm, 1 * aln->numseq * num_anchor));
-                STOP_TIMER(t1);
+                RUN(add_pseudocounts(phmm, 1));// * aln->numseq * num_anchor));
+                //STOP_TIMER(t1);
                 //fprintf(stdout,"%d %f sec\n", iter, GET_TIMING(t1));
                 RUN(phmm_transitions(phmm));
 

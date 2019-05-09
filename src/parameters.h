@@ -2,6 +2,10 @@
 #define PARAMETERS_H
 
 
+#define KALIGNDIST_ALN 0
+#define KALIGNDIST_BPM 1
+#define KALIGNDIST_WU 2
+
 struct parameters{
         char **infile;
         char *input;
@@ -25,6 +29,7 @@ struct parameters{
         float same_feature_score;
         float diff_feature_score;
 
+        int dist_method;
         int num_infiles;
         int reformat;
         int id;

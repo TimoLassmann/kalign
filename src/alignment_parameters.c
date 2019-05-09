@@ -329,19 +329,19 @@ float balimt[]={
 
         ap->gpo = 8.304180 / 2.0;
 ap->gpe =  0.139298;
-ap->tgpe =  0.000000;
+ap->tgpe = 0.0;
 
         m_pos = 0;
         for (i = 0;i < 23;i++){
                 for (j = 0;j <= i;j++){
                         if (i == j){
                                 //	subm[i][j] += blosum62mt[m_pos]*10;
-                                ap->subm[i][j] = balimt[m_pos]*1.5;
+                                ap->subm[i][j] = balimt[m_pos]*2;
                         }else{
                                 //	subm[i][j] += blosum62mt[m_pos]*10;
                                 //	subm[j][i] += blosum62mt[m_pos]*10;
-                                ap->subm[i][j] = balimt[m_pos]*1.5;
-                                ap->subm[j][i] = balimt[m_pos]*1.5;
+                                ap->subm[i][j] = balimt[m_pos]*2;
+                                ap->subm[j][i] = balimt[m_pos]*2;
                         }
                         m_pos++;
                 }

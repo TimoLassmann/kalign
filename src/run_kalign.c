@@ -362,6 +362,8 @@ int run_kalign(struct parameters* param)
                 free_aln(aln);
                 return OK;
         }
+
+
         /* allocate aln parameters  */
         RUNP(ap = init_ap(param,aln->numseq));
         //fprintf(stderr,"        %0.8f	gap open penalty\n",ap->gpo);
@@ -371,12 +373,19 @@ int run_kalign(struct parameters* param)
         //fprintf(stderr,"        %0.8f	terminal gap penalty\n",ap->tgpe);
         //fprintf(stderr,"        %0.8f	bonus\n",param->secret/10);
         //fprintf(stderr,"        %0.8f	bonus\n",param->secret);
+        LOG_MSG("Estimating alignment param.");
+        START_TIMER(t1);
 
         //RUN(estimate_aln_param(aln, ap));
+        STOP_TIMER(t1);
+        LOG_MSG("Took %f sec.", GET_TIMING(t1));
+
+
+
 
         LOG_MSG("Building guide tree.");
         START_TIMER(t1);
-
+        //param->dist_method = KALIGNDIST_WU;
         //RUN(build_tree(aln,param,ap));
         RUN(build_tree_kmeans(aln,param,ap));
         STOP_TIMER(t1);
@@ -384,7 +393,6 @@ int run_kalign(struct parameters* param)
 
         //LOG_MSG("Building guide tree.");
         //START_TIMER(t1);
-
         //STOP_TIMER(t1);
         //LOG_MSG("Took %f sec.", GET_TIMING(t1));
 
@@ -395,17 +403,48 @@ int run_kalign(struct parameters* param)
         STOP_TIMER(t1);
         LOG_MSG("Took %f sec.", GET_TIMING(t1));
 
+        int iter;
+        for(iter = 0; iter < 0;iter++){
+                RUN(weave(aln , map, ap->tree));
+
+                param->dist_method = KALIGNDIST_ALN;
+                build_tree(aln, param,ap);
+                clean_aln(aln);
+
+
+                for(i = 0; i < aln->num_profiles ;i++){
+                        if(map[i]){
+                                MFREE(map[i]);
+                        }
+                }
+                MFREE(map);
+                map = NULL;
+
+
+                LOG_MSG("Aligning");
+                START_TIMER(t1);
+                RUNP(map = hirschberg_alignment(aln, ap));
+                STOP_TIMER(t1);
+                LOG_MSG("Took %f sec.", GET_TIMING(t1));
+        }
         RUN(weave(aln , map, ap->tree));
 
-
-        RUN(output(aln, param));
         /* clean up map */
         for(i = 0; i < aln->num_profiles ;i++){
                if(map[i]){
-                        MFREE(map[i]);
-                }
+                       MFREE(map[i]);
+               }
         }
         MFREE(map);
+        map = NULL;
+
+        /* alignment output order .... */
+        for (i = 0; i < aln->numseq;i++){
+                aln->nsip[i] = i;
+        }
+
+        RUN(output(aln, param));
+
         free_aln(aln);
         free_ap(ap);
         return OK;

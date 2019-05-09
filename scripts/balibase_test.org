@@ -133,7 +133,7 @@
      library(tidyverse)
      library(ggplot2)
      library(stringi)
-
+library(cowplot)
      readBaliscores <-function(file,name){
        mat  <- read.table(file);
        colnames(mat) <- c("Type","Name","SP","TC")
@@ -154,15 +154,30 @@
    
 
    #+BEGIN_SRC R :session one :results output graphics :file BalibaseSP_scores.jpeg :exports both :width 160 :height 80
-     mat <- readBaliscores("scores_old_kalign.csv","oldkalign")
+     mat <- readBaliscores("scores_kalign_old.csv","oldkalign")
      mat <- rbind(mat,readBaliscores("scores_new_kmer.csv","bikmer"));
      mat <- rbind(mat,readBaliscores("scores_kalign_bpm.csv","kalign_bpm"));
-     p <- ggplot(mat, aes(Group, SP))
-     p <- p + geom_boxplot(aes(colour = Type))
-     p
-     filename <- "BalibaseSP_scores.jpeg"
+     mat <- rbind(mat,readBaliscores("scores_kalign_iter.csv","kalign_iter"));
 
-     ggsave(filename,p, dpi = 300,width = 160, height = 80, unit = "mm")
+     p1 <- ggplot(mat, aes(Group, SP))
+     p1 <- p1 + geom_boxplot(aes(colour = Type))
+
+     p2 <- ggplot(mat, aes(Type, SP))
+     p2 <- p2 + geom_boxplot(aes(colour = Type))
+
+
+
+     p3 <- ggplot(mat, aes(Group, TC))
+     p3 <- p3 + geom_boxplot(aes(colour = Type))
+
+
+
+     p4 <- ggplot(mat, aes(Type, TC))
+     p4 <- p4 + geom_boxplot(aes(colour = Type))
+
+
+
+     p  = plot_grid(p1,p2,p3,p4, labels=c("SP", "TC"), ncol = 2, nrow= 2)
 
 
 
@@ -174,10 +189,10 @@
 
 
    #+BEGIN_SRC R :session one :results output graphics :file BalibaseTC_scores.jpeg :exports both :width 160 :height 80
-     p <- ggplot(mat, aes(Group, TC))
+     p <- ggplot(mat, aes(Group, SP))
      p <- p + geom_boxplot(aes(colour = Type))
-
-     filename <- "BalibaseTC_scores.jpeg"
+     p
+     filename <- "BalibaseSP_scores.jpeg"
 
 
 

@@ -13,10 +13,12 @@ struct counts{
         double GPO;
         double GPE;
         double TM;
+        double TGPE;
         double tau;
         double eta;
         double num_alignments;
         double num_seq;
+        int L;
 };
 struct counts* init_counts(void);
 int normalize_counts(struct counts*ap);
@@ -77,8 +79,11 @@ int main(int argc, char *argv[])
         for(i = 0; i < num_infiles;i++){
                 fprintf(stdout,"%s\n",infile[i]);
                 RUNP(aln = read_alignment(infile[i]));
+
                 RUN(convert_alignment_to_internal(aln, defPROTEIN));
+                fprintf(stdout,"%d L \n", aln->L);
                 RUN(fill_counts(ap, aln));
+                ap->L = aln->L;
                 free_aln(aln);
         }
         normalize_counts(ap);
@@ -123,20 +128,27 @@ int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len)
         int p_aln_len = 0;
         int begin = 0;
         int end = 0;
+
+        double sim = 0;
         for(i = 0;i < len;i++){
-                if(a[i] != -1 && b[i] != -1){ /* aligned residues  */
+                ap->TGPE += sim;
+                if(a[i] != 255 && b[i] != 255){
+
                         begin = i;
                         break;
                 }
         }
+
         for(i = len-1; i>= 0;i--){
-                if(a[i] != -1 && b[i] != -1){ /* aligned residues  */
+                ap->TGPE += sim;
+                if(a[i] != 255 && b[i] != 255){
+
                         end = i;
                         break;
                 }
 
         }
-        double sim = 0;
+
         for(i = begin;i < end;i++){
                 if(a[i] != 255 && b[i] != 255){
                         if(a[i] == b[i]){
@@ -145,12 +157,14 @@ int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len)
                 }
         }
 
-        sim = sim / (double) (end - begin);
-        //sim = sim * sim * sim * sim;
+        sim =   sim / (double) (end - begin);
+        sim = sim * sim * sim * sim;
         //sim = 1.0;
-        //fprintf(stdout,"Sim :%f\n", sim);
+        fprintf(stdout,"Sim :%f\n", sim);
 
-        sim = 1.0;
+
+        //sim = 1.0;
+
 
         for(i = begin;i < end;i++){
                 if(a[i] == 255 && b[i] == 255){ /* two gaps do nothing */
@@ -217,6 +231,7 @@ struct counts* init_counts(void)
         }
         ap->MM = 0.0;
         ap->TM = 0.0;
+        ap->TGPE = 0.0;
         ap->GPE = 0.0;
         ap->GPO = 0.0;
         ap->tau = 0.0;
@@ -228,27 +243,28 @@ ERROR:
         return NULL;
 }
 
+
 int normalize_counts(struct counts*ap)
 {
         int i,j;
         double sum;
-
+        double tmp;
 
         sum = 0.0;
 
-        for(i = 0; i < 26;i++){
+        for(i = 0; i < ap->L;i++){
                 sum += ap->back[i];
         }
-        for(i = 0; i < 26;i++){
+        for(i = 0; i < ap->L;i++){
                 ap->back[i] /= sum;
         }
         sum = 0.0;
-        for(i = 0; i < 26;i++){
+        for(i = 0; i < ap->L;i++){
                 for(j = 0; j <= i;j++){
                         sum += ap->emit[i][j];
                 }
         }
-        for(i = 0; i < 26;i++){
+        for(i = 0; i < ap->L;i++){
                 for(j = 0; j <= i;j++){
                         ap->emit[i][j]/= sum;
                         ap->emit[j][i] = ap->emit[i][j];
@@ -257,6 +273,15 @@ int normalize_counts(struct counts*ap)
 
         ap->tau = 1.0 / (ap->tau / ap->num_alignments);
 
+        sum = ap->TGPE;
+        sum += ap->num_alignments*2.0; /* we need to get in an out of the alignment */
+
+        ap->TGPE = ap->TGPE / sum;
+
+        tmp = (ap->num_alignments*2.0) / sum;
+        fprintf(stdout,"%f %f ", ap->TGPE, tmp);
+        ap->TGPE = -log2 (1.0-ap->TGPE);
+        fprintf(stdout,"-> %f\n", ap->TGPE);
         sum = ap->MM;
         sum += ap->GPO;
         sum += ap->GPO;
@@ -297,21 +322,21 @@ int print_probabilies(struct counts*ap)
 {
 
         int i,j;
-        fprintf(stdout,"float prior_back[23] = {\n");
-        for(i = 0; i < 22;i++){
+        fprintf(stdout,"float prior_back[%d] = {\n",ap->L);
+        for(i = 0; i < ap->L;i++){
                 fprintf(stdout,"%f,\n", prob2scaledprob(ap->back[i]));
         }
-        fprintf(stdout,"%f};\n", prob2scaledprob(ap->back[22]));
+        fprintf(stdout,"%f};\n", prob2scaledprob(ap->back[ap->L]));
 
-        fprintf(stdout,"float prior_m[23][23] = {\n");
-        for(i = 0; i < 23;i++){
+        fprintf(stdout,"float prior_m[%d][%d] = {\n", ap->L,ap->L);
+        for(i = 0; i < ap->L;i++){
                 j = 0;
                 fprintf(stdout,"{%f", prob2scaledprob(ap->emit[i][j]));
-                for(j = 1; j < 23;j++){
+                for(j = 1; j < ap->L;j++){
                         fprintf(stdout,",%f", prob2scaledprob(ap->emit[i][j]));
                 }
                 fprintf(stdout,"}");
-                if(i != 22){
+                if(i != ap->L){
                         fprintf(stdout,",");
                 }
                 fprintf(stdout,"\n");
@@ -326,6 +351,7 @@ int print_probabilies(struct counts*ap)
 
         return OK;
 }
+
 int print_counts(struct counts* ap)
 {
         int i,j;
@@ -346,7 +372,7 @@ int print_counts(struct counts* ap)
         */
         fprintf(stdout,"float balimt[]={\n");
 
-        for(i = 0; i < 23;i++){
+        for(i = 0; i < ap->L;i++){
                 //fprintf(stdout,"%d",i);
                 for(j = 0; j <= i;j++){
                         sum = log2(ap->emit[i][j] / ( ap->back[i] * ap->back[j])) + log2(ap->MM/((ap->eta)*(ap->eta)));
@@ -368,7 +394,7 @@ int print_counts(struct counts* ap)
         fprintf(stdout,"ap->gpo = %f;\n", sum);
         sum = -1.0 *log2(ap->GPE/(1.0 - ap->tau));
         fprintf(stdout,"ap->gpe =  %f;\n", sum);
-        fprintf(stdout,"ap->tgpe =  %f;\n", 0.0);
+        fprintf(stdout,"ap->tgpe =  %f;\n", ap->TGPE);
         //;
         //sum = ap->MM / ((ap->eta)*(ap->eta));
         //fprintf(stdout,"%f\n",sum);

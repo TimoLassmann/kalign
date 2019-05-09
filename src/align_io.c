@@ -193,6 +193,7 @@ int convert_alignment_to_internal(struct alignment* aln, int type)
                 }
                 //fprintf(stdout,"\n");
         }
+        aln->L = a->L;
         MFREE(a);
         return OK;
 ERROR:
@@ -344,6 +345,7 @@ char* get_input_into_string(char* infile)
                 fread(string,sizeof(char), i, file);
                 string[i] = 0;
                 fclose(file);
+
         }else{
                 if (!isatty(0)){
                         MMALLOC(string, sizeof(char)* (string_length));
@@ -362,6 +364,7 @@ char* get_input_into_string(char* infile)
                         return NULL;
                 }
         }
+
         return string;
 ERROR:
         return NULL;
@@ -1732,6 +1735,8 @@ struct alignment* aln_alloc(int numseq)
         MMALLOC(aln->sn,sizeof(char*) * numseq);
         MMALLOC(aln->lsn,sizeof(unsigned int) * numseq);
 
+        LOG_MSG("Allocating: %d and %d\n", numseq,aln->num_profiles);
+        exit(0);
 
         MMALLOC(aln->sl,sizeof(unsigned int) * aln->num_profiles);
         MMALLOC(aln->sip,sizeof(unsigned int*)* aln->num_profiles);
@@ -2752,6 +2757,32 @@ ERROR:
         }
 
         return FAIL;
+}
+
+int make_aliged_seq(uint8_t* aligned, uint8_t* unaligned, int* gaps,int len)
+{
+        int c;
+        int i;
+        int tmp;
+        c= 0;
+        for(i = 0; i < len;i++){
+                tmp = gaps[i];
+                while(tmp){
+                        aligned[c] = 255;
+                        tmp--;
+                        c++;
+                }
+                aligned[c] = unaligned[i];
+                c++;
+
+        }
+        tmp = gaps[len];
+        while(tmp){
+                aligned[c] = 255;
+                tmp--;
+                c++;
+        }
+        return OK;
 }
 
 

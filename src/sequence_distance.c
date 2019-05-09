@@ -35,6 +35,87 @@ float dna_distance_calculation(struct bignode* hash[], const uint8_t * p,const i
 int sort_by_kmer_then_seq(const void *a, const void *b);
 int sort_by_hash(const void *a, const void *b);
 
+
+float** aln_distance(struct alignment* aln,struct aln_param* ap)
+{
+        float** dm = NULL;
+        uint8_t* aligned_a = NULL;
+        uint8_t* aligned_b = NULL;
+
+        int numseq;
+        int i,j,c,d;
+
+        int aln_len = 0;
+
+        numseq = aln->numseq;
+
+        for(i = 0; i <= aln->sl[0];i++){
+                aln_len += aln->gaps[0][i];
+        }
+        aln_len += aln->sl[0];
+        LOG_MSG("Aln len: %d.",aln_len);
+
+        MMALLOC(aligned_a, sizeof(uint8_t) * aln_len);
+        MMALLOC(aligned_b, sizeof(uint8_t) * aln_len);
+
+        float avg = 0;
+        for(i = 0; i< aln->L;i++){
+                avg += ap->subm[i][i];
+        }
+        float max_a,max_b;
+
+        RUNP(dm = galloc(dm,numseq,numseq,0.0f));
+        for(i = 0; i < numseq;i++){
+                RUN(make_aliged_seq(aligned_a, aln->s[i], aln->gaps[i], aln->sl[i]));
+                for(j = i+1;j < numseq;j++){
+                        RUN(make_aliged_seq(aligned_b, aln->s[j], aln->gaps[j], aln->sl[j]));
+                        dm[i][j] = 0.0f;
+
+                        d = 0;
+                        max_a = 0;
+                        max_b = 0;
+                        for(c = 0;c < aln_len;c++){
+
+                                if(aligned_a[c] == 255 && aligned_b[c] == 255){
+
+                                }else{
+                                        //if(aligned_a[c] == aligned_b[c]){
+                                        if(aligned_a[c] != 255 && aligned_b[c] != 255){
+
+                                                dm[i][j]+= ap->subm[aligned_a[c]][aligned_b[c]];
+                                                //dm[i][j]++;
+                                        }
+
+                                        if(aligned_a[c]!= 255){
+
+                                                max_a += ap->subm[aligned_a[c]][aligned_a[c]];
+
+                                        }
+                                        if(aligned_b[c]!= 255){
+
+                                                max_b += ap->subm[aligned_b[c]][aligned_b[c]];
+
+                                        }
+
+                                        d++;
+                                }
+                                //        fprintf(stdout,"%d %d %f %d \n", aligned_a[c],aligned_b[c],dm[i][j],d);
+                        }
+                        //fprintf(stdout,"%f %f %f    ", dm[i][j],max_a,max_b);
+                        dm[i][j] = -1.0 * log(( fabsf(dm[i][j]) / ((max_a + max_b) / 2.0)) + 0.01);
+                        //fprintf(stdout,"%f\n", dm[i][j]);
+                        dm[j][i] = dm[i][j];
+                }
+
+        }
+
+        MFREE(aligned_a);
+        MFREE(aligned_b);
+        return dm;
+ERROR:
+        return NULL;
+}
+
 float** kmer_distance(struct alignment* aln, int* seeds, int num_seeds, int kmer_len)
 {
         struct alphabet* alphabet = NULL;

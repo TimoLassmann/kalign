@@ -87,7 +87,23 @@ int build_tree(struct alignment* aln,struct parameters* param, struct aln_param*
         }*/
 
         //RUNP(dm=  kmer_bpm_distance(aln, 10, 100));
-        RUNP(dm = bpm_distance(aln));
+        switch (param->dist_method) {
+        case KALIGNDIST_BPM:
+                RUNP(dm = bpm_distance(aln));
+                break;
+        case KALIGNDIST_WU:
+                RUNP(dm =  protein_wu_distance(aln,param->zlevel,0,NULL,0));
+                break;
+        case KALIGNDIST_ALN:
+                RUNP(dm = aln_distance(aln,ap));
+
+        default:
+                break;
+        }
+
+
+
+
         if(byg_start(param->tree,"njNJ") != -1){
                 tree2 = real_nj(dm,param->ntree,aln->numseq);
         }else{
@@ -357,6 +373,8 @@ struct aln_tree_node* real_upgma(float **dm,int ntree,int numseq)
                 for (j = numseq;j--;){
                         if (j != node_b){
                                 dm[node_a][j] = (dm[node_a][j] + dm[node_b][j])*0.5f;
+                                //dm[node_a][j] = MACRO_MAX(dm[node_a][j],dm[node_b][j]);
+                                //dm[node_a][j] = MACRO_MIN(dm[node_a][j],dm[node_b][j]);
                         }
                 }
                 dm[node_a][node_a] = 0.0f;

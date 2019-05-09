@@ -1,7 +1,8 @@
 #include "weave_alignment.h"
 
-int clean_aln(struct alignment* aln);
-struct alignment* make_seq(struct alignment* aln,int a,int b,int* path);
+
+//struct alignment* make_seq(struct alignment* aln,int a,int b,int* path);
+int make_seq(struct alignment* aln,int a,int b,int* path);
 int update_gaps(int old_len,int*gis,int new_len,int *newgaps);
 
 int weave(struct alignment* aln, int** map, int* tree)
@@ -9,17 +10,14 @@ int weave(struct alignment* aln, int** map, int* tree)
         int i;
         int a,b;
 
-        RUN(clean_aln(aln));
+        //RUN(clean_aln(aln));
 
         for (i = 0; i < (aln->numseq-1)*3;i +=3){
                 a = tree[i];
                 b = tree[i+1];
-                aln = make_seq(aln,a,b,map[tree[i+2]]);
+                RUN(make_seq(aln,a,b,map[tree[i+2]]));
         }
 
-        for (i = 0; i < aln->numseq;i++){
-                aln->nsip[i] = i;
-        }
         return OK;
 ERROR:
         return FAIL;
@@ -35,11 +33,28 @@ int clean_aln(struct alignment* aln)
                         p[j] = 0;
                 }
         }
+        for(i =0;i < aln->numseq;i++){
+                aln->nsip[i] = 1;
+                aln->sip[i][0] = i;
+        }
+
+        for (i =aln->numseq;i < aln->num_profiles ;i++){
+                if(aln->sip[i]){
+                        MFREE(aln->sip[i]);
+
+                        aln->sip[i] = NULL;
+                }
+                aln->nsip[i] =0;
+        }
+
+
+
+
         return OK;
 
 }
 
-struct alignment* make_seq(struct alignment* aln,int a,int b,int* path)
+int make_seq(struct alignment* aln,int a,int b,int* path)
 {
         int* gap_a = NULL;
         int* gap_b = NULL;
@@ -81,9 +96,9 @@ struct alignment* make_seq(struct alignment* aln,int a,int b,int* path)
         }
         MFREE(gap_a);
         MFREE(gap_b);
-        return aln;
+        return OK;
 ERROR:
-        return NULL;
+        return FAIL;
 }
 
 int update_gaps(int old_len,int*gis,int new_len,int *newgaps)

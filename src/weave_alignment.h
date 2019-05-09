@@ -5,5 +5,6 @@
 
 extern int weave(struct alignment* aln, int** map, int* tree);
 
+extern int clean_aln(struct alignment* aln);
 
 #endif

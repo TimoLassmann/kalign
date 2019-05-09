@@ -11,6 +11,7 @@ struct parameters* init_param(void)
 
 
         MMALLOC(param, sizeof(struct parameters));
+        param->dist_method = KALIGNDIST_BPM;
         param->gpo = -1.0;
         param->gpe = -1.0;
         param->tgpe = -1.0;

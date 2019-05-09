@@ -28,11 +28,11 @@ struct phmm{
         float** bX ;
         float** bY ;
 
-        float emit_M[26][26];
-        float emit_background[26];
+        float emit_M[23][23];
+        float emit_background[23];
 
-        float emit_M_e[26][26];
-        float emit_background_e[26];
+        float emit_M_e[23][23];
+        float emit_background_e[23];
 
         float transition[4];
         float transition_e[4];
