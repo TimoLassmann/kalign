@@ -35,6 +35,7 @@ int build_tree(struct alignment* aln,struct parameters* param, struct aln_param*
         struct aln_tree_node* tree2 = NULL;
         float** dm = NULL;
         int* tree = NULL;
+        int* anchors = NULL;
         int numseq;
         int a,c;
         int i;
@@ -89,7 +90,10 @@ int build_tree(struct alignment* aln,struct parameters* param, struct aln_param*
         //RUNP(dm=  kmer_bpm_distance(aln, 10, 100));
         switch (param->dist_method) {
         case KALIGNDIST_BPM:
-                RUNP(dm = bpm_distance(aln));
+
+
+                RUNP(dm = bpm_distance_pair(aln,NULL,0));
+
                 break;
         case KALIGNDIST_WU:
                 RUNP(dm =  protein_wu_distance(aln,param->zlevel,0,NULL,0));

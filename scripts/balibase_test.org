@@ -155,9 +155,11 @@ library(cowplot)
 
    #+BEGIN_SRC R :session one :results output graphics :file BalibaseSP_scores.jpeg :exports both :width 160 :height 80
      mat <- readBaliscores("scores_kalign_old.csv","oldkalign")
-     mat <- rbind(mat,readBaliscores("scores_new_kmer.csv","bikmer"));
-     mat <- rbind(mat,readBaliscores("scores_kalign_bpm.csv","kalign_bpm"));
-     mat <- rbind(mat,readBaliscores("scores_kalign_iter.csv","kalign_iter"));
+     mat <- rbind(mat,readBaliscores("scores_kalign_bikmer.csv","bikmer"));
+
+     mat <- rbind(mat,readBaliscores("scores_kalign_bibpm.csv","bibpm"));
+     mat <- rbind(mat,readBaliscores("scores_kalign_bibpm_zero.csv","bibpm_zero"));
+     
 
      p1 <- ggplot(mat, aes(Group, SP))
      p1 <- p1 + geom_boxplot(aes(colour = Type))

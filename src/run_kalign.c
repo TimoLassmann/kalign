@@ -376,7 +376,7 @@ int run_kalign(struct parameters* param)
         LOG_MSG("Estimating alignment param.");
         START_TIMER(t1);
 
-        //RUN(estimate_aln_param(aln, ap));
+        RUN(estimate_aln_param(aln, ap));
         STOP_TIMER(t1);
         LOG_MSG("Took %f sec.", GET_TIMING(t1));
 

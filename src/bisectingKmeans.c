@@ -15,13 +15,13 @@ struct node{
 };
 
 
-
+struct node* upgma(float **dm,int* samples, int numseq);
 struct node* alloc_node(void);
 
 int label_internal(struct node*n, int label);
 int* readbitree(struct node* p,int* tree);
 void printTree(struct node* curr,int depth);
-struct node* bisecting_kmeans(struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct drand48_data* randBuffer);
+struct node* bisecting_kmeans(struct alignment*aln, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct drand48_data* randBuffer);
 
 float** pair_wu_fast_dist(struct alignment* aln, struct aln_param* ap, int* num_anchors);
 
@@ -34,6 +34,7 @@ int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln
         float** dm = NULL;
         int* tree = NULL;
         int* samples = NULL;
+        int* anchors = NULL;
         int num_anchors;
         int numseq;
 
@@ -49,7 +50,20 @@ int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln
 
         numseq = aln->numseq;
 
-        dm = pair_wu_fast_dist(aln, ap, &num_anchors);
+
+
+        /* pick anchors . */
+
+        RUNP(anchors = pick_anchor(aln, &num_anchors));
+
+        //RUNP(dm = kmer_distance(aln,  anchors, num_anchors,10));
+        RUNP(dm = bpm_distance_thin(aln, anchors, num_anchors));
+//RUNP(dm = bpm_distance(aln,anchors,num_anchors));
+/* normalize  */
+        MFREE(anchors);
+
+
+        //dm = pair_wu_fast_dist(aln, ap, &num_anchors);
 
 
         //unit_zero(dm, aln->numseq, num_anchors);
@@ -93,21 +107,24 @@ int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln
                 samples[i] = i;
         }
 
-        RUNP(root = alloc_node());
+
+
+        //RUNP(root = alloc_node());
 
 
 
 
-        RUNP(root = bisecting_kmeans(root, dm, samples, numseq, num_anchors, numseq, &randBuffer));
+        RUNP(root = bisecting_kmeans(aln,root, dm, samples, numseq, num_anchors, numseq, &randBuffer));
 
+//        MFREE(samples);
         label_internal(root, numseq);
-        //printTree(root, 0);
+        //      printTree(root, 0);
 
         ap->tree[0] = 1;
         ap->tree = readbitree(root, ap->tree);
         for (i = 0; i < (numseq*3);i++){
                 tree[i] = tree[i+1];
-                //fprintf(stdout,"%d %d\n",tree[i], aln->num_profiles);
+//                fprintf(stdout,"%d %d\n",tree[i], aln->num_profiles);
                 //if(tree[i] = aln->num_profiles-1){
                 //break;
                 //}
@@ -145,9 +162,9 @@ int unit_zero(float** d, int len_a, int len_b)
                 variance = sq_sum / (float) len_a - mean * mean;
                 //fprintf(stdout,"%d %f %f \n",j,mean,variance);
                 if(variance){
-                for(i = 0; i < len_a;i++){
-                        d[i][j] = (d[i][j] - mean) / variance;
-                }
+                        for(i = 0; i < len_a;i++){
+                                d[i][j] = (d[i][j] - mean) / variance;
+                        }
                 }
                 /*sum = 0.0f;
                 sq_sum = 0.0f;
@@ -174,7 +191,7 @@ float** pair_wu_fast_dist(struct alignment* aln, struct aln_param* ap, int* num_
         RUNP(anchors = pick_anchor(aln, num_anchors));
 
         //dm = protein_wu_distance(aln, 59.0,0, anchors, *num_anchors);
-
+        //dm = bpm_distance(aln,anchors,*num_anchors);
         dm = kmer_distance(aln,  anchors, *num_anchors,10);
         /* normalize  */
         MFREE(anchors);
@@ -184,7 +201,7 @@ ERROR:
 }
 
 
-struct node* bisecting_kmeans(struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct drand48_data* randBuffer)
+struct node* bisecting_kmeans(struct alignment*aln, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct drand48_data* randBuffer)
 {
         long int r;
         int* sl = NULL;
@@ -200,12 +217,25 @@ struct node* bisecting_kmeans(struct node* n, float** dm,int* samples,int numseq
         int i,j,s;
 /* Pick random point (in samples !! ) */
         int stop = 0;
-        if(num_samples == 1){
+
+        if(num_samples < 100){
+                float** dm = NULL;
+
+                dm = bpm_distance_pair(aln, samples, num_samples);
+//                MFREE(n);
+
+                n = upgma(dm,samples, num_samples);
+                gfree(dm);
+                MFREE(samples);
+                return n;
+        }
+        /*if(num_samples == 1){
                 n->id = samples[0];
                 MFREE(samples);
                 return n;
         }
         if(num_samples == 2){
+                n = alloc_node();
                 n->left = alloc_node();
                 n->right = alloc_node();
                 n->left->id = samples[0];
@@ -213,14 +243,14 @@ struct node* bisecting_kmeans(struct node* n, float** dm,int* samples,int numseq
                 MFREE(samples);
                 return n;
 
-        }
+        }*/
         s = num_anchors / 8;
         if( num_anchors%8){
                 s++;
         }
         s = s << 3;
 
-        w = _mm_malloc(sizeof(float)*s,32);
+        w = _mm_malloc(sizeof(float) *s,32);
         wr = _mm_malloc(sizeof(float) *s,32);
         wl = _mm_malloc(sizeof(float) *s,32);
 
@@ -243,10 +273,10 @@ struct node* bisecting_kmeans(struct node* n, float** dm,int* samples,int numseq
                         w[j] += dm[s][j];
                 }
         }
+
         for(j = 0; j < num_anchors;j++){
                 w[j] /= num_samples;
         }
-
 
         lrand48_r(randBuffer, &r);
         r = r % num_samples;
@@ -294,10 +324,11 @@ struct node* bisecting_kmeans(struct node* n, float** dm,int* samples,int numseq
                 _mm_free(cl);
 
                 MFREE(samples);
-                n->left = alloc_node();
-                RUNP(n->left = bisecting_kmeans(n->left, dm, sl, numseq, num_anchors, num_l,randBuffer));
-                n->right = alloc_node();
-                RUNP(n->right = bisecting_kmeans(n->right, dm, sr, numseq, num_anchors, num_r,randBuffer));
+                n = alloc_node();
+                //n->left = alloc_node();
+                RUNP(n->left = bisecting_kmeans(aln,n->left, dm, sl, numseq, num_anchors, num_l,randBuffer));
+                //n->right = alloc_node();
+                RUNP(n->right = bisecting_kmeans(aln,n->right, dm, sr, numseq, num_anchors, num_r,randBuffer));
                 return n;
         }
 
@@ -435,10 +466,11 @@ struct node* bisecting_kmeans(struct node* n, float** dm,int* samples,int numseq
         _mm_free(cr);
         _mm_free(cl);
         MFREE(samples);
-        n->left = alloc_node();
-        RUNP(n->left = bisecting_kmeans(n->left, dm, sl, numseq, num_anchors, num_l,randBuffer));
-        n->right = alloc_node();
-        RUNP(n->right = bisecting_kmeans(n->right, dm, sr, numseq, num_anchors, num_r,randBuffer));
+        n = alloc_node();
+        //n->left = alloc_node();
+        RUNP(n->left = bisecting_kmeans(aln,n->left, dm, sl, numseq, num_anchors, num_l,randBuffer));
+        //n->right = alloc_node();
+        RUNP(n->right = bisecting_kmeans(aln,n->right, dm, sr, numseq, num_anchors, num_r,randBuffer));
 
 
         return n;
@@ -446,6 +478,88 @@ ERROR:
         return NULL;
 }
 
+
+
+struct node* upgma(float **dm,int* samples, int numseq)
+{
+        struct node** tree = NULL;
+        struct node* tmp =NULL;
+
+        int i,j;
+        int *as = NULL;
+        float max;
+        int node_a = 0;
+        int node_b = 0;
+        int cnode = numseq;
+        int numprofiles;
+
+
+        numprofiles = (numseq << 1) - 1;
+
+        MMALLOC(as,sizeof(int)*numseq);
+        for (i = numseq; i--;){
+                as[i] = i+1;
+        }
+
+        MMALLOC(tree,sizeof(struct node*)*numseq);
+        for (i=0;i < numseq;i++){
+
+                tree[i] = NULL;
+                tree[i] = alloc_node();
+                tree[i]->id = samples[i];
+        }
+
+        while (cnode != numprofiles){
+                max = FLT_MAX;
+                for (i = 0;i < numseq-1; i++){
+                        if (as[i]){
+                                for ( j = i + 1;j < numseq;j++){
+                                        if (as[j]){
+                                                if (dm[i][j] < max){
+                                                        max = dm[i][j];
+                                                        node_a = i;
+                                                        node_b = j;
+                                                }
+                                        }
+                                }
+                        }
+                }
+                tmp = NULL;
+                tmp = alloc_node();
+                tmp->left = tree[node_a];
+                tmp->right = tree[node_b];
+
+
+                tree[node_a] = tmp;
+                tree[node_b] = NULL;
+
+                /*deactivate  sequences to be joined*/
+                as[node_a] = cnode+1;
+                as[node_b] = 0;
+                cnode++;
+
+                /*calculate new distances*/
+                for (j = numseq;j--;){
+                        if (j != node_b){
+                                dm[node_a][j] = (dm[node_a][j] + dm[node_b][j])*0.5f;
+                                //dm[node_a][j] = MACRO_MAX(dm[node_a][j],dm[node_b][j]);
+                                //dm[node_a][j] = MACRO_MIN(dm[node_a][j],dm[node_b][j]);
+                        }
+                }
+                dm[node_a][node_a] = 0.0f;
+                for (j = numseq;j--;){
+                        dm[j][node_a] = dm[node_a][j];
+                        dm[j][node_b] = 0.0f;
+                        dm[node_b][j] = 0.0f;
+                }
+        }
+        tmp = tree[node_a];
+        MFREE(tree);
+        MFREE(as);
+        return tmp;
+ERROR:
+        return NULL;
+}
 
 
 

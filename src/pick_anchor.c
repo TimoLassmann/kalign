@@ -13,6 +13,7 @@ int* select_seqs(struct alignment* aln, int num_anchor);
 int* pick_anchor(struct alignment* aln, int* n)
 {
 
+
         int* anchors = NULL;
         int num_anchor = 0;
 

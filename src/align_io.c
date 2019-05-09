@@ -9,7 +9,7 @@
 struct infile_buffer{
         char* input;
         unsigned short int input_type;
-        unsigned short int input_numseq;
+        int input_numseq;
 
 };
 
@@ -302,6 +302,7 @@ int count_sequences_fasta(char* string)
         int n = 0;
         int stop = 0;
         nbytes = strlen(string);
+
         for (i =0;i < nbytes;i++){
                 if (string[i] == '>'&& stop == 0){
                         stop = 1;
@@ -311,6 +312,7 @@ int count_sequences_fasta(char* string)
                         stop = 0;
                 }
         }
+
         if(!n){
                 return 0;
         }
@@ -342,9 +344,14 @@ char* get_input_into_string(char* infile)
                 }
                 MMALLOC(string, sizeof(char)* (i+1));
 
-                fread(string,sizeof(char), i, file);
+                size_t ret = fread(string,sizeof(char), i, file);
+
                 string[i] = 0;
                 fclose(file);
+                if(ret*sizeof(char) != i*sizeof(char)){
+                        ERROR_MSG("FREAD FAILED");
+                }
+
 
         }else{
                 if (!isatty(0)){
@@ -367,6 +374,9 @@ char* get_input_into_string(char* infile)
 
         return string;
 ERROR:
+        if(string){
+                MFREE(string);
+        }
         return NULL;
 }
 
@@ -1735,9 +1745,6 @@ struct alignment* aln_alloc(int numseq)
         MMALLOC(aln->sn,sizeof(char*) * numseq);
         MMALLOC(aln->lsn,sizeof(unsigned int) * numseq);
 
-        LOG_MSG("Allocating: %d and %d\n", numseq,aln->num_profiles);
-        exit(0);
-
         MMALLOC(aln->sl,sizeof(unsigned int) * aln->num_profiles);
         MMALLOC(aln->sip,sizeof(unsigned int*)* aln->num_profiles);
         MMALLOC(aln->nsip,sizeof(unsigned int)* aln->num_profiles);
@@ -1995,7 +2002,6 @@ int count_sequences_and_detect(struct align_io_buffer* b)
                                 //fprintf(stdout,"Fasta\n");
                                 in->input_numseq  = count_sequences_fasta(in->input);
                                 in->input_type = 0;
-                                //fprintf(stdout,"Detected %d\n", in->input_numseq);
                         }
 
                         if(in->input_numseq < 1){
@@ -2004,7 +2010,7 @@ int count_sequences_and_detect(struct align_io_buffer* b)
                         }else{
                                 b->numseq += in->input_numseq;
                         }
-                        //fprintf(stdout,"%d\n",b->numseq);
+
                 }
         }
         return OK;

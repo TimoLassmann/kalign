@@ -560,11 +560,9 @@ ERROR:
 }
 
 
-float** bpm_distance(struct alignment* aln)
+float** bpm_distance_thin(struct alignment* aln, int* seeds, int num_seeds)
 {
         float** dm = NULL;
-
-
         uint8_t* seq_a;
         uint8_t* seq_b;
 
@@ -575,33 +573,41 @@ float** bpm_distance(struct alignment* aln)
 
         int i,j, numseq;
         ASSERT(aln != NULL, "No alignment");
-
+        /* Very important to call before bpm_256 */
+        set_broadcast_mask();
 
 
         numseq = aln->numseq;
+        int a;
+        MMALLOC(dm, sizeof(float*)* numseq);
+        //fprintf(stdout,"MASK: %lx\n", mask);
+        a = num_seeds / 8;
+        if( num_seeds%8){
+                a++;
+        }
+        a = a << 3;
 
-        //RUN(convert_alignment_to_internal(aln, redPROTEIN));
-/* Very important to call before bpm_256 */
-        set_broadcast_mask();
+        for(i = 0; i < numseq;i++){
+                dm[i] = NULL;
+                dm[i] = _mm_malloc(sizeof(float) * a,32);
+                for(j = 0; j < a;j++){
+                        dm[i][j] = 0.0f;
+                }
+        }
 
-        i = numseq;
 
-        RUNP(dm = galloc(dm,i,i,0.0f));
         for(i = 0; i < numseq;i++){
                 seq_a = aln->s[i];
                 len_a = aln->sl[i];
-                for(j = i;j < numseq;j++){
+                for(j = 0;j < num_seeds;j++){
                         //fprintf(stdout, "Working on %d %d\n", i,j);
 
-                        seq_b = aln->s[j];
-                        len_b = aln->sl[j];
-
-
-
+                        seq_b = aln->s[ seeds[j]];
+                        len_b = aln->sl[seeds[j]];
                         /*dm[i][j] = MACRO_MIN(len_a, len_b) - MACRO_MIN(
-                                bpm_256(seq_a, seq_b, len_a, len_b),
-                                bpm_256(seq_b, seq_a, len_b, len_a)
-                                );*/
+                          bpm_256(seq_a, seq_b, len_a, len_b),
+                          bpm_256(seq_b, seq_a, len_b, len_a)
+                          );*/
                         if(len_a > len_b){
                                 dist = bpm_256(seq_a, seq_b, len_a, len_b);
                                 //   dm[i][j] =((float) MACRO_MIN(len_b, 255) - (float) dist) ;/// (float) MACRO_MIN(len_b, 255);
@@ -610,12 +616,92 @@ float** bpm_distance(struct alignment* aln)
                                 //dm[i][j] = ((float) MACRO_MIN(len_a, 255) - (float) dist);// / (float) MACRO_MIN(len_a, 255);
                         }
                         dm[i][j] = dist;
-                        //dm[i][j] = dm[i][j] * dm[i][j];
-                        dm[j][i] = dm[i][j];
                         //fprintf(stdout,"%f ",dm[i][j]);
                 }
                 //fprintf(stdout,"\n");
         }
+//RUN(convert_alignment_to_internal(aln, defPROTEIN));
+        return dm;
+ERROR:
+        return NULL;
+}
+
+float** bpm_distance_pair(struct alignment* aln, int* selection, int num_sel)
+{
+        float** dm = NULL;
+        uint8_t* seq_a;
+        uint8_t* seq_b;
+
+        uint8_t dist;
+
+        int len_a;
+        int len_b;
+
+        int i,j, numseq;
+        ASSERT(aln != NULL, "No alignment");
+        /* Very important to call before bpm_256 */
+        set_broadcast_mask();
+
+
+        numseq = aln->numseq;
+
+        if(num_sel){
+                RUNP(dm = galloc(dm,num_sel,num_sel,0.0f));
+                for(i = 0; i < num_sel;i++){
+                        seq_a = aln->s[selection[i]];
+                        len_a = aln->sl[selection[i]];
+                        for(j = 0;j < num_sel;j++){
+                                //fprintf(stdout, "Working on %d %d\n", i,j);
+
+                                seq_b = aln->s[ selection[j]];
+                                len_b = aln->sl[selection[j]];
+                                /*dm[i][j] = MACRO_MIN(len_a, len_b) - MACRO_MIN(
+                                  bpm_256(seq_a, seq_b, len_a, len_b),
+                                  bpm_256(seq_b, seq_a, len_b, len_a)
+                                  );*/
+                                if(len_a > len_b){
+                                        dist = bpm_256(seq_a, seq_b, len_a, len_b);
+                                        //   dm[i][j] =((float) MACRO_MIN(len_b, 255) - (float) dist) ;/// (float) MACRO_MIN(len_b, 255);
+                                }else{
+                                        dist = bpm_256(seq_b, seq_a, len_b, len_a);
+                                        //dm[i][j] = ((float) MACRO_MIN(len_a, 255) - (float) dist);// / (float) MACRO_MIN(len_a, 255);
+                                }
+                                dm[i][j] = dist;
+                                dm[j][i] = dm[i][j];
+                        }
+                        //fprintf(stdout,"\n");
+                }
+        }else{
+                RUNP(dm = galloc(dm,numseq,numseq,0.0f));
+                for(i = 0; i < numseq;i++){
+                        seq_a = aln->s[i];
+                        len_a = aln->sl[i];
+                        for(j = 0;j < numseq;j++){
+                                //fprintf(stdout, "Working on %d %d\n", i,j);
+
+                                seq_b = aln->s[j];
+                                len_b = aln->sl[j];
+                                /*dm[i][j] = MACRO_MIN(len_a, len_b) - MACRO_MIN(
+                                  bpm_256(seq_a, seq_b, len_a, len_b),
+                                  bpm_256(seq_b, seq_a, len_b, len_a)
+                                  );*/
+                                if(len_a > len_b){
+                                        dist = bpm_256(seq_a, seq_b, len_a, len_b);
+                                        //   dm[i][j] =((float) MACRO_MIN(len_b, 255) - (float) dist) ;/// (float) MACRO_MIN(len_b, 255);
+                                }else{
+                                        dist = bpm_256(seq_b, seq_a, len_b, len_a);
+                                        //dm[i][j] = ((float) MACRO_MIN(len_a, 255) - (float) dist);// / (float) MACRO_MIN(len_a, 255);
+                                }
+                                dm[i][j] = dist;
+                                dm[j][i] = dm[i][j];
+                        }
+                        //fprintf(stdout,"\n");
+                }
+        }
+
+
+
+
 
         //RUN(convert_alignment_to_internal(aln, defPROTEIN));
         return dm;

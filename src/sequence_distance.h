@@ -7,7 +7,11 @@
 
 extern float** aln_distance(struct alignment* aln,struct aln_param* ap);
 
-extern float** bpm_distance(struct alignment* aln);
+extern float** bpm_distance_thin(struct alignment* aln, int* seeds, int num_seeds);
+extern float** bpm_distance_pair(struct alignment* aln, int* selection, int num_sel);
+
+extern float** bpm_distance(struct alignment* aln, int* seeds, int num_seeds);
+
 
 extern float** kmer_distance(struct alignment* aln, int* seeds, int num_seeds, int kmer_len);
 

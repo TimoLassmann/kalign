@@ -14,6 +14,9 @@ struct aln_param* init_ap(struct parameters* param,int numseq)
         ap->tree = NULL;
         MMALLOC(ap->tree, sizeof(int) * (numseq*3+1));
 
+        for(i = 0;i < (numseq*3+1);i++){
+                ap->tree[i] = 0;
+        }
         ap->subm = NULL;
         MMALLOC(ap->subm,sizeof (float*) * 32);
         for (i = 32;i--;){
