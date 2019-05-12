@@ -27,9 +27,89 @@ float** pair_wu_fast_dist(struct alignment* aln, struct aln_param* ap, int* num_
 
 int unit_zero(float** d, int len_a, int len_b);
 
+int shuffle_arr_r(int* arr,int n, struct drand48_data* randBuffer);
+int sort_int_desc(const void *a, const void *b);
+
+int random_tree(struct aln_param* ap, int numseq)
+{
+        int* tree = NULL;
+        int* selection  = NULL;
+        int num_profiles = 0;
+        int i,j,c,g,f;
+
+        tree = ap->tree;
+        MMALLOC(selection, sizeof(int) * numseq);
+
+        for(i =0; i < numseq;i++){
+                selection[i] = i;
+        }
+
+        shuffle_arr_r(selection, numseq, &ap->randBuffer);
+
+        c = numseq;
+        g = numseq;
+
+        f = 0;
+
+        num_profiles = (numseq << 1) - 1;
+        while(c != num_profiles){
+                i = selection[0];
+                j = selection[1];
+                //fprintf(stdout,"Align %d %d -> %d\n",i,j,c);
+                selection[0] = c;
+                selection[1] = -1;
+
+
+                tree[f] = i;
+                f++;
+                tree[f] = j;
+                f++;
+                tree[f] = c;
+                f++;
+
+
+                qsort(selection, g, sizeof(int) , sort_int_desc);
+                /*for(i = 0; i < numseq;i++){
+                        fprintf(stdout,"%d ",selection[i]);
+                }
+                fprintf(stdout,"\n");*/
+
+                g--;
+                shuffle_arr_r(selection, g, &ap->randBuffer);
+
+                c++;
+
+        }
+
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+int sort_int_desc(const void *a, const void *b)
+{
+           return ( *(int*)b - *(int*)a );
+}
+
+int shuffle_arr_r(int* arr,int n, struct drand48_data* randBuffer)
+{
+        long int r;
+        int i,j;
+        int tmp;
+        for (i = 0; i < n - 1; i++) {
+                lrand48_r(randBuffer,&r);
+                j = i +  r % (n-i);
+                tmp = arr[j];
+                arr[j] = arr[i];
+                arr[i] = tmp;
+        }
+        return OK;
+}
+
+
 int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln_param* ap)
 {
-        struct drand48_data randBuffer;
+        //struct drand48_data randBuffer;
         struct node* root = NULL;
         float** dm = NULL;
         int* tree = NULL;
@@ -44,9 +124,9 @@ int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln
         ASSERT(param != NULL, "No input parameters.");
         ASSERT(ap != NULL, "No alignment parameters.");
 
-        srand48_r(time(NULL), &randBuffer);
 
         tree = ap->tree;
+
 
         numseq = aln->numseq;
 
@@ -114,7 +194,7 @@ int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln
 
 
 
-        RUNP(root = bisecting_kmeans(aln,root, dm, samples, numseq, num_anchors, numseq, &randBuffer));
+        RUNP(root = bisecting_kmeans(aln,root, dm, samples, numseq, num_anchors, numseq, &ap->randBuffer));
 
 //        MFREE(samples);
         label_internal(root, numseq);

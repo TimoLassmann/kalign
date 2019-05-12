@@ -5,15 +5,19 @@
 
 #include "pick_anchor.h"
 
-
+int get_background(struct alignment*aln, struct phmm* phmm);
 int create_subm(struct aln_param* ap,struct phmm* phmm);
 
 
 int estimate_aln_param(struct alignment*aln, struct aln_param*ap)
 {
         struct phmm* phmm = NULL;
+        uint8_t* seqa = NULL;
+        uint8_t* seqb = NULL;
+
         int* anchors = NULL;
         int num_anchor = 0;
+        int len_a,len_b;
 
         int i,j;
         ASSERT(aln != NULL, "No alignment.");
@@ -25,8 +29,9 @@ int estimate_aln_param(struct alignment*aln, struct aln_param*ap)
         i = aln->sl[anchors[0]] + 2;
         RUNP(phmm = alloc_phmm(i));
         phmm->L = aln->L;
-        //RUN(simple_init(phmm));
 
+        RUN(get_background(aln,phmm));
+        //RUN(simple_init(phmm));
 
         RUN(add_pseudocounts(phmm, 1));
         RUN(re_estimate(phmm));
@@ -48,11 +53,8 @@ int estimate_aln_param(struct alignment*aln, struct aln_param*ap)
         LOG_MSG("%f eta", scaledprob2prob(phmm->eta));
 //exit(0);
 
-        uint8_t* seqa = NULL;
-        uint8_t* seqb = NULL;
-        int len_a,len_b;
         //DECLARE_TIMER(t1);
-        for(int iter = 0;iter < 50;iter++){
+        for(int iter = 0;iter < 10;iter++){
                 //START_TIMER(t1);
                 for(i = 0; i < aln->numseq;i++){
                         seqa = aln->s[i];
@@ -88,6 +90,38 @@ int estimate_aln_param(struct alignment*aln, struct aln_param*ap)
         return OK;
 ERROR:
         return FAIL;
+}
+
+
+
+int get_background(struct alignment*aln, struct phmm* phmm)
+{
+
+        uint8_t* seq = NULL;
+        int len;
+
+        int i,j;
+        float sum;
+        for(i = 0; i < aln->L;i++){
+                phmm->emit_background[i] = 0.0f;
+        }
+        /* get background */
+        for(i =0; i <aln->numseq;i++){
+                seq = aln->s[i];
+                len = aln->sl[i];
+                for(j = 0; j < len;j++){
+                        phmm->emit_background[seq[j]]++;
+                }
+        }
+        sum = 0.0;
+        for(i = 0; i < aln->L;i++){
+                sum+= phmm->emit_background[i];
+        }
+
+        for(i = 0; i < aln->L;i++){
+                phmm->emit_background[i] = prob2scaledprob(phmm->emit_background[i] / sum);
+        }
+        return OK;
 }
 
 int create_subm(struct aln_param* ap,struct phmm* phmm)

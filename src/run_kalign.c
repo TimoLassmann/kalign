@@ -373,21 +373,25 @@ int run_kalign(struct parameters* param)
         //fprintf(stderr,"        %0.8f	terminal gap penalty\n",ap->tgpe);
         //fprintf(stderr,"        %0.8f	bonus\n",param->secret/10);
         //fprintf(stderr,"        %0.8f	bonus\n",param->secret);
-        LOG_MSG("Estimating alignment param.");
+        /*LOG_MSG("Estimating alignment param.");
         START_TIMER(t1);
 
         RUN(estimate_aln_param(aln, ap));
         STOP_TIMER(t1);
-        LOG_MSG("Took %f sec.", GET_TIMING(t1));
+        LOG_MSG("Took %f sec.", GET_TIMING(t1));*/
 
 
 
 
         LOG_MSG("Building guide tree.");
         START_TIMER(t1);
+
+        random_tree(ap, aln->numseq);
+
+
         //param->dist_method = KALIGNDIST_WU;
         //RUN(build_tree(aln,param,ap));
-        RUN(build_tree_kmeans(aln,param,ap));
+        //RUN(build_tree_kmeans(aln,param,ap));
         STOP_TIMER(t1);
         LOG_MSG("Took %f sec.", GET_TIMING(t1));
 

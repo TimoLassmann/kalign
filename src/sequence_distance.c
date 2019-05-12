@@ -246,6 +246,7 @@ float** kmer_distance(struct alignment* aln, int* seeds, int num_seeds, int kmer
 
         }
         LOG_MSG("len:%d",kmer_idx);
+
         qsort(kmer_list, kmer_idx, sizeof(struct kmer*), sort_by_kmer_then_seq);
 
         code = 0UL;
@@ -281,8 +282,6 @@ float** kmer_distance(struct alignment* aln, int* seeds, int num_seeds, int kmer
 ERROR:
         return NULL;
 }
-
-
 
 int sort_by_kmer_then_seq(const void *a, const void *b)
 {

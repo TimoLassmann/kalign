@@ -48,20 +48,29 @@ int main(int argc, char *argv[])
 
 
 
+        
+
+
         RUNP(phmm = alloc_phmm(MACRO_MAX(len_a,len_b)));
-        RUN(simple_init(phmm));
+        phmm->L = 21;
+//RUN(simple_init(phmm));
+        RUN(add_pseudocounts(phmm, 1));
+        RUN(re_estimate(phmm));
+        RUN(phmm_transitions(phmm));
 
         RUN(clear_phmm_e(phmm));
+        RUN(add_pseudocounts(phmm, 1));
         //RUN(add_pseudocounts(phmm, 20));
 
         //RUN(phmm_transitions(phmm));
-        for(int iter = 0;iter < 50;iter++){
+        for(int iter = 0;iter < 5;iter++){
                 RUN(forward_phmm(phmm, seqa, seqb, len_a, len_b));
                 RUN(backward_phmm(phmm, seqa, seqb, len_a, len_b));
 
 
                 RUN(collect_phmm(phmm, seqa, seqb, len_a, len_b));
                 RUN(re_estimate(phmm));
+                RUN(clear_phmm_e(phmm));
                 RUN(add_pseudocounts(phmm, 20));
                 fprintf(stdout,"%f\tforward\n%f\tbackward\n",phmm->f_score, phmm->b_score);
         }
@@ -476,6 +485,8 @@ int re_estimate(struct phmm* phmm)
         int i,j;
         int L;
         float sum;
+        float priorXY;
+        float priorM;
         /* first for match state  */
         /*  */
         L = phmm->L;
@@ -538,7 +549,7 @@ int re_estimate(struct phmm* phmm)
 
         phmm->transition[INDEXGPE] =  phmm->transition[INDEXGPE] - sum;
         phmm->transition[INDEXTM] =  phmm->transition[INDEXTM] - sum;
-        
+
 
         sum = phmm->transition[INDEXGPE];
         sum = logsum(sum, phmm->transition[INDEXTM]);
@@ -546,37 +557,35 @@ int re_estimate(struct phmm* phmm)
 
         //fprintf(stdout,"sanity: X/Y: %f\n", scaledprob2prob(sum));
 
-        sum = prob2scaledprob(0.0f);
+        //priorXY= prob2scaledprob(0.0f);
+        priorM = prob2scaledprob(0.0f);
+
         for(i = 0; i < L;i++){
-
-                sum = logsum(sum, phmm->emit_background_e[i]);
-
+                //     priorXY = logsum(priorXY, phmm->emit_background_e[i]);
         }
 
+
+
         for(i = 0; i < L;i++){
-                phmm->emit_background[i] = phmm->emit_background_e[i] -sum;
+                //phmm->emit_background[i] = phmm->emit_background_e[i] - priorXY;
                 //fprintf(stdout,"%d\t%f\n",i,scaledprob2prob(phmm->emit_background[i]));
         }
-        sum = prob2scaledprob(0.0f);
-        for(i = 0; i < L;i++){
-                sum = logsum(sum, phmm->emit_background[i]);
-        }
-        //fprintf(stdout,"sanity:background: %f\n", scaledprob2prob(sum));
 
-        sum = prob2scaledprob(0.0f);
+
         for(i = 0; i < L;i++){
                 for(j = 0; j <= i;j++){
 //                        fprintf(stdout," %0.2f",phmm->emit_M_e[i][j]);
-                        sum = logsum(sum, phmm->emit_M_e[i][j]);
+                        priorM = logsum(priorM, phmm->emit_M_e[i][j]);
                 }
                 //fprintf(stdout,"\n");
         }
+
 
         //fprintf(stdout,"\n");fprintf(stdout,"SUM:%f\n",sum);
 
         for(i = 0; i < L;i++){
                 for(j = 0; j <= i;j++){
-                        phmm->emit_M[i][j] = phmm->emit_M_e[i][j] - sum;
+                        phmm->emit_M[i][j] = phmm->emit_M_e[i][j] - priorM;
                         phmm->emit_M[j][i] = phmm->emit_M[i][j];
                         //              fprintf(stdout," %0.2f",scaledprob2prob(phmm->emit_M[i][j])*100.0);
                         //fprintf(stdout,"%0.2f ",scaledprob2prob(phmm->emit_M[i][j]));
@@ -585,17 +594,17 @@ int re_estimate(struct phmm* phmm)
 //                fprintf(stdout,"\n");
 
         }
-        //      fprintf(stdout,"\n");
+
+        /*fprintf(stdout,"%f %f\n",priorM,priorXY);
+        sum = logsum(priorM,priorXY);
+
+        priorM = priorM - sum;
+        priorXY = priorXY - sum;
+
+        fprintf(stdout,"%f %f\n",scaledprob2prob(priorM ),scaledprob2prob(priorXY));*/
+//      fprintf(stdout,"\n");
         //    exit(0);
 //fprintf(stdout,"\n");
-
-        sum = prob2scaledprob(0.0f);
-        for(i = 0; i < L;i++){
-                for(j = 0; j < L;j++){
-                        sum = logsum(sum, phmm->emit_M[i][j]);
-                }
-        }
-        //fprintf(stdout,"sanity:emit: %f\n", scaledprob2prob(sum));
         clear_phmm_e(phmm);
 
         return OK;
@@ -603,10 +612,10 @@ int re_estimate(struct phmm* phmm)
 
 int phmm_transitions(struct phmm* phmm)
 {
-        fprintf(stdout,"%f\tMM\n", scaledprob2prob(phmm->transition[INDEXMM]));
-        fprintf(stdout,"%f\tGPO\n",scaledprob2prob(phmm->transition[INDEXGPO]));
-        fprintf(stdout,"%f\tGPE\n",scaledprob2prob(phmm->transition[INDEXGPE]));
-        fprintf(stdout,"%f\tTM\n",scaledprob2prob(phmm->transition[INDEXTM]));
+        fprintf(stdout,"%f MM\t", scaledprob2prob(phmm->transition[INDEXMM]));
+        fprintf(stdout,"%f GPO\t",scaledprob2prob(phmm->transition[INDEXGPO]));
+        fprintf(stdout,"%f GPE\t",scaledprob2prob(phmm->transition[INDEXGPE]));
+        fprintf(stdout,"%f TM\n",scaledprob2prob(phmm->transition[INDEXTM]));
         return OK;
 }
 
@@ -812,8 +821,7 @@ int add_pseudocounts(struct phmm* phmm, float w)
 -2.657298,
 -4.388594,
 -3.402006,
--8.457309,
-0.000000};
+-8.457309};
 float prior_m[21][21] = {
 {-3.177299,-6.191718,-5.419304,-4.957334,-5.935829,-4.777886,-6.339544,-5.268996,-5.102014,-4.902290,-6.165040,-5.657795,-5.499347,-5.647688,-5.481493,-4.709463,-5.124226,-4.784890,-7.212927,-6.058960,-10.571393},
 {-6.191718,-4.954772,-7.795046,-7.669646,-7.500984,-7.225438,-8.290624,-6.950052,-7.753595,-6.616895,-7.820372,-7.657623,-7.697898,-8.023582,-7.629232,-6.917443,-6.908076,-6.411755,-9.012855,-7.828272,-12.526193},
