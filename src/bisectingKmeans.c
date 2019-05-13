@@ -27,7 +27,7 @@ float** pair_wu_fast_dist(struct alignment* aln, struct aln_param* ap, int* num_
 
 int unit_zero(float** d, int len_a, int len_b);
 
-int shuffle_arr_r(int* arr,int n, struct drand48_data* randBuffer);
+
 int sort_int_desc(const void *a, const void *b);
 
 int random_tree(struct aln_param* ap, int numseq)
@@ -91,20 +91,6 @@ int sort_int_desc(const void *a, const void *b)
            return ( *(int*)b - *(int*)a );
 }
 
-int shuffle_arr_r(int* arr,int n, struct drand48_data* randBuffer)
-{
-        long int r;
-        int i,j;
-        int tmp;
-        for (i = 0; i < n - 1; i++) {
-                lrand48_r(randBuffer,&r);
-                j = i +  r % (n-i);
-                tmp = arr[j];
-                arr[j] = arr[i];
-                arr[i] = tmp;
-        }
-        return OK;
-}
 
 
 int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln_param* ap)

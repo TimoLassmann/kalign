@@ -154,8 +154,10 @@
    
 
    #+BEGIN_SRC R :session one :results output graphics :file BalibaseSP_scores.jpeg :exports both :width 160 :height 80
-     mat <- readBaliscores("scores_kalign25.csv","kalign")
-     mat <- rbind(mat,readBaliscores("scores_kalign_rt.csv","kalignrt"));
+     mat <- readBaliscores("scores_old_kalign.csv","kalign  old")
+     mat <- rbind(mat,readBaliscores("scores_kalign_iter.csv","kalign iter"));
+
+     mat <- rbind(mat,readBaliscores("scores_kalign_bi.csv","kalign bi "));
 
      ## mat
      ## <- rbind(mat,readBaliscores("scores_kalign_bibpm.csv","bibpm"));
@@ -166,18 +168,24 @@
      p1 <- ggplot(mat, aes(Group, SP))
      p1 <- p1 + geom_boxplot(aes(colour = Type))
 
+     means <- aggregate(SP ~  Type, mat, mean)
+     means$SP <- round(means$SP,digits = 4)
      p2 <- ggplot(mat, aes(Type, SP))
      p2 <- p2 + geom_boxplot(aes(colour = Type))
-
-
+     p2 <- p2 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
+     p2 <- p2 + geom_text(data = means, aes(label = SP, y = SP + 0.08))
 
      p3 <- ggplot(mat, aes(Group, TC))
      p3 <- p3 + geom_boxplot(aes(colour = Type))
 
-
+     means <- aggregate(TC ~  Type, mat, mean)
+     means$TC <- round(means$TC,digits = 4)
 
      p4 <- ggplot(mat, aes(Type, TC))
      p4 <- p4 + geom_boxplot(aes(colour = Type))
+p4 <- p4 + geom_boxplot(aes(colour = Type))
+     p4 <- p4 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
+     p4 <- p4 + geom_text(data = means, aes(label = TC, y = TC + 0.08))
 
 
 

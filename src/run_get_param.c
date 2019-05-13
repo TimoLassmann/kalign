@@ -21,8 +21,10 @@ struct counts{
         int L;
 };
 struct counts* init_counts(void);
+int clean_counts(struct counts* ap);
 int normalize_counts(struct counts*ap);
 int print_counts(struct counts* ap);
+int print_counts_flat(struct counts* ap,double* raw);
 int fill_counts(struct counts* ap, struct alignment* aln);
 int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len);
 
@@ -34,24 +36,32 @@ int main(int argc, char *argv[])
         struct alignment* aln = NULL;
 
         struct counts* ap = NULL;
-
-        int i;
+        double** raw = NULL;
+        int i,j;
         int num_infiles = 0;
         char** infile = NULL;
         int c = 0;
+
+        int print_all = 0;
         //int help = 0;
         while (1){
                 static struct option long_options[] ={
+                        {"all",0,0,'a'},
                         {"help",0,0,'h'},
                         {0, 0, 0, 0}
                 };
                 int option_index = 0;
-                c = getopt_long_only (argc, argv,"h",long_options, &option_index);
+                c = getopt_long_only (argc, argv,"ha",long_options, &option_index);
 
                 if (c == -1){
                         break;
                 }
                 switch(c) {
+                case 'a':
+                        print_all = 1;
+                        break;
+
+
                 case 'h':
                         //help = 1;
                         break;
@@ -75,21 +85,54 @@ int main(int argc, char *argv[])
         }
 
         RUNP(ap = init_counts());
-
-        for(i = 0; i < num_infiles;i++){
-                fprintf(stdout,"%s\n",infile[i]);
-                RUNP(aln = read_alignment(infile[i]));
+        if(print_all){
+                /* get L */
+                RUNP(aln = read_alignment(infile[0]));
 
                 RUN(convert_alignment_to_internal(aln, defPROTEIN));
-                fprintf(stdout,"%d L \n", aln->L);
-                RUN(fill_counts(ap, aln));
                 ap->L = aln->L;
+                int len = (ap->L *( ap->L-1)) / 2 + ap->L + 2;
                 free_aln(aln);
-        }
-        normalize_counts(ap);
-        print_counts(ap);
-        print_probabilies(ap);
 
+                raw = galloc(raw,num_infiles,len,0.0);
+                for(i = 0; i < num_infiles;i++){
+                        clean_counts(ap);
+                        //fprintf(stdout,"%s\n",infile[i]);
+                        RUNP(aln = read_alignment(infile[i]));
+
+                        RUN(convert_alignment_to_internal(aln, defPROTEIN));
+                        //fprintf(stdout,"%d L \n", aln->L);
+                        RUN(fill_counts(ap, aln));
+                        //ap->L = aln->L;
+                        normalize_counts(ap);
+                        print_counts_flat(ap,raw[i]);
+                        free_aln(aln);
+                }
+                for(i = 0; i < num_infiles;i++){
+                        for(j = 0; j < len;j++){
+                                fprintf(stdout,"%f,",raw[i][j]);
+                        }
+                        fprintf(stdout,"\n");
+                }
+                fprintf(stdout,"\n");
+
+        }else{
+
+
+                for(i = 0; i < num_infiles;i++){
+                        fprintf(stdout,"%s\n",infile[i]);
+                        RUNP(aln = read_alignment(infile[i]));
+
+                        RUN(convert_alignment_to_internal(aln, defPROTEIN));
+                        fprintf(stdout,"%d L \n", aln->L);
+                        RUN(fill_counts(ap, aln));
+                        ap->L = aln->L;
+                        free_aln(aln);
+                }
+                normalize_counts(ap);
+                print_counts(ap);
+                print_probabilies(ap);
+        }
         if(infile){
                 MFREE(infile);
         }
@@ -129,7 +172,7 @@ int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len)
         int begin = 0;
         int end = 0;
 
-        double sim = 0;
+        double sim = 1.0;
         for(i = 0;i < len;i++){
                 ap->TGPE += sim;
                 if(a[i] != 255 && b[i] != 255){
@@ -158,12 +201,12 @@ int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len)
         }
 
         sim =   sim / (double) (end - begin);
-        sim = sim * sim * sim * sim;
+        //sim = sim * sim * sim * sim;
         //sim = 1.0;
-        fprintf(stdout,"Sim :%f\n", sim);
+        //fprintf(stdout,"Sim :%f\n", sim);
 
 
-        //sim = 1.0;
+        sim = 1.0;
 
 
         for(i = begin;i < end;i++){
@@ -219,28 +262,40 @@ int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len)
 
 struct counts* init_counts(void)
 {
-        int i,j;
+
         struct counts* ap = NULL;
         MMALLOC(ap, sizeof(struct counts));
 
+
+        RUN(clean_counts(ap));
+        return ap;
+ERROR:
+        return NULL;
+}
+
+
+int clean_counts(struct counts* ap)
+{
+        int i,j;
+
+        double pseudocount = 1.0;
         for(i = 0; i < 26;i++){
-                ap->back[i] = 1.0;
+
+                ap->back[i] = pseudocount;
                 for(j = 0; j < 26;j++){
-                        ap->emit[i][j] = 1.0;
+                        ap->emit[i][j] = pseudocount;
                 }
         }
-        ap->MM = 0.0;
-        ap->TM = 0.0;
-        ap->TGPE = 0.0;
-        ap->GPE = 0.0;
-        ap->GPO = 0.0;
+        ap->MM = pseudocount;
+        ap->TM = pseudocount;
+        ap->TGPE = pseudocount;
+        ap->GPE = pseudocount;
+        ap->GPO = pseudocount;
         ap->tau = 0.0;
         ap->eta = 0.0;
         ap->num_seq = 0.0;
         ap->num_alignments = 0.0;
-        return ap;
-ERROR:
-        return NULL;
+        return OK;
 }
 
 
@@ -248,15 +303,17 @@ int normalize_counts(struct counts*ap)
 {
         int i,j;
         double sum;
-        double tmp;
+        //double tmp;
 
         sum = 0.0;
 
         for(i = 0; i < ap->L;i++){
+                //fprintf(stdout,"BAK:%d %f\n",i,ap->back[i]);
                 sum += ap->back[i];
         }
         for(i = 0; i < ap->L;i++){
                 ap->back[i] /= sum;
+                //fprintf(stdout,"BAK:%d %f\n",i,ap->back[i]);
         }
         sum = 0.0;
         for(i = 0; i < ap->L;i++){
@@ -278,10 +335,11 @@ int normalize_counts(struct counts*ap)
 
         ap->TGPE = ap->TGPE / sum;
 
-        tmp = (ap->num_alignments*2.0) / sum;
-        fprintf(stdout,"%f %f ", ap->TGPE, tmp);
-        ap->TGPE = -log2 (1.0-ap->TGPE);
-        fprintf(stdout,"-> %f\n", ap->TGPE);
+
+        //tmp = (ap->num_alignments*2.0) / sum;
+        //fprintf(stdout,"%f %f ", ap->TGPE, tmp);
+        //ap->TGPE = -log2 (1.0-ap->TGPE);
+        //fprintf(stdout,"-> %f\n", ap->TGPE);
         sum = ap->MM;
         sum += ap->GPO;
         sum += ap->GPO;
@@ -313,7 +371,7 @@ int normalize_counts(struct counts*ap)
         ap->TM = ap->TM / sum;
 
         /* eta  */
-
+        ap->eta = 1.0 - 1.0 / (ap->eta / ap->num_seq);
         return OK;
 }
 
@@ -352,13 +410,43 @@ int print_probabilies(struct counts*ap)
         return OK;
 }
 
+
+int print_counts_flat(struct counts* ap,double* raw)
+{
+        int i,j;
+
+        double sum = 0.0;
+        int c = 0;
+        for(i = 0; i < ap->L;i++){
+                //fprintf(stdout,"%d",i);
+                for(j = 0; j <= i;j++){
+
+                        //fprintf(stdout,"\n%d %f\n",i,ap->back[i]);
+                        sum = log2(ap->emit[i][j] / ( ap->back[i] * ap->back[j])) + log2(ap->MM/((ap->eta)*(ap->eta)));
+                        raw[c] = sum;
+                        //                    fprintf(stdout,"%f,",sum);
+                        c++;
+                }
+        }
+
+        sum = -1.0 * log2( (ap->GPO * ap->TM) / ((ap->eta) * ap->MM));
+        //fprintf(stdout,"%f,", sum);
+        raw[c] = sum;
+        c++;
+        sum = -1.0 *log2(ap->GPE/(1.0 - ap->tau));
+        //fprintf(stdout,"%f   %d\n", sum,c);
+        raw[c] = sum;
+        c++;
+        return OK;
+}
+
 int print_counts(struct counts* ap)
 {
         int i,j;
 
         double sum = 0.0;
 
-        ap->eta = 1.0 - 1.0 / (ap->eta / ap->num_seq);
+        //ap->eta = 1.0 - 1.0 / (ap->eta / ap->num_seq);
         /*for(i = 0; i < 26;i++){
                 fprintf(stdout,"%*d ",3,i);
         }
@@ -384,17 +472,19 @@ int print_counts(struct counts* ap)
         /*fprintf(stdout,"%f\tMM\n", ap->MM);
         fprintf(stdout,"%f\tGPO\n", ap->GPO);
         fprintf(stdout,"%f\tGPE\n", ap->GPE);
+        fprintf(stdout,"%f\tTGPE\n", ap->TGPE);
         fprintf(stdout,"%f\tTM\n", ap->TM);*/
         /* taushould be 1/ average length */
-        fprintf(stdout,"%f\ttau\n", ap->tau);
-        fprintf(stdout,"%f\teta\n", ap->eta);
+        //fprintf(stdout,"%f\ttau\n", ap->tau);
+        //fprintf(stdout,"%f\teta\n", ap->eta);
         sum = 0.0;
 
         sum = -1.0 * log2( (ap->GPO * ap->TM) / ((ap->eta) * ap->MM));
-        fprintf(stdout,"ap->gpo = %f;\n", sum);
+        fprintf(stdout,"ap->gpo = %f;\n", sum/ 2.0);
         sum = -1.0 *log2(ap->GPE/(1.0 - ap->tau));
         fprintf(stdout,"ap->gpe =  %f;\n", sum);
-        fprintf(stdout,"ap->tgpe =  %f;\n", ap->TGPE);
+        sum = -1.0 *log2(ap->TGPE/(1.0 - ap->tau));
+        fprintf(stdout,"ap->tgpe =  %f;\n", sum);
         //;
         //sum = ap->MM / ((ap->eta)*(ap->eta));
         //fprintf(stdout,"%f\n",sum);

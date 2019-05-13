@@ -386,12 +386,12 @@ int run_kalign(struct parameters* param)
         LOG_MSG("Building guide tree.");
         START_TIMER(t1);
 
-        random_tree(ap, aln->numseq);
+        //random_tree(ap, aln->numseq);
 
 
         //param->dist_method = KALIGNDIST_WU;
         //RUN(build_tree(aln,param,ap));
-        //RUN(build_tree_kmeans(aln,param,ap));
+        RUN(build_tree_kmeans(aln,param,ap));
         STOP_TIMER(t1);
         LOG_MSG("Took %f sec.", GET_TIMING(t1));
 
@@ -410,7 +410,6 @@ int run_kalign(struct parameters* param)
         int iter;
         for(iter = 0; iter < 0;iter++){
                 RUN(weave(aln , map, ap->tree));
-
                 param->dist_method = KALIGNDIST_ALN;
                 build_tree(aln, param,ap);
                 clean_aln(aln);
@@ -431,6 +430,16 @@ int run_kalign(struct parameters* param)
                 STOP_TIMER(t1);
                 LOG_MSG("Took %f sec.", GET_TIMING(t1));
         }
+
+                int max_len = 0;
+        for(i = 0; i < aln->numseq;i++){
+                if(aln->sl[i] > max_len){
+                        max_len = aln->sl[i];
+                }
+
+        }
+        aln->gaps = galloc(aln->gaps,aln->numseq,max_len+1,0);
+
         RUN(weave(aln , map, ap->tree));
 
         /* clean up map */

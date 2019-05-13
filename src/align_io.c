@@ -158,14 +158,6 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
                 }
                 //fprintf(stderr,"Output file: %s, in %s format.\n",param->outfile,param->format);
         }
-        int max_len = 0;
-        for(i = 0; i < aln->numseq;i++){
-                if(aln->sl[i] > max_len){
-                        max_len = aln->sl[i];
-                }
-
-        }
-        aln->gaps = galloc(aln->gaps,aln->numseq,max_len+1,0);
         /* translate to internal */
         free_align_io_buffer(b);
         return aln;
