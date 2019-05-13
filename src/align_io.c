@@ -2469,7 +2469,7 @@ int aln_output(struct alignment* aln,struct parameters* param)
 
         struct names* n = NULL;
 
-        n = get_meaningful_names(aln,param->id);
+        n = get_meaningful_names(aln,-1);
 
         //namestart = get_meaningful_names(aln,param->id);
 

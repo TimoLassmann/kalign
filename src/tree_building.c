@@ -48,23 +48,9 @@ int build_tree(struct alignment* aln,struct parameters* param, struct aln_param*
         tree = ap->tree;
         numseq = aln->numseq;
 
-        /* if we don't build a tree fill and return  */
-        if(param->ntree <= 1){
-                tree[0] = 0;
-                tree[1] = 1;
 
-                c = numseq;
-                tree[2] = c;
-                a = 2;
-                for ( i = 3; i < (numseq-1)*3;i+=3){
-                        tree[i] = c;
-                        tree[i+1] = a;
-                        c++;
-                        tree[i+2] = c;
-                        a++;
-                }
-                return OK;
-        }
+
+
 
         /* calculate distances  */
 
@@ -96,7 +82,7 @@ int build_tree(struct alignment* aln,struct parameters* param, struct aln_param*
 
                 break;
         case KALIGNDIST_WU:
-                RUNP(dm =  protein_wu_distance(aln,param->zlevel,0,NULL,0));
+                RUNP(dm =  protein_wu_distance(aln,58.8,0,NULL,0));
                 break;
         case KALIGNDIST_ALN:
                 RUNP(dm = aln_distance(aln,ap));
@@ -108,12 +94,10 @@ int build_tree(struct alignment* aln,struct parameters* param, struct aln_param*
 
 
 
-        if(byg_start(param->tree,"njNJ") != -1){
-                tree2 = real_nj(dm,param->ntree,aln->numseq);
-        }else{
 
-                tree2 = real_upgma(dm,param->ntree,aln->numseq);
-        }
+
+                tree2 = real_upgma(dm,2 ,aln->numseq);
+
 
         gfree(dm);
 
@@ -123,9 +107,6 @@ int build_tree(struct alignment* aln,struct parameters* param, struct aln_param*
 
         tree[0] = 1;
 
-        if(param->ntree > 2){
-                ntreeify(tree2,param->ntree);
-        }else{
                 tree = readtree(tree2,tree);
                 for (i = 0; i < (numseq*3);i++){
                         tree[i] = tree[i+1];
@@ -133,7 +114,7 @@ int build_tree(struct alignment* aln,struct parameters* param, struct aln_param*
                 free(tree2->links);
                 free(tree2->internal_lables);
                 free(tree2);
-        }
+
         return OK;
 ERROR:
         return FAIL;

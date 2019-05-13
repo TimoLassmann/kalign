@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
 
 
                 double** means = NULL;
-                int k = 15;
+                int k =4;
                 means = kmeans(raw, assignment,num_infiles,len, k);
                 //means = galloc(means,1,len,0.0);
                 for(j = 0; j < k;j++){
