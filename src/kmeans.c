@@ -2,7 +2,7 @@
 
 
 
-double** kmeans(double** data, int len_a,int len_b, int k)
+double** kmeans(double** data,int* cluster_assignment, int len_a,int len_b, int k)
 {
         double** means = NULL;
         double** tmp = NULL;
@@ -16,24 +16,25 @@ double** kmeans(double** data, int len_a,int len_b, int k)
         int min_index;
         int i,j;
         int change;
-        int num_attempts = 10;
+        int num_attempts = 10000;
         int a_item;
         struct drand48_data randBuffer;
         int* sel = NULL;
         double* n_item = NULL;
 
-        ASSERT(k > 1,"K needs to be greater than one");
+        ASSERT(k > 0,"K needs to be greater than one");
         ASSERT(k < len_a,"K larger than number of items");
         srand48_r(time(NULL), &randBuffer);
 
 
-        sel = galloc(sel,len_a,0);
+        sel = galloc(sel,len_a);
 
         for(i = 0; i < len_a;i++){
                 sel[i] = i;
         }
 
-        n_item = galloc(n_item,k,0.0);
+
+        n_item = galloc(n_item,k);
 
         for(i = 0; i < k;i++){
                 n_item[i] = 0.0;
@@ -80,9 +81,9 @@ double** kmeans(double** data, int len_a,int len_b, int k)
                         score = 0.0;
                         for(i= 0; i < len_a;i++){
                                 min = DBL_MAX;
+                                min_index = -1;
                                 for(j = 0; j < k;j++){
-
-                                        edist_serial(data[i], tmp[j], len_b, &d);
+                                        edist_serial_d(data[i], tmp[j], len_b, &d);
                                         if(d < min){
                                                 min = d;
                                                 min_index = j;
@@ -92,6 +93,9 @@ double** kmeans(double** data, int len_a,int len_b, int k)
                                 score += min;
                                 for(j = 0; j < len_b;j++){
                                         tmp2[min_index][j] += data[i][j];
+                                }
+                                if(cluster_assignment){
+                                        cluster_assignment[i] = min_index;
                                 }
                         }
                         /* calculate new means  */
@@ -122,15 +126,25 @@ double** kmeans(double** data, int len_a,int len_b, int k)
                         }
                 }
         }
+        for(i = 0; i < k;i++){
+                n_item[i] = 0.0;
+        }
 
-
+        for(i= 0; i < len_a;i++){
+                if(cluster_assignment){
+                        n_item[cluster_assignment[i]]++;
+                }
+        }
+        for(i = 0; i < k;i++){
+                fprintf(stdout,"%d %f\n",i,n_item[i]);
+        }
 
         gfree(tmp);
         gfree(tmp2);
 
         gfree(n_item);
         gfree(sel);
-        gfree(tmp);
+
         return means;
 ERROR:
         return NULL;

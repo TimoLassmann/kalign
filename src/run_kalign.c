@@ -341,14 +341,11 @@ int run_kalign(struct parameters* param)
         RUNP(aln = detect_and_read_sequences(param));
         /* copy dna parameter to alignment */
         aln->dna = param->dna;
-        if(param->ntree > aln->numseq){
-                param->ntree = aln->numseq;
-        }
         RUN(detect_dna(aln));
         LOG_MSG("Detected: %d sequences.", aln->numseq);
         //LOG_MSG("Output is %s in format %s.", param->outfile,param->format);
         //LOG_MSG("Is DNA: %d", aln->dna);
-        param->dna = aln->dna;
+        //param->dna = aln->dna;
         /* If we just want to reformat end here */
         if(param->reformat){
                 for (i = 0 ;i < aln->numseq;i++){
@@ -364,8 +361,10 @@ int run_kalign(struct parameters* param)
         }
 
 
+
+        param->param_set = 4;
         /* allocate aln parameters  */
-        RUNP(ap = init_ap(param,aln->numseq));
+        RUNP(ap = init_ap(param,aln->numseq,aln->L));
         //fprintf(stderr,"        %0.8f	gap open penalty\n",ap->gpo);
         //fprintf(stderr,"        %0.8f	gap extension\n",(float)gpe/10);
         //fprintf(stderr,"        %0.8f	gap extension\n",ap->gpe);

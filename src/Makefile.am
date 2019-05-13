@@ -74,8 +74,11 @@ global.h \
 misc.h \
 misc.c \
 alphabet.h \
-alphabet.c
-
+alphabet.c \
+euclidean_dist.h \
+euclidean_dist.c \
+kmeans.h \
+kmeans.c
 
 
 phmm_SOURCES = phmm.h phmm.c

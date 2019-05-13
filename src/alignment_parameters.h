@@ -15,6 +15,6 @@ struct aln_param{
 };
 
 
-extern struct aln_param* init_ap(struct parameters* param,int numseq);
+extern struct aln_param* init_ap(struct parameters* param,int numseq,int L);
 extern void free_ap(struct aln_param* ap);
 #endif

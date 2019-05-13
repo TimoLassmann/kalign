@@ -5,6 +5,8 @@
 #include "align_io.h"
 
 #include "alphabet.h"
+#include "kmeans.h"
+
 
 struct counts{
         double emit[26][26];
@@ -36,6 +38,7 @@ int main(int argc, char *argv[])
         struct alignment* aln = NULL;
 
         struct counts* ap = NULL;
+        int* assignment = NULL;
         double** raw = NULL;
         int i,j;
         int num_infiles = 0;
@@ -91,8 +94,17 @@ int main(int argc, char *argv[])
 
                 RUN(convert_alignment_to_internal(aln, defPROTEIN));
                 ap->L = aln->L;
-                int len = (ap->L *( ap->L-1)) / 2 + ap->L + 2;
+                int len = (ap->L *( ap->L-1)) / 2 + ap->L + 3;
                 free_aln(aln);
+
+
+
+                MMALLOC(assignment, sizeof(int) * num_infiles);
+                for(i = 0; i < num_infiles;i++){
+                        assignment[i] = 0;
+                }
+
+                //fprintf(stdout,"LEN:%d\n",ap->L);
 
                 raw = galloc(raw,num_infiles,len,0.0);
                 for(i = 0; i < num_infiles;i++){
@@ -108,6 +120,7 @@ int main(int argc, char *argv[])
                         print_counts_flat(ap,raw[i]);
                         free_aln(aln);
                 }
+                /*
                 for(i = 0; i < num_infiles;i++){
                         for(j = 0; j < len;j++){
                                 fprintf(stdout,"%f,",raw[i][j]);
@@ -115,16 +128,56 @@ int main(int argc, char *argv[])
                         fprintf(stdout,"\n");
                 }
                 fprintf(stdout,"\n");
+                */
 
+
+                double** means = NULL;
+                int k = 15;
+                means = kmeans(raw, assignment,num_infiles,len, k);
+                //means = galloc(means,1,len,0.0);
+                for(j = 0; j < k;j++){
+                        clean_counts(ap);
+                        for(i = 0; i < num_infiles;i++){
+                                if(assignment[i] == j){
+                                        //                fprintf(stdout,"%s %d\n",infile[i],assignment[i]);
+                                        RUNP(aln = read_alignment(infile[i]));
+
+                                        RUN(convert_alignment_to_internal(aln, defPROTEIN));
+                                        //fprintf(stdout,"%d L \n", aln->L);
+                                        RUN(fill_counts(ap, aln));
+                                        //ap->L = aln->L;
+                                        free_aln(aln);
+                                }
+
+
+                        }
+
+                        normalize_counts(ap);
+                        print_counts_flat(ap,means[j]);
+                }
+
+                fprintf(stdout,"MEANs:\n");
+                fprintf(stdout,"double defprot_set10[%d][%d] = {",k, len);
+                for(i = 0; i < k;i++){
+                        //means[i][len-2] /= 2.0;
+                        fprintf(stdout, "{ %f ", means[i][0]);
+                        for(j = 1; j < len;j++){
+                                fprintf(stdout,",%f",means[i][j]);
+                        }
+                        if(i == k-1){
+                                fprintf(stdout,"}\n");
+                        }else{
+                                fprintf(stdout,"},\n");
+                        }
+                }
+                fprintf(stdout,"};\n");
         }else{
-
-
                 for(i = 0; i < num_infiles;i++){
-                        fprintf(stdout,"%s\n",infile[i]);
+                        //fprintf(stdout,"%s\n",infile[i]);
                         RUNP(aln = read_alignment(infile[i]));
 
                         RUN(convert_alignment_to_internal(aln, defPROTEIN));
-                        fprintf(stdout,"%d L \n", aln->L);
+                        //fprintf(stdout,"%d L \n", aln->L);
                         RUN(fill_counts(ap, aln));
                         ap->L = aln->L;
                         free_aln(aln);
@@ -431,12 +484,17 @@ int print_counts_flat(struct counts* ap,double* raw)
 
         sum = -1.0 * log2( (ap->GPO * ap->TM) / ((ap->eta) * ap->MM));
         //fprintf(stdout,"%f,", sum);
-        raw[c] = sum;
+        raw[c] = sum /2.0;
         c++;
         sum = -1.0 *log2(ap->GPE/(1.0 - ap->tau));
         //fprintf(stdout,"%f   %d\n", sum,c);
         raw[c] = sum;
         c++;
+
+        sum = -1.0 *log2(ap->TGPE/(1.0 - ap->tau));
+        raw[c] = sum;
+        c++;
+
         return OK;
 }
 

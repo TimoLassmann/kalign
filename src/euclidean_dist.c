@@ -111,6 +111,22 @@ int edist_serial(const float* a,const float* b,const int len, float* ret)
 }
 
 
+int edist_serial_d(const double* a,const double* b,const int len, double* ret)
+{
+        int i;
+        double d = 0.0f;
+        double t;
+
+        for(i = 0; i < len;i++){
+                t = (a[i] - b[i]);
+                d += t *t;
+        }
+
+        *ret = sqrt(d);
+        return OK;
+}
+
+
 
 int edist_256(const float* a,const float* b, const int len, float* ret)
 {

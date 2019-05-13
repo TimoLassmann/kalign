@@ -9,7 +9,8 @@
 #include "misc.h"
 #include "euclidean_dist.h"
 
-double** kmeans(double** data, int len_a,int len_b, int k);
+
+double** kmeans(double** data,int* cluster_assignment, int len_a,int len_b, int k);
 
 
 #endif

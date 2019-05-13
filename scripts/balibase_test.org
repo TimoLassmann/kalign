@@ -158,6 +158,13 @@
      mat <- rbind(mat,readBaliscores("scores_kalign_iter.csv","kalign iter"));
 
      mat <- rbind(mat,readBaliscores("scores_kalign_bi.csv","kalign bi "));
+mat <- rbind(mat,readBaliscores("scores_kalign_21.csv","kalign 21 "));
+mat <- rbind(mat,readBaliscores("scores_kalign_set0.csv","kalign set0 "));
+mat <- rbind(mat,readBaliscores("scores_kalign_set1.csv","kalign set1 "));
+mat <- rbind(mat,readBaliscores("scores_kalign_set2.csv","kalign set2 "));
+mat <- rbind(mat,readBaliscores("scores_kalign_set3.csv","kalign set3 "));
+mat <- rbind(mat,readBaliscores("scores_kalign_set4.csv","kalign set4 "));
+mat <- rbind(mat,readBaliscores("scores_kalign_set_all.csv","kalign set all "));
 
      ## mat
      ## <- rbind(mat,readBaliscores("scores_kalign_bibpm.csv","bibpm"));
