@@ -31,7 +31,10 @@ AM_CPPFLAGS=${MYINCDIRS} ${HDF5_CPPFLAGS}
 
 #LOGO_SOURCES = motif_logo.c motif_logo.h
 
-bin_PROGRAMS =  kalign phmm get_param edist alphabet heap_test misc_test bpm_test
+bin_PROGRAMS =  kalign phmm get_param edist alphabet heap_test misc_test bpm_test pbil
+
+pbil_SOURCES = \
+pbil.c
 
 bpm_test_SOURCES = \
 bpm.h \

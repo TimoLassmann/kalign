@@ -12,6 +12,8 @@
 
 #define OPT_SET 1
 
+#define OPT_ALNPARAM 2
+
 int run_kalign(struct parameters* param);
 int detect_dna(struct alignment* aln);
 
@@ -25,6 +27,7 @@ int main(int argc, char *argv[])
 
         while (1){
                 static struct option long_options[] ={
+                        {"alnp", required_argument,0,OPT_ALNPARAM},
                         {"set", required_argument,0,OPT_SET},
                         {"format",  required_argument, 0, 'f'},
                         {"reformat",  0, 0, 'r'},
@@ -49,6 +52,10 @@ int main(int argc, char *argv[])
                         break;
                 }
                 switch(c) {
+                case  OPT_ALNPARAM:
+                        param->aln_param_file = optarg;
+                        break;
+
                 case OPT_SET:
                         param->param_set = atoi(optarg);
                         break;

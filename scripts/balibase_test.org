@@ -8,7 +8,7 @@
 #+LATEX_CMD: pdflatex
 * Introduction 
   Let's run kalign on the core BAliBASE test alignments. 
-
+  
 * Method 
 
 ** Step 1: install balibase 
@@ -80,7 +80,7 @@
    | sh-4.4$ sh-4.4$ sh-4.4$ sh-4.4$ sh-4.4$ sh-4.4$ /home/user/data/bb3_release_tmp_aln |
 
    #+BEGIN_SRC sh :session onesh :results raw 
-     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign %s -o %s/%s_%skalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_kalign.sh
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign -ntree 3 %s -o %s/%s_%skalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_kalign.sh
 
      find ~/data/bb3_release -name "*.tfa"  | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "clustalo --dealign -i  %s --outfmt=msf -o %s/%s_%sclustalo.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_clustalo.sh
 
@@ -136,7 +136,7 @@ find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split 
      ./alignment_scores.sh | grep auto > scores2.csv
 
    #+END_SRC
-
+   
 ** Step 3: plot scores 
 
    #+BEGIN_SRC R :session  one :results none :export none 
@@ -165,40 +165,41 @@ find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split 
    
 
    #+BEGIN_SRC R :session one :results output graphics :file BalibaseSP_scores.jpeg :exports both :width 160 :height 80
-               mat <- readBaliscores("scores_old_kalign.csv","kalign  old")
-               mat <- rbind(mat,readBaliscores("scores_kalign.csv","kalign new"));
-     
-               ## mata
-               ## <- rbind(mat,readBaliscores("scores_kalign_bibpm.csv","bibpm"));
-               ## mat 
-               ## <- rbind(mat,readBaliscores("scores_kalign_bibpm_zero.csv","bibpm_zero"));
+     mat <- readBaliscores("scores_old_kalign.csv","kalign  old")
+     mat <- rbind(mat,readBaliscores("scores_kalign.csv","kalign new"));
+     mat <- rbind(mat,readBaliscores("scores_kalign_3.csv","kalign 3"));
+
+     ## mata
+     ## <- rbind(mat,readBaliscores("scores_kalign_bibpm.csv","bibpm"));
+     ## mat 
+     ## <- rbind(mat,readBaliscores("scores_kalign_bibpm_zero.csv","bibpm_zero"));
 
 
-               p1 <- ggplot(mat, aes(Group, SP))
-               p1 <- p1 + geom_boxplot(aes(colour = Type))
+     p1 <- ggplot(mat, aes(Group, SP))
+     p1 <- p1 + geom_boxplot(aes(colour = Type))
 
-               means <- aggregate(SP ~  Type, mat, mean)
-               means$SP <- round(means$SP,digits = 4)
-               p2 <- ggplot(mat, aes(Type, SP))
-               p2 <- p2 + geom_boxplot(aes(colour = Type))
-               p2 <- p2 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
-               p2 <- p2 + geom_text(data = means, aes(label = SP, y = SP + 0.08))
+     means <- aggregate(SP ~  Type, mat, mean)
+     means$SP <- round(means$SP,digits = 4)
+     p2 <- ggplot(mat, aes(Type, SP))
+     p2 <- p2 + geom_boxplot(aes(colour = Type))
+     p2 <- p2 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
+     p2 <- p2 + geom_text(data = means, aes(label = SP, y = SP + 0.08))
 
-               p3 <- ggplot(mat, aes(Group, TC))
-               p3 <- p3 + geom_boxplot(aes(colour = Type))
+     p3 <- ggplot(mat, aes(Group, TC))
+     p3 <- p3 + geom_boxplot(aes(colour = Type))
 
-               means <- aggregate(TC ~  Type, mat, mean)
-               means$TC <- round(means$TC,digits = 4)
+     means <- aggregate(TC ~  Type, mat, mean)
+     means$TC <- round(means$TC,digits = 4)
 
-               p4 <- ggplot(mat, aes(Type, TC))
-               p4 <- p4 + geom_boxplot(aes(colour = Type))
-          p4 <- p4 + geom_boxplot(aes(colour = Type))
-               p4 <- p4 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
-               p4 <- p4 + geom_text(data = means, aes(label = TC, y = TC + 0.08))
+     p4 <- ggplot(mat, aes(Type, TC))
+     p4 <- p4 + geom_boxplot(aes(colour = Type))
+     p4 <- p4 + geom_boxplot(aes(colour = Type))
+     p4 <- p4 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
+     p4 <- p4 + geom_text(data = means, aes(label = TC, y = TC + 0.08))
 
 
 
-               p  = plot_grid(p1,p2,p3,p4, labels=c("SP", "TC"), ncol = 2, nrow= 2)
+     p  = plot_grid(p1,p2,p3,p4, labels=c("SP", "TC"), ncol = 2, nrow= 2)
 
 
 
@@ -207,4 +208,58 @@ find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split 
 
    #+RESULTS:
    [[file:BalibaseSP_scores.jpeg]]
+
+
+
+* Part 2: parameter optimisation
+
+
+  Need a script to run kalign; balibase and return SP and TC scores.
+
+
+  #+BEGIN_SRC bash -n :tangle run_kalign_bali_score.sh :shebang #!/usr/bin/env bash
+    DIR=`pwd`
+    INFILE=""
+    ALNP=""
+
+    function usage()
+    {
+        printf "usage: $0 -i <test.fa> -a <alnpfile>"
+        exit 1;
+    }
+
+
+    while getopts i:a:  opt
+    do
+        case ${opt} in
+            a) ALNP=${OPTARG};;
+            i) INFILE=${OPTARG};;
+            ,*) usage;;
+        esac
+    done
+
+    if [ "${INFILE}" = "" ]; then usage; fi
+    if [ "${ALNP}" = "" ]; then usage; fi
+
+    programs=(kalign bali_score)
+
+    #printf "Running Sanity checks:\n";
+
+    for item in ${programs[*]}
+    do
+        if which $item >/dev/null; then
+            printf "%15s found.\n"  $item;
+        else
+            printf "\nERROR: %s not found!\n\n" $item;
+            exit 1;
+        fi
+    done
+    tmpfile=$(mktemp /tmp/kalign_aln.XXXXXX.msf)
+
+
+    kalign -alnp $ALNP $INFILE -o $tmpfile > /dev/null 2>&1
+    bali_score $INFILE  $tmpfile | grep auto 
+    rm "$tmpfile"
+
+  #+END_SRC
 

@@ -4,6 +4,8 @@
 int set_subm_gaps(struct parameters* param, struct aln_param* ap);
 
 int set_param_number(struct aln_param* ap,int L, int sel);
+int read_aln_param_from_file(struct aln_param* ap, char* infile, int L);
+
 struct aln_param* init_ap(struct parameters* param,int numseq,int L)
 {
         struct aln_param* ap = NULL;
@@ -34,12 +36,78 @@ struct aln_param* init_ap(struct parameters* param,int numseq,int L)
         }else{
                 set_param_number(ap, L, param->param_set);
         }
+        /* read parameters from file */
+        if(param->aln_param_file){
+                LOG_MSG("Reading parameters from file: %s", param->aln_param_file);
+                RUN(read_aln_param_from_file(ap, param->aln_param_file, L));
+        }
 
 
         return ap;
 ERROR:
         free_ap(ap);
         return NULL;
+}
+
+int read_aln_param_from_file(struct aln_param* ap, char* infile, int L)
+{
+        char line_buffer[BUFFER_LEN];
+        FILE* f_ptr = NULL;
+        double* values = NULL;
+        int i,j;
+        int m_pos;
+        double val = 0;
+
+        int expected;
+
+
+        expected = (L * (L-1)) / 2 + L + 3;
+
+        MMALLOC(values, sizeof(double) * expected); /* NEED to remove constant!!!  */
+
+        if(!my_file_exists(infile)){
+                ERROR_MSG("File: %s does not exist", infile);
+        }
+        RUNP( f_ptr = fopen(infile, "r"));
+
+        m_pos =0;
+        while (fgets(line_buffer , BUFFER_LEN, f_ptr)){
+                sscanf(line_buffer, "%lf", &val);
+                values[m_pos] = val;
+                m_pos++;
+                //fprintf(stdout,"%s", ret);
+        }
+
+        //fprintf(stdout,"-%s-", ret);
+
+
+        if(expected != m_pos){
+                ERROR_MSG("Expected number of parameters (%d) do not match number of parameters in file %s (%d)", expected,infile,m_pos);
+        }
+
+        m_pos = 0;
+        for (i = 0;i < L;i++){
+                for (j = 0;j <= i;j++){
+
+                        ap->subm[i][j] = values[m_pos];
+                        ap->subm[j][i] = ap->subm[i][j];
+                        m_pos++;
+                }
+        }
+
+        ap->gpo = values[m_pos];
+        m_pos++;
+        ap->gpe = values[m_pos];
+        m_pos++;
+
+        ap->tgpe = values[m_pos];
+
+        MFREE(values);
+        fclose(f_ptr);
+
+        return OK;
+ERROR:
+        return FAIL;
 }
 
 int set_param_number(struct aln_param* ap,int L, int sel)

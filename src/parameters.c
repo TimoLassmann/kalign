@@ -12,7 +12,7 @@ struct parameters* init_param(void)
 
         MMALLOC(param, sizeof(struct parameters));
         param->dist_method = KALIGNDIST_BPM;
-
+        param->aln_param_file = NULL;
         param->param_set = -1;
         param->infile = NULL;
         param->num_infiles = 0;

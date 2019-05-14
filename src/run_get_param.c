@@ -26,6 +26,7 @@ struct counts* init_counts(void);
 int clean_counts(struct counts* ap);
 int normalize_counts(struct counts*ap);
 int print_counts(struct counts* ap);
+int print_counts_to_file(struct counts* ap,char* out);
 int print_counts_flat(struct counts* ap,double* raw);
 int fill_counts(struct counts* ap, struct alignment* aln);
 int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len);
@@ -43,27 +44,32 @@ int main(int argc, char *argv[])
         int i,j;
         int num_infiles = 0;
         char** infile = NULL;
+        char* outfile = NULL;
         int c = 0;
 
         int print_all = 0;
         //int help = 0;
         while (1){
                 static struct option long_options[] ={
+                        {"out",  required_argument, 0, 'o'},
                         {"all",0,0,'a'},
                         {"help",0,0,'h'},
                         {0, 0, 0, 0}
                 };
                 int option_index = 0;
-                c = getopt_long_only (argc, argv,"ha",long_options, &option_index);
+                c = getopt_long_only (argc, argv,"hao:",long_options, &option_index);
 
                 if (c == -1){
                         break;
                 }
                 switch(c) {
+                case 'o':
+                        outfile = optarg;
+                        break;
+
                 case 'a':
                         print_all = 1;
                         break;
-
 
                 case 'h':
                         //help = 1;
@@ -183,6 +189,9 @@ int main(int argc, char *argv[])
                         free_aln(aln);
                 }
                 normalize_counts(ap);
+                if(outfile){
+                        print_counts_to_file(ap, outfile);
+                }
                 print_counts(ap);
                 print_probabilies(ap);
         }
@@ -496,6 +505,36 @@ int print_counts_flat(struct counts* ap,double* raw)
         c++;
 
         return OK;
+}
+
+int print_counts_to_file(struct counts* ap,char* out)
+{
+        FILE* f_ptr = NULL;
+        int i,j;
+        double sum;
+        LOG_MSG("Open %s",out);
+        RUNP( f_ptr = fopen(out, "w"));
+        for(i = 0; i < ap->L;i++){
+                //fprintf(stdout,"%d",i);
+                for(j = 0; j <= i;j++){
+                        sum = log2(ap->emit[i][j] / ( ap->back[i] * ap->back[j])) + log2(ap->MM/((ap->eta)*(ap->eta)));
+                        fprintf(f_ptr,"%f\n",sum);;
+                }
+
+        }
+        sum = 0.0;
+
+        sum = -1.0 * log2( (ap->GPO * ap->TM) / ((ap->eta) * ap->MM));
+        fprintf(f_ptr,"%f\n", sum/ 2.0);
+        sum = -1.0 *log2(ap->GPE/(1.0 - ap->tau));
+        fprintf(f_ptr,"%f\n", sum);
+        sum = -1.0 *log2(ap->TGPE/(1.0 - ap->tau));
+        fprintf(f_ptr,"%f\n", sum);
+
+        fclose(f_ptr);
+        return OK;
+ERROR:
+        return FAIL;
 }
 
 int print_counts(struct counts* ap)

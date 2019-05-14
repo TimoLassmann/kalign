@@ -11,6 +11,7 @@ struct parameters{
         char *input;
         char *outfile;
         char* format;
+        char* aln_param_file;
         //int reformat;
         /* char* feature_type; */
         /* char* alignment_type; */
