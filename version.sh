@@ -1,5 +1,4 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
 VERSION=
 inside_git_repo=
 
