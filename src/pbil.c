@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
         int num_threads = 5;
         struct thr_pool* pool;
         RUNP(pool = thr_pool_create(num_threads, num_threads, 0, 0));
-        RUNP(d = init_pbil_data(234, 16, 1000, 100, 1));
+        RUNP(d = init_pbil_data(234, 16, 1000, 10, 1));
 
         if(seedfile){
 
@@ -406,6 +406,14 @@ int mutate_prob_vector(struct pbil_data* d)
 
                         d->bit_prob[i] = d->bit_prob[i] * (1.0 - d->bit_mutation_shift) + r * d->bit_mutation_shift;
                 }
+
+
+                if(d->bit_prob[i] <= 0.0){
+                        d->bit_prob[i] = 0.00001;
+                }
+                if(d->bit_prob[i] >= 1.0){
+                        d->bit_prob[i] = 0.99999;
+                }
         }
         return OK;
 }
@@ -556,6 +564,15 @@ int init_pop_from_seed(struct pbil_data*d, char* infile)
         double r;
         double tmp;
         RUN(read_aln_param_from_file(d,infile));
+
+        for(i = 0; i < d->num_param;i++){
+                d->min[i] = d->population[0]->param[i] - 1.0;
+                d->max[i] = d->population[0]->param[i] + 1.0;
+                d->step[i] = (1 << d->bits_per_param) -1;
+
+                d->step[i] = (d->max[i] - d->min[i]) / d->step[i];
+
+        }
 
         for(i = 0; i < d->num_param;i++){
                 tmp = d->population[0]->param[i] - d->min[i];
