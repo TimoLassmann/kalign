@@ -10,7 +10,7 @@
 
 
 #include "tldevel.h"
-
+#include "rng.h"
 
 
 extern int byg_detect(uint8_t* text,int n);
@@ -18,7 +18,7 @@ extern int byg_start(char* pattern,char*text);
 extern int byg_end(char* pattern,char*text);
 extern int byg_count(char* pattern,char*text);
 
-extern int shuffle_arr_r(int* arr,int n, struct drand48_data* randBuffer);
+extern int shuffle_arr_r(int* arr,int n, struct rng_state* rng);
 
 /* The following two hash functions are taken from the supplementary of: */
 

@@ -1,7 +1,7 @@
 
 
 #include "tldevel.h"
-
+#include "rng.h"
 #include <getopt.h>
 
 #include "thr_pool.h"
@@ -25,7 +25,9 @@ struct individual{
 
 struct pbil_data{
         struct individual** population;
-        struct drand48_data randBuffer;
+        struct rng_state* rng;
+
+        //struct drand48_data randBuffer;
         struct individual* best;
         double* bit_prob;
         double* min;
@@ -352,15 +354,15 @@ int random_score(struct pbil_data* d)
         int i;
         double r;
         for(i = 0; i < d->mu;i++){
-                RUN(drand48_r(&d->randBuffer, &r));
+                r =  tl_random_double(d->rng);
+                //RUN(drand48_r(&d->randBuffer, &r));
                 d->population[i]->score = r;
 
         }
 
         return OK;
-ERROR:
-        return FAIL;
 }
+
 int sample_pop(struct pbil_data* d)
 {
         int i,j;
@@ -371,7 +373,8 @@ int sample_pop(struct pbil_data* d)
                 }
 
                 for(j = 0; j < d->n_bits;j++){
-                        RUN(drand48_r(&d->randBuffer, &r));
+                        r = tl_random_double(d->rng);
+
                         //fprintf(stdout,"%f",r);
                         if(r <= d->bit_prob[j]){
                                 d->population[i]->code[j/d->bits_per_param] |= 1 << (j % d->bits_per_param);
@@ -388,8 +391,6 @@ int sample_pop(struct pbil_data* d)
                 //fprintf(stdout," %d\n",d->num_param);
         }
         return OK;
-ERROR:
-        return FAIL;
 }
 
 
@@ -400,9 +401,10 @@ int mutate_prob_vector(struct pbil_data* d)
         int i;
         double r;
         for(i = 0; i < d->n_bits;i++){
-                drand48_r(&d->randBuffer, &r);
+                r = tl_random_double(d->rng);
+                //drand48_r(&d->randBuffer, &r);
                 if(r < d->bit_mutation_prob){
-                        drand48_r(&d->randBuffer, &r);
+                        r = tl_random_double(d->rng);
 
                         d->bit_prob[i] = d->bit_prob[i] * (1.0 - d->bit_mutation_shift) + r * d->bit_mutation_shift;
                 }
@@ -461,7 +463,7 @@ struct pbil_data* init_pbil_data(int num_param,int num_bits,int num_gen,int samp
                 d->step[i] = (d->max[i] - d->min[i]) / d->step[i];
 
         }
-        srand48_r(time(NULL), &d->randBuffer);
+        //srand48_r(time(NULL), &d->randBuffer);
         for(i = 0; i < d->n_bits;i++){
                 d->bit_prob[i] = 0.5f;
         }
@@ -560,7 +562,6 @@ int sort_pop_by_score(const void *a, const void *b)
 int init_pop_from_seed(struct pbil_data*d, char* infile)
 {
         int i,j;
-        int c;
         double r;
         double tmp;
         RUN(read_aln_param_from_file(d,infile));
@@ -607,7 +608,7 @@ int init_pop_from_seed(struct pbil_data*d, char* infile)
         }
 
         for(j = 0; j < d->n_bits;j++){
-                RUN(drand48_r(&d->randBuffer, &r));
+                r = tl_random_double(d->rng);
                 //fprintf(stdout,"%f\n", d->bit_prob[j]);
                 if(r <= d->bit_prob[j]){
                         d->population[i]->code[j/d->bits_per_param] |= 1 << (j % d->bits_per_param);

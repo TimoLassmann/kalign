@@ -5,7 +5,8 @@
 #include "parameters.h"
 #include "misc.h"
 struct aln_param{
-        struct drand48_data randBuffer;
+        struct rng_state* rng;
+        //struct drand48_data randBuffer;
         float** subm;
         float gpo;
         float gpe;

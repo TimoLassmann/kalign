@@ -1,7 +1,10 @@
 EXTRA_DIST = version.sh autogen.sh VERSION
 
+ACLOCAL_AMFLAGS = -I m4
+
 # Build the library in the hand subdirectory first
 LIB_TLDEVELDIR = @LIB_TLDEVELDIR@
+
 
 # top_builddir = @top_builddir@
 

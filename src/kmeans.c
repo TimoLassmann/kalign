@@ -18,13 +18,16 @@ double** kmeans(double** data,int* cluster_assignment, int len_a,int len_b, int 
         int change;
         int num_attempts = 10000;
         int a_item;
-        struct drand48_data randBuffer;
+
+        struct rng_state* rng;
         int* sel = NULL;
         double* n_item = NULL;
 
         ASSERT(k > 0,"K needs to be greater than one");
         ASSERT(k < len_a,"K larger than number of items");
-        srand48_r(time(NULL), &randBuffer);
+
+        RUN(rng = init_rng(0));
+        //srand48_r(time(NULL), &randBuffer);
 
 
         sel = galloc(sel,len_a);
@@ -53,7 +56,7 @@ double** kmeans(double** data,int* cluster_assignment, int len_a,int len_b, int 
                         }
                 }
                 /* shuffle to select first k means */
-                shuffle_arr_r(sel, len_a, &randBuffer);
+                shuffle_arr_r(sel, len_a,rng);
 
 
                 /* initial selection  */

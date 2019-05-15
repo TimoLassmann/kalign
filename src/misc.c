@@ -242,13 +242,14 @@ uint16_t circ_hash_next(const uint_fast8_t * x,const uint_fast8_t length,const u
         return h;
 }
 
-int shuffle_arr_r(int* arr,int n, struct drand48_data* randBuffer)
+int shuffle_arr_r(int* arr,int n, struct rng_state* rng)
 {
-        long int r;
+        int r;
         int i,j;
         int tmp;
         for (i = 0; i < n - 1; i++) {
-                lrand48_r(randBuffer,&r);
+                r = tl_random_int(rng,n);
+                //lrand48_r(randBuffer,&r);
                 j = i +  r % (n-i);
                 tmp = arr[j];
                 arr[j] = arr[i];

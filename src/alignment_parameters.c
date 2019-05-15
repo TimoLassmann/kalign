@@ -22,7 +22,8 @@ struct aln_param* init_ap(struct parameters* param,int numseq,int L)
         }
         ap->subm = NULL;
 
-        srand48_r(time(NULL), &ap->randBuffer);
+        RUNP(ap->rng = init_rng(0));
+        //srand48_r(time(NULL), &ap->randBuffer);
         MMALLOC(ap->subm,sizeof (float*) * 32);
         for (i = 32;i--;){
                 ap->subm[i] = NULL;

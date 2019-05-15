@@ -21,7 +21,7 @@ struct node* alloc_node(void);
 int label_internal(struct node*n, int label);
 int* readbitree(struct node* p,int* tree);
 void printTree(struct node* curr,int depth);
-struct node* bisecting_kmeans(struct alignment*aln, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct drand48_data* randBuffer);
+struct node* bisecting_kmeans(struct alignment*aln, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct rng_state* rng);
 
 float** pair_wu_fast_dist(struct alignment* aln, struct aln_param* ap, int* num_anchors);
 
@@ -44,7 +44,7 @@ int random_tree(struct aln_param* ap, int numseq)
                 selection[i] = i;
         }
 
-        shuffle_arr_r(selection, numseq, &ap->randBuffer);
+        shuffle_arr_r(selection, numseq, ap->rng);
 
         c = numseq;
         g = numseq;
@@ -75,7 +75,7 @@ int random_tree(struct aln_param* ap, int numseq)
                 fprintf(stdout,"\n");*/
 
                 g--;
-                shuffle_arr_r(selection, g, &ap->randBuffer);
+                shuffle_arr_r(selection, g, ap->rng);
 
                 c++;
 
@@ -180,7 +180,7 @@ int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln
 
 
 
-        RUNP(root = bisecting_kmeans(aln,root, dm, samples, numseq, num_anchors, numseq, &ap->randBuffer));
+        RUNP(root = bisecting_kmeans(aln,root, dm, samples, numseq, num_anchors, numseq, ap->rng));
 
 //        MFREE(samples);
         label_internal(root, numseq);
@@ -267,9 +267,9 @@ ERROR:
 }
 
 
-struct node* bisecting_kmeans(struct alignment*aln, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct drand48_data* randBuffer)
+struct node* bisecting_kmeans(struct alignment*aln, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct rng_state* rng)
 {
-        long int r;
+        int r;
         int* sl = NULL;
         int* sr = NULL;
         int num_l,num_r;
@@ -344,8 +344,9 @@ struct node* bisecting_kmeans(struct alignment*aln, struct node* n, float** dm,i
                 w[j] /= num_samples;
         }
 
-        lrand48_r(randBuffer, &r);
-        r = r % num_samples;
+        r = tl_random_int(rng  , num_samples);
+
+
         s = samples[r];
         //LOG_MSG("Selected %d\n",s);
         for(j = 0; j < num_anchors;j++){
@@ -392,9 +393,9 @@ struct node* bisecting_kmeans(struct alignment*aln, struct node* n, float** dm,i
                 MFREE(samples);
                 n = alloc_node();
                 //n->left = alloc_node();
-                RUNP(n->left = bisecting_kmeans(aln,n->left, dm, sl, numseq, num_anchors, num_l,randBuffer));
+                RUNP(n->left = bisecting_kmeans(aln,n->left, dm, sl, numseq, num_anchors, num_l,rng));
                 //n->right = alloc_node();
-                RUNP(n->right = bisecting_kmeans(aln,n->right, dm, sr, numseq, num_anchors, num_r,randBuffer));
+                RUNP(n->right = bisecting_kmeans(aln,n->right, dm, sr, numseq, num_anchors, num_r,rng));
                 return n;
         }
 
@@ -534,9 +535,9 @@ struct node* bisecting_kmeans(struct alignment*aln, struct node* n, float** dm,i
         MFREE(samples);
         n = alloc_node();
         //n->left = alloc_node();
-        RUNP(n->left = bisecting_kmeans(aln,n->left, dm, sl, numseq, num_anchors, num_l,randBuffer));
+        RUNP(n->left = bisecting_kmeans(aln,n->left, dm, sl, numseq, num_anchors, num_l,rng));
         //n->right = alloc_node();
-        RUNP(n->right = bisecting_kmeans(aln,n->right, dm, sr, numseq, num_anchors, num_r,randBuffer));
+        RUNP(n->right = bisecting_kmeans(aln,n->right, dm, sr, numseq, num_anchors, num_r,rng));
 
 
         return n;
