@@ -155,6 +155,13 @@ int main(int argc, char *argv[])
                 print_help(argv);
                 return EXIT_SUCCESS;
         }
+
+        if(!outfile){
+                print_help(argv);
+                ERROR_MSG("no outfile suffix - use -o <>");
+
+        }
+        num_infiles = 0;
         if (optind < argc){
 
                 //fprintf(stderr,"EXTRA :%d\n",argc - optind);
@@ -166,10 +173,24 @@ int main(int argc, char *argv[])
                         c++;
                 }
         }
+
+        if(!num_infiles){
+                print_help(argv);
+                ERROR_MSG("No input files found");
+
+        }
+
+
         RUNP(pool = thr_pool_create(num_threads, num_threads, 0, 0));
 
         num_param = (ALPHABET_LEN * (ALPHABET_LEN-1)) / 2 + ALPHABET_LEN + 3;
 
+        LOG_MSG("Starting run with parameters:");
+
+        LOG_MSG("%d generations.", n_gen);
+        LOG_MSG("%d popsize.", mu);
+        LOG_MSG("%d keep.", lambda);
+        LOG_MSG("%d threads.", num_threads);
         RUNP(d = init_pbil_data(num_param, 16, n_gen, mu, lambda));
 
         if(seedfile){
@@ -197,12 +218,15 @@ int main(int argc, char *argv[])
 
         return EXIT_SUCCESS;
 ERROR:
+        if(infile){
+                MFREE(infile);
+        }
         return EXIT_FAILURE;
 }
 
 int print_help(char **argv)
 {
-        const char usage[] = "  < *.xml | *.msf > -out <outfile>";
+        const char usage[] = "  < *.xml | *.msf > -o <outfile suffix>";
         fprintf(stdout,"\nUsage: %s [-options] %s\n\n",basename(argv[0]) ,usage);
         fprintf(stdout,"Options:\n\n");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--ngen","Number of generations." ,"[1000]"  );
@@ -363,15 +387,14 @@ int update_pbil(struct pbil_data* d)
                 sum += d->population[i]->score;
         }
 
-        fprintf(stdout,"average:%f\n",sum / (double) d->lambda);
+        //fprintf(stdout,"average:%f\n",sum / (double) d->lambda);
         if(d->population[0]->score > d->best->score){
 
                 for(i = 0; i < d->num_param;i++){
                         d->best->param[i] = d->population[0]->param[i];
                 }
                 d->best->score =d->population[0]->score;
-
-                fprintf(stdout,"New best: %f\t",d->best->score);
+                LOG_MSG("Found new best: %f.",d->best->score);
         }
         f = 0;
         for(j= 0 ;j < d->num_param;j++){
@@ -409,40 +432,40 @@ int print_best(struct pbil_data* d,char* out)
 
         snprintf(buffer, BUFFER_LEN, "%s_flat.txt", out);
 
-        LOG_MSG("Open %s",buffer);
+        //LOG_MSG("Open %s",buffer);
         RUNP( f_ptr = fopen(buffer, "w"));
         for( i = 0; i < d->num_param;i++){
 
-                fprintf(stdout,"%f\n", d->best->param[i]);
+                fprintf(f_ptr,"%f\n", d->best->param[i]);
         }
         fflush(f_ptr);
         fclose(f_ptr);
 
         snprintf(buffer, BUFFER_LEN, "%s_arr.txt", out);
 
-        LOG_MSG("Open %s",buffer);
+        //LOG_MSG("Open %s",buffer);
         RUNP( f_ptr = fopen(buffer, "w"));
-        fprintf(stdout,"float balimt[]={\n");
+        fprintf(f_ptr,"float balimt[]={\n");
         c =0;
         for(i = 0; i < ALPHABET_LEN;i++){
                 //fprintf(stdout,"%d",i);
                 for(j = 0; j <= i;j++){
 
 
-                        fprintf(stdout," %f,",d->best->param[c]);
+                        fprintf(f_ptr," %f,",d->best->param[c]);
                         c++;
                 }
-                fprintf(stdout,"\n");
+                fprintf(f_ptr,"\n");
         }
-        fprintf(stdout,"};\n");
+        fprintf(f_ptr,"};\n");
 
-        fprintf(stdout,"ap->gpo = %f;\n", d->best->param[c]);
+        fprintf(f_ptr,"ap->gpo = %f;\n", d->best->param[c]);
         c++;
 
-        fprintf(stdout,"ap->gpe =  %f;\n", d->best->param[c]);
+        fprintf(f_ptr,"ap->gpe =  %f;\n", d->best->param[c]);
         c++;
 
-        fprintf(stdout,"ap->tgpe =  %f;\n", d->best->param[c]);
+        fprintf(f_ptr,"ap->tgpe =  %f;\n", d->best->param[c]);
         c++;
         fflush(f_ptr);
         fclose(f_ptr);
@@ -590,6 +613,8 @@ struct pbil_data* init_pbil_data(int num_param,int num_bits,int num_gen,int samp
                 MMALLOC(d->population[i]->code, sizeof(unsigned int) * num_param);
                 MMALLOC(d->population[i]->param, sizeof(double) * num_param);
         }
+
+        RUNP(d->rng = init_rng(0));
         return d;
 ERROR:
         free_pbil_data(d);
@@ -611,6 +636,7 @@ void free_pbil_data(struct pbil_data* d)
                         MFREE(d->population);
                 }
                 MFREE(d->bit_prob);
+                MFREE(d->rng);
                 MFREE(d);
         }
 }
@@ -673,6 +699,17 @@ int init_pop_from_seed(struct pbil_data*d, char* infile)
         for(i = 0; i < d->num_param;i++){
                 d->min[i] = d->population[0]->param[i] - 1.0;
                 d->max[i] = d->population[0]->param[i] + 1.0;
+                d->step[i] = (1 << d->bits_per_param) -1;
+
+                d->step[i] = (d->max[i] - d->min[i]) / d->step[i];
+
+        }
+        for(i = d->num_param -3; i < d->num_param;i++){
+                d->min[i] = d->population[0]->param[i] - 1.0;
+                d->max[i] = d->population[0]->param[i] + 1.0;
+                if(d->min[i] < 0.0){
+                        d->min[i] = 0.0;
+                }
                 d->step[i] = (1 << d->bits_per_param) -1;
 
                 d->step[i] = (d->max[i] - d->min[i]) / d->step[i];
