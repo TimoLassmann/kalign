@@ -6,8 +6,7 @@
 
 #include "thr_pool.h"
 
-
-
+#define ALPHABET_LEN 21
 
 struct thread_data{
         char* in;
@@ -26,8 +25,6 @@ struct individual{
 struct pbil_data{
         struct individual** population;
         struct rng_state* rng;
-
-        //struct drand48_data randBuffer;
         struct individual* best;
         double* bit_prob;
         double* min;
@@ -54,10 +51,13 @@ int write_kalign_parameter_files(struct pbil_data* d);
 int update_pbil(struct pbil_data* d);
 int mutate_prob_vector(struct pbil_data* d);
 
+int print_best(struct pbil_data* d, char* out);
+
+
 /* Misc  */
 unsigned int BinaryToGray(unsigned int num);
 unsigned int GrayToBinary32(unsigned int num);
-
+int print_help(char **argv);
 /* objective function */
 int eval(struct pbil_data* d,char** infile, int num_infiles,struct thr_pool* pool);
 void* run_kalign_thread(void *threadarg);
@@ -74,12 +74,21 @@ int random_score(struct pbil_data* d);
 
 int sort_pop_by_score(const void *a, const void *b);
 
+
+#define OPT_NGEN 1
+#define OPT_MU 2
+#define OPT_LAMBDA 3
+#define OPT_NTHREADS 4
+
 int main(int argc, char *argv[])
 {
         int i;
         //double SP,TC;
-
+        int num_param;
         struct pbil_data* d = NULL;
+
+        struct thr_pool* pool;
+
 
 
         int num_infiles = 0;
@@ -87,11 +96,21 @@ int main(int argc, char *argv[])
         char* outfile = NULL;
         char* seedfile = NULL;
         int c = 0;
+        int n_gen,mu,lambda,num_threads,help;
 
-
+        n_gen = 1000;
+        mu = 100;
+        lambda = 1;
+        num_threads = 8;
+        help = 0;
+        print_program_header(argv, "Optimises alignment parameters.");
         //int help = 0;
         while (1){
                 static struct option long_options[] ={
+                        {"ngen",  required_argument, 0, OPT_NGEN},
+                        {"popsize",  required_argument, 0, OPT_MU},
+                        {"keep",  required_argument, 0, OPT_LAMBDA},
+                        {"nthreads",  required_argument, 0, OPT_NTHREADS},
                         {"seed",  required_argument, 0, 's'},
                         {"out",  required_argument, 0, 'o'},
                         {"help",0,0,'h'},
@@ -104,7 +123,18 @@ int main(int argc, char *argv[])
                         break;
                 }
                 switch(c) {
-
+                case OPT_NGEN:
+                        n_gen= atoi(optarg);
+                        break;
+                case OPT_MU:
+                        mu = atoi(optarg);
+                        break;
+                case OPT_LAMBDA:
+                        lambda = atoi(optarg);
+                        break;
+                case OPT_NTHREADS:
+                        num_threads = atoi(optarg);
+                        break;
                 case 's':
                         seedfile = optarg;
                         break;
@@ -112,7 +142,8 @@ int main(int argc, char *argv[])
                         outfile = optarg;
                         break;
                 case 'h':
-                        //help = 1;
+
+                        help = 1;
                         break;
                 default:
                         ERROR_MSG("not recognized");
@@ -120,7 +151,10 @@ int main(int argc, char *argv[])
                 }
         }
 
-
+        if(help){
+                print_help(argv);
+                return EXIT_SUCCESS;
+        }
         if (optind < argc){
 
                 //fprintf(stderr,"EXTRA :%d\n",argc - optind);
@@ -132,15 +166,14 @@ int main(int argc, char *argv[])
                         c++;
                 }
         }
-        int num_threads = 5;
-        struct thr_pool* pool;
         RUNP(pool = thr_pool_create(num_threads, num_threads, 0, 0));
-        RUNP(d = init_pbil_data(234, 16, 1000, 10, 1));
+
+        num_param = (ALPHABET_LEN * (ALPHABET_LEN-1)) / 2 + ALPHABET_LEN + 3;
+
+        RUNP(d = init_pbil_data(num_param, 16, n_gen, mu, lambda));
 
         if(seedfile){
-
                 RUN(init_pop_from_seed(d, seedfile));
-
         }
         //d->lambda = 5;
 
@@ -154,6 +187,7 @@ int main(int argc, char *argv[])
 
                 RUN(update_pbil(d));
                 RUN(mutate_prob_vector(d));
+                RUN(print_best(d, outfile));
         }
 
 
@@ -164,6 +198,20 @@ int main(int argc, char *argv[])
         return EXIT_SUCCESS;
 ERROR:
         return EXIT_FAILURE;
+}
+
+int print_help(char **argv)
+{
+        const char usage[] = "  < *.xml | *.msf > -out <outfile>";
+        fprintf(stdout,"\nUsage: %s [-options] %s\n\n",basename(argv[0]) ,usage);
+        fprintf(stdout,"Options:\n\n");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--ngen","Number of generations." ,"[1000]"  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--popsize","Size of sampled population." ,"[100]"  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--keep","Number of best solutions to keep." ,"[1]"  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--nthreads","Number of threads." ,"[8]"  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--seed","File containing a starting solution." ,"[]"  );
+
+        return OK;
 }
 
 
@@ -347,6 +395,62 @@ int update_pbil(struct pbil_data* d)
                 }
         }
         return OK;
+}
+
+
+int print_best(struct pbil_data* d,char* out)
+{
+        char buffer[BUFFER_LEN];
+        FILE* f_ptr = NULL;
+        int i,j,c;
+
+
+        ASSERT(d != NULL, "No data");
+
+        snprintf(buffer, BUFFER_LEN, "%s_flat.txt", out);
+
+        LOG_MSG("Open %s",buffer);
+        RUNP( f_ptr = fopen(buffer, "w"));
+        for( i = 0; i < d->num_param;i++){
+
+                fprintf(stdout,"%f\n", d->best->param[i]);
+        }
+        fflush(f_ptr);
+        fclose(f_ptr);
+
+        snprintf(buffer, BUFFER_LEN, "%s_arr.txt", out);
+
+        LOG_MSG("Open %s",buffer);
+        RUNP( f_ptr = fopen(buffer, "w"));
+        fprintf(stdout,"float balimt[]={\n");
+        c =0;
+        for(i = 0; i < ALPHABET_LEN;i++){
+                //fprintf(stdout,"%d",i);
+                for(j = 0; j <= i;j++){
+
+
+                        fprintf(stdout," %f,",d->best->param[c]);
+                        c++;
+                }
+                fprintf(stdout,"\n");
+        }
+        fprintf(stdout,"};\n");
+
+        fprintf(stdout,"ap->gpo = %f;\n", d->best->param[c]);
+        c++;
+
+        fprintf(stdout,"ap->gpe =  %f;\n", d->best->param[c]);
+        c++;
+
+        fprintf(stdout,"ap->tgpe =  %f;\n", d->best->param[c]);
+        c++;
+        fflush(f_ptr);
+        fclose(f_ptr);
+
+
+        return OK;
+ERROR:
+        return FAIL;
 }
 
 int random_score(struct pbil_data* d)
