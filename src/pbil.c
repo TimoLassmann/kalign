@@ -14,6 +14,7 @@ struct thread_data{
         int param_index;
         double SP;
         double TC;
+        int job_number;
 };
 
 struct individual{
@@ -61,8 +62,8 @@ int print_help(char **argv);
 /* objective function */
 int eval(struct pbil_data* d,char** infile, int num_infiles,struct thr_pool* pool);
 void* run_kalign_thread(void *threadarg);
-int run_kalign_and_score(char* infile,char* p_file,double* SP, double* TC);
 
+int run_kalign_and_score(char* infile,char* p_file, double* SP, double* TC,char* name);
 
 /* seeding */
 int set_pbil_based_on_pop(struct pbil_data* d);
@@ -265,6 +266,7 @@ int eval(struct pbil_data* d,char** infile, int num_infiles,struct thr_pool* poo
                 td[i]->TC = 0.0;
                 td[i]->in = NULL;
                 td[i]->param = NULL;
+                td[i]->job_number = i;
         }
         c = 0;
         for(i = 0; i < num_infiles;i++){
@@ -305,13 +307,16 @@ ERROR:
 
 void* run_kalign_thread(void *threadarg)
 {
+        char buffer[32];
 
 
         struct thread_data *data;
         data = (struct thread_data *) threadarg;
         ASSERT(data != NULL, "No data");
+
+        snprintf(buffer, 32, "job%d.msf", data->job_number);
         //fprintf(stdout,"%s %s\n", data->in,data->param);
-        RUN(run_kalign_and_score(data->in, data->param, &data->SP, &data->TC));
+        RUN(run_kalign_and_score(data->in, data->param, &data->SP, &data->TC, buffer));
         return NULL;
 ERROR:
         return NULL;
@@ -641,14 +646,14 @@ void free_pbil_data(struct pbil_data* d)
         }
 }
 
-int run_kalign_and_score(char* infile,char* p_file, double* SP, double* TC)
+int run_kalign_and_score(char* infile,char* p_file, double* SP, double* TC,char* name)
 {
 
         FILE *pf;
-        char cmd[BUFFER_LEN];
+        char cmd[BUFFER_LEN+32];
         char ret[BUFFER_LEN];
 
-        snprintf(cmd, BUFFER_LEN, "run_kalign_bali_score.sh -a %s -i %s ",p_file, infile);
+        snprintf(cmd, BUFFER_LEN+32, "run_kalign_bali_score.sh -a %s -i %s -n %s",p_file, infile,name);
         // Execute a process listing
 
 

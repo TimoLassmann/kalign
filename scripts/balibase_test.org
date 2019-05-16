@@ -222,25 +222,28 @@ mat <- rbind(mat,readBaliscores("scores_kalign_alnp.csv","kalign alnp"));
     DIR=`pwd`
     INFILE=""
     ALNP=""
+    NAME=""
 
     function usage()
     {
-        printf "usage: $0 -i <test.fa> -a <alnpfile>"
+        printf "usage: $0 -i <test.fa> -a <alnpfile> -n <name>"
         exit 1;
     }
 
 
-    while getopts i:a:  opt
+    while getopts i:a:n:  opt
     do
         case ${opt} in
             a) ALNP=${OPTARG};;
             i) INFILE=${OPTARG};;
+            n) NAME=${OPTARG};;
             ,*) usage;;
         esac
     done
 
     if [ "${INFILE}" = "" ]; then usage; fi
     if [ "${ALNP}" = "" ]; then usage; fi
+    if [ "${NAME}" = "" ]; then usage; fi
 
     programs=(kalign bali_score)
 
@@ -255,7 +258,7 @@ mat <- rbind(mat,readBaliscores("scores_kalign_alnp.csv","kalign alnp"));
             exit 1;
         fi
     done
-    tmpfile=$(mktemp /tmp/kalign_aln.XXXXXX.msf)
+    tmpfile=$NAME 
 
 
     kalign -alnp $ALNP $INFILE -o $tmpfile > /dev/null 2>&1
