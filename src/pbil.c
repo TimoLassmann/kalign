@@ -8,13 +8,20 @@
 
 #define ALPHABET_LEN 21
 
-struct thread_data{
+struct jobs{
         char* in;
         char* param;
         int param_index;
         double SP;
         double TC;
         int job_number;
+};
+
+struct thread_data{
+        struct jobs** jobs;
+        int num_threads;
+        int num_jobs;
+        int id;
 };
 
 struct individual{
@@ -39,6 +46,7 @@ struct pbil_data{
         int lambda;             /* selected */
         int num_gen;
         int num_param;
+        int num_threads;
         double gamma;           /* learning rate */
 };
 
@@ -193,6 +201,7 @@ int main(int argc, char *argv[])
         LOG_MSG("%d keep.", lambda);
         LOG_MSG("%d threads.", num_threads);
         RUNP(d = init_pbil_data(num_param, 16, n_gen, mu, lambda));
+        d->num_threads = num_threads;
 
         if(seedfile){
                 RUN(init_pop_from_seed(d, seedfile));
@@ -242,6 +251,8 @@ int print_help(char **argv)
 
 int eval(struct pbil_data* d,char** infile, int num_infiles,struct thr_pool* pool)
 {
+
+        struct jobs** jobs = NULL;
         struct thread_data** td = NULL;
         char** param_file_name_buffer = NULL;
         int i,j,c;
@@ -258,43 +269,58 @@ int eval(struct pbil_data* d,char** infile, int num_infiles,struct thr_pool* poo
 
         num_jobs = num_infiles * d->mu;
 
-        MMALLOC(td, sizeof(struct thread_data*) * num_jobs);
+        MMALLOC(jobs, sizeof(struct jobs*) * num_jobs);
         for(i = 0; i < num_jobs;i++){
-                td[i] = NULL;
-                MMALLOC(td[i], sizeof(struct thread_data));
-                td[i]->SP = 0.0;
-                td[i]->TC = 0.0;
-                td[i]->in = NULL;
-                td[i]->param = NULL;
-                td[i]->job_number = i;
+                jobs[i] = NULL;
+                MMALLOC(jobs[i], sizeof(struct jobs));
+                jobs[i]->SP = 0.0;
+                jobs[i]->TC = 0.0;
+                jobs[i]->in = NULL;
+                jobs[i]->param = NULL;
+                jobs[i]->job_number = i;
         }
         c = 0;
         for(i = 0; i < num_infiles;i++){
 
                 for(j = 0; j < d->mu;j++){
-                        td[c]->in = infile[i];
-                        td[c]->param = param_file_name_buffer[j];
-                        td[c]->param_index = j;
+                        jobs[c]->in = infile[i];
+                        jobs[c]->param = param_file_name_buffer[j];
+                        jobs[c]->param_index = j;
                         c++;
                 }
         }
 
-        for(i = 0; i < num_jobs;i++){
+        MMALLOC(td, sizeof(struct thread_data*)* d->num_threads);
+
+        for(i = 0; i < d->num_threads;i++){
+                td[i] = NULL;
+                MMALLOC(td[i],sizeof(struct thread_data));
+                td[i]->id = i;
+                td[i]->jobs = jobs;
+                td[i]->num_jobs = num_jobs;
+                td[i]->num_threads = d->num_threads;
+        }
+
+
+
+        for(i = 0; i < d->num_threads ;i++){
                 if((status = thr_pool_queue(pool, run_kalign_thread, td[i])) == -1) ERROR_MSG("Adding job to queue failed.");
         }
         thr_pool_wait(pool);
         for(i = 0; i < num_jobs;i++){
                 //fprintf(stdout,"%s %s: %f %f\n",td[i]->in,td[i]->param,td[i]->SP,td[i]->TC);
-                d->population[td[i]->param_index]->score += td[i]->SP;
+                d->population[jobs[i]->param_index]->score += jobs[i]->SP;// td[i]->SP;
         }
         for(i = 0; i < d->mu;i++){
-
                 d->population[i]->score /= (double) num_infiles;
                 //fprintf(stdout,"SCORE: %d %f\n",i,d->population[i]->score);
         }
 
-
         for(i = 0; i < num_jobs;i++){
+                MFREE(jobs[i]);
+        }
+        MFREE(jobs);
+        for(i = 0; i < d->num_threads;i++){
                 MFREE(td[i]);
         }
         MFREE(td);
@@ -309,14 +335,26 @@ void* run_kalign_thread(void *threadarg)
 {
         char buffer[32];
 
-
+        struct jobs** jobs = NULL;
         struct thread_data *data;
+        int num_jobs;
+        int id;
+        int i;
         data = (struct thread_data *) threadarg;
         ASSERT(data != NULL, "No data");
 
-        snprintf(buffer, 32, "job%d.msf", data->job_number);
-        //fprintf(stdout,"%s %s\n", data->in,data->param);
-        RUN(run_kalign_and_score(data->in, data->param, &data->SP, &data->TC, buffer));
+        jobs = data->jobs;
+        num_jobs = data->num_jobs;
+        id = data->id;
+
+
+        for(i = 0; i < num_jobs;i++){
+                if(i % data->num_threads == id){
+                        snprintf(buffer, 32, "job%d.msf",  jobs[i]->job_number);
+                //fprintf(stdout,"%s %s\n", data->in,data->param);
+                        RUN(run_kalign_and_score(jobs[i]->in, jobs[i]->param, &jobs[i]->SP, &jobs[i]->TC, buffer));
+                }
+        }
         return NULL;
 ERROR:
         return NULL;
