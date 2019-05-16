@@ -1,6 +1,5 @@
 #include <xmmintrin.h>
 
-
 #include "sequence_distance.h"
 #include "bisectingKmeans.h"
 

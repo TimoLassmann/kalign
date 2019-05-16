@@ -1,6 +1,6 @@
 
 #include "euclidean_dist.h"
-
+#include "rng.h"
 #include <xmmintrin.h>
 #include <immintrin.h>
 #include "float.h"
@@ -13,7 +13,8 @@ float hsum_ps_sse3(__m128 v);
 #ifdef ITEST
 int main(int argc, char *argv[])
 {
-        struct drand48_data randBuffer;
+        struct rng_state* rng;
+
         float** mat = NULL;
         double r;
         float d1,d2;
