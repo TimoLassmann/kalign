@@ -245,19 +245,19 @@ mat <- rbind(mat,readBaliscores("scores_kalign_alnp.csv","kalign alnp"));
     if [ "${ALNP}" = "" ]; then usage; fi
     if [ "${NAME}" = "" ]; then usage; fi
 
-    programs=(kalign bali_score)
+    #programs=(kalign bali_score)
 
     #printf "Running Sanity checks:\n";
 
-    for item in ${programs[*]}
-    do
-        if which $item >/dev/null; then
-            printf "%15s found.\n"  $item;
-        else
-            printf "\nERROR: %s not found!\n\n" $item;
-            exit 1;
-        fi
-    done
+    # for item in ${programs[*]}
+    # do
+    #     if which $item >/dev/null; then
+    #         printf "%15s found.\n"  $item;
+    #     else
+    #         printf "\nERROR: %s not found!\n\n" $item;
+    #         exit 1;
+    #     fi
+    # done
     tmpfile=$NAME 
 
 
