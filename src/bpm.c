@@ -3,6 +3,7 @@
 #include <immintrin.h>
 #include  <stdalign.h>
 
+#include "rng.h"
 __m256i BROADCAST_MASK[16];
 
 
@@ -21,7 +22,7 @@ __m256i bitShiftRight256ymm (__m256i *data, int count);
 /* Functions needed for the unit test*/
 uint8_t dyn_256(const uint8_t* t,const uint8_t* p,int n,int m);
 uint8_t dyn_256_print(const uint8_t* t,const uint8_t* p,int n,int m);
-int  mutate_seq(uint8_t* s, int len,int k,int L, struct drand48_data* b);
+int  mutate_seq(uint8_t* s, int len,int k,int L, struct rng_state* rng);
 
 /* For debugging */
 void print_256(__m256i X);
@@ -46,7 +47,7 @@ int bpm_test(void)
 
         /* idea: start with identical sequences add errors run bpm */
         struct alphabet* alphabet = NULL;
-        struct drand48_data randBuffer;
+        struct rng_state* rng;
         //long int r;
         int len = 0;
         int i,j,c;
@@ -59,7 +60,7 @@ int bpm_test(void)
         int total_calc = 0;
         int dyn_score,bpm_score;
 
-        srand48_r(time(NULL), &randBuffer);
+        RUNP(rng = init_rng(0));
 
         RUNP(alphabet = create_alphabet(defPROTEIN));
 
@@ -87,7 +88,7 @@ int bpm_test(void)
         len =63; //could fix;
         for(i = 0; i < 10;i++){
                 for (j =0 ; j < test_iter; j++){
-                        RUN(mutate_seq(b,len,i,alphabet->L,&randBuffer));
+                        RUN(mutate_seq(b,len,i,alphabet->L,rng));
                         dyn_score = dyn_256(a,b,len,len);
                         bpm_score = bpm(a,b,len,len);
 
@@ -139,7 +140,7 @@ int bpm_test(void)
         total_calc = 0;
         for(i = 0; i < 10;i++){
                 for (j =0 ; j < test_iter; j++){
-                        RUN(mutate_seq(b,len,i,alphabet->L,&randBuffer));
+                        RUN(mutate_seq(b,len,i,alphabet->L,rng));
                         dyn_score = dyn_256(a,b,len,len);
                         bpm_score = bpm_256(a,b,len,len);
 
@@ -196,7 +197,7 @@ int bpm_test(void)
         int timing_iter = 10000;
         DECLARE_TIMER(t);
         for(i = 0; i < 100;i+=5){
-                RUN(mutate_seq(b,len,i,alphabet->L,&randBuffer));
+                RUN(mutate_seq(b,len,i,alphabet->L,rng));
                 START_TIMER(t);
                 for(j = 0; j < timing_iter;j++){
                         dyn_score = dyn_256(a,b,len,len);
@@ -242,22 +243,22 @@ int bpm_test(void)
 
         MFREE(a);
         MFREE(b);
+        MFREE(rng);
         return OK;
 ERROR:
         return FAIL;
 }
 
-int  mutate_seq(uint8_t* s, int len,int k,int L, struct drand48_data* b)
+int  mutate_seq(uint8_t* s, int len,int k,int L, struct rng_state* rng)
 {
         int i,j;
-        long int r;
+        int r;
 
         for(i = 0; i < k;i++){
-                lrand48_r(b, &r);
-                r = r % len;
+                r = tl_random_int(rng,len);
+
                 j = r;
-                lrand48_r(b, &r);
-                r = r % L;
+                r = tl_random_int(rng,L);
                 s[j] = r;
         }
         return OK;
