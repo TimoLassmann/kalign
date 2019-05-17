@@ -1,6 +1,6 @@
 
 #include "euclidean_dist.h"
-
+#include "rng.h"
 #include <xmmintrin.h>
 #include <immintrin.h>
 #include "float.h"
@@ -13,7 +13,8 @@ float hsum_ps_sse3(__m128 v);
 #ifdef ITEST
 int main(int argc, char *argv[])
 {
-        struct drand48_data randBuffer;
+        struct rng_state* rng;
+
         float** mat = NULL;
         double r;
         float d1,d2;
@@ -28,13 +29,13 @@ int main(int argc, char *argv[])
                 mat[i] = _mm_malloc(sizeof(float)*num_element, 32);
         }
 
-
-        srand48_r(time(NULL), &randBuffer);
+        RUNP( rng =init_rng(0));
+        //srand48_r(time(NULL), &randBuffer);
 
         for(i =0; i < 1000;i++){
                 for(j = 0; j <num_element;j++){
-                        drand48_r(&randBuffer,&r);
-
+                        //drand48_r(&randBuffer,&r);
+                        r = tl_random_double(rng);
                         mat[i][j] = (float) r;
                 }
         }
@@ -86,6 +87,7 @@ int main(int argc, char *argv[])
         }
         MFREE(mat);
 
+        MFREE(rng);
         return EXIT_SUCCESS;
 ERROR:
         return EXIT_FAILURE;

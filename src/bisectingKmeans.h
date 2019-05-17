@@ -3,6 +3,7 @@
 
 #include "global.h"
 
+#include "rng.h"
 #include "alignment_parameters.h"
 
 

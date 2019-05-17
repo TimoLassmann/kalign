@@ -6,15 +6,22 @@
 
 #include "thr_pool.h"
 
+#define ALPHABET_LEN 21
 
-
-
-struct thread_data{
+struct jobs{
         char* in;
         char* param;
         int param_index;
         double SP;
         double TC;
+        int job_number;
+};
+
+struct thread_data{
+        struct jobs** jobs;
+        int num_threads;
+        int num_jobs;
+        int id;
 };
 
 struct individual{
@@ -26,8 +33,6 @@ struct individual{
 struct pbil_data{
         struct individual** population;
         struct rng_state* rng;
-
-        //struct drand48_data randBuffer;
         struct individual* best;
         double* bit_prob;
         double* min;
@@ -41,6 +46,7 @@ struct pbil_data{
         int lambda;             /* selected */
         int num_gen;
         int num_param;
+        int num_threads;
         double gamma;           /* learning rate */
 };
 
@@ -54,15 +60,18 @@ int write_kalign_parameter_files(struct pbil_data* d);
 int update_pbil(struct pbil_data* d);
 int mutate_prob_vector(struct pbil_data* d);
 
+int print_best(struct pbil_data* d, char* out);
+
+
 /* Misc  */
 unsigned int BinaryToGray(unsigned int num);
 unsigned int GrayToBinary32(unsigned int num);
-
+int print_help(char **argv);
 /* objective function */
 int eval(struct pbil_data* d,char** infile, int num_infiles,struct thr_pool* pool);
 void* run_kalign_thread(void *threadarg);
-int run_kalign_and_score(char* infile,char* p_file,double* SP, double* TC);
 
+int run_kalign_and_score(char* infile,char* p_file, double* SP, double* TC,char* name);
 
 /* seeding */
 int set_pbil_based_on_pop(struct pbil_data* d);
@@ -74,12 +83,21 @@ int random_score(struct pbil_data* d);
 
 int sort_pop_by_score(const void *a, const void *b);
 
+
+#define OPT_NGEN 1
+#define OPT_MU 2
+#define OPT_LAMBDA 3
+#define OPT_NTHREADS 4
+
 int main(int argc, char *argv[])
 {
         int i;
         //double SP,TC;
-
+        int num_param;
         struct pbil_data* d = NULL;
+
+        struct thr_pool* pool;
+
 
 
         int num_infiles = 0;
@@ -87,11 +105,21 @@ int main(int argc, char *argv[])
         char* outfile = NULL;
         char* seedfile = NULL;
         int c = 0;
+        int n_gen,mu,lambda,num_threads,help;
 
-
+        n_gen = 1000;
+        mu = 100;
+        lambda = 1;
+        num_threads = 8;
+        help = 0;
+        print_program_header(argv, "Optimises alignment parameters.");
         //int help = 0;
         while (1){
                 static struct option long_options[] ={
+                        {"ngen",  required_argument, 0, OPT_NGEN},
+                        {"popsize",  required_argument, 0, OPT_MU},
+                        {"keep",  required_argument, 0, OPT_LAMBDA},
+                        {"nthreads",  required_argument, 0, OPT_NTHREADS},
                         {"seed",  required_argument, 0, 's'},
                         {"out",  required_argument, 0, 'o'},
                         {"help",0,0,'h'},
@@ -104,7 +132,18 @@ int main(int argc, char *argv[])
                         break;
                 }
                 switch(c) {
-
+                case OPT_NGEN:
+                        n_gen= atoi(optarg);
+                        break;
+                case OPT_MU:
+                        mu = atoi(optarg);
+                        break;
+                case OPT_LAMBDA:
+                        lambda = atoi(optarg);
+                        break;
+                case OPT_NTHREADS:
+                        num_threads = atoi(optarg);
+                        break;
                 case 's':
                         seedfile = optarg;
                         break;
@@ -112,7 +151,8 @@ int main(int argc, char *argv[])
                         outfile = optarg;
                         break;
                 case 'h':
-                        //help = 1;
+
+                        help = 1;
                         break;
                 default:
                         ERROR_MSG("not recognized");
@@ -120,7 +160,17 @@ int main(int argc, char *argv[])
                 }
         }
 
+        if(help){
+                print_help(argv);
+                return EXIT_SUCCESS;
+        }
 
+        if(!outfile){
+                print_help(argv);
+                ERROR_MSG("no outfile suffix - use -o <>");
+
+        }
+        num_infiles = 0;
         if (optind < argc){
 
                 //fprintf(stderr,"EXTRA :%d\n",argc - optind);
@@ -132,15 +182,29 @@ int main(int argc, char *argv[])
                         c++;
                 }
         }
-        int num_threads = 5;
-        struct thr_pool* pool;
+
+        if(!num_infiles){
+                print_help(argv);
+                ERROR_MSG("No input files found");
+
+        }
+
+
         RUNP(pool = thr_pool_create(num_threads, num_threads, 0, 0));
-        RUNP(d = init_pbil_data(234, 16, 1000, 10, 1));
+
+        num_param = (ALPHABET_LEN * (ALPHABET_LEN-1)) / 2 + ALPHABET_LEN + 3;
+
+        LOG_MSG("Starting run with parameters:");
+
+        LOG_MSG("%d generations.", n_gen);
+        LOG_MSG("%d popsize.", mu);
+        LOG_MSG("%d keep.", lambda);
+        LOG_MSG("%d threads.", num_threads);
+        RUNP(d = init_pbil_data(num_param, 16, n_gen, mu, lambda));
+        d->num_threads = num_threads;
 
         if(seedfile){
-
                 RUN(init_pop_from_seed(d, seedfile));
-
         }
         //d->lambda = 5;
 
@@ -154,6 +218,7 @@ int main(int argc, char *argv[])
 
                 RUN(update_pbil(d));
                 RUN(mutate_prob_vector(d));
+                RUN(print_best(d, outfile));
         }
 
 
@@ -163,12 +228,31 @@ int main(int argc, char *argv[])
 
         return EXIT_SUCCESS;
 ERROR:
+        if(infile){
+                MFREE(infile);
+        }
         return EXIT_FAILURE;
+}
+
+int print_help(char **argv)
+{
+        const char usage[] = "  < *.xml | *.msf > -o <outfile suffix>";
+        fprintf(stdout,"\nUsage: %s [-options] %s\n\n",basename(argv[0]) ,usage);
+        fprintf(stdout,"Options:\n\n");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--ngen","Number of generations." ,"[1000]"  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--popsize","Size of sampled population." ,"[100]"  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--keep","Number of best solutions to keep." ,"[1]"  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--nthreads","Number of threads." ,"[8]"  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--seed","File containing a starting solution." ,"[]"  );
+
+        return OK;
 }
 
 
 int eval(struct pbil_data* d,char** infile, int num_infiles,struct thr_pool* pool)
 {
+
+        struct jobs** jobs = NULL;
         struct thread_data** td = NULL;
         char** param_file_name_buffer = NULL;
         int i,j,c;
@@ -185,42 +269,58 @@ int eval(struct pbil_data* d,char** infile, int num_infiles,struct thr_pool* poo
 
         num_jobs = num_infiles * d->mu;
 
-        MMALLOC(td, sizeof(struct thread_data*) * num_jobs);
+        MMALLOC(jobs, sizeof(struct jobs*) * num_jobs);
         for(i = 0; i < num_jobs;i++){
-                td[i] = NULL;
-                MMALLOC(td[i], sizeof(struct thread_data));
-                td[i]->SP = 0.0;
-                td[i]->TC = 0.0;
-                td[i]->in = NULL;
-                td[i]->param = NULL;
+                jobs[i] = NULL;
+                MMALLOC(jobs[i], sizeof(struct jobs));
+                jobs[i]->SP = 0.0;
+                jobs[i]->TC = 0.0;
+                jobs[i]->in = NULL;
+                jobs[i]->param = NULL;
+                jobs[i]->job_number = i;
         }
         c = 0;
         for(i = 0; i < num_infiles;i++){
 
                 for(j = 0; j < d->mu;j++){
-                        td[c]->in = infile[i];
-                        td[c]->param = param_file_name_buffer[j];
-                        td[c]->param_index = j;
+                        jobs[c]->in = infile[i];
+                        jobs[c]->param = param_file_name_buffer[j];
+                        jobs[c]->param_index = j;
                         c++;
                 }
         }
 
-        for(i = 0; i < num_jobs;i++){
+        MMALLOC(td, sizeof(struct thread_data*)* d->num_threads);
+
+        for(i = 0; i < d->num_threads;i++){
+                td[i] = NULL;
+                MMALLOC(td[i],sizeof(struct thread_data));
+                td[i]->id = i;
+                td[i]->jobs = jobs;
+                td[i]->num_jobs = num_jobs;
+                td[i]->num_threads = d->num_threads;
+        }
+
+
+
+        for(i = 0; i < d->num_threads ;i++){
                 if((status = thr_pool_queue(pool, run_kalign_thread, td[i])) == -1) ERROR_MSG("Adding job to queue failed.");
         }
         thr_pool_wait(pool);
         for(i = 0; i < num_jobs;i++){
                 //fprintf(stdout,"%s %s: %f %f\n",td[i]->in,td[i]->param,td[i]->SP,td[i]->TC);
-                d->population[td[i]->param_index]->score += td[i]->SP;
+                d->population[jobs[i]->param_index]->score += jobs[i]->SP;// td[i]->SP;
         }
         for(i = 0; i < d->mu;i++){
-
                 d->population[i]->score /= (double) num_infiles;
                 //fprintf(stdout,"SCORE: %d %f\n",i,d->population[i]->score);
         }
 
-
         for(i = 0; i < num_jobs;i++){
+                MFREE(jobs[i]);
+        }
+        MFREE(jobs);
+        for(i = 0; i < d->num_threads;i++){
                 MFREE(td[i]);
         }
         MFREE(td);
@@ -233,13 +333,28 @@ ERROR:
 
 void* run_kalign_thread(void *threadarg)
 {
+        char buffer[32];
 
-
+        struct jobs** jobs = NULL;
         struct thread_data *data;
+        int num_jobs;
+        int id;
+        int i;
         data = (struct thread_data *) threadarg;
         ASSERT(data != NULL, "No data");
-        //fprintf(stdout,"%s %s\n", data->in,data->param);
-        RUN(run_kalign_and_score(data->in, data->param, &data->SP, &data->TC));
+
+        jobs = data->jobs;
+        num_jobs = data->num_jobs;
+        id = data->id;
+
+
+        for(i = 0; i < num_jobs;i++){
+                if(i % data->num_threads == id){
+                        snprintf(buffer, 32, "job%d.msf",  jobs[i]->job_number);
+                //fprintf(stdout,"%s %s\n", data->in,data->param);
+                        RUN(run_kalign_and_score(jobs[i]->in, jobs[i]->param, &jobs[i]->SP, &jobs[i]->TC, buffer));
+                }
+        }
         return NULL;
 ERROR:
         return NULL;
@@ -315,15 +430,14 @@ int update_pbil(struct pbil_data* d)
                 sum += d->population[i]->score;
         }
 
-        fprintf(stdout,"average:%f\n",sum / (double) d->lambda);
+        //fprintf(stdout,"average:%f\n",sum / (double) d->lambda);
         if(d->population[0]->score > d->best->score){
 
                 for(i = 0; i < d->num_param;i++){
                         d->best->param[i] = d->population[0]->param[i];
                 }
                 d->best->score =d->population[0]->score;
-
-                fprintf(stdout,"New best: %f\t",d->best->score);
+                LOG_MSG("Found new best: %f.",d->best->score);
         }
         f = 0;
         for(j= 0 ;j < d->num_param;j++){
@@ -347,6 +461,62 @@ int update_pbil(struct pbil_data* d)
                 }
         }
         return OK;
+}
+
+
+int print_best(struct pbil_data* d,char* out)
+{
+        char buffer[BUFFER_LEN];
+        FILE* f_ptr = NULL;
+        int i,j,c;
+
+
+        ASSERT(d != NULL, "No data");
+
+        snprintf(buffer, BUFFER_LEN, "%s_flat.txt", out);
+
+        //LOG_MSG("Open %s",buffer);
+        RUNP( f_ptr = fopen(buffer, "w"));
+        for( i = 0; i < d->num_param;i++){
+
+                fprintf(f_ptr,"%f\n", d->best->param[i]);
+        }
+        fflush(f_ptr);
+        fclose(f_ptr);
+
+        snprintf(buffer, BUFFER_LEN, "%s_arr.txt", out);
+
+        //LOG_MSG("Open %s",buffer);
+        RUNP( f_ptr = fopen(buffer, "w"));
+        fprintf(f_ptr,"float balimt[]={\n");
+        c =0;
+        for(i = 0; i < ALPHABET_LEN;i++){
+                //fprintf(stdout,"%d",i);
+                for(j = 0; j <= i;j++){
+
+
+                        fprintf(f_ptr," %f,",d->best->param[c]);
+                        c++;
+                }
+                fprintf(f_ptr,"\n");
+        }
+        fprintf(f_ptr,"};\n");
+
+        fprintf(f_ptr,"ap->gpo = %f;\n", d->best->param[c]);
+        c++;
+
+        fprintf(f_ptr,"ap->gpe =  %f;\n", d->best->param[c]);
+        c++;
+
+        fprintf(f_ptr,"ap->tgpe =  %f;\n", d->best->param[c]);
+        c++;
+        fflush(f_ptr);
+        fclose(f_ptr);
+
+
+        return OK;
+ERROR:
+        return FAIL;
 }
 
 int random_score(struct pbil_data* d)
@@ -486,6 +656,8 @@ struct pbil_data* init_pbil_data(int num_param,int num_bits,int num_gen,int samp
                 MMALLOC(d->population[i]->code, sizeof(unsigned int) * num_param);
                 MMALLOC(d->population[i]->param, sizeof(double) * num_param);
         }
+
+        RUNP(d->rng = init_rng(0));
         return d;
 ERROR:
         free_pbil_data(d);
@@ -507,18 +679,19 @@ void free_pbil_data(struct pbil_data* d)
                         MFREE(d->population);
                 }
                 MFREE(d->bit_prob);
+                MFREE(d->rng);
                 MFREE(d);
         }
 }
 
-int run_kalign_and_score(char* infile,char* p_file, double* SP, double* TC)
+int run_kalign_and_score(char* infile,char* p_file, double* SP, double* TC,char* name)
 {
 
         FILE *pf;
-        char cmd[BUFFER_LEN];
+        char cmd[BUFFER_LEN+32];
         char ret[BUFFER_LEN];
 
-        snprintf(cmd, BUFFER_LEN, "run_kalign_bali_score.sh -a %s -i %s ",p_file, infile);
+        snprintf(cmd, BUFFER_LEN+32, "run_kalign_bali_score.sh -a %s -i %s -n %s",p_file, infile,name);
         // Execute a process listing
 
 
@@ -569,6 +742,17 @@ int init_pop_from_seed(struct pbil_data*d, char* infile)
         for(i = 0; i < d->num_param;i++){
                 d->min[i] = d->population[0]->param[i] - 1.0;
                 d->max[i] = d->population[0]->param[i] + 1.0;
+                d->step[i] = (1 << d->bits_per_param) -1;
+
+                d->step[i] = (d->max[i] - d->min[i]) / d->step[i];
+
+        }
+        for(i = d->num_param -3; i < d->num_param;i++){
+                d->min[i] = d->population[0]->param[i] - 1.0;
+                d->max[i] = d->population[0]->param[i] + 1.0;
+                if(d->min[i] < 0.0){
+                        d->min[i] = 0.0;
+                }
                 d->step[i] = (1 << d->bits_per_param) -1;
 
                 d->step[i] = (d->max[i] - d->min[i]) / d->step[i];

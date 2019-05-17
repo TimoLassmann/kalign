@@ -1,6 +1,6 @@
 #include "heap.h"
 
-
+#include "rng.h"
 
 int min (heap_t *h, int i, int j, int k);
 
@@ -8,23 +8,20 @@ int min (heap_t *h, int i, int j, int k);
 
 int main(int argc, char *argv[])
 {
-        struct drand48_data randBuffer;
+        struct rng_state* rng;
 
         int i,j;
-        long int r;
+
         int heap_size = 100;
 
 
-        srand48_r(time(NULL), &randBuffer);
-
+        RUNP(rng = init_rng(0));
         //lrand48_r(randBuffer, &r);
         //r = r % num_samples;
         heap_t* h = NULL;
         RUNP(h = create_heap(heap_size));
         for(i = 0; i < 10;i++){
-
-                lrand48_r(&randBuffer, &r);
-                j = r %100;
+                j = tl_random_int(rng,100);
                 push_heap(h, i,j);
 
         }
@@ -35,6 +32,7 @@ int main(int argc, char *argv[])
                 fprintf(stdout,"%d\t%d\n", i,j);
         }
         free_heap(h);
+        MFREE(rng);
         return EXIT_SUCCESS;
 
 ERROR:
