@@ -80,7 +80,7 @@
    | sh-4.4$ sh-4.4$ sh-4.4$ sh-4.4$ sh-4.4$ sh-4.4$ /home/user/data/bb3_release_tmp_aln |
 
    #+BEGIN_SRC sh :session onesh :results raw 
-     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign -alnp /home/user/code/kalign/dev/seed_param.txt %s -o %s/%s_%skalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_kalign.sh
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign  /home/user/code/kalign/dev/seed_param.txt %s -o %s/%s_%skalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_kalign.sh
 
      find ~/data/bb3_release -name "*.tfa"  | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "clustalo --dealign -i  %s --outfmt=msf -o %s/%s_%sclustalo.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_clustalo.sh
 
@@ -165,42 +165,42 @@ find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split 
    
 
    #+BEGIN_SRC R :session one :results output graphics :file BalibaseSP_scores.jpeg :exports both :width 160 :height 80
-     mat <- readBaliscores("scores_old_kalign.csv","kalign  old")
-     mat <- rbind(mat,readBaliscores("scores_kalign.csv","kalign new"));
-     mat <- rbind(mat,readBaliscores("scores_kalign_3.csv","kalign 3"));
-mat <- rbind(mat,readBaliscores("scores_kalign_alnp.csv","kalign alnp"));
-
-     ## mata
-     ## <- rbind(mat,readBaliscores("scores_kalign_bibpm.csv","bibpm"));
-     ## mat 
-     ## <- rbind(mat,readBaliscores("scores_kalign_bibpm_zero.csv","bibpm_zero"));
-
-
-     p1 <- ggplot(mat, aes(Group, SP))
-     p1 <- p1 + geom_boxplot(aes(colour = Type))
-
-     means <- aggregate(SP ~  Type, mat, mean)
-     means$SP <- round(means$SP,digits = 4)
-     p2 <- ggplot(mat, aes(Type, SP))
-     p2 <- p2 + geom_boxplot(aes(colour = Type))
-     p2 <- p2 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
-     p2 <- p2 + geom_text(data = means, aes(label = SP, y = SP + 0.08))
-
-     p3 <- ggplot(mat, aes(Group, TC))
-     p3 <- p3 + geom_boxplot(aes(colour = Type))
-
-     means <- aggregate(TC ~  Type, mat, mean)
-     means$TC <- round(means$TC,digits = 4)
-
-     p4 <- ggplot(mat, aes(Type, TC))
-     p4 <- p4 + geom_boxplot(aes(colour = Type))
-     p4 <- p4 + geom_boxplot(aes(colour = Type))
-     p4 <- p4 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
-     p4 <- p4 + geom_text(data = means, aes(label = TC, y = TC + 0.08))
+     
+      mat <- readBaliscores("scores_kalign_23.csv","kalign23");
+      mat <- rbind(mat,readBaliscores("scores_kalign_32.csv","kalign 32"));
+     ##      mat <- rbind(mat,readBaliscores("scores_kalign_3.csv","kalign 3"));
+     
+          ## mata
+          ## <- rbind(mat,readBaliscores("scores_kalign_bibpm.csv","bibpm"));
+          ## mat 
+          ## <- rbind(mat,readBaliscores("scores_kalign_bibpm_zero.csv","bibpm_zero"));
 
 
+          p1 <- ggplot(mat, aes(Group, SP))
+          p1 <- p1 + geom_boxplot(aes(colour = Type))
 
-     p  = plot_grid(p1,p2,p3,p4, labels=c("SP", "TC"), ncol = 2, nrow= 2)
+          means <- aggregate(SP ~  Type, mat, mean)
+          means$SP <- round(means$SP,digits = 4)
+          p2 <- ggplot(mat, aes(Type, SP))
+          p2 <- p2 + geom_boxplot(aes(colour = Type))
+          p2 <- p2 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
+          p2 <- p2 + geom_text(data = means, aes(label = SP, y = SP + 0.08))
+
+          p3 <- ggplot(mat, aes(Group, TC))
+          p3 <- p3 + geom_boxplot(aes(colour = Type))
+
+          means <- aggregate(TC ~  Type, mat, mean)
+          means$TC <- round(means$TC,digits = 4)
+
+          p4 <- ggplot(mat, aes(Type, TC))
+          p4 <- p4 + geom_boxplot(aes(colour = Type))
+          p4 <- p4 + geom_boxplot(aes(colour = Type))
+          p4 <- p4 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
+          p4 <- p4 + geom_text(data = means, aes(label = TC, y = TC + 0.08))
+
+
+
+          p  = plot_grid(p1,p2,p3,p4, labels=c("SP", "TC"), ncol = 2, nrow= 2)
 
 
 

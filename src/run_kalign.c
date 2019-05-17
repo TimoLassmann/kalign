@@ -229,7 +229,6 @@ int run_kalign(struct parameters* param)
                 build_tree(aln, param,ap);
                 clean_aln(aln);
 
-
                 for(i = 0; i < aln->num_profiles ;i++){
                         if(map[i]){
                                 MFREE(map[i]);
@@ -237,7 +236,6 @@ int run_kalign(struct parameters* param)
                 }
                 MFREE(map);
                 map = NULL;
-
 
                 LOG_MSG("Aligning");
                 START_TIMER(t1);

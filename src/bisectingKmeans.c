@@ -116,8 +116,6 @@ int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln
 
         numseq = aln->numseq;
 
-
-
         /* pick anchors . */
 
         RUNP(anchors = pick_anchor(aln, &num_anchors));
@@ -550,7 +548,7 @@ ERROR:
 struct node* upgma(float **dm,int* samples, int numseq)
 {
         struct node** tree = NULL;
-        struct node* tmp =NULL;
+        struct node* tmp = NULL;
 
         int i,j;
         int *as = NULL;
@@ -569,8 +567,7 @@ struct node* upgma(float **dm,int* samples, int numseq)
         }
 
         MMALLOC(tree,sizeof(struct node*)*numseq);
-        for (i=0;i < numseq;i++){
-
+        for (i = 0;i < numseq;i++){
                 tree[i] = NULL;
                 tree[i] = alloc_node();
                 tree[i]->id = samples[i];
@@ -616,8 +613,8 @@ struct node* upgma(float **dm,int* samples, int numseq)
                 dm[node_a][node_a] = 0.0f;
                 for (j = numseq;j--;){
                         dm[j][node_a] = dm[node_a][j];
-                        dm[j][node_b] = 0.0f;
-                        dm[node_b][j] = 0.0f;
+                        //           dm[j][node_b] = 0.0f;
+                        //dm[node_b][j] = 0.0f;
                 }
         }
         tmp = tree[node_a];
@@ -642,7 +639,7 @@ ERROR:
         return NULL;
 }
 
-int rec[1000006];
+
 
 int label_internal(struct node*n, int label)
 {
@@ -683,7 +680,8 @@ int* readbitree(struct node* p,int* tree)
         return tree;
 }
 
-
+/*
+int rec[1000006];
 void printTree(struct node* curr,int depth)
 {
         int i;
@@ -702,3 +700,4 @@ void printTree(struct node* curr,int depth)
         rec[depth]=0;
         printTree(curr->right,depth+1);
 }
+*/
