@@ -208,14 +208,12 @@ int main(int argc, char *argv[])
         }
         //d->lambda = 5;
 
-
         for(i = 0; i < d->num_gen;i++){
                 RUN(sample_pop(d));
 
                 RUN(write_kalign_parameter_files(d));
                 RUN(eval(d, infile, num_infiles, pool));
                 //random_score(d);
-
                 RUN(update_pbil(d));
                 RUN(mutate_prob_vector(d));
                 RUN(print_best(d, outfile));
@@ -300,8 +298,6 @@ int eval(struct pbil_data* d,char** infile, int num_infiles,struct thr_pool* poo
                 td[i]->num_jobs = num_jobs;
                 td[i]->num_threads = d->num_threads;
         }
-
-
 
         for(i = 0; i < d->num_threads ;i++){
                 if((status = thr_pool_queue(pool, run_kalign_thread, td[i])) == -1) ERROR_MSG("Adding job to queue failed.");

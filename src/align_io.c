@@ -135,7 +135,6 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
 
         /* convert to internal format  */
 
-
         RUN(convert_alignment_to_internal(aln, defPROTEIN));
 
 
