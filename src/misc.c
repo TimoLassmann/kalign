@@ -3,6 +3,7 @@
 #include "misc.h"
 #include  <stdalign.h>
 
+#include "rng.h"
 #ifdef ITEST_MISC
 
 #include "alphabet.h"
@@ -11,8 +12,7 @@
 
 int hash_test(void);
 
-int  mutate_seq(uint8_t* s, int len,int k,int L, struct drand48_data* b);
-
+//int  mutate_seq(uint8_t* s, int len,int k,int L, struct rng_state* rng);
 int main(int argc, char *argv[])
 {
         //int a = 2345;

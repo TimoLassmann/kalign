@@ -2010,7 +2010,7 @@ int hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hirs
 
 int foward_hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem* hm)
 {
-        unsigned int freq[32];
+        unsigned int freq[21];
 
         struct states* s = hm->f;
         register float pa = 0;
@@ -2145,7 +2145,7 @@ int foward_hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem
 
 int backward_hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem* hm)
 {
-        unsigned int freq[32];
+        unsigned int freq[21];
         struct states* s = hm->b;
         register float pa = 0;
         register float pga = 0;
