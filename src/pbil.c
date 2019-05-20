@@ -298,6 +298,7 @@ int fill_pair_hash(struct batch_train* bt)
         bt->ht = HT_INIT(TESTINT,1024);
         for(i = 0; i < bt->num_alignments;i++){
                 aln = bt->aln[i];
+                bt->num_pairs[i] = 0.0;
                 for(j = 0; j < aln->numseq;j++){
                         for(c = j+1;c < aln->numseq;c++){
                                 f = 0;
@@ -320,6 +321,7 @@ int fill_pair_hash(struct batch_train* bt)
                                                 tmp[3] = f;
                                                 tmp[4] = g;
                                                 RUN(HT_INSERT(TESTINT,bt->ht,tmp,NULL));
+                                                bt->num_pairs[i] += 1.0;
                                                 f++;
                                                 g++;
                                                 break;
