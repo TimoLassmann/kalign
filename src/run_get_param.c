@@ -98,6 +98,7 @@ int main(int argc, char *argv[])
                 /* get L */
                 RUNP(aln = read_alignment(infile[0]));
 
+
                 RUN(convert_alignment_to_internal(aln, defPROTEIN));
                 ap->L = aln->L;
                 int len = (ap->L *( ap->L-1)) / 2 + ap->L + 3;
@@ -181,7 +182,7 @@ int main(int argc, char *argv[])
                 for(i = 0; i < num_infiles;i++){
                         //fprintf(stdout,"%s\n",infile[i]);
                         RUNP(aln = read_alignment(infile[i]));
-
+                        //dealign(aln);
                         RUN(convert_alignment_to_internal(aln, defPROTEIN));
                         //fprintf(stdout,"%d L \n", aln->L);
                         RUN(fill_counts(ap, aln));

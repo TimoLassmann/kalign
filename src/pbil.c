@@ -1,12 +1,24 @@
 
 
+
 #include "tldevel.h"
 #include "rng.h"
 #include <getopt.h>
 
 #include "thr_pool.h"
 
+#include "hash_table.h"
+#include "align_io.h"
+#include "alignment_parameters.h"
+#include "estimate_aln_param.h"
+#include "tree_building.h"
+#include "bisectingKmeans.h"
+#include "alignment.h"
+#include "weave_alignment.h"
+#include "misc.h"
+
 #define ALPHABET_LEN 21
+
 
 struct jobs{
         char* in;
@@ -49,7 +61,18 @@ struct pbil_data{
         int num_threads;
         double gamma;           /* learning rate */
 };
+HT_GLOBAL_INIT(TESTINT, int*)
 
+struct batch_train{
+        struct alignment** aln; /* each element can be  */
+        struct pbil_data* pbil;
+        double** scores;        /* threads work on separate row */
+        double* num_pairs;
+        HT_TYPE(TESTINT )* ht;
+        int num_alignments;
+};
+
+int fill_pair_hash(struct batch_train* bt);
 /* Memory functions  */
 struct pbil_data* init_pbil_data(int num_param,int num_bits,int num_gen,int sampled, int selected);
 void free_pbil_data(struct pbil_data* d);
@@ -94,6 +117,8 @@ int main(int argc, char *argv[])
         int i;
         //double SP,TC;
         int num_param;
+
+        struct batch_train* bt = NULL;
         struct pbil_data* d = NULL;
 
         struct thr_pool* pool;
@@ -183,11 +208,27 @@ int main(int argc, char *argv[])
                 }
         }
 
+
         if(!num_infiles){
                 print_help(argv);
                 ERROR_MSG("No input files found");
 
         }
+
+        MMALLOC(bt, sizeof(struct batch_train));
+        bt->num_alignments = num_infiles;
+        bt->num_pairs = NULL;
+        bt->aln = NULL;
+        bt->scores = NULL;
+
+        MMALLOC(bt->aln, sizeof(struct alignment*)* bt->num_alignments);
+        MMALLOC(bt->num_pairs, sizeof(double) * bt->num_alignments);
+        for(i = 0; i < bt->num_alignments;i++){
+                RUNP(bt->aln[i] = read_alignment(infile[i]));
+                bt->num_pairs[i] = 0.0;
+        }
+        LOG_MSG("Read all alignments");
+        RUN(fill_pair_hash(bt));
 
 
         RUNP(pool = thr_pool_create(num_threads, num_threads, 0, 0));
@@ -246,6 +287,66 @@ int print_help(char **argv)
         return OK;
 }
 
+
+int fill_pair_hash(struct batch_train* bt)
+{
+        struct alignment* aln = NULL;
+        int i,j,c,f,g,a,res;
+        int* tmp;
+
+        bt->ht = NULL;
+        bt->ht = HT_INIT(TESTINT,1024);
+        for(i = 0; i < bt->num_alignments;i++){
+                aln = bt->aln[i];
+                for(j = 0; j < aln->numseq;j++){
+                        for(c = j+1;c < aln->numseq;c++){
+                                f = 0;
+                                g = 0;
+                                for(a = 0; a < aln->sl[0];a++){
+                                        res= 0;
+                                        if(isalpha(aln->seq[j][f])){
+                                                res |= 1;
+                                        }
+                                        if(isalpha(aln->seq[c][g])){
+                                                res |=2;
+                                        }
+                                        switch(res){
+                                        case 3:
+                                                tmp = NULL;
+                                                tmp= galloc(tmp,5);
+                                                tmp[0] = i;
+                                                tmp[1] = j;
+                                                tmp[2] = c;
+                                                tmp[3] = f;
+                                                tmp[4] = g;
+                                                RUN(HT_INSERT(TESTINT,bt->ht,tmp,NULL));
+                                                f++;
+                                                g++;
+                                                break;
+                                        case 2:
+                                                g++;
+                                                break;
+                                        case 1:
+                                                f++;
+                                                break;
+                                        default:
+                                                break;
+                                        }
+
+                                }
+
+                        }
+                }
+
+        }
+        HT_PRINT(TESTINT,bt->ht);
+
+        HT_FREE(TESTINT,bt->ht);
+        exit(0);
+        return OK;
+ERROR:
+        return FAIL;
+}
 
 int eval(struct pbil_data* d,char** infile, int num_infiles,struct thr_pool* pool)
 {
@@ -809,39 +910,6 @@ int init_pop_from_seed(struct pbil_data*d, char* infile)
         return OK;
 ERROR:
         return FAIL;
-}
-
-int read_aln_param_from_file(struct pbil_data*d, char* infile)
-{
-        char line_buffer[BUFFER_LEN];
-        FILE* f_ptr = NULL;
-
-
-        int m_pos;
-        double val = 0;
-
-
-
-        if(!my_file_exists(infile)){
-                ERROR_MSG("File: %s does not exist", infile);
-        }
-        RUNP( f_ptr = fopen(infile, "r"));
-
-        m_pos =0;
-        while (fgets(line_buffer , BUFFER_LEN, f_ptr)){
-                sscanf(line_buffer, "%lf", &val);
-                d->population[0]->param[m_pos] = val;
-                m_pos++;
-                //fprintf(stdout,"%s", ret);
-        }
-
-
-        fclose(f_ptr);
-
-        return OK;
-ERROR:
-        return FAIL;
-
 }
 
 

@@ -52,8 +52,6 @@ struct alphabet* create_alphabet(int type)
 
         for(i = 0; i < 128;i++){
                 a->to_internal[i] = -1;
-
-
         }
 
         for(i = 0; i < 32;i++){

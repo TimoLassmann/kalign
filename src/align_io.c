@@ -78,10 +78,12 @@ struct alignment* read_sequences_clustal(struct alignment* aln,char* string);
 struct alignment* read_sequences_stockholm(struct alignment* aln,char* string);
 
 
+
 struct alignment* read_alignment(char* infile)
 {
         struct alignment* aln = NULL;
         struct align_io_buffer* b = NULL;
+        int i;
         ASSERT(infile!= NULL, "No infile");
         RUNP(b = alloc_align_io_buffer(1)); /* this will allocate and extra buffer for stdin (param->num_profiles) */
         if(!my_file_exists(infile)){
@@ -92,6 +94,17 @@ struct alignment* read_alignment(char* infile)
         RUNP(aln = aln_alloc(b->numseq));
 
         RUN(read_all_aligned_sequences(aln, b));
+
+        aln->max_len = 0;
+        for(i = 0; i < aln->numseq;i++){
+                //fprintf(stdout,"LEN: %d %d\n",i,aln->sl[i]);
+                if(aln->sl[i] > aln->max_len){
+                        aln->max_len = aln->sl[i];
+                }
+
+        }
+        //LOG_MSG("%d",aln->max_len);
+        aln->gaps = galloc(aln->gaps,aln->numseq,aln->max_len+1,0);
 
         free_align_io_buffer(b);
         return aln;
@@ -157,6 +170,15 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
                 }
                 //fprintf(stderr,"Output file: %s, in %s format.\n",param->outfile,param->format);
         }
+
+        aln->max_len = 0;
+        for(i = 0; i < aln->numseq;i++){
+                if(aln->sl[i] > aln->max_len){
+                        aln->max_len = aln->sl[i];
+                }
+
+        }
+        aln->gaps = galloc(aln->gaps,aln->numseq,aln->max_len+1,0);
         /* translate to internal */
         free_align_io_buffer(b);
         return aln;
@@ -164,6 +186,31 @@ ERROR:
         free_align_io_buffer(b);
         free_aln(aln);
         return NULL;
+}
+
+int dealign(struct alignment* aln)
+{
+        int i;
+        int j;
+        int c;
+        for(i = 0; i < aln->numseq;i++){
+                //fprintf(stdout,"%s\n",aln->seq[i]);
+                c = 0;
+                for(j = 0; j < aln->sl[i];j++){
+                        if(isalpha(aln->seq[i][j])){
+                                aln->seq[i][c] = aln->seq[i][j];
+                                c++;
+                        }
+                }
+                aln->seq[i][c] =0;
+                c++;
+                aln->sl[i] = c;
+                for(j = 0; j < aln->sl[i];j++){
+                        aln->gaps[i][j] = 0;
+                }
+                //fprintf(stdout,"%s\n",aln->seq[i]);
+        }
+        return OK;
 }
 
 int convert_alignment_to_internal(struct alignment* aln, int type)

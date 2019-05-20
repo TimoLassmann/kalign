@@ -37,7 +37,40 @@ AM_CPPFLAGS=${MYINCDIRS} ${HDF5_CPPFLAGS}
 bin_PROGRAMS =  kalign phmm get_param edist alphabet heap_test misc_test bpm_test pbil
 
 pbil_SOURCES = \
-pbil.c
+pbil.c \
+global.h \
+parameters.h \
+parameters.c \
+aln_data.h \
+aln_data.c \
+align_io.h \
+align_io.c \
+alphabet.h \
+alphabet.c \
+alignment_parameters.h \
+alignment_parameters.c \
+estimate_aln_param.h \
+estimate_aln_param.c \
+phmm.h \
+phmm.c \
+pick_anchor.h \
+pick_anchor.c \
+tree_building.h \
+tree_building.c \
+bisectingKmeans.h \
+bisectingKmeans.c \
+sequence_distance.h \
+sequence_distance.c \
+euclidean_dist.h \
+euclidean_dist.c \
+alignment.h \
+alignment.c \
+weave_alignment.h \
+weave_alignment.c \
+misc.h \
+misc.c \
+bpm.h \
+bpm.c
 
 bpm_test_SOURCES = \
 bpm.h \

@@ -17,6 +17,7 @@ extern void free_aln(struct alignment* aln);
 
 extern int convert_alignment_to_internal(struct alignment* aln, int type);
 
+extern int dealign(struct alignment* aln);
 
 extern int output(struct alignment* aln,struct parameters* param);
 

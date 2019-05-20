@@ -238,20 +238,14 @@ int run_kalign(struct parameters* param)
                 map = NULL;
 
                 LOG_MSG("Aligning");
+
                 START_TIMER(t1);
                 RUNP(map = hirschberg_alignment(aln, ap));
                 STOP_TIMER(t1);
                 LOG_MSG("Took %f sec.", GET_TIMING(t1));
         }
 
-                int max_len = 0;
-        for(i = 0; i < aln->numseq;i++){
-                if(aln->sl[i] > max_len){
-                        max_len = aln->sl[i];
-                }
 
-        }
-        aln->gaps = galloc(aln->gaps,aln->numseq,max_len+1,0);
 
         RUN(weave(aln , map, ap->tree));
 

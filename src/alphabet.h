@@ -9,8 +9,8 @@
 
 
 struct alphabet{
-        int_fast8_t to_internal[128];
-        int_fast8_t to_external[32];
+        int8_t to_internal[128];
+        int8_t to_external[32];
         int type;
         int L;
 };

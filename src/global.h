@@ -39,6 +39,7 @@ struct alignment{
         int** gaps;
         char** seq;
         char** sn;
+        int max_len;
         int numseq;
         int num_profiles;
         int dna;
