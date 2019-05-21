@@ -4,8 +4,10 @@ LIB_TLDEVELDIR = @LIB_TLDEVELDIR@
 
 ACLOCAL_AMFLAGS = -I m4
 
-AM_CFLAGS =@SIMD_FLAGS@
 
+
+
+AM_CFLAGS =  @SIMD_FLAGS@ @OPENMP_CFLAGS@ 
 CLEANFILES = ihmm_seq_itest_read_test.fa test_model_file.txt test.lfa test_dna.lfa libhdf5gluetest_exp.h5 libhdf5gluetest.h5 model_at_*h5 test1.h5 test2.h5
 
 # top_builddir = @top_builddir@
@@ -14,13 +16,15 @@ CLEANFILES = ihmm_seq_itest_read_test.fa test_model_file.txt test.lfa test_dna.l
 AM_LDFLAGS = @DEAD_STRIP@
 AM_LDFLAGS += -Wno-undef
 
+
+
 MYLIBDIRS = ../tldevel/libtldevel.a
 
 
 MYINCDIRS = -I${top_builddir}/${LIB_TLDEVELDIR} \
             -I${top_srcdir}/${LIB_TLDEVELDIR}
 
-LIBS = ${MYLIBDIRS} $(HDF5_LDFLAGS)  $(HDF5_LIBS) -lpthread -lm
+LIBS = ${MYLIBDIRS} $(HDF5_LDFLAGS)  $(HDF5_LIBS) -lpthread -lm 
 
 
 #     AC_SUBST(HDF5_CFLAGS)

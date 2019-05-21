@@ -1,4 +1,4 @@
-
+#include <omp.h>
 #include "tldevel.h"
 #include "rng.h"
 #include <getopt.h>
@@ -351,13 +351,20 @@ int eval_batch(struct batch_train* bt,struct thr_pool* pool,int num_threads)
                 td[i]->num_threads = num_threads;
         }
         LOG_MSG("Starting threadjobs");
+#ifdef HAVE_OPENMP
+#pragma omp parallel shared(num_threads,td) private(i)
 
-        for(i = 0; i < num_threads ;i++){
+        {
+#pragma omp for schedule(dynamic) nowait
+#endif
+                for(i = 0; i < num_threads ;i++){
                 run_kalign_batch_thread(td[i]);
                 //if((status = thr_pool_queue(pool, run_kalign_batch_thread, td[i])) == -1) ERROR_MSG("Adding job to queue failed.");
         }
         //thr_pool_wait(pool);
-
+#ifdef HAVE_OPENMP
+        }
+#endif
         LOG_MSG("Done aligning");
         for(i = 0; i < bt->pbil->mu;i++){
                 bt->pbil->population[i]->score = 0.0;
@@ -410,7 +417,7 @@ void* run_kalign_batch_thread(void *threadarg)
                         aln = data->bt->aln[i];
 
                         for(j = 0; j < data->bt->pbil->mu;j++){
-                                LOG_MSG("aligning %d with param %d",i,j);
+                                //LOG_MSG("aligning %d with param %d",i,j);
 /* dealign */
                                 dealign(aln);
 

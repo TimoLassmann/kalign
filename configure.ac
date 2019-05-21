@@ -21,11 +21,32 @@ m4_include([m4/ax_gcc_x86_avx_xgetbv.m4])
 m4_include([m4/ax_gcc_x86_cpuid.m4])
 m4_include([m4/ax_check_compile_flag.m4])
 m4_include([m4/ax_ext.m4])
+m4_include([m4/ax_openmp.m4])
 AX_EXT
 
+AC_ARG_ENABLE(openmp, [AC_HELP_STRING([--enable-openmp],[use OpenMP directives for parallelism])], enable_openmp=$enableval, enable_openmp=no)
 
+if test "$enable_openmp" = "yes"; then
+   AC_DEFINE(HAVE_OPENMP,1,[Define to enable OpenMP])
+   AX_OPENMP([], [AC_MSG_ERROR([don't know how to enable OpenMP])])
+fi
 AC_SUBST(SIMD_FLAGS)
-# AC_SUBST(CPUEXT_FLAGS)
+
+
+AC_ARG_WITH([openmp],
+    AS_HELP_STRING([--without-openmp], [Do not use OpenMP]))
+AS_IF([test "x$with_openmp" = "xno"], 
+            [], 
+            [AX_OPENMP(
+                AC_DEFINE([HAVE_OPENMP],[1],[Defined if OpenMP should and can be used])
+             )]
+     )
+AC_SUBST(OPENMP_CFLAGS)
+# according to http://beagle-lib.googlecode.com/svn-history/r824/trunk/configure.ac:
+# "OpenMP checker only defines for C when compiling both C and C++"
+OPENMP_CXXFLAGS=$OPENMP_CFLAGS
+AC_SUBST(OPENMP_CXXFLAGS)
+
 
 # Checks for programs.
 AC_PROG_CC
