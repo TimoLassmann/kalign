@@ -212,7 +212,7 @@ int clean_and_set_to_extern(struct alphabet* a)
 {
         int i;
         int code = 0;
-        int_fast8_t trans[32];
+        int8_t trans[32];
         for(i = 0; i < 32;i++){
                 trans[i] = -1;
 

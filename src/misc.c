@@ -35,7 +35,7 @@ int hash_test(void)
         int kmer_len = 10;
         int len = 0;
         int i;
-        uint_fast8_t* internal = NULL;
+        uint8_t* internal = NULL;
 
         RUNP(a = create_alphabet(defPROTEIN));
 

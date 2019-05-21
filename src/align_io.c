@@ -226,10 +226,10 @@ int convert_alignment_to_internal(struct alignment* aln, int type)
         aln->L = a->L;
         for(i = 0; i < aln->numseq;i++){
                 for(j =0 ; j < aln->sl[i];j++){
-                        fprintf(stdout,"%c", aln->seq[i][j] );
+                        //       fprintf(stdout,"%c", aln->seq[i][j] );
                         aln->s[i][j] = t[(int) aln->seq[i][j]];
                 }
-                fprintf(stdout,"\n");
+                //fprintf(stdout,"\n");
         }
         aln->L = a->L;
         MFREE(a);
