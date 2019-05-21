@@ -351,10 +351,12 @@ int eval_batch(struct batch_train* bt,struct thr_pool* pool,int num_threads)
                 td[i]->num_threads = num_threads;
         }
         LOG_MSG("Starting threadjobs");
+
         for(i = 0; i < num_threads ;i++){
-                if((status = thr_pool_queue(pool, run_kalign_batch_thread, td[i])) == -1) ERROR_MSG("Adding job to queue failed.");
+                run_kalign_batch_thread(td[i]);
+                //if((status = thr_pool_queue(pool, run_kalign_batch_thread, td[i])) == -1) ERROR_MSG("Adding job to queue failed.");
         }
-        thr_pool_wait(pool);
+        //thr_pool_wait(pool);
 
         LOG_MSG("Done aligning");
         for(i = 0; i < bt->pbil->mu;i++){
