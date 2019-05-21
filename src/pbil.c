@@ -17,7 +17,6 @@
 
 #define ALPHABET_LEN 21
 
-
 struct jobs{
         char* in;
         char* param;
