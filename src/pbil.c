@@ -355,7 +355,7 @@ int eval_batch(struct batch_train* bt,struct thr_pool* pool,int num_threads)
         }
         thr_pool_wait(pool);
 
-
+        LOG_MSG("Done aligning");
         for(i = 0; i < bt->pbil->mu;i++){
                 bt->pbil->population[i]->score = 0.0;
                 for(j = 0; j < bt->num_alignments;j++){
@@ -407,7 +407,8 @@ void* run_kalign_batch_thread(void *threadarg)
                         aln = data->bt->aln[i];
 
                         for(j = 0; j < data->bt->pbil->mu;j++){
-                                /* dealign */
+                                LOG_MSG("aligning %d with param %d",i,j);
+/* dealign */
                                 dealign(aln);
 
                                 /* run kalign */
