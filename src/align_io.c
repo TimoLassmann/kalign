@@ -217,7 +217,7 @@ int convert_alignment_to_internal(struct alignment* aln, int type)
 {
         struct alphabet* a = NULL;
 
-        int_fast8_t* t = NULL;
+        int8_t* t = NULL;
         int i,j;
 
         RUNP(a = create_alphabet(type));
