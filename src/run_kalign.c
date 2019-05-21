@@ -180,7 +180,7 @@ int run_kalign(struct parameters* param)
 
         //param->param_set = 4;
         /* allocate aln parameters  */
-        RUNP(ap = init_ap(param,aln->numseq,aln->L));
+        RUNP(ap = init_ap(aln->numseq,aln->L));
         //fprintf(stderr,"        %0.8f	gap open penalty\n",ap->gpo);
         //fprintf(stderr,"        %0.8f	gap extension\n",(float)gpe/10);
         //fprintf(stderr,"        %0.8f	gap extension\n",ap->gpe);
@@ -206,7 +206,7 @@ int run_kalign(struct parameters* param)
 
         //param->dist_method = KALIGNDIST_WU;
         //RUN(build_tree(aln,param,ap));
-        RUN(build_tree_kmeans(aln,param,ap));
+        RUN(build_tree_kmeans(aln,ap));
         STOP_TIMER(t1);
         LOG_MSG("Took %f sec.", GET_TIMING(t1));
 

@@ -532,6 +532,7 @@ uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
                 //fprintf(stdout,"set bit %d in arr %d[%d]", i%32,p[i],i/32);
                 //fprintf(stdout,"\ta: %u\n",f[p[i]][i/32]);
         }
+
         //fprintf(stdout,"\n");
         /*
         for(i = 0; i < 21;i++){

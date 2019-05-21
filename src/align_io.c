@@ -203,9 +203,9 @@ int dealign(struct alignment* aln)
                         }
                 }
                 aln->seq[i][c] =0;
-                c++;
+                //            c++;
                 aln->sl[i] = c;
-                for(j = 0; j < aln->sl[i];j++){
+                for(j = 0; j < aln->sl[i]+1;j++){
                         aln->gaps[i][j] = 0;
                 }
                 //fprintf(stdout,"%s\n",aln->seq[i]);

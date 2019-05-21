@@ -116,6 +116,7 @@ ERROR:
         return NULL;
 }
 
+
 float** kmer_distance(struct alignment* aln, int* seeds, int num_seeds, int kmer_len)
 {
         struct alphabet* alphabet = NULL;

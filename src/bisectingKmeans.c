@@ -92,7 +92,7 @@ int sort_int_desc(const void *a, const void *b)
 
 
 
-int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln_param* ap)
+int build_tree_kmeans(struct alignment* aln, struct aln_param* ap)
 {
         //struct drand48_data randBuffer;
         struct node* root = NULL;
@@ -106,7 +106,7 @@ int build_tree_kmeans(struct alignment* aln,struct parameters* param, struct aln
         int i;
 
         ASSERT(aln != NULL, "No alignment.");
-        ASSERT(param != NULL, "No input parameters.");
+        //ASSERT(param != NULL, "No input parameters.");
         ASSERT(ap != NULL, "No alignment parameters.");
 
 

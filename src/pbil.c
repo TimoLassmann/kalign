@@ -1,12 +1,10 @@
 
-
-
 #include "tldevel.h"
 #include "rng.h"
 #include <getopt.h>
 
 #include "thr_pool.h"
-
+#include "alphabet.h"
 #include "hash_table.h"
 #include "align_io.h"
 #include "alignment_parameters.h"
@@ -31,6 +29,7 @@ struct jobs{
 
 struct thread_data{
         struct jobs** jobs;
+        struct batch_train* bt;
         int num_threads;
         int num_jobs;
         int id;
@@ -91,8 +90,12 @@ unsigned int BinaryToGray(unsigned int num);
 unsigned int GrayToBinary32(unsigned int num);
 int print_help(char **argv);
 /* objective function */
+int eval_batch(struct batch_train* bt,struct thr_pool* pool,int num_threads);
 int eval(struct pbil_data* d,char** infile, int num_infiles,struct thr_pool* pool);
 void* run_kalign_thread(void *threadarg);
+void* run_kalign_batch_thread(void *threadarg);
+int fill_sampled_parameters(struct aln_param* ap, double* values,int L);
+int score_aln(struct alignment* aln, int aln_id,  HT_TYPE(TESTINT )* ht, double pairs,double* score);
 
 int run_kalign_and_score(char* infile,char* p_file, double* SP, double* TC,char* name);
 
@@ -215,20 +218,6 @@ int main(int argc, char *argv[])
 
         }
 
-        MMALLOC(bt, sizeof(struct batch_train));
-        bt->num_alignments = num_infiles;
-        bt->num_pairs = NULL;
-        bt->aln = NULL;
-        bt->scores = NULL;
-
-        MMALLOC(bt->aln, sizeof(struct alignment*)* bt->num_alignments);
-        MMALLOC(bt->num_pairs, sizeof(double) * bt->num_alignments);
-        for(i = 0; i < bt->num_alignments;i++){
-                RUNP(bt->aln[i] = read_alignment(infile[i]));
-                bt->num_pairs[i] = 0.0;
-        }
-        LOG_MSG("Read all alignments");
-        RUN(fill_pair_hash(bt));
 
 
         RUNP(pool = thr_pool_create(num_threads, num_threads, 0, 0));
@@ -241,19 +230,50 @@ int main(int argc, char *argv[])
         LOG_MSG("%d popsize.", mu);
         LOG_MSG("%d keep.", lambda);
         LOG_MSG("%d threads.", num_threads);
+
+
+
+        MMALLOC(bt, sizeof(struct batch_train));
+        bt->num_alignments = num_infiles;
+        bt->num_pairs = NULL;
+        bt->aln = NULL;
+        bt->scores = NULL;
+        bt->scores = galloc(bt->scores,num_infiles, mu,0.0);
+        MMALLOC(bt->aln, sizeof(struct alignment*)* bt->num_alignments);
+        MMALLOC(bt->num_pairs, sizeof(double) * bt->num_alignments);
+        for(i = 0; i < bt->num_alignments;i++){
+                RUNP(bt->aln[i] = read_alignment(infile[i]));
+                bt->num_pairs[i] = 0.0;
+        }
+
+        LOG_MSG("Read all alignments");
+        RUN(fill_pair_hash(bt));
+
+
+        for(i = 0; i < bt->num_alignments;i++){
+                RUN(dealign(bt->aln[i]));
+                RUN(convert_alignment_to_internal(bt->aln[i], defPROTEIN));
+
+        }
+
+
+
         RUNP(d = init_pbil_data(num_param, 16, n_gen, mu, lambda));
         d->num_threads = num_threads;
 
         if(seedfile){
                 RUN(init_pop_from_seed(d, seedfile));
         }
+        bt->pbil = d;
         //d->lambda = 5;
 
         for(i = 0; i < d->num_gen;i++){
                 RUN(sample_pop(d));
 
                 RUN(write_kalign_parameter_files(d));
-                RUN(eval(d, infile, num_infiles, pool));
+                eval_batch(bt, pool, d->num_threads);
+//                exit(0);
+                //RUN(eval(d, infile, num_infiles, pool));
                 //random_score(d);
                 RUN(update_pbil(d));
                 RUN(mutate_prob_vector(d));
@@ -261,10 +281,26 @@ int main(int argc, char *argv[])
         }
 
 
+
         //RUN(run_kalign_and_score("~/data/bb3_release/RV30/BB30001.xml","test_kalign_param.txt", &SP, &TC));
         //fprintf(stdout,"%f %f\n",SP,TC);
+        for(i = 0; i < bt->num_alignments;i++){
+                free_aln(bt->aln[i]);
+
+
+        }
+
+        HT_FREE(TESTINT, bt->ht);
+
+        MFREE(bt->aln);
+        MFREE(bt->num_pairs);
+        gfree(bt->scores);
+        MFREE(bt);
         free_pbil_data(d);
 
+        thr_pool_destroy( pool);
+
+        MFREE(infile);
         return EXIT_SUCCESS;
 ERROR:
         if(infile){
@@ -287,6 +323,237 @@ int print_help(char **argv)
         return OK;
 }
 
+int eval_batch(struct batch_train* bt,struct thr_pool* pool,int num_threads)
+{
+        struct thread_data** td = NULL;
+        int i,j;
+        int status;
+
+        /* clear scores */
+        for ( i = 0; i < bt->num_alignments;i++){
+                for(j = 0; j < bt->pbil->mu;j++){
+                        bt->scores[i][j]= 0.0;
+                }
+        }
+
+        MMALLOC(td, sizeof(struct thread_data*)* num_threads);
+
+        for(i = 0; i < num_threads;i++){
+                td[i] = NULL;
+                MMALLOC(td[i],sizeof(struct thread_data));
+                td[i]->id = i;
+                td[i]->bt = bt;
+                //td[i]->jobs = jobs;
+                //td[i]->num_jobs = num_jobs;
+                td[i]->num_threads = num_threads;
+        }
+        for(i = 0; i < num_threads ;i++){
+                if((status = thr_pool_queue(pool, run_kalign_batch_thread, td[i])) == -1) ERROR_MSG("Adding job to queue failed.");
+        }
+        thr_pool_wait(pool);
+
+
+        for(i = 0; i < bt->pbil->mu;i++){
+                bt->pbil->population[i]->score = 0.0;
+                for(j = 0; j < bt->num_alignments;j++){
+
+                        bt->pbil->population[i]->score += bt->scores[j][i];
+                }
+        }
+
+        for(i = 0; i < bt->pbil->mu;i++){
+                bt->pbil->population[i]->score /= (double)  bt->num_alignments;
+                //fprintf(stdout,"SCORE: %d %f\n",i,d->population[i]->score);
+        }
+
+
+
+        for(i = 0; i < num_threads;i++){
+
+                MFREE(td[i]);//,sizeof(struct thread_data));
+        }
+
+        MFREE(td);
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+
+void* run_kalign_batch_thread(void *threadarg)
+{
+        struct thread_data *data;
+        struct alignment* aln = NULL;
+        struct aln_param* ap = NULL;
+        int** map = NULL;       /* holds all alignment paths  */
+        int num_jobs;
+        int id;
+        int i;
+        int j;
+        int c;
+
+        data = (struct thread_data *) threadarg;
+        ASSERT(data != NULL, "No data");
+
+        id = data->id;
+
+
+        for(i = 0; i < data->bt->num_alignments;i++){
+
+                if(i % data->num_threads == id){
+                        aln = data->bt->aln[i];
+
+                        for(j = 0; j < data->bt->pbil->mu;j++){
+                                /* dealign */
+                                dealign(aln);
+
+                                /* run kalign */
+                                RUNP(ap = init_ap(aln->numseq,aln->L));
+                                RUN(fill_sampled_parameters(ap, data->bt->pbil->population[j]->param, aln->L));
+                                RUN(build_tree_kmeans(aln,ap));
+                                RUNP(map = hirschberg_alignment(aln, ap));
+                                RUN(weave(aln , map, ap->tree));
+
+                                RUN(score_aln(aln, i, data->bt->ht, data->bt->num_pairs[i], &data->bt->scores[i][j]));
+                                //fprintf(stdout,"%f ",  data->bt->scores[i][j]);
+
+                                for(c = 0; c < aln->num_profiles ;c++){
+                                        if(map[c]){
+                                                MFREE(map[c]);
+                                        }
+                                }
+
+                                free_ap(ap);
+                                MFREE(map);
+
+                                map = NULL;
+
+                                int c;
+                                for( c = aln->numseq;c < aln->num_profiles;c++){
+                                        MFREE(aln->sip[c]);
+                                        aln->sip[c] = NULL;
+                                }
+
+                        }
+                        //fprintf(stdout,"\n");
+                }
+        }
+
+        return NULL;
+ERROR:
+        return NULL;
+}
+
+int fill_sampled_parameters(struct aln_param* ap, double* values,int L)
+{
+
+        int i,j;
+
+        int  m_pos = 0;
+        for (i = 0;i < L;i++){
+                for (j = 0;j <= i;j++){
+                        ap->subm[i][j] = values[m_pos];
+                        ap->subm[j][i] = ap->subm[i][j];
+                        m_pos++;
+                }
+        }
+
+        ap->gpo = values[m_pos];
+        m_pos++;
+        ap->gpe = values[m_pos];
+        m_pos++;
+
+        ap->tgpe = values[m_pos];
+        return OK;
+}
+
+int score_aln(struct alignment* aln, int aln_id,  HT_TYPE(TESTINT )* ht, double pairs,double* score)
+{
+
+        uint8_t* aligned_a = NULL;
+        uint8_t* aligned_b = NULL;
+
+        int numseq;
+        int i,j,c,f,g,res;
+
+        int aln_len = 0;
+
+        double common = 0.0;
+
+        int* tmp = NULL;
+        hash_table_node_TESTINT_t* hashnode = NULL;
+
+        tmp = NULL;
+        tmp= galloc(tmp,5);
+
+        numseq = aln->numseq;
+
+        for(i = 0; i <= aln->sl[0];i++){
+                aln_len += aln->gaps[0][i];
+        }
+        aln_len += aln->sl[0];
+        //LOG_MSG("Aln len: %d.",aln_len);
+
+        MMALLOC(aligned_a, sizeof(uint8_t) * aln_len);
+        MMALLOC(aligned_b, sizeof(uint8_t) * aln_len);
+
+
+
+        for(i = 0; i < numseq;i++){
+                RUN(make_aliged_seq(aligned_a, aln->s[i], aln->gaps[i], aln->sl[i]));
+                for(j = i+1;j < numseq;j++){
+                        RUN(make_aliged_seq(aligned_b, aln->s[j], aln->gaps[j], aln->sl[j]));
+
+                        f = 0;
+                        g = 0;
+                        for(c = 0;c < aln_len;c++){
+                                res= 0;
+                                if(aligned_a[c] != 255){
+                                        res |= 1;
+                                }
+                                if(aligned_b[c] != 255){
+                                        res |=2;
+                                }
+                                switch(res){
+                                case 3:
+                                        tmp[0] = aln_id;
+                                        tmp[1] = i;
+                                        tmp[2] = j;
+                                        tmp[3] = f;
+                                        tmp[4] = g;
+                                        hashnode = HT_SEARCH(TESTINT, ht, tmp);
+                                        if(hashnode){
+                                                common += 1.0;
+                                        }
+
+                                        f++;
+                                        g++;
+                                        break;
+                                case 2:
+                                        g++;
+                                        break;
+                                case 1:
+                                        f++;
+                                        break;
+                                default:
+                                        break;
+                                }
+
+
+                        }
+                }
+        }
+        gfree(tmp);
+        //MFREE(tmp);
+        MFREE(aligned_a);
+        MFREE(aligned_b);
+//        LOG_MSG("Alignment: %d , %f %f\n", aln_id,common,pairs);
+        *score = common /pairs;
+        return OK;
+ERROR:
+        return FAIL;
+}
+
 
 int fill_pair_hash(struct batch_train* bt)
 {
@@ -305,10 +572,10 @@ int fill_pair_hash(struct batch_train* bt)
                                 g = 0;
                                 for(a = 0; a < aln->sl[0];a++){
                                         res= 0;
-                                        if(isalpha(aln->seq[j][f])){
+                                        if(isalpha(aln->seq[j][a])){
                                                 res |= 1;
                                         }
-                                        if(isalpha(aln->seq[c][g])){
+                                        if(isalpha(aln->seq[c][a])){
                                                 res |=2;
                                         }
                                         switch(res){
@@ -341,10 +608,9 @@ int fill_pair_hash(struct batch_train* bt)
                 }
 
         }
-        HT_PRINT(TESTINT,bt->ht);
-
+/*        HT_PRINT(TESTINT,bt->ht);
         HT_FREE(TESTINT,bt->ht);
-        exit(0);
+        exit(0);*/
         return OK;
 ERROR:
         return FAIL;
@@ -777,6 +1043,12 @@ void free_pbil_data(struct pbil_data* d)
                         }
                         MFREE(d->population);
                 }
+                MFREE(d->best->param);
+                MFREE(d->best->code);
+                MFREE(d->best);
+                MFREE(d->max);
+                MFREE(d->min);
+                MFREE(d->step);
                 MFREE(d->bit_prob);
                 MFREE(d->rng);
                 MFREE(d);

@@ -1,12 +1,12 @@
 
 #include "alignment_parameters.h"
 
-int set_subm_gaps(struct parameters* param, struct aln_param* ap);
+int set_subm_gaps(struct aln_param* ap);
 
 int set_param_number(struct aln_param* ap,int L, int sel);
 int read_aln_param_from_file(struct aln_param* ap, char* infile, int L);
 
-struct aln_param* init_ap(struct parameters* param,int numseq,int L)
+struct aln_param* init_ap(int numseq,int L)
 {
         struct aln_param* ap = NULL;
         int i,j;
@@ -32,16 +32,16 @@ struct aln_param* init_ap(struct parameters* param,int numseq,int L)
                         ap->subm[i][j] = 0.0f;
                 }
         }
-        if(param->param_set == -1){
-                RUN(set_subm_gaps(param, ap));
-        }else{
-                set_param_number(ap, L, param->param_set);
-        }
+        //if(param->param_set == -1){
+                RUN(set_subm_gaps(ap));
+                //}else{
+                //set_param_number(ap, L, param->param_set);
+                //}
         /* read parameters from file */
-        if(param->aln_param_file){
-                LOG_MSG("Reading parameters from file: %s", param->aln_param_file);
-                RUN(read_aln_param_from_file(ap, param->aln_param_file, L));
-        }
+        //if(param->aln_param_file){
+                //LOG_MSG("Reading parameters from file: %s", param->aln_param_file);
+                //RUN(read_aln_param_from_file(ap, param->aln_param_file, L));
+                //}
 
 
         return ap;
@@ -153,6 +153,9 @@ void free_ap(struct aln_param* ap)
                         }
                         MFREE(ap->subm);
                 }
+                if(ap->rng){
+                        free_rng(ap->rng);
+                }
                 if(ap->tree){
                         MFREE(ap->tree);
                 }
@@ -161,7 +164,7 @@ void free_ap(struct aln_param* ap)
 }
 
 
-int set_subm_gaps(struct parameters* param, struct aln_param* ap)
+int set_subm_gaps(struct aln_param* ap)
 {
         int i,j;
         int m_pos = 0;
