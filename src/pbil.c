@@ -58,6 +58,7 @@ struct pbil_data{
         int num_param;
         int num_threads;
         double gamma;           /* learning rate */
+        int L;
 };
 HT_GLOBAL_INIT(TESTINT, int*)
 
@@ -101,7 +102,7 @@ int run_kalign_and_score(char* infile,char* p_file, double* SP, double* TC,char*
 
 /* seeding */
 int set_pbil_based_on_pop(struct pbil_data* d);
-int init_pop_from_seed(struct pbil_data*d, char* infile);
+int init_pop_from_seed(struct pbil_data*d);
 int read_aln_param_from_file(struct pbil_data*d, char* infile);
 
 /* for testing */
@@ -261,9 +262,9 @@ int main(int argc, char *argv[])
 
         RUNP(d = init_pbil_data(num_param, 16, n_gen, mu, lambda));
         d->num_threads = num_threads;
-
+        d->L = bt->aln[0]->L;
         if(seedfile){
-                RUN(init_pop_from_seed(d, seedfile));
+                RUN(init_pop_from_seed(d));
         }
         bt->pbil = d;
         //d->lambda = 5;
@@ -272,7 +273,7 @@ int main(int argc, char *argv[])
                 LOG_MSG("Gen %d",i);
                 RUN(sample_pop(d));
 
-                RUN(write_kalign_parameter_files(d));
+                //RUN(write_kalign_parameter_files(d));
                 eval_batch(bt, pool, d->num_threads);
 //                exit(0);
                 //RUN(eval(d, infile, num_infiles, pool));
@@ -1107,12 +1108,35 @@ int sort_pop_by_score(const void *a, const void *b)
 
 
 
-int init_pop_from_seed(struct pbil_data*d, char* infile)
+int init_pop_from_seed(struct pbil_data*d)
 {
-        int i,j;
+        int i,j,c,m_pos;
         double r;
         double tmp;
-        RUN(read_aln_param_from_file(d,infile));
+        struct aln_param* ap = NULL;
+        RUNP(ap = init_ap(10,d->L));
+        //fprintf(stdout,"%d\n", d->L);
+        m_pos = 0;
+        for(j = 0; j < d->L;j++){
+                for(c = 0; c <= j;c++){
+                        //                      fprintf(stdout,"%d ",m_pos);
+                        d->population[0]->param[m_pos] = ap->subm[j][c];
+                        m_pos++;
+                }
+        }
+
+
+        d->population[0]->param[m_pos] = ap->gpo;
+        m_pos++;
+
+        d->population[0]->param[m_pos] = ap->gpe;
+        m_pos++;
+        d->population[0]->param[m_pos] = ap->tgpe;
+        m_pos++;
+
+        free_ap(ap);
+        
+        //RUN(read_aln_param_from_file(d,infile));
 
         for(i = 0; i < d->num_param;i++){
                 d->min[i] = d->population[0]->param[i] - 1.0;
