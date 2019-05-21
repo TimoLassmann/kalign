@@ -433,7 +433,7 @@ void* run_kalign_batch_thread(void *threadarg)
 
                                 map = NULL;
 
-                                int c;
+
                                 for( c = aln->numseq;c < aln->num_profiles;c++){
                                         MFREE(aln->sip[c]);
                                         aln->sip[c] = NULL;
