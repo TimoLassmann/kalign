@@ -70,6 +70,7 @@ struct batch_train{
         int num_alignments;
 };
 
+
 int fill_pair_hash(struct batch_train* bt);
 /* Memory functions  */
 struct pbil_data* init_pbil_data(int num_param,int num_bits,int num_gen,int sampled, int selected);
@@ -247,6 +248,7 @@ int main(int argc, char *argv[])
 
         LOG_MSG("Read all alignments");
         RUN(fill_pair_hash(bt));
+        LOG_MSG("Created hash");
 
 
         for(i = 0; i < bt->num_alignments;i++){
@@ -267,6 +269,7 @@ int main(int argc, char *argv[])
         //d->lambda = 5;
 
         for(i = 0; i < d->num_gen;i++){
+                LOG_MSG("Gen %d",i);
                 RUN(sample_pop(d));
 
                 RUN(write_kalign_parameter_files(d));
@@ -483,7 +486,7 @@ int score_aln(struct alignment* aln, int aln_id,  HT_TYPE(TESTINT )* ht, double 
         hash_table_node_TESTINT_t* hashnode = NULL;
 
         tmp = NULL;
-        tmp= galloc(tmp,5);
+        tmp= galloc(tmp,3);
 
         numseq = aln->numseq;
 
@@ -498,9 +501,9 @@ int score_aln(struct alignment* aln, int aln_id,  HT_TYPE(TESTINT )* ht, double 
 
 
 
-        for(i = 0; i < numseq;i++){
+        for(i = 0; i < MACRO_MIN(10,numseq)-1;i++){
                 RUN(make_aliged_seq(aligned_a, aln->s[i], aln->gaps[i], aln->sl[i]));
-                for(j = i+1;j < numseq;j++){
+                for(j = i+1;j < MACRO_MIN(10,numseq);j++){
                         RUN(make_aliged_seq(aligned_b, aln->s[j], aln->gaps[j], aln->sl[j]));
 
                         f = 0;
@@ -516,10 +519,10 @@ int score_aln(struct alignment* aln, int aln_id,  HT_TYPE(TESTINT )* ht, double 
                                 switch(res){
                                 case 3:
                                         tmp[0] = aln_id;
-                                        tmp[1] = i;
-                                        tmp[2] = j;
-                                        tmp[3] = f;
-                                        tmp[4] = g;
+                                        tmp[1] = (i << 16) | f;
+                                        tmp[2] = (j << 16) | g;
+                                        //tmp[3] = f;
+                                        //tmp[4] = g;
                                         hashnode = HT_SEARCH(TESTINT, ht, tmp);
                                         if(hashnode){
                                                 common += 1.0;
@@ -561,12 +564,14 @@ int fill_pair_hash(struct batch_train* bt)
         int* tmp;
 
         bt->ht = NULL;
-        bt->ht = HT_INIT(TESTINT,63556);
+        bt->ht = HT_INIT(TESTINT,1 << 20);
+
         for(i = 0; i < bt->num_alignments;i++){
+                LOG_MSG("Processing aln: %d",i);
                 aln = bt->aln[i];
                 bt->num_pairs[i] = 0.0;
-                for(j = 0; j < aln->numseq;j++){
-                        for(c = j+1;c < aln->numseq;c++){
+                for(j = 0; j < MACRO_MIN(10,aln->numseq)-1;j++){
+                        for(c = j+1;c < MACRO_MIN(10,aln->numseq);c++){
                                 f = 0;
                                 g = 0;
                                 for(a = 0; a < aln->sl[0];a++){
@@ -580,12 +585,12 @@ int fill_pair_hash(struct batch_train* bt)
                                         switch(res){
                                         case 3:
                                                 tmp = NULL;
-                                                tmp= galloc(tmp,5);
+                                                tmp= galloc(tmp,3);
                                                 tmp[0] = i;
-                                                tmp[1] = j;
-                                                tmp[2] = c;
-                                                tmp[3] = f;
-                                                tmp[4] = g;
+                                                tmp[1] = (j << 16) | f;
+                                                tmp[2] = (c << 16) | g;
+                                                //tmp[3] = f;
+                                                //tmp[4] = g;
                                                 RUN(HT_INSERT(TESTINT,bt->ht,tmp,NULL));
                                                 bt->num_pairs[i] += 1.0;
                                                 f++;
