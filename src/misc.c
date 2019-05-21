@@ -42,7 +42,7 @@ int hash_test(void)
         char seq[] = "GKGDPKKPRGKMSSYAFFVQTSREEHKKKHPDASVNFSEFSKKCSERWKTMSAKEKGKFEDMAKADKARYEREMKTYIPPKGE";
 
         len = strlen(seq);
-        MMALLOC(internal , sizeof(uint_fast8_t) * len) ;
+        MMALLOC(internal , sizeof(uint8_t) * len) ;
 
         for(i = 0;i < len;i++){
                 internal[i] = a->to_internal[(int)seq[i]];
@@ -211,14 +211,14 @@ int byg_start(char* pattern,char*text)
 // Transform each letter x[i] to a fixed random number RAND[x[i]]
 // to ensure instantaneous mixing into the 16 bits
 // Do XOR with RAND[x[i]] and 5-bit rotate left for each i from 1 to k
-uint16_t circ_hash(const uint_fast8_t* x, const uint_fast8_t length)
+uint16_t circ_hash(const uint8_t* x, const uint8_t length)
 {
         const uint16_t RAND[21] = {0x4567, 0x23c6, 0x9869, 0x4873, 0xdc51, 0x5cff, 0x944a, 0x58ec,
                                    0x1f29, 0x7ccd, 0x58ba, 0xd7ab, 0x41f2, 0x1efb, 0xa9e3, 0xe146,
                                    0x007c, 0x62c2, 0x0854, 0x27f8, 0x231b};// 16 bit random numbers
         register uint16_t h = 0x0;
         h = h^ RAND[x[0]];// XOR h and ki
-        for (register uint_fast8_t i = 1; i < length; ++i){
+        for (register uint8_t i = 1; i < length; ++i){
                 h = RoL(h, 5);
                 h ^= RAND[x[i]];// XOR h and ki
         }
@@ -229,7 +229,7 @@ uint16_t circ_hash(const uint_fast8_t* x, const uint_fast8_t length)
 // Computes hash value for next key x[0:length-1] from previous hash value
 // hash( x[-1:length-2] ) and x_first = x[-1]
 
-uint16_t circ_hash_next(const uint_fast8_t * x,const uint_fast8_t length,const uint_fast8_t x_first, uint16_t h)
+uint16_t circ_hash_next(const uint8_t * x,const uint8_t length,const uint8_t x_first, uint16_t h)
 {
         const uint16_t RAND[21] = {0x4567, 0x23c6, 0x9869, 0x4873, 0xdc51, 0x5cff, 0x944a, 0x58ec,
                                    0x1f29, 0x7ccd, 0x58ba, 0xd7ab, 0x41f2, 0x1efb, 0xa9e3, 0xe146,

@@ -51,8 +51,8 @@ int bpm_test(void)
         //long int r;
         int len = 0;
         int i,j,c;
-        uint_fast8_t* a = NULL;
-        uint_fast8_t* b = NULL;
+        uint8_t* a = NULL;
+        uint8_t* b = NULL;
 
         int test_iter = 100;
 
@@ -70,8 +70,8 @@ int bpm_test(void)
                 len = 256;
         }
 
-        MMALLOC(a , sizeof(uint_fast8_t) * len) ;
-        MMALLOC(b , sizeof(uint_fast8_t) * len) ;
+        MMALLOC(a , sizeof(uint8_t) * len) ;
+        MMALLOC(b , sizeof(uint8_t) * len) ;
 
         for(i = 0;i < len;i++){
                 a[i] = alphabet->to_internal[(int)seq[i]];
