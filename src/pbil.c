@@ -409,7 +409,7 @@ void* run_kalign_batch_thread(void *threadarg)
         ASSERT(data != NULL, "No data");
 
         id = data->id;
-        LOG_MSG("Thread %d",id);
+        //LOG_MSG("Thread %d",id);
 
         for(i = 0; i < data->bt->num_alignments;i++){
 
@@ -579,7 +579,7 @@ int fill_pair_hash(struct batch_train* bt)
         bt->ht = HT_INIT(TESTINT,1 << 20);
 
         for(i = 0; i < bt->num_alignments;i++){
-                LOG_MSG("Processing aln: %d",i);
+                //LOG_MSG("Processing aln: %d",i);
                 aln = bt->aln[i];
                 bt->num_pairs[i] = 0.0;
                 for(j = 0; j < MACRO_MIN(10,aln->numseq)-1;j++){
@@ -962,10 +962,10 @@ int mutate_prob_vector(struct pbil_data* d)
 
 
                 if(d->bit_prob[i] <= 0.0){
-                        d->bit_prob[i] = 0.00001;
+                        d->bit_prob[i] = 0.0001;
                 }
                 if(d->bit_prob[i] >= 1.0){
-                        d->bit_prob[i] = 0.99999;
+                        d->bit_prob[i] = 0.9999;
                 }
         }
         return OK;
