@@ -17,6 +17,9 @@
 
 #define ALPHABET_LEN 21
 
+
+#define TEST_LIMIT 20
+
 struct jobs{
         char* in;
         char* param;
@@ -513,9 +516,9 @@ int score_aln(struct alignment* aln, int aln_id,  HT_TYPE(TESTINT )* ht, double 
 
 
 
-        for(i = 0; i < MACRO_MIN(10,numseq)-1;i++){
+        for(i = 0; i < MACRO_MIN(TEST_LIMIT,numseq)-1;i++){
                 RUN(make_aliged_seq(aligned_a, aln->s[i], aln->gaps[i], aln->sl[i]));
-                for(j = i+1;j < MACRO_MIN(10,numseq);j++){
+                for(j = i+1;j < MACRO_MIN(TEST_LIMIT,numseq);j++){
                         RUN(make_aliged_seq(aligned_b, aln->s[j], aln->gaps[j], aln->sl[j]));
 
                         f = 0;
@@ -582,8 +585,8 @@ int fill_pair_hash(struct batch_train* bt)
                 //LOG_MSG("Processing aln: %d",i);
                 aln = bt->aln[i];
                 bt->num_pairs[i] = 0.0;
-                for(j = 0; j < MACRO_MIN(10,aln->numseq)-1;j++){
-                        for(c = j+1;c < MACRO_MIN(10,aln->numseq);c++){
+                for(j = 0; j < MACRO_MIN(TEST_LIMIT,aln->numseq)-1;j++){
+                        for(c = j+1;c < MACRO_MIN(TEST_LIMIT,aln->numseq);c++){
                                 f = 0;
                                 g = 0;
                                 for(a = 0; a < aln->sl[0];a++){

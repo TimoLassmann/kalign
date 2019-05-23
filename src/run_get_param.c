@@ -20,6 +20,7 @@ struct counts{
         double eta;
         double num_alignments;
         double num_seq;
+        double id_threshold;
         int L;
 };
 struct counts* init_counts(void);
@@ -29,8 +30,8 @@ int print_counts(struct counts* ap);
 int print_counts_to_file(struct counts* ap,char* out);
 int print_counts_flat(struct counts* ap,double* raw);
 int fill_counts(struct counts* ap, struct alignment* aln);
-int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len);
 
+int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len,double id_threshold);
 int print_probabilies(struct counts*ap);
 
 
@@ -38,9 +39,13 @@ int main(int argc, char *argv[])
 {
         struct alignment* aln = NULL;
 
+
         struct counts* ap = NULL;
+
         int* assignment = NULL;
+
         double** raw = NULL;
+        double id_threshold;
         int i,j;
         int num_infiles = 0;
         char** infile = NULL;
@@ -49,20 +54,25 @@ int main(int argc, char *argv[])
 
         int print_all = 0;
         //int help = 0;
+        id_threshold = 0.0;
         while (1){
                 static struct option long_options[] ={
+                        {"thres",  required_argument, 0, 't'},
                         {"out",  required_argument, 0, 'o'},
                         {"all",0,0,'a'},
                         {"help",0,0,'h'},
                         {0, 0, 0, 0}
                 };
                 int option_index = 0;
-                c = getopt_long_only (argc, argv,"hao:",long_options, &option_index);
+                c = getopt_long_only (argc, argv,"hao:t:",long_options, &option_index);
 
                 if (c == -1){
                         break;
                 }
                 switch(c) {
+                case 't':
+                        id_threshold = atof(optarg);
+                        break;
                 case 'o':
                         outfile = optarg;
                         break;
@@ -94,6 +104,7 @@ int main(int argc, char *argv[])
         }
 
         RUNP(ap = init_counts());
+        ap->id_threshold = id_threshold;
         if(print_all){
                 /* get L */
                 RUNP(aln = read_alignment(infile[0]));
@@ -219,7 +230,7 @@ int fill_counts(struct counts* ap, struct alignment* aln)
                 ap->eta += aln->sl[i];
                 for(j = i+1; j < aln->numseq;j++){
                         ASSERT(aln->sl[i] == aln->sl[j], "Sequences not aligned?");
-                        RUN(pair_fill(ap, aln->s[i], aln->s[j], aln->sl[i]));
+                        RUN(pair_fill(ap, aln->s[i], aln->s[j], aln->sl[i], ap->id_threshold));
                 }
         }
         return OK;
@@ -227,14 +238,16 @@ ERROR:
         return FAIL;
 }
 
-int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len)
+
+int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len,double id_threshold)
 {
         int i;
         int state = 1;          /* match - 0 is a gap */
         int p_aln_len = 0;
         int begin = 0;
         int end = 0;
-
+        int len_a;
+        int len_b;
         double sim = 1.0;
         for(i = 0;i < len;i++){
                 ap->TGPE += sim;
@@ -262,14 +275,29 @@ int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len)
                         }
                 }
         }
+        len_a = 0;
+        len_b = 0;
+        for(i = 0;i < len;i++){
 
-        sim =   sim / (double) (end - begin);
+                if(a[i] != 255){
+                        len_a++;
+                }
+                if(b[i]  != 255){
+                        len_b++;
+                }
+        }
+
+        sim =   sim / (double) (MACRO_MIN(len_a, len_b));
         //sim = sim * sim * sim * sim;
         //sim = 1.0;
-        //fprintf(stdout,"Sim :%f\n", sim);
+        fprintf(stdout,"Sim :%f\n", sim);
 
+        if(sim > id_threshold){
+                sim = 1.0;
+        }else{
 
-        sim = 1.0;
+                return OK;
+        }
 
 
         for(i = begin;i < end;i++){
