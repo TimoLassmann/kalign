@@ -1,0 +1,241 @@
+#+TITLE:  Test kalign on BAliBASE 
+#+AUTHOR: Timo Lassmann
+#+EMAIL:  timo.lassmann@telethonkids.org.au
+#+DATE:   2019-04-23
+#+LATEX_CLASS: report
+#+OPTIONS:  toc:nil
+#+OPTIONS: H:4
+#+LATEX_CMD: pdflatex
+* Introduction 
+  Let's run kalign on the Bralibase benchmark 
+  
+* Method 
+
+
+
+** script to run test
+   :PROPERTIES:
+   :ORDERED:  t
+   :END:
+
+   The script has points to a bralibase directory containing =structural= and =unaligned= sub directory 
+
+
+   #+BEGIN_SRC bash -n :tangle run_bralibase_test.sh :shebang #!/usr/bin/env bash :noweb yes
+     DIR=`pwd`
+     INDIR=
+     OUTPUT=
+     function usage()
+     {
+
+         printf "This script runs kalign for a across the bralibase test sets.\n\n" ;
+         printf "usage: $0 -i <bralibase root directory> -o <score.csv file>\n";
+         exit 1;
+     }
+
+     while getopts i:o:  opt
+     do
+         case ${opt} in
+             i) INDIR=${OPTARG};;
+             o) OUTPUT=${OPTARG};;
+             ,*) usage;;
+         esac
+     done
+     if [ "${INDIR}" == "" ]; then usage; fi
+     if [ "${OUTPUT}" == "" ]; then usage; fi
+
+
+     if [ -f $OUTPUT ]; then
+         printf "OUTPUT file exits - will overwrite.\n";
+         rm $OUTPUT
+     fi 
+
+     function run_test()
+     {
+         dir=$1
+         name=$2
+         echo "$name"
+
+         for file in "$dir"/unaligned/*.fa
+         do
+             ref="${file//unaligned/structural}" 
+        # printf "Working on %s\n" $file;
+             kalign $file -o test.msf  2>&1 > /dev/null
+             kalign $ref -r -o ref.msf 2>&1 > /dev/null
+             bali_score ref.msf test.msf | grep auto | awk -v name="$name" '{printf "%s,%f,%f\n" , name, $3, $4}' >> $OUTPUT
+
+         done
+
+     }
+
+     run_test $INDIR/data-set1/g2intron g2intron
+     run_test $INDIR/data-set1/rRNA rRNA
+     run_test $INDIR/data-set1/SRP SRP
+     run_test $INDIR/data-set1/tRNA tRNA
+     run_test $INDIR/data-set1/U5 U5
+
+
+   #+END_SRC
+
+
+   #+BEGIN_SRC sh :session onesh
+     cd ~/data/bb3_release
+     cd .. 
+
+     mkdir -p bb3_release_tmp_aln
+     cd bb3_release_tmp_aln
+     KALIGNOUTDIR=$PWD 
+     echo $KALIGNOUTDIR
+
+   #+END_SRC
+
+   #+RESULTS:
+   |                                                                             |
+   | sh-4.4$ sh-4.4$ sh-4.4$ sh-4.4$ sh-4.4$ /home/user/data/bb3_release_tmp_aln |
+   #+BEGIN_SRC sh :session onesh :results raw
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign -alnp param_25.txt %s -o %s/%s_%skalign25.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_kalign.sh
+
+
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign -alnp param_50.txt  %s -o %s/%s_%skalign50.msf\n", $1,outdir,a[n-2],a[n-1] }' >> run_kalign.sh
+
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign -alnp param_75.txt  %s -o %s/%s_%skalign75.msf\n", $1,outdir,a[n-2],a[n-1] }' >> run_kalign.sh
+
+   #+END_SRC 
+
+   #+BEGIN_SRC sh :session onesh :results raw 
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign  %s -o %s/%s_%skalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_kalign.sh
+
+     find ~/data/bb3_release -name "*.tfa"  | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "clustalo --dealign -i  %s --outfmt=msf -o %s/%s_%sclustalo.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_clustalo.sh
+
+      find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/);
+     printf "kalign %s -set 0 -o %s/%s_%skalign_1.msf\n", $1,outdir,a[n-2],a[n-1] ;
+     printf "kalign %s -set 1 -o %s/%s_%skalign_2.msf\n", $1,outdir,a[n-2],a[n-1] ;
+     printf "kalign %s -set 2 -o %s/%s_%skalign_3.msf\n", $1,outdir,a[n-2],a[n-1] ;
+     printf "kalign %s -set 3 -o %s/%s_%skalign_4.msf\n", $1,outdir,a[n-2],a[n-1] ;
+     }' > run_kalign_cmsa.sh
+
+
+find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/);
+     printf "cmsa -a  %s/%s_%skalign_*.msf -out %s/%s_%skalign_cmsa.msf -f msf \n",outdir,a[n-2],a[n-1],outdir,a[n-2],a[n-1] ;
+     }' > run_cmsa.sh
+
+     chmod 755 run_kalign_cmsa.sh 
+
+
+     chmod 755 run_kalign.sh 
+     chmod 755 run_clustalo.sh
+
+   #+END_SRC
+
+   #+RESULTS:
+
+   #+BEGIN_SRC sh :session onesh :results raw 
+
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%skalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > alignment_scores.sh
+
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%skalign_1.msf\n", $1,outdir,a[n-2],a[n-1] }' > alignment_scores_set1.sh
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%skalign_2.msf\n", $1,outdir,a[n-2],a[n-1] }' > alignment_scores_set2.sh
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%skalign_3.msf\n", $1,outdir,a[n-2],a[n-1] }' > alignment_scores_set3.sh
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%skalign_4.msf\n", $1,outdir,a[n-2],a[n-1] }' > alignment_scores_set4.sh
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%skalign_5.msf\n", $1,outdir,a[n-2],a[n-1] }' > alignment_scores_set5.sh
+
+
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%skalign_cmsa.msf\n", $1,outdir,a[n-2],a[n-1] }' > alignment_scores_cmsa.sh
+
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%sclustalo.msf\n", $1,outdir,a[n-2],a[n-1] }' >> alignment_scores.sh
+
+
+     chmod 755 alignment_scores.sh
+   #+END_SRC
+
+
+   #+RESULTS:
+
+   run the tests 
+
+   #+BEGIN_SRC sh :session onesh
+     parallel --jobs 5 < ./run_kalign.sh 
+     parallel --jobs 5 < ./run_clustalo.sh 
+     ./alignment_scores.sh | grep auto > scores2.csv
+
+   #+END_SRC
+   
+** Step 3: plot scores 
+
+   #+BEGIN_SRC R :session  one :results none :export none 
+
+     library(tidyverse)
+     library(ggplot2)
+     library(stringi)
+     library(cowplot)
+     readBaliscores <-function(file,name){
+       mat  <- read.table(file);
+       colnames(mat) <- c("Type","Name","SP","TC")
+       mat$Type <- name
+       mat$Name <- sub(".*/" ,"", mat$Name)
+       mat$Name <- sub("[A-Z,_]*[.]{1}[A-Z]*$" ,"", mat$Name,ignore.case = TRUE)
+       mat <- as.tibble(mat)
+       x = str_split(mat$Name, "_", n = Inf, simplify = TRUE)
+       mat$Group <- x[,1] 
+       return(mat)
+
+     }
+
+
+   #+END_SRC
+
+
+   
+
+   #+BEGIN_SRC R :session one :results output graphics :file BalibaseSP_scores.jpeg :exports both :width 160 :height 80
+
+     mat <- readBaliscores("scores_kalign_old.csv","kalign old");
+     mat <- rbind(mat,readBaliscores("scores_kalign_newp.csv","kalign newp"));
+     mat <- rbind(mat,readBaliscores("scores_kalign_digi.csv","kalign digi"));
+     mat <- rbind(mat,readBaliscores("scores_kalign_digi2.csv","kalign digi 2"));
+     mat <- rbind(mat,readBaliscores("scores_kalign_dist2.csv","kalign dist 2"));
+
+     ##      mat <- rbind(mat,readBaliscores("scores_kalign_3.csv","kalign 3"));
+
+     ## mata
+     ## <- rbind(mat,readBaliscores("scores_kalign_bibpm.csv","bibpm"));
+     ## mat 
+     ## <- rbind(mat,readBaliscores("scores_kalign_bibpm_zero.csv","bibpm_zero"));
+
+
+     p1 <- ggplot(mat, aes(Group, SP))
+     p1 <- p1 + geom_boxplot(aes(colour = Type))
+
+     means <- aggregate(SP ~  Type, mat, mean)
+     means$SP <- round(means$SP,digits = 4)
+     p2 <- ggplot(mat, aes(Type, SP))
+     p2 <- p2 + geom_boxplot(aes(colour = Type))
+     p2 <- p2 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
+     p2 <- p2 + geom_text(data = means, aes(label = SP, y = SP + 0.08))
+
+     p3 <- ggplot(mat, aes(Group, TC))
+     p3 <- p3 + geom_boxplot(aes(colour = Type))
+
+     means <- aggregate(TC ~  Type, mat, mean)
+     means$TC <- round(means$TC,digits = 4)
+
+     p4 <- ggplot(mat, aes(Type, TC))
+     p4 <- p4 + geom_boxplot(aes(colour = Type))
+     p4 <- p4 + geom_boxplot(aes(colour = Type))
+     p4 <- p4 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
+     p4 <- p4 + geom_text(data = means, aes(label = TC, y = TC + 0.08))
+
+
+
+     p  = plot_grid(p1,p2,p3,p4, labels=c("SP", "TC"), ncol = 2, nrow= 2)
+
+
+
+
+   #+END_SRC
+
+   #+RESULTS:
+   [[file:BalibaseSP_scores.jpeg]]
+
+
+

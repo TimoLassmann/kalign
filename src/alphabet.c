@@ -150,12 +150,12 @@ int create_default_protein(struct alphabet* a)
 int create_default_DNA(struct alphabet* a)
 {
 
-        char dnacode[6] = "ACGTUN";
+        char dnacode[16] = "ACGTUNRYSWKMBDHV";
 
         int code;
         int i;
         code = 0;
-        for(i = 0; i < 6;i++){
+        for(i = 0; i < 1s6;i++){
                 //fprintf(stdout,"%c %d CODE: %d\n", aacode[i], (int) aacode[i], code);
                 a->to_internal[(int) dnacode[i]] = code;
 
@@ -163,6 +163,28 @@ int create_default_DNA(struct alphabet* a)
         }
 
         merge_codes(a,'U','T');
+
+        /* R.................A or G */
+        /* Y.................C or T */
+        /* S.................G or C */
+        /* W.................A or T */
+        /* K.................G or T */
+        /* M.................A or C */
+        /* B.................C or G or T */
+        /* D.................A or G or T */
+        /* H.................A or C or T */
+        /* V.................A or C or G */
+        merge_codes(a,'N','R');
+        merge_codes(a,'N','Y');
+        merge_codes(a,'N','S');
+        merge_codes(a,'N','W');
+        merge_codes(a,'N','K');
+        merge_codes(a,'N','M');
+        merge_codes(a,'N','B');
+        merge_codes(a,'N','D');
+        merge_codes(a,'N','H');
+        merge_codes(a,'N','V');
+
         return OK;
 }
 
