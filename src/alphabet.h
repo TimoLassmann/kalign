@@ -3,9 +3,9 @@
 
 #include "global.h"
 
-#define defPROTEIN 1
-#define redPROTEIN 2
-#define defDNA 3
+#define defPROTEIN 21
+#define redPROTEIN 13
+#define defDNA 5
 
 
 struct alphabet{

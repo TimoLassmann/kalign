@@ -1,6 +1,7 @@
 #include "alphabet.h"
 
 int create_default_protein(struct alphabet* a);
+int create_default_DNA(struct alphabet* a);
 int create_reduced_protein(struct alphabet* a);
 
 int clean_and_set_to_extern(struct alphabet* a);
@@ -21,6 +22,11 @@ int main(int argc, char *argv[])
         MFREE(a);
         a = NULL;
         RUNP(a = create_alphabet(redPROTEIN));
+
+        print_alphabet(a);
+        MFREE(a);
+
+        RUNP(a = create_alphabet(defDNA));
 
         print_alphabet(a);
         MFREE(a);
@@ -61,6 +67,10 @@ struct alphabet* create_alphabet(int type)
         switch (type) {
         case defPROTEIN : {
                 create_default_protein(a);
+                break;
+        }
+        case defDNA : {
+                create_default_DNA(a);
                 break;
         }
         case redPROTEIN : {
@@ -134,6 +144,25 @@ int create_default_protein(struct alphabet* a)
         a->to_internal[(int) 'X'] = code;
 
         code++;
+        return OK;
+}
+
+int create_default_DNA(struct alphabet* a)
+{
+
+        char dnacode[6] = "ACGTUN";
+
+        int code;
+        int i;
+        code = 0;
+        for(i = 0; i < 6;i++){
+                //fprintf(stdout,"%c %d CODE: %d\n", aacode[i], (int) aacode[i], code);
+                a->to_internal[(int) dnacode[i]] = code;
+
+                code++;
+        }
+
+        merge_codes(a,'U','T');
         return OK;
 }
 

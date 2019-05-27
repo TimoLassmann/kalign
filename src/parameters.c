@@ -19,6 +19,7 @@ struct parameters* init_param(void)
         param->input = NULL;
         param->outfile = NULL;
         param->format = NULL;
+        param->reformat = 0;
         param->help_flag = 0;
         param->quiet = 0;
         return param;

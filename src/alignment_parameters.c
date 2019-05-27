@@ -1,8 +1,9 @@
 
 #include "alignment_parameters.h"
 
+#include "alphabet.h"
 int set_subm_gaps(struct aln_param* ap);
-
+int set_subm_gaps_DNA(struct aln_param* ap);
 int set_param_number(struct aln_param* ap,int L, int sel);
 int read_aln_param_from_file(struct aln_param* ap, char* infile, int L);
 
@@ -10,6 +11,8 @@ struct aln_param* init_ap(int numseq,int L)
 {
         struct aln_param* ap = NULL;
         int i,j;
+
+
 
 
         MMALLOC(ap, sizeof(struct aln_param));
@@ -33,7 +36,15 @@ struct aln_param* init_ap(int numseq,int L)
                 }
         }
         //if(param->param_set == -1){
-        RUN(set_subm_gaps(ap));
+
+        if(L ==defDNA){
+                LOG_MSG("DNADNADNA");
+                //exit(0);
+                RUN(set_subm_gaps_DNA(ap));
+        }else if(L == defPROTEIN){
+
+                RUN(set_subm_gaps(ap));
+        }
                 //}else{
                 //set_param_number(ap, L, param->param_set);
                 //}
@@ -164,6 +175,49 @@ void free_ap(struct aln_param* ap)
 }
 
 
+int set_subm_gaps_DNA(struct aln_param* ap)
+{
+        int i,j;
+
+
+        for(i = 0; i < 5; i++){
+
+                for(j =0; j < 5;j++){
+                        ap->subm[i][j] = 283;
+                }
+        }
+        //	A   91 -114  -31 -123    0  -43
+        ap->subm[0][0] += 91;
+        ap->subm[0][1] += -114;
+        ap->subm[0][2] += -31;
+        ap->subm[0][3] += -123;
+
+//	C -114  100 -125  -31    0  -43
+        ap->subm[1][0] += -114;
+        ap->subm[1][1] += 100;
+        ap->subm[1][2] += -125;
+        ap->subm[1][3] += -31;
+
+//	G  -31 -125  100 -114    0  -43
+        ap->subm[2][0] += -31;
+        ap->subm[2][1] += -125;
+        ap->subm[2][2] += 100;
+        ap->subm[2][3] += -114;
+
+//	T -123  -31 -114   91    0  -43
+        ap->subm[3][0] += -123;
+        ap->subm[3][1] += -31;
+        ap->subm[3][2] += -114;
+        ap->subm[3][3] += 91;
+
+        ap->gpo = 217;
+        ap->gpe = 39.4;
+        ap->tgpe =  292.6;
+        //param->secret = 28.3;
+ 			  //		     A    C    G    T    .    N
+
+        return OK;
+}
 int set_subm_gaps(struct aln_param* ap)
 {
         int i,j;

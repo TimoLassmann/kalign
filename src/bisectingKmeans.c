@@ -7,6 +7,7 @@
 
 #include "alignment.h"
 #include "pick_anchor.h"
+
 struct node{
         struct node* left;
         struct node* right;

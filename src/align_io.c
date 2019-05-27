@@ -27,6 +27,7 @@ struct names{
         int* len;
 };
 
+int detect_alphabet(struct alignment* aln);
 
 int aln_output(struct alignment* aln,struct parameters* param);
 int macsim_output(struct alignment* aln,char* outfile,char* infile);
@@ -143,12 +144,12 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
         /* allocate alignment structure */
         RUNP(aln = aln_alloc(b->numseq));
         /* read sequences */
-        RUN(read_all_sequences(aln,b));
+
+        RUN(read_all_aligned_sequences(aln, b));
+        //RUN(read_all_sequences(aln,b));
 
 
-        /* convert to internal format  */
-
-        RUN(convert_alignment_to_internal(aln, defPROTEIN));
+        RUN(detect_alphabet(aln));
 
 
         if(aln->numseq < 2){
@@ -2143,6 +2144,7 @@ int output(struct alignment* aln,struct parameters* param)
 {
         ASSERT(aln!= NULL, "No alignment");
         ASSERT(param != NULL, "No parameters");
+        LOG_MSG("Output in %s format", param->format);
         if(!param->format){
                 fasta_output(aln,param->outfile);
         }else{
@@ -2860,4 +2862,77 @@ void names_free(struct names* n)
         MFREE(n->end);
         MFREE(n->len);
         MFREE(n);
+}
+
+
+
+int detect_alphabet(struct alignment* aln)
+{
+        char* seq = NULL;
+        int len;
+        int i,j;
+        int min,c;
+        uint8_t DNA[256];
+        uint8_t protein[256];
+        uint8_t query[256];
+        int diff[3];
+        char DNA_letters[]= "acgtACGTnN";
+        char protein_letters[] = "ACDEFGHIKLMNPQRSTVWY";
+
+
+        ASSERT(aln != NULL, "No alignment");
+
+        for(i = 0; i <256;i++){
+                DNA[i] = 0;
+                protein[i] = 0;
+                query[i] = 0;
+        }
+
+        for(i = 0 ; i < strlen(DNA_letters);i++){
+                DNA[(int) DNA_letters[i]] = 1;
+        }
+
+        for(i = 0 ; i < strlen(protein_letters);i++){
+                protein[(int) protein_letters[i]] = 1;
+        }
+
+        for(i = 0; i < aln->numseq;i++){
+                len  = aln->sl[i];
+                seq = aln->seq[i];
+                for(j = 0; j < len;j++){
+                        query[(int)seq[j]] = 1;
+                }
+        }
+
+        diff[0] = 0;
+        diff[1] = 0;
+        for(i = 0; i < 256;i++){
+                if(query[i] != DNA[i]){
+                        diff[0]++;
+                }
+                if(query[i] != protein[i]){
+                        diff[1]++;
+                }
+        }
+
+        c = -1;
+        min = 2147483647;
+        for(i = 0; i < 2;i++){
+                if(diff[i] < min){
+                        min = diff[i];
+                        c = i;
+                }
+        }
+        if(c == 0){
+                LOG_MSG("Detected DNA sequences.");
+                RUN(convert_alignment_to_internal(aln, defDNA));
+        }else if(c == 1){
+                LOG_MSG("Detected protein sequences.");
+                RUN(convert_alignment_to_internal(aln, defPROTEIN));
+        }else{
+                ERROR_MSG("Alphabet not recognized.");
+        }
+        return OK;
+ERROR:
+        return FAIL;
 }

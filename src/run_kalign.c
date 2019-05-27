@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
                 };
 
                 int option_index = 0;
-                c = getopt_long_only (argc, argv,"i:o:r:f:hq",long_options, &option_index);
+                c = getopt_long_only (argc, argv,"i:o:rf:hq",long_options, &option_index);
                 //c = getopt (argc, argv, "hi:o:");
                 /* Detect the end of the options. */
 
@@ -158,25 +158,26 @@ int run_kalign(struct parameters* param)
         RUNP(aln = detect_and_read_sequences(param));
         /* copy dna parameter to alignment */
         //aln->dna = param->dna;
-        RUN(detect_dna(aln));
+
         LOG_MSG("Detected: %d sequences.", aln->numseq);
         //LOG_MSG("Output is %s in format %s.", param->outfile,param->format);
         //LOG_MSG("Is DNA: %d", aln->dna);
         //param->dna = aln->dna;
         /* If we just want to reformat end here */
         if(param->reformat){
+                //LOG_MSG("%s reformat",param->reformat);
                 for (i = 0 ;i < aln->numseq;i++){
                         aln->nsip[i] = i;
                         for (j = 0; j < aln->sl[i];j++){
                                 aln->s[i][j] = 0;
                         }
                 }
-                param->format = "fasta";//param->reformat;
+                //sparam->format = param->reformat;
                 RUN(output(aln, param));
                 free_aln(aln);
                 return OK;
         }
-
+        RUN(dealign(aln));
 
 
         //param->param_set = 4;
@@ -268,35 +269,6 @@ int run_kalign(struct parameters* param)
 
         free_aln(aln);
         free_ap(ap);
-        return OK;
-ERROR:
-        return FAIL;
-}
-
-
-int detect_dna(struct alignment* aln)
-{
-        int i;
-        ASSERT(aln != NULL, "No alignment.");
-
-        if(aln->dna){
-                for(i = 0; i < aln->numseq;i++){
-                        aln->dna = byg_detect(aln->s[i],aln->sl[i]);
-                        if(aln->dna){
-                                break;
-                        }
-                }
-        }
-
-        if(aln->dna == 1){
-                //brief sanity check...
-                for(i = 0; i < aln->numseq;i++){
-                        if(aln->sl[i] < 6){
-                                ERROR_MSG("Dna/Rna alignments are only supported for sequences longer than 6.");
-                        }
-                }
-                RUN(make_dna(aln));
-        }
         return OK;
 ERROR:
         return FAIL;

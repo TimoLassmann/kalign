@@ -179,6 +179,7 @@ find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split 
      mat <- rbind(mat,readBaliscores("scores_kalign_newp.csv","kalign newp"));
      mat <- rbind(mat,readBaliscores("scores_kalign_digi.csv","kalign digi"));
      mat <- rbind(mat,readBaliscores("scores_kalign_digi2.csv","kalign digi 2"));
+     mat <- rbind(mat,readBaliscores("scores_kalign_dist2.csv","kalign dist 2"));
 
      ##      mat <- rbind(mat,readBaliscores("scores_kalign_3.csv","kalign 3"));
 

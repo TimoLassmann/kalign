@@ -97,8 +97,6 @@ float** pair_aln_dist(struct alignment* aln, struct aln_param* ap, int* num_anch
 
         RUNP(anchors = pick_anchor(aln, num_anchors));
 
-
-
         //RUNP(dm = galloc(dm,i,i,0.0f));
 
         MMALLOC(dm, sizeof(float*)* numseq);
@@ -115,7 +113,6 @@ float** pair_aln_dist(struct alignment* aln, struct aln_param* ap, int* num_anch
                 for(j = 0; j < c;j++){
                         dm[i][j] = 0.0f;
                 }
-
         }
         //fprintf(stdout,"%d C \n",c);
         i  = aln->sl[anchors[0]] + 2;
