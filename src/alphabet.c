@@ -155,7 +155,7 @@ int create_default_DNA(struct alphabet* a)
         int code;
         int i;
         code = 0;
-        for(i = 0; i < 1s6;i++){
+        for(i = 0; i < 16;i++){
                 //fprintf(stdout,"%c %d CODE: %d\n", aacode[i], (int) aacode[i], code);
                 a->to_internal[(int) dnacode[i]] = code;
 

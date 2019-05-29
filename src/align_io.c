@@ -146,9 +146,19 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
         /* read sequences */
 
         RUN(read_all_aligned_sequences(aln, b));
+
+        aln->max_len = 0;
+        for(i = 0; i < aln->numseq;i++){
+                if(aln->sl[i] > aln->max_len){
+                        aln->max_len = aln->sl[i];
+                }
+
+        }
+        aln->gaps = galloc(aln->gaps,aln->numseq,aln->max_len+1,0);
+
+
         //RUN(read_all_sequences(aln,b));
-
-
+        //RUN(test_if_aligned(aln));
         RUN(detect_alphabet(aln));
 
 
@@ -172,14 +182,6 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
                 //fprintf(stderr,"Output file: %s, in %s format.\n",param->outfile,param->format);
         }
 
-        aln->max_len = 0;
-        for(i = 0; i < aln->numseq;i++){
-                if(aln->sl[i] > aln->max_len){
-                        aln->max_len = aln->sl[i];
-                }
-
-        }
-        aln->gaps = galloc(aln->gaps,aln->numseq,aln->max_len+1,0);
         /* translate to internal */
         free_align_io_buffer(b);
         return aln;
@@ -193,19 +195,8 @@ int dealign(struct alignment* aln)
 {
         int i;
         int j;
-        int c;
+
         for(i = 0; i < aln->numseq;i++){
-                //fprintf(stdout,"%s\n",aln->seq[i]);
-                c = 0;
-                for(j = 0; j < aln->sl[i];j++){
-                        if(isalpha(aln->seq[i][j])){
-                                aln->seq[i][c] = aln->seq[i][j];
-                                c++;
-                        }
-                }
-                aln->seq[i][c] =0;
-                //            c++;
-                aln->sl[i] = c;
                 for(j = 0; j < aln->sl[i]+1;j++){
                         aln->gaps[i][j] = 0;
                 }
@@ -219,18 +210,24 @@ int convert_alignment_to_internal(struct alignment* aln, int type)
         struct alphabet* a = NULL;
 
         int8_t* t = NULL;
-        int i,j;
+        int i,j,c;
 
         RUNP(a = create_alphabet(type));
 
         t = a->to_internal;
         aln->L = a->L;
         for(i = 0; i < aln->numseq;i++){
+                c = 0;
                 for(j =0 ; j < aln->sl[i];j++){
-                        //       fprintf(stdout,"%c", aln->seq[i][j] );
-                        aln->s[i][j] = t[(int) aln->seq[i][j]];
+                        if(t[(int) aln->seq[i][j]] == -1){
+                                aln->gaps[i][c]++;
+                        }else{
+                                aln->seq[i][c] = aln->seq[i][j];
+                                aln->s[i][c] = t[(int) aln->seq[i][j]];
+                                c++;
+                        }
                 }
-                //fprintf(stdout,"\n");
+                aln->sl[i] = c;
         }
         aln->L = a->L;
         MFREE(a);
@@ -2877,8 +2874,7 @@ int detect_alphabet(struct alignment* aln)
         uint8_t query[256];
         int diff[3];
         char DNA_letters[]= "acgtACGTnN";
-        char protein_letters[] = "ACDEFGHIKLMNPQRSTVWY";
-
+        char protein_letters[] = "acdefghiklmnpqrstvwyACDEFGHIKLMNPQRSTVWY";
 
         ASSERT(aln != NULL, "No alignment");
 
@@ -2900,7 +2896,9 @@ int detect_alphabet(struct alignment* aln)
                 len  = aln->sl[i];
                 seq = aln->seq[i];
                 for(j = 0; j < len;j++){
-                        query[(int)seq[j]] = 1;
+                        query[(int)toupper(seq[j])] = 1;
+                        query[(int)tolower(seq[j])] = 1;
+
                 }
         }
 
@@ -2914,7 +2912,7 @@ int detect_alphabet(struct alignment* aln)
                         diff[1]++;
                 }
         }
-
+        //LOG_MSG("%d %d", diff[0],diff[1]);
         c = -1;
         min = 2147483647;
         for(i = 0; i < 2;i++){

@@ -624,6 +624,7 @@ uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
                 //fprintf(stdout,"%d:\t",i);
 //fprintf(stderr,"%c",*t + 65);
                 //X = (B[(int) *t] | VN);
+
                 X = _mm256_or_si256(B[t[i]], VN);
                                 //fprintf(stdout,"%lu ", X);
                 //D0 = ((VP+(X&VP)) ^ VP) | X ;

@@ -182,6 +182,7 @@ int run_kalign(struct parameters* param)
 
         //param->param_set = 4;
         /* allocate aln parameters  */
+
         RUNP(ap = init_ap(aln->numseq,aln->L));
         //fprintf(stderr,"        %0.8f	gap open penalty\n",ap->gpo);
         //fprintf(stderr,"        %0.8f	gap extension\n",(float)gpe/10);
@@ -235,7 +236,8 @@ int run_kalign(struct parameters* param)
                         if(map[i]){
                                 MFREE(map[i]);
                         }
-                }
+
+ }
                 MFREE(map);
                 map = NULL;
 
