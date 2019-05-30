@@ -22,7 +22,7 @@ int* pick_anchor(struct alignment* aln, int* n)
 
         ASSERT(aln != NULL, "No alignment.");
 
-        num_anchor = MACRO_MAX(MACRO_MIN(8, aln->numseq), (int) pow(log2((double) aln->numseq), 2.0));
+        num_anchor = MACRO_MAX(MACRO_MIN(16, aln->numseq), (int) pow(log2((double) aln->numseq), 2.0));
         RUNP(anchors = select_seqs(aln, num_anchor));
         *n = num_anchor;
         return anchors;

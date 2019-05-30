@@ -669,7 +669,7 @@ float** bpm_distance_pair(struct alignment* aln, int* selection, int num_sel)
 
                                 //dist = aln_distance(struct alignment *aln, struct aln_param *ap)
 
-                                dm[i][j] = dist;
+                                dm[i][j] = dist;//*dist;
                                 dm[j][i] = dm[i][j];
                         }
                         //fprintf(stdout,"\n");
@@ -698,7 +698,7 @@ float** bpm_distance_pair(struct alignment* aln, int* selection, int num_sel)
                                 //dm[i][j] = exp((double)  dist+1.0);
                                 //fprintf(stdout,"%d %d %f\n", i,j, dm[i][j]);
 //dm[i][j] = dist;
-                                dm[i][j] = dist * dist * dist;
+                                dm[i][j] = dist;// * dist;
                                 dm[j][i] = dm[i][j];
                         }
                         //fprintf(stdout,"\n");
