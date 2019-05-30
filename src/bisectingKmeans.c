@@ -284,10 +284,10 @@ struct node* bisecting_kmeans(struct alignment*aln, struct node* n, float** dm,i
 
         if(num_samples < 100){
                 float** dm = NULL;
-
+                //dm = protein_wu_distance(aln, 58, 0, samples, num_samples);
                 dm = bpm_distance_pair(aln, samples, num_samples);
 //                MFREE(n);
-
+                //RUN(unit_zero(dm, num_samples, num_samples));
                 n = upgma(dm,samples, num_samples);
                 gfree(dm);
                 MFREE(samples);
@@ -304,7 +304,8 @@ struct node* bisecting_kmeans(struct alignment*aln, struct node* n, float** dm,i
                 n->right = alloc_node();
                 n->left->id = samples[0];
                 n->right->id = samples[1];
-                MFREE(samples);
+
+   MFREE(samples);
                 return n;
 
         }*/

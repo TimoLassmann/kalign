@@ -4,6 +4,7 @@
 
 int min (heap_t *h, int i, int j, int k);
 
+int print_heap(heap_t *h, int num);
 #ifdef ITEST
 
 int main(int argc, char *argv[])
@@ -20,12 +21,13 @@ int main(int argc, char *argv[])
         //r = r % num_samples;
         heap_t* h = NULL;
         RUNP(h = create_heap(heap_size));
-        for(i = 0; i < 10;i++){
+        for(i = 0; i < 88;i++){
                 j = tl_random_int(rng,100);
                 push_heap(h, i,j);
 
         }
 
+        print_heap(h,heap_size);
 
         for(i = 0; i < h->len;i++){
                 j = pop_heap(h);
@@ -99,6 +101,7 @@ void push_heap(heap_t *h, int v, int p)
         h->index[v] = i;
 }
 
+
 int min(heap_t *h, int i, int j, int k)
 {
         int m = i;
@@ -107,6 +110,17 @@ int min(heap_t *h, int i, int j, int k)
         if (k <= h->len && h->prio[k] < h->prio[m])
                 m = k;
         return m;
+}
+
+int print_heap(heap_t *h, int num)
+{
+
+        int i;
+        for(i = 0; i < num;i++){
+
+                fprintf(stdout,"%d %d\n",h->prio[i], h->data[i]);
+        }
+        return OK;
 }
 
 int pop_heap(heap_t *h)

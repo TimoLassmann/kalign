@@ -642,7 +642,6 @@ float** bpm_distance_pair(struct alignment* aln, int* selection, int num_sel)
         /* Very important to call before bpm_256 */
         set_broadcast_mask();
 
-
         numseq = aln->numseq;
 
         if(num_sel){
@@ -664,8 +663,12 @@ float** bpm_distance_pair(struct alignment* aln, int* selection, int num_sel)
                                         //   dm[i][j] =((float) MACRO_MIN(len_b, 255) - (float) dist) ;/// (float) MACRO_MIN(len_b, 255);
                                 }else{
                                         dist = bpm_256(seq_b, seq_a, len_b, len_a);
+                                        //dist = len_a - dist;
                                         //dm[i][j] = ((float) MACRO_MIN(len_a, 255) - (float) dist);// / (float) MACRO_MIN(len_a, 255);
                                 }
+
+                                //dist = aln_distance(struct alignment *aln, struct aln_param *ap)
+
                                 dm[i][j] = dist;
                                 dm[j][i] = dm[i][j];
                         }
@@ -692,7 +695,10 @@ float** bpm_distance_pair(struct alignment* aln, int* selection, int num_sel)
                                         dist = bpm_256(seq_b, seq_a, len_b, len_a);
                                         //dm[i][j] = ((float) MACRO_MIN(len_a, 255) - (float) dist);// / (float) MACRO_MIN(len_a, 255);
                                 }
-                                dm[i][j] = dist;
+                                //dm[i][j] = exp((double)  dist+1.0);
+                                //fprintf(stdout,"%d %d %f\n", i,j, dm[i][j]);
+//dm[i][j] = dist;
+                                dm[i][j] = dist * dist * dist;
                                 dm[j][i] = dm[i][j];
                         }
                         //fprintf(stdout,"\n");

@@ -597,6 +597,7 @@ uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
         //diff = _mm256_set_epi64x (0ul,0ul,0ul,m);
         diff = m;
         k = m;
+
         //K = _mm256_set_epi64x (0ul,0ul,0ul,m);
         VP     = _mm256_set1_epi64x(0xFFFFFFFFFFFFFFFFul);
         /*i = (256 -m ) / 64;
@@ -688,7 +689,6 @@ uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
 
                 //fprintf(stdout,"%d ",diff);
                 //xmm1 = _mm256_cmpgt_epi64(K, diff);
-
                 k = MACRO_MIN(k, diff);
 
                 //K = _mm256_min_epi32(diff,K);

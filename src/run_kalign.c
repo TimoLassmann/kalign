@@ -10,7 +10,7 @@
 #include "weave_alignment.h"
 #include "misc.h"
 #include <getopt.h>
-
+#include "alphabet.h"
 #define OPT_SET 1
 
 #define OPT_ALNPARAM 2
@@ -49,7 +49,6 @@ int main(int argc, char *argv[])
                 /* Detect the end of the options. */
 
                 if (c == -1){
-
                         break;
                 }
                 switch(c) {
@@ -209,7 +208,13 @@ int run_kalign(struct parameters* param)
 
         //param->dist_method = KALIGNDIST_WU;
         //RUN(build_tree(aln,param,ap));
+
+        RUN(convert_alignment_to_internal(aln,redPROTEIN));
         RUN(build_tree_kmeans(aln,ap));
+        RUN(convert_alignment_to_internal(aln,defPROTEIN ));
+
+
+
         STOP_TIMER(t1);
         LOG_MSG("Took %f sec.", GET_TIMING(t1));
 
