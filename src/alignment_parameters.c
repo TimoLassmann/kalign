@@ -12,9 +12,6 @@ struct aln_param* init_ap(int numseq,int L)
         struct aln_param* ap = NULL;
         int i,j;
 
-
-
-
         MMALLOC(ap, sizeof(struct aln_param));
 
         ap->tree = NULL;
@@ -43,6 +40,8 @@ struct aln_param* init_ap(int numseq,int L)
                 RUN(set_subm_gaps_DNA(ap));
         }else if(L == defPROTEIN){
 
+                RUN(set_subm_gaps(ap));
+        }else if(L == redPROTEIN){
                 RUN(set_subm_gaps(ap));
         }
                 //}else{
@@ -301,7 +300,6 @@ int set_subm_gaps(struct aln_param* ap)
                 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
                 -22,   0,  -5, -28, -27,  51, -40,  22,  -7, -21,   0,  -2, -14, -31, -17, -18, -19, -19, -11,  41,   0,  78,
                 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0};
-
 
         float balimt[]={
                 3.920888,

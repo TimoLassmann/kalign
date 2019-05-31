@@ -275,7 +275,6 @@ int main(int argc, char *argv[])
         for(i = 0; i < d->num_gen;i++){
                 LOG_MSG("Gen %d",i);
                 RUN(sample_pop(d));
-
                 //RUN(write_kalign_parameter_files(d));
                 eval_batch(bt, pool, d->num_threads);
 //                exit(0);
@@ -427,7 +426,9 @@ void* run_kalign_batch_thread(void *threadarg)
                                 /* run kalign */
                                 RUNP(ap = init_ap(aln->numseq,aln->L));
                                 RUN(fill_sampled_parameters(ap, data->bt->pbil->population[j]->param, aln->L));
+                                convert_alignment_to_internal(aln,redPROTEIN);
                                 RUN(build_tree_kmeans(aln,ap));
+                                convert_alignment_to_internal(aln,defPROTEIN);
                                 RUNP(map = hirschberg_alignment(aln, ap));
                                 RUN(weave(aln , map, ap->tree));
 

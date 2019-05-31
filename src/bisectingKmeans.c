@@ -81,8 +81,12 @@ int random_tree(struct aln_param* ap, int numseq)
 
         }
 
+        MFREE(selection);
         return OK;
 ERROR:
+        if(selection){
+                MFREE(selection);
+        }
         return FAIL;
 }
 

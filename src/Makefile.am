@@ -140,6 +140,8 @@ alphabet.h \
 alphabet.c \
 alignment_parameters.h \
 alignment_parameters.c \
+counts_from_random_trees.h \
+counts_from_random_trees.c \
 estimate_aln_param.h \
 estimate_aln_param.c \
 phmm.h \

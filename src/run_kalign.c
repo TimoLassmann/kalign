@@ -8,6 +8,8 @@
 #include "bisectingKmeans.h"
 #include "alignment.h"
 #include "weave_alignment.h"
+
+#include "counts_from_random_trees.h"
 #include "misc.h"
 #include <getopt.h>
 #include "alphabet.h"
@@ -183,22 +185,19 @@ int run_kalign(struct parameters* param)
         /* allocate aln parameters  */
 
         RUNP(ap = init_ap(aln->numseq,aln->L));
-        //fprintf(stderr,"        %0.8f	gap open penalty\n",ap->gpo);
+
+        //counts_from_random_trees(aln, ap, 10);
+
+
+
+
+//fprintf(stderr,"        %0.8f	gap open penalty\n",ap->gpo);
         //fprintf(stderr,"        %0.8f	gap extension\n",(float)gpe/10);
         //fprintf(stderr,"        %0.8f	gap extension\n",ap->gpe);
         //fprintf(stderr,"        %0.8f	terminal gap penalty\n",(float)tgpe/10);
         //fprintf(stderr,"        %0.8f	terminal gap penalty\n",ap->tgpe);
         //fprintf(stderr,"        %0.8f	bonus\n",param->secret/10);
         //fprintf(stderr,"        %0.8f	bonus\n",param->secret);
-        /*LOG_MSG("Estimating alignment param.");
-        START_TIMER(t1);
-
-        RUN(estimate_aln_param(aln, ap));
-        STOP_TIMER(t1);
-        LOG_MSG("Took %f sec.", GET_TIMING(t1));*/
-
-
-
 
         LOG_MSG("Building guide tree.");
         START_TIMER(t1);
@@ -209,7 +208,7 @@ int run_kalign(struct parameters* param)
         //param->dist_method = KALIGNDIST_WU;
         //RUN(build_tree(aln,param,ap));
 
-        RUN(convert_alignment_to_internal(aln,redPROTEIN));
+        //RUN(convert_alignment_to_internal(aln,redPROTEIN));
         RUN(build_tree_kmeans(aln,ap));
         RUN(convert_alignment_to_internal(aln,defPROTEIN ));
 
@@ -242,7 +241,7 @@ int run_kalign(struct parameters* param)
                                 MFREE(map[i]);
                         }
 
- }
+                }
                 MFREE(map);
                 map = NULL;
 

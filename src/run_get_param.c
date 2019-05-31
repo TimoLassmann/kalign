@@ -191,7 +191,7 @@ int main(int argc, char *argv[])
                 fprintf(stdout,"};\n");
         }else{
                 for(i = 0; i < num_infiles;i++){
-                        //fprintf(stdout,"%s\n",infile[i]);
+                        fprintf(stdout,"%s\n",infile[i]);
                         RUNP(aln = read_alignment(infile[i]));
                         //dealign(aln);
                         RUN(convert_alignment_to_internal(aln, defPROTEIN));
@@ -224,15 +224,36 @@ ERROR:
 int fill_counts(struct counts* ap, struct alignment* aln)
 {
         int i,j;
+        int aln_len;
+
+        uint8_t* aligned_a = NULL;
+        uint8_t* aligned_b = NULL;
+
+
+        for(i = 0; i <= aln->sl[0];i++){
+                aln_len += aln->gaps[0][i];
+        }
+        aln_len += aln->sl[0];
+        LOG_MSG("Aln len: %d.",aln_len);
+
+        MMALLOC(aligned_a, sizeof(uint8_t) * aln_len);
+        MMALLOC(aligned_b, sizeof(uint8_t) * aln_len);
 
         for(i = 0; i < aln->numseq;i++){
                 ap->num_seq++;
                 ap->eta += aln->sl[i];
+                RUN(make_aliged_seq(aligned_a, aln->s[i], aln->gaps[i], aln->sl[i]));
                 for(j = i+1; j < aln->numseq;j++){
-                        ASSERT(aln->sl[i] == aln->sl[j], "Sequences not aligned?");
-                        RUN(pair_fill(ap, aln->s[i], aln->s[j], aln->sl[i], ap->id_threshold));
+                        //ASSERT(aln->sl[i] == aln->sl[j], "Sequences not aligned?");
+
+
+                        RUN(make_aliged_seq(aligned_b, aln->s[j], aln->gaps[j], aln->sl[j]));
+
+                        RUN(pair_fill(ap, aligned_a, aligned_b, aln_len, ap->id_threshold));
                 }
         }
+        MFREE(aligned_a);
+        MFREE(aligned_b);
         return OK;
 ERROR:
         return FAIL;
@@ -249,6 +270,9 @@ int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len,double id_threshold
         int len_a;
         int len_b;
         double sim = 1.0;
+
+
+
         for(i = 0;i < len;i++){
                 ap->TGPE += sim;
                 if(a[i] != 255 && b[i] != 255){

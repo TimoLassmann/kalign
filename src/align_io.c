@@ -2926,7 +2926,7 @@ int detect_alphabet(struct alignment* aln)
                 RUN(convert_alignment_to_internal(aln, defDNA));
         }else if(c == 1){
                 LOG_MSG("Detected protein sequences.");
-                RUN(convert_alignment_to_internal(aln, defPROTEIN));
+                RUN(convert_alignment_to_internal(aln, redPROTEIN));
         }else{
                 ERROR_MSG("Alphabet not recognized.");
         }
