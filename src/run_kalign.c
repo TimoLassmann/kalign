@@ -201,13 +201,10 @@ int run_kalign(struct parameters* param)
 
         LOG_MSG("Building guide tree.");
         START_TIMER(t1);
-
         //random_tree(ap, aln->numseq);
-
         //RUN(convert_alignment_to_internal(aln,defPROTEIN ));
         //param->dist_method = KALIGNDIST_WU;
         //RUN(build_tree(aln,param,ap));
-
         //RUN(convert_alignment_to_internal(aln,redPROTEIN));
         RUN(build_tree_kmeans(aln,ap));
         RUN(convert_alignment_to_internal(aln,defPROTEIN ));

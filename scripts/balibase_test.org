@@ -192,7 +192,7 @@ find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split 
      p1 <- ggplot(mat, aes(Group, SP))
      p1 <- p1 + geom_boxplot(aes(colour = Type))
 
-     means <- aggregate(SP ~  Type, mat, mean)
+     means <- aggregate(SP ~  Type, mat, median)
      means$SP <- round(means$SP,digits = 4)
      p2 <- ggplot(mat, aes(Type, SP))
      p2 <- p2 + geom_boxplot(aes(colour = Type))
@@ -202,7 +202,7 @@ find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split 
      p3 <- ggplot(mat, aes(Group, TC))
      p3 <- p3 + geom_boxplot(aes(colour = Type))
 
-     means <- aggregate(TC ~  Type, mat, mean)
+     means <- aggregate(TC ~  Type, mat, median)
      means$TC <- round(means$TC,digits = 4)
 
      p4 <- ggplot(mat, aes(Type, TC))
