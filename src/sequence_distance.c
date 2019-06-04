@@ -856,7 +856,7 @@ float protein_wu_distance_calculation(struct bignode* hash[],const uint8_t* seq,
         }
         for (i = seqlen-2;i--;){
                 //for(i = 0; i < seqlen-2;i++){
-                hv = (seq[i+1] << 5) + seq[i+2];
+                /*hv = (seq[i+1] << 5) + seq[i+2];
 
                 node_p = hash[hv];
                 while(node_p){
@@ -865,7 +865,7 @@ float protein_wu_distance_calculation(struct bignode* hash[],const uint8_t* seq,
                                 d[tmp[j]]++;
                         }
                         node_p = node_p->next;
-                }
+                        }*/
                 hv = (seq[i] << 5) + seq[i+1];
                 //printf("3:%d\n",hv);
                 node_p = hash[hv];
@@ -880,7 +880,7 @@ float protein_wu_distance_calculation(struct bignode* hash[],const uint8_t* seq,
                         }
                         node_p = node_p->next;
                 }
-                /*hv = (seq[i] << 5) + seq[i+2];
+                hv = (seq[i] << 5) + seq[i+2];
 
                 node_p = hash[hv];
 
@@ -892,7 +892,7 @@ float protein_wu_distance_calculation(struct bignode* hash[],const uint8_t* seq,
                                 d[c]++;
                         }
                         node_p = node_p->next;
-                        }*/
+                        }
                 d++;
 
 

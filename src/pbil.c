@@ -371,7 +371,7 @@ int eval_batch(struct batch_train* bt,struct thr_pool* pool,int num_threads)
         for(i = 0; i < bt->pbil->mu;i++){
                 bt->pbil->population[i]->score = 0.0;
                 for(j = 0; j < bt->num_alignments;j++){
-
+                        //fprintf(stdout,"score: %d %d %f\n",j,i, bt->scores[j][i]);
                         bt->pbil->population[i]->score += bt->scores[j][i];
                 }
         }
@@ -565,7 +565,7 @@ int score_aln(struct alignment* aln, int aln_id,  HT_TYPE(TESTINT )* ht, double 
         //MFREE(tmp);
         MFREE(aligned_a);
         MFREE(aligned_b);
-//        LOG_MSG("Alignment: %d , %f %f\n", aln_id,common,pairs);
+        //LOG_MSG("Alignment: %d , %f %f %f", aln_id,common,pairs, common / pairs);
         *score = common /pairs;
         return OK;
 ERROR:
@@ -578,24 +578,42 @@ int fill_pair_hash(struct batch_train* bt)
         struct alignment* aln = NULL;
         int i,j,c,f,g,a,res;
         int* tmp;
+        uint8_t* aligned_a = NULL;
+        uint8_t* aligned_b = NULL;
+        int aln_len;
 
         bt->ht = NULL;
         bt->ht = HT_INIT(TESTINT,1 << 20);
 
+
         for(i = 0; i < bt->num_alignments;i++){
                 //LOG_MSG("Processing aln: %d",i);
                 aln = bt->aln[i];
+                aln_len = 0;
+                for(j = 0; j <= aln->sl[0];j++){
+                        aln_len += aln->gaps[0][j];
+                }
+                aln_len += aln->sl[0];
+                //LOG_MSG("Aln len: %d.",aln_len);
+                MMALLOC(aligned_a, sizeof(uint8_t) * aln_len);
+                MMALLOC(aligned_b, sizeof(uint8_t) * aln_len);
+
                 bt->num_pairs[i] = 0.0;
                 for(j = 0; j < MACRO_MIN(TEST_LIMIT,aln->numseq)-1;j++){
+                        RUN(make_aliged_seq(aligned_a, aln->s[j], aln->gaps[j], aln->sl[j]));
                         for(c = j+1;c < MACRO_MIN(TEST_LIMIT,aln->numseq);c++){
+                                RUN(make_aliged_seq(aligned_b, aln->s[c], aln->gaps[c], aln->sl[c]));
                                 f = 0;
                                 g = 0;
-                                for(a = 0; a < aln->sl[0];a++){
+                                //fprintf(stdout,"Comparting: %d %d\n", j,c);
+                                //fprintf(stdout,"Comparting: %d %d\n", aln->sl[j],aln->sl[c]);
+                                for(a = 0; a < aln_len;a++){
                                         res= 0;
-                                        if(isalpha(aln->seq[j][a])){
+
+                                        if(aligned_a[a] != 255){
                                                 res |= 1;
                                         }
-                                        if(isalpha(aln->seq[c][a])){
+                                        if(aligned_b[a] != 255){
                                                 res |=2;
                                         }
                                         switch(res){
@@ -619,15 +637,22 @@ int fill_pair_hash(struct batch_train* bt)
                                                 f++;
                                                 break;
                                         default:
+
                                                 break;
                                         }
+                                        //fprintf(stdout,"%d %d %d pa:%d pb:%d \n",a, aligned_a[a],aligned_b[a],f,g);
 
                                 }
-
+                                //exit(0);
                         }
                 }
-
+                MFREE(aligned_a);
+                MFREE(aligned_b);
+                if(bt->num_pairs[i] == 0){
+                        ERROR_MSG("Nothing aligned in alignment %d",i);
+                }
         }
+
 /*        HT_PRINT(TESTINT,bt->ht);
         HT_FREE(TESTINT,bt->ht);
         exit(0);*/
@@ -993,7 +1018,7 @@ struct pbil_data* init_pbil_data(int num_param,int num_bits,int num_gen,int samp
         d->min = NULL;
         d->max = NULL;
         d->best = NULL;
-        d->bit_mutation_prob = 0.02;
+        d->bit_mutation_prob = 0.01;
         d->bit_mutation_shift = 0.05;
         MMALLOC(d->bit_prob, sizeof(double) * num_bits * num_param);
         MMALLOC(d->step, sizeof(double) * num_param);

@@ -308,12 +308,12 @@ struct aln_tree_node* real_upgma(float **dm,int ntree,int numseq)
         }
 
         while (cnode != numprofiles){
-                max = FLT_MAX;
+                max = -FLT_MAX;
                 for (i = 0;i < numseq-1; i++){
                         if (as[i]){
                                 for ( j = i + 1;j < numseq;j++){
                                         if (as[j]){
-                                                if (dm[i][j] < max){
+                                                if (dm[i][j] > max){
                                                         max = dm[i][j];
                                                         node_a = i;
                                                         node_b = j;

@@ -73,6 +73,7 @@
      KALIGNOUTDIR=$PWD 
      echo $KALIGNOUTDIR
 
+
    #+END_SRC
 
    #+RESULTS:
@@ -89,7 +90,7 @@
    #+END_SRC 
 
    #+BEGIN_SRC sh :session onesh :results raw 
-     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign  %s -o %s/%s_%skalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_kalign.sh
+     find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign -alnp testparam  %s -o %s/%s_%skalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_kalign.sh
 
      find ~/data/bb3_release -name "*.tfa"  | awk -v outdir="$KALIGNOUTDIR" '{n=split ($1,a,/[\/,.]/); printf "clustalo --dealign -i  %s --outfmt=msf -o %s/%s_%sclustalo.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_clustalo.sh
 

@@ -271,10 +271,12 @@ int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len,double id_threshold
         int len_b;
         double sim = 1.0;
 
+        double tmp_tgpe = 0.0;
 
 
         for(i = 0;i < len;i++){
-                ap->TGPE += sim;
+                tmp_tgpe += sim;
+                //ap->TGPE += sim;
                 if(a[i] != 255 && b[i] != 255){
 
                         begin = i;
@@ -283,7 +285,9 @@ int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len,double id_threshold
         }
 
         for(i = len-1; i>= 0;i--){
-                ap->TGPE += sim;
+                tmp_tgpe += sim;
+
+                //ap->TGPE += sim;
                 if(a[i] != 255 && b[i] != 255){
 
                         end = i;
@@ -317,6 +321,7 @@ int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len,double id_threshold
         fprintf(stdout,"Sim :%f\n", sim);
 
         if(sim > id_threshold){
+                ap->TGPE += tmp_tgpe;
                 sim = 1.0;
         }else{
 

@@ -107,6 +107,7 @@ struct alignment* read_alignment(char* infile)
         //LOG_MSG("%d",aln->max_len);
         aln->gaps = galloc(aln->gaps,aln->numseq,aln->max_len+1,0);
 
+        RUN(detect_alphabet(aln));
         free_align_io_buffer(b);
         return aln;
 ERROR:

@@ -309,10 +309,10 @@ struct node* bisecting_kmeans(struct alignment*aln, struct node* n, float** dm,i
                 n->left->id = samples[0];
                 n->right->id = samples[1];
 
-   MFREE(samples);
+                MFREE(samples);
                 return n;
 
-        }*/
+                }*/
         s = num_anchors / 8;
         if( num_anchors%8){
                 s++;
@@ -629,8 +629,6 @@ struct node* upgma(float **dm,int* samples, int numseq)
 ERROR:
         return NULL;
 }
-
-
 
 struct node* alloc_node(void)
 {

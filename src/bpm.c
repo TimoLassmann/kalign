@@ -8,7 +8,7 @@ __m256i BROADCAST_MASK[16];
 
 
 
-__m256i bitShiftLeft256ymm (__m256i *data, int count);
+ void bitShiftLeft256ymm (__m256i *data, int count);
 __m256i bitShiftRight256ymm (__m256i *data, int count);
 
 /* taken from Alexander Yee: http://www.numberworld.org/y-cruncher/internals/addition.html#ks_add */
@@ -513,13 +513,13 @@ uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
 
         int i,j, k,diff;
 
-        alignas(32)  uint32_t f[23][8];
+        alignas(32)  uint32_t f[21][8];
         //int ALIGNED_(64) f[8];
         if(m > 255){
                 m = 255;
         }
 
-        for(i = 0; i < 23;i++){
+        for(i = 0; i < 21;i++){
                 for(j = 0;j < 8;j++){
                         f[i][j] =0u;
                 }
@@ -691,6 +691,7 @@ uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
                 //xmm1 = _mm256_cmpgt_epi64(K, diff);
                 k = MACRO_MIN(k, diff);
 
+
                 //K = _mm256_min_epi32(diff,K);
                 //K = _mm256_xor_si256(diff, xmm1);
                 //xmm1 = _mm256_cmplt_epi64_mask(diff, K);
@@ -773,7 +774,7 @@ __m256i add256(uint32_t carry, __m256i A, __m256i B)
 //          int count     - number of bits to shift
 // return:  __m256i       - carry out bit(s)
 
-__m256i bitShiftLeft256ymm (__m256i *data, int count)
+void bitShiftLeft256ymm (__m256i *data, int count)
 {
         __m256i innerCarry, carryOut, rotate;
 
@@ -782,8 +783,8 @@ __m256i bitShiftLeft256ymm (__m256i *data, int count)
         innerCarry = _mm256_blend_epi32 (_mm256_setzero_si256 (), rotate, 0xFC);   // clear lower qword
         *data    = _mm256_slli_epi64 (*data, count);                               // shift all qwords left
         *data    = _mm256_or_si256 (*data, innerCarry);                            // propagate carrys from low qwords
-        carryOut   = _mm256_xor_si256 (innerCarry, rotate);                        // clear all except lower qword
-        return carryOut;
+        //carryOut   = _mm256_xor_si256 (innerCarry, rotate);                        // clear all except lower qword
+        //return carryOut;
 }
 
 __m256i bitShiftRight256ymm (__m256i *data, int count)

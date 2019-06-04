@@ -204,7 +204,7 @@ int run_kalign(struct parameters* param)
 
         //random_tree(ap, aln->numseq);
 
-
+        //RUN(convert_alignment_to_internal(aln,defPROTEIN ));
         //param->dist_method = KALIGNDIST_WU;
         //RUN(build_tree(aln,param,ap));
 

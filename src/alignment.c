@@ -70,7 +70,8 @@ int* mirror_hirsch_path(int* hirsch_path,int len_a,int len_b);
 int* add_gap_info_to_hirsch_path(int* hirsch_path,int len_a,int len_b);
 
 
-int update(const float* profa, const float* profb,float* newp,const int* path);
+//int update(const float* profa, const float* profb,float* newp,const int* path);
+int update(const float* profa, const float* profb,float* newp, struct aln_param*ap, int* path,int sipa,int sipb);
 int calc_seq_id(const int* path,int* a, int*b,float* dist);
 
 
@@ -275,7 +276,8 @@ int** hirschberg_alignment(struct alignment* aln, struct aln_param* ap)
                 if(i != numseq-2){
                         //MREALLOC(profile_ptr, sizeof(float)*64*(map[c][0]+2));
                         MMALLOC(profile[c],sizeof(float)*64*(map[c][0]+2));
-                        update(profile[a],profile[b],profile[c],map[c]);
+                        //update(profile[a],profile[b],profile[c],map[c]);
+                        update(profile[a],profile[b],profile[c],ap,map[c],aln->nsip[a],aln->nsip[b]);
                 }
 
                 aln->sl[c] = map[c][0];
@@ -2499,7 +2501,154 @@ int set_gap_penalties(float* prof,int len,int nsip)
         return OK;
 }
 
-int update(const float* profa, const float* profb,float* newp,const int* path)
+
+int update(const float* profa, const float* profb,float* newp, struct aln_param*ap, int* path,int sipa,int sipb)
+{
+        int i,j,c;
+        for (i = 64; i--;){
+                newp[i] = profa[i] + profb[i];
+        }
+
+        profa += 64;
+        profb += 64;
+        newp += 64;
+
+        c = 1;
+
+        while(path[c] != 3){
+                //Idea: limit the 'virtual' number of residues of one type to x.
+                // i.e. only allow a maximum of 10 alanines to be registered in each column
+                // the penalty for aligning a 'G' to this column will stay stable even when many (>10) alanines are present.
+                // the difference in score between the 'correct' (all alanine) and incorrect (alanines + glycine) will not increase
+                // with the number of sequences. -> see Durbin pp 140
+
+                if (!path[c]){
+                        //fprintf(stderr,"Align	%d\n",c);
+                        for (i = 64; i--;){
+                                newp[i] = profa[i] + profb[i];
+                        }
+
+
+                        profa += 64;
+                        profb += 64;
+                }
+
+                if (path[c] & 1){
+                        //fprintf(stderr,"Gap_A:%d\n",c);
+                        //printf("open:%d	ext:%d	%d	%d\n",si->nsip[a] * gpo,si->nsip[a] * gpe,si->nsip[a] * profb[41],si->nsip[a] * profb[46]);
+                        for (i = 64; i--;){
+                                newp[i] = profb[i];
+                        }
+                        profb += 64;
+                        if(!(path[c] & 20)){
+                                if(path[c] & 32){
+                                        newp[25] += sipa;//1;
+                                        i = ap->tgpe*sipa;
+                                }else{
+                                        newp[24] += sipa;//1;
+                                        i = ap->gpe*sipa;
+                                }
+
+                                for (j = 32; j < 55;j++){
+                                        newp[j] -=i;
+                                }
+                        }else{
+                                if (path[c] & 16){
+                                        //			fprintf(stderr,"close_open");
+                                        if(path[c] & 32){
+                                                newp[25] += sipa;//1;
+                                                i = ap->tgpe*sipa;
+                                                newp[23] += sipa;//1;
+                                                i += ap->gpo*sipa;
+                                        }else{
+                                                newp[23] += sipa;//1;
+                                                i = ap->gpo*sipa;
+                                        }
+
+                                        for (j = 32; j < 55;j++){
+                                                newp[j] -=i;
+                                        }
+                                }
+                                if (path[c] & 4){
+                                        //			fprintf(stderr,"Gap_open");
+                                        if(path[c] & 32){
+                                                newp[25] += sipa;//1;
+                                                i = ap->tgpe*sipa;
+                                                newp[23] += sipa;//1;
+                                                i += ap->gpo*sipa;
+                                        }else{
+                                                newp[23] += sipa;//1;
+                                                i = ap->gpo*sipa;
+                                        }
+                                        for (j = 32; j < 55;j++){
+                                                newp[j] -=i;
+                                        }
+                                }
+                        }
+                }
+                if (path[c] & 2){
+                        //fprintf(stderr,"Gap_B:%d\n",c);
+                        //printf("open:%d	ext:%d	%d	%d\n",si->nsip[b] * gpo,si->nsip[b] * gpe,profa[26],profa[27]);
+                        for (i = 64; i--;){
+                                newp[i] = profa[i];
+                        }
+                        profa+=64;
+                        if(!(path[c] & 20)){
+                                if(path[c] & 32){
+                                        newp[25] += sipb;//1;
+                                        i = ap->tgpe*sipb;
+                                }else{
+                                        newp[24] += sipb;//1;
+                                        i = ap->gpe*sipb;
+                                }
+                                for (j = 32; j < 55;j++){
+                                        newp[j] -=i;
+                                }
+                        }else{
+                                if (path[c] & 16){
+                                        //			fprintf(stderr,"close_open");
+                                        if(path[c] & 32){
+                                                newp[25] += sipb;//1;
+                                                i =  ap->tgpe*sipb;
+                                                newp[23] += sipb;//1;
+                                                i +=  ap->gpo*sipb;
+                                        }else{
+                                                newp[23] += sipb;//1;
+                                                i =  ap->gpo*sipb;
+                                        }
+                                        for (j = 32; j < 55;j++){
+                                                newp[j] -=i;
+                                        }
+                                }
+                                if (path[c] & 4){
+                                        //			fprintf(stderr,"Gap_open");
+                                        if(path[c] & 32){
+                                                newp[25] += sipb;//1;
+                                                i = ap->tgpe*sipb;
+                                                newp[23] += sipb;//1;
+                                                i += ap->gpo*sipb;
+                                        }else{
+                                                newp[23] += sipb;//1;
+                                                i = ap->gpo*sipb;
+                                        }
+
+                                        for (j = 32; j < 55;j++){
+                                                newp[j] -=i;
+                                        }
+                                }
+                        }
+                }
+                newp += 64;
+                c++;
+        }
+        for (i = 64; i--;){
+                newp[i] =  profa[i] + profb[i];
+        }
+        newp -= (path[0]+1) *64;
+        return OK;
+}
+
+/*int update(const float* profa, const float* profb,float* newp,const int* path)
 {
         int i,c;
         //float gpo,gpe,tgpe;
@@ -2564,7 +2713,7 @@ int update(const float* profa, const float* profb,float* newp,const int* path)
         }
         newp -= (path[0]+1) *64;
         return OK;
-}
+        }*/
 
 int calc_seq_id(const int* path,int* a, int*b,float* dist)
 {
