@@ -1215,7 +1215,6 @@ int init_pop_from_seed(struct pbil_data*d)
                         d->bit_prob[i] = 0.99;
 
                 }else{
-
                         //c = i % d->bits_per_param;
                         d->bit_prob[i] = 0.01;
                 }

@@ -180,7 +180,7 @@ find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split 
      mat <- rbind(mat,readBaliscores("scores_kalign_new.csv","kalign new"));
      mat <- rbind(mat,readBaliscores("scores_kalign_pbil2.csv","kalign pbil 2"));
      mat <- rbind(mat,readBaliscores("scores_kalign_16seed.csv","kalign 16 seed"));
-
+     mat <- rbind(mat,readBaliscores("scores_kalign_test.csv","rel"))
      ##      mat <- rbind(mat,readBaliscores("scores_kalign_3.csv","kalign 3"));
 
      ## mata
@@ -225,58 +225,51 @@ find ~/data/bb3_release -name "*.xml" | awk -v outdir="$KALIGNOUTDIR" '{n=split 
 
 
 
-* Part 2: parameter optimisation
+* Benchmarking 
+
+Programs to test: 
+
+| Name          | Download                                                                     | version |
+|---------------+------------------------------------------------------------------------------+---------|
+| Muscle        | https://www.drive5.com/muscle/downloads3.8.31/muscle3.8.31_i86linux64.tar.gz |  3.8.31 |
+| Clustal omega | http://clustal.org/omega/clustalo-1.2.4-Ubuntu-x86_64                        |   1.2.4 |
+
+Since the clustal papers provide a great overview of alignment programs I think these two should suffice. Note I am not comparing kalign against consistency based methods as these are a) all more accurate and b) slower. Kalign is targeted at the accurate and fast niche. 
+
+Benchmarks: 
+#+NAME: Benchmarkdata 
+| Name           | Download                                                          |
+|----------------+-------------------------------------------------------------------|
+| Balibase1-5    | http://www.lbgi.fr/balibase/BalibaseDownload/BAliBASE_R1-5.tar.gz |
+| Balifam        | http://clustal.org/omega/bali3fam-26.tar.gz                       |
+| Bralibaseset1  | http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz    |
+| Bralibaseset2  | http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz    |
+
+** Step one: create test directory and download all data
+
+   #+BEGIN_SRC bash :exports both :results none 
+     cd 
+     mkdir -p kalignbenchmark
+     cd  kalignbenchmark
+     mkdir -p data
+     mkdir -p programs 
+   #+END_SRC
+     
+   #+BEGIN_SRC bash -n :results raw :exports both :var tbl=Benchmarkdata :colnames yes
+     for idx in ${!tbl[*]}; do
+         #echo  ${tbl[$idx]} 
+         if [[ ${tbl[$idx]} =~ ^http* ]];
+         then
+             echo "wget ${tbl[$idx]}"
+         fi
+     done
+   #+END_SRC
+
+   #+RESULTS:
+   wget http://clustal.org/omega/bali3fam-26.tar.gz
+   wget http://www.lbgi.fr/balibase/BalibaseDownload/BAliBASE_R1-5.tar.gz
+   wget http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz
+   wget http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz
 
 
-  Need a script to run kalign; balibase and return SP and TC scores.
-
-
-  #+BEGIN_SRC bash -n :tangle run_kalign_bali_score.sh :shebang #!/usr/bin/env bash
-    DIR=`pwd`
-    INFILE=""
-    ALNP=""
-    NAME=""
-
-    function usage()
-    {
-        printf "usage: $0 -i <test.fa> -a <alnpfile> -n <name>"
-        exit 1;
-    }
-
-
-    while getopts i:a:n:  opt
-    do
-        case ${opt} in
-            a) ALNP=${OPTARG};;
-            i) INFILE=${OPTARG};;
-            n) NAME=${OPTARG};;
-            ,*) usage;;
-        esac
-    done
-
-    if [ "${INFILE}" = "" ]; then usage; fi
-    if [ "${ALNP}" = "" ]; then usage; fi
-    if [ "${NAME}" = "" ]; then usage; fi
-
-    #programs=(kalign bali_score)
-
-    #printf "Running Sanity checks:\n";
-
-    # for item in ${programs[*]}
-    # do
-    #     if which $item >/dev/null; then
-    #         printf "%15s found.\n"  $item;
-    #     else
-    #         printf "\nERROR: %s not found!\n\n" $item;
-    #         exit 1;
-    #     fi
-    # done
-    tmpfile=$NAME 
-
-
-    kalign -alnp $ALNP $INFILE -o $tmpfile > /dev/null 2>&1
-    bali_score $INFILE  $tmpfile | grep auto 
-    rm "$tmpfile"
-
-  #+END_SRC
 

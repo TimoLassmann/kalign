@@ -250,7 +250,7 @@ int set_subm_gaps(struct aln_param* ap)
         ap->tgpe = 4.42410;
 
 
-        float balimt[]={
+/*        float balimt[]={
                 3.920888,
                 1.604000, 7.678390,
                 0.382178, -1.189945, 5.110847,
@@ -276,7 +276,7 @@ int set_subm_gaps(struct aln_param* ap)
         ap->gpo = 4.596402;
         ap->gpe =  0.037633;
         ap->tgpe =  0.004585;
-
+*/
 
 /*
   float balimt[]={
