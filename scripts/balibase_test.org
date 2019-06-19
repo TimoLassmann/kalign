@@ -149,79 +149,129 @@
    
 ** Step 3: plot scores 
 
-   #+BEGIN_SRC R :session  one :results none :export none 
+*** Check for dependencies
+   
+    Here I define the list of libraries I'll be using. 
+   
+    #+NAME: liblist
+    #+BEGIN_SRC R -n :exports code :results none
+      libraries <- c("tidyverse","ggplot2","stringi","cowplot")
 
-     library(tidyverse)
-     library(ggplot2)
-     library(stringi)
-     library(cowplot)
-     readBaliscores <-function(file,name){
-       mat  <- read.table(file);
-       colnames(mat) <- c("Type","Name","SP","TC")
-       mat$Type <- name
-       mat$Name <- sub(".*/" ,"", mat$Name)
-       mat$Name <- sub("[A-Z,_]*[.]{1}[A-Z]*$" ,"", mat$Name,ignore.case = TRUE)
-       mat <- as.tibble(mat)
-       x = str_split(mat$Name, "_", n = Inf, simplify = TRUE)
-       mat$Group <- x[,1] 
-       return(mat)
+    #+END_SRC
+   
+    Script to test if libraries are present.
+    #+BEGIN_SRC R -n :tangle test_for_libraries.R :shebang #!/usr/bin/env Rscript :noweb yes :exports code :results none
+      <<liblist>>
+      Sys.info()["nodename"]
+      for(library in libraries) 
+      { 
+        f = is.element(library, installed.packages()[,1])
+        print(paste("Library",library, "is installed?", f))
+        if(!f)
+        {
+          message("Missing library:",library )
+          quit(status=1)
+        }
+      }
+      quit(status=0)
+    #+END_SRC
+   
+   
+    #+BEGIN_SRC sh -n :results output :exports both
+      ./test_for_libraries.R
+    #+END_SRC
 
-     }
+    #+RESULTS:
+    : nodename 
+    :   "work" 
+    : [1] "Library tidyverse is installed? TRUE"
+    : [1] "Library ggplot2 is installed? TRUE"
+    : [1] "Library stringi is installed? TRUE"
+    : [1] "Library cowplot is installed? TRUE"
+
+    install.packages("tidyverse")
+    Code block to load the libraries in R code.
+
+    #+NAME: Rlibraries
+    #+BEGIN_SRC R -n :exports code :results none :noweb yes
+      <<liblist>>
+      lapply(libraries, FUN = function(X) {
+        do.call("library", list(X)) 
+      })
+
+    #+END_SRC
+
+*** Plotting functions 
+    #+BEGIN_SRC R :session  one :results none :export none :noweb yes 
+      <<Rlibraries>> 
+      readBaliscores <-function(file,name){
+        mat  <- read.table(file);
+        colnames(mat) <- c("Type","Name","SP","TC")
+        mat$Type <- name
+        mat$Name <- sub(".*/" ,"", mat$Name)
+        mat$Name <- sub("[A-Z,_]*[.]{1}[A-Z]*$" ,"", mat$Name,ignore.case = TRUE)
+        mat <- as.tibble(mat)
+        x = str_split(mat$Name, "_", n = Inf, simplify = TRUE)
+        mat$Group <- x[,1] 
+        return(mat)
+
+      }
 
 
-   #+END_SRC
+    #+END_SRC
 
 
    
 
-   #+BEGIN_SRC R :session one :results output graphics :file BalibaseSP_scores.jpeg :exports both :width 160 :height 80
+    #+BEGIN_SRC R :session one :results output graphics :file BalibaseSP_scores.jpeg :exports both :width 160 :height 80 :noweb yes 
 
-     mat <- readBaliscores("scores_kalign_old.csv","kalign old");
-     mat <- rbind(mat,readBaliscores("scores_kalign_new.csv","kalign new"));
-     mat <- rbind(mat,readBaliscores("scores_kalign_pbil2.csv","kalign pbil 2"));
-     mat <- rbind(mat,readBaliscores("scores_kalign_16seed.csv","kalign 16 seed"));
-     mat <- rbind(mat,readBaliscores("scores_kalign_test.csv","rel"))
-     ##      mat <- rbind(mat,readBaliscores("scores_kalign_3.csv","kalign 3"));
+      mat <- readBaliscores("scores_kalign_old.csv","kalign old");
+      mat <- rbind(mat,readBaliscores("scores_kalign_new.csv","kalign new"));
+      mat <- rbind(mat,readBaliscores("scores_kalign_pbil2.csv","kalign pbil 2"));
+      mat <- rbind(mat,readBaliscores("scores_kalign_16seed.csv","kalign 16 seed"));
+      mat <- rbind(mat,readBaliscores("scores_kalign_test.csv","rel"))
+      mat <- rbind(mat,readBaliscores("scores_kalign_optimized.csv","Opt"))
+      ##      mat <- rbind(mat,readBaliscores("scores_kalign_3.csv","kalign 3"));
 
-     ## mata
-     ## <- rbind(mat,readBaliscores("scores_kalign_bibpm.csv","bibpm"));
-     ## mat 
-     ## <- rbind(mat,readBaliscores("scores_kalign_bibpm_zero.csv","bibpm_zero"));
-
-
-     p1 <- ggplot(mat, aes(Group, SP))
-     p1 <- p1 + geom_boxplot(aes(colour = Type))
-
-     means <- aggregate(SP ~  Type, mat, median)
-     means$SP <- round(means$SP,digits = 4)
-     p2 <- ggplot(mat, aes(Type, SP))
-     p2 <- p2 + geom_boxplot(aes(colour = Type))
-     p2 <- p2 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
-     p2 <- p2 + geom_text(data = means, aes(label = SP, y = SP + 0.08))
-
-     p3 <- ggplot(mat, aes(Group, TC))
-     p3 <- p3 + geom_boxplot(aes(colour = Type))
-
-     means <- aggregate(TC ~  Type, mat, median)
-     means$TC <- round(means$TC,digits = 4)
-
-     p4 <- ggplot(mat, aes(Type, TC))
-     p4 <- p4 + geom_boxplot(aes(colour = Type))
-     p4 <- p4 + geom_boxplot(aes(colour = Type))
-     p4 <- p4 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
-     p4 <- p4 + geom_text(data = means, aes(label = TC, y = TC + 0.08))
+      ## mata
+      ## <- rbind(mat,readBaliscores("scores_kalign_bibpm.csv","bibpm"));
+      ## mat 
+      ## <- rbind(mat,readBaliscores("scores_kalign_bibpm_zero.csv","bibpm_zero"));
 
 
+      p1 <- ggplot(mat, aes(Group, SP))
+      p1 <- p1 + geom_boxplot(aes(colour = Type))
 
-     p  = plot_grid(p1,p2,p3,p4, labels=c("SP", "TC"), ncol = 2, nrow= 2)
+      means <- aggregate(SP ~  Type, mat, median)
+      means$SP <- round(means$SP,digits = 4)
+      p2 <- ggplot(mat, aes(Type, SP))
+      p2 <- p2 + geom_boxplot(aes(colour = Type))
+      p2 <- p2 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
+      p2 <- p2 + geom_text(data = means, aes(label = SP, y = SP + 0.08))
+
+      p3 <- ggplot(mat, aes(Group, TC))
+      p3 <- p3 + geom_boxplot(aes(colour = Type))
+
+      means <- aggregate(TC ~  Type, mat, median)
+      means$TC <- round(means$TC,digits = 4)
+
+      p4 <- ggplot(mat, aes(Type, TC))
+      p4 <- p4 + geom_boxplot(aes(colour = Type))
+      p4 <- p4 + geom_boxplot(aes(colour = Type))
+      p4 <- p4 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
+      p4 <- p4 + geom_text(data = means, aes(label = TC, y = TnC + 0.08))
 
 
 
+      p  = plot_grid(p1,p2,p3,p4, labels=c("SP", "TC"), ncol = 2, nrow= 2)
 
-   #+END_SRC
 
-   #+RESULTS:
-   [[file:BalibaseSP_scores.jpeg]]
+
+
+    #+END_SRC
+
+    #+RESULTS:
+    [[file:BalibaseSP_scores.jpeg]]
 
 
 
@@ -274,10 +324,15 @@
     #+END_SRC
 
     #+RESULTS:
-    wget http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz
-    wget http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz
     wget http://clustal.org/omega/bali3fam-26.tar.gz
     wget http://www.lbgi.fr/balibase/BalibaseDownload/BAliBASE_R1-5.tar.gz
+    wget http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz
+    wget http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz
+    wget http://clustal.org/omega/bali3fam-26.tar.gz
+    wget http://www.lbgi.fr/balibase/BalibaseDownload/BAliBASE_R1-5.tar.gz
+    wget http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz
+    wget http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz
+
 
     inter all data sets 
     #+BEGIN_SRC bash  :results none :exports code 
@@ -322,27 +377,23 @@
       tar -zxvf qscore_src.tar.gz
     #+END_SRC
 
-    #+RESULTS:
-    wget https://www.drive5.com/muscle/downloads3.8.31/muscle3.8.31_i86linux32.tar.gz
-    wget http://clustal.org/omega/clustalo-1.2.4-Ubuntu-x86_64
-    muscle3.8.31_i86linux32
 
 *** Compile q-score 
 
-NOTE: this is manual! 
+    NOTE: this is manual! 
 
-Add:
+    Add:
 
-#+BEGIN_EXAMPLE C
-#include <limits.h> 
-#+END_EXAMPLE
+    #+BEGIN_EXAMPLE C
+    #include <limits.h> 
+    #+END_EXAMPLE
 
-to qscore header: =qscore.h=  
+    to qscore header: =qscore.h=  
 
-then: 
-#+BEGIN_EXAMPLE bash
-make
-#+END_EXAMPLE
+    then: 
+    #+BEGIN_EXAMPLE bash
+    make
+    #+END_EXAMPLE
 
 
 
@@ -352,7 +403,7 @@ make
 
    small code chunk to set path:
 
-  #+NAME: path
+   #+NAME: path
    #+BEGIN_SRC bash :results none :exports code :noweb yes
      export PATH=~/kalignbenchmark/programs:$PATH
    #+END_SRC
@@ -372,54 +423,233 @@ make
     
     Let's try on a balibase case: 
 
-#+BEGIN_SRC bash :results raw :exports code :noweb yes
-<<path>> 
-IN=~/kalignbenchmark/data/bb3_release/RV11/BB11002.tfa
-REF=~/kalignbenchmark/data/bb3_release/RV11/BB11002.msf
-OUT=~/kalignbenchmark/scratch/BB11002_muscle.msf 
-muscle3.8.31_i86linux32 -msf -in $IN -out $OUT
-bali_score $REF $OUT
+    #+BEGIN_SRC bash :results raw :exports code :noweb yes
+      <<path>> 
+      IN=~/kalignbenchmark/data/bb3_release/RV11/BB11002.tfa
+      REF=~/kalignbenchmark/data/bb3_release/RV11/BB11002.msf
+      OUT=~/kalignbenchmark/scratch/BB11002_muscle.msf 
+      muscle3.8.31_i86linux32 -msf -in $IN -out $OUT
+      bali_score $REF $OUT
 
-#+END_SRC
+    #+END_SRC
 
-#+RESULTS:
-Using GCG format reference alignment
+    #+RESULTS:
+    Using GCG format reference alignment
 
-Comparing test alignment in /home/user/kalignbenchmark/scratch/BB11002_muscle.msf
-with reference alignment in /home/user/kalignbenchmark/data/bb3_release/RV11/BB11002.msf
+    Comparing test alignment in /home/user/kalignbenchmark/scratch/BB11002_muscle.msf
+    with reference alignment in /home/user/kalignbenchmark/data/bb3_release/RV11/BB11002.msf
 
-	SP score= 0.572
+	  SP score= 0.572
 
-	TC score= 0.270
-auto /home/user/kalignbenchmark/scratch/BB11002_muscle.msf 0.572 0.270
+	  TC score= 0.270
+    auto /home/user/kalignbenchmark/scratch/BB11002_muscle.msf 0.572 0.270
 
 
     Let's try on a balifam 
 
-#+BEGIN_SRC bash :results raw :exports both :noweb yes
-<<path>> 
+    #+BEGIN_SRC bash :results raw :exports both :noweb yes
+      <<path>> 
 
-IN=~/kalignbenchmark/data/BB20021-package.vie
-ADD=~/kalignbenchmark/data/bb3_release/RV20/BB20021.tfa
-REF=~/kalignbenchmark/data/bb3_release/RV20/BB20021.msf
-OUT=~/kalignbenchmark/scratch/BB20021_muscle.fa
+      IN=~/kalignbenchmark/data/BB20021-package.vie
+      ADD=~/kalignbenchmark/data/bb3_release/RV20/BB20021.tfa
+      REF=~/kalignbenchmark/data/bb3_release/RV20/BB20021.msf
+      OUT=~/kalignbenchmark/scratch/BB20021_muscle.fa
 
-cd ~/kalignbenchmark/scratch
+      cd ~/kalignbenchmark/scratch
 
-cat $IN $ADD > test.fa
-time muscle3.8.31_i86linux32 -maxiters 2 -in test.fa -out $OUT
-kalign $REF -r -f fasta -o ref.fa
-qscore -test $OUT -ref ref.fa
+      cat $IN $ADD > test.fa
+      time muscle3.8.31_i86linux32 -maxiters 2 -in test.fa -out $OUT
+      kalign $REF -r -f fasta -o ref.fa
+      qscore -test $OUT -ref ref.fa
 
-#+END_SRC
+    #+END_SRC
 
-#+RESULTS:
-[2019-06-11 07:56:02] :     LOG : kalign -r -f fasta -o ref.fa /home/user/kalignbenchmark/data/bb3_release/RV20/BB20021.msf 
-[2019-06-11 07:56:02] :     LOG : Detected protein sequences.
-[2019-06-11 07:56:02] :     LOG : Detected: 53 sequences.
-[2019-06-11 07:56:02] :     LOG : Output in fasta format
-
-
+    #+RESULTS:
+    [2019-06-11 20:55:42] :     LOG : kalign -r -f fasta -o ref.fa /home/user/kalignbenchmark/data/bb3_release/RV20/BB20021.msf 
+    [2019-06-11 20:55:42] :     LOG : Detected protein sequences.
+    [2019-06-11 20:55:42] :     LOG : Detected: 53 sequences.
+    [2019-06-11 20:55:42] :     LOG : Output in fasta format
 
 
 
+
+
+*** clustalo 
+    Can I run muscle? 
+    
+    #+BEGIN_SRC bash :results value :exports code :noweb yes 
+      <<path>>
+
+      clustalo-1.2.4-Ubuntu-x86_64 --version 
+    #+END_SRC
+    Let's try on a balibase case: 
+
+    #+BEGIN_SRC bash :results raw :exports code :noweb yes
+      <<path>> 
+      IN=~/kalignbenchmark/data/bb3_release/RV11/BB11002.tfa
+      REF=~/kalignbenchmark/data/bb3_release/RV11/BB11002.msf
+      OUT=~/kalignbenchmark/scratch/BB11002_clustalo.msf 
+
+      clustalo-1.2.4-Ubuntu-x86_64 --outfmt=msf  --in $IN  --out $OUT
+
+      bali_score $REF $OUT 
+
+    #+END_SRC
+
+    #+RESULTS:
+    Using GCG format reference alignment
+
+    Comparing test alignment in /home/user/kalignbenchmark/scratch/BB11002_clustalo.msf
+    with reference alignment in /home/user/kalignbenchmark/data/bb3_release/RV11/BB11002.msf
+
+	  SP score= 0.483
+
+	  TC score= 0.000
+    auto /home/user/kalignbenchmark/scratch/BB11002_clustalo.msf 0.483 0.000
+
+
+** Step 3: scripts to run benchmarks  
+
+   #+NAME: scratchdir
+   #+BEGIN_SRC bash :results none :exports code :noweb yes
+     SCRATCHDIR="~/kalignbenchmark/scratch"
+   #+END_SRC
+
+
+*** Balibase 
+
+    #+BEGIN_SRC bash -n :tangle gen_run_balibase.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
+      <<scratchdir>>
+
+    #+END_SRC
+
+    #+BEGIN_SRC bash -n :tangle gen_run_balibase.sh :noweb yes :exports code :results none :noweb yes 
+
+      DIR=`pwd`
+      function usage()
+      {
+          printf "This script will generate scripts to run kalign, clustal omega and muscle on the balibase MSA benchmark data set.\n\n" ;
+          printf "usage: $0\n\n" ;
+          exit 1;
+      }
+
+      while getopts h  opt
+      do
+          case ${opt} in
+              h) usage;;
+              ,*) usage;;
+          esac
+      done
+
+
+      printf "Generating kalign run script\n";
+      find ~/kalignbenchmark/data/bb3_release -name "*.xml" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign %s -o %s/%s_%s_kalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_kalign.sh
+      chmod 755 run_kalign.sh
+
+      printf "Generating muscle run script\n";
+      find ~/kalignbenchmark/data/bb3_release -name "*.tfa" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "muscle3.8.31_i86linux32 -msf -in %s -out  %s/%s_%s_muscle.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_muscle.sh
+      chmod 755 run_muscle.sh
+
+      printf "Generating clustalo run script\n";
+      find ~/kalignbenchmark/data/bb3_release -name "*.tfa" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "clustalo-1.2.4-Ubuntu-x86_64 --outfmt=msf  --in %s  --out %s/%s_%s_clustalo.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_clustalo.sh
+      chmod 755 run_clustalo.sh
+
+
+      printf "Generating kalign scoring run script\n";
+      find ~/kalignbenchmark/data/bb3_release -name "*.xml" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%s_kalign.msf | grep auto\n", $1,outdir,a[n-2],a[n-1] }' > score_bb3_kalign.sh
+      chmod 755  score_bb3_kalign.sh
+
+      printf "Generating muscle scoring run script\n";
+      find ~/kalignbenchmark/data/bb3_release -name "*.xml" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%s_muscle.msf | grep auto\n", $1,outdir,a[n-2],a[n-1] }' > score_bb3_muscle.sh
+      chmod 755  score_bb3_muscle.sh
+
+      printf "Generating clustalo scoring run script\n";
+      find ~/kalignbenchmark/data/bb3_release -name "*.xml" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%s_clustalo.msf | grep auto\n", $1,outdir,a[n-2],a[n-1] }' > score_bb3_clustalo.sh
+      chmod 755  score_bb3_clustalo.sh
+
+
+    #+END_SRC
+
+
+**** Kick off jobs 
+
+
+     #+BEGIN_SRC bash -n :tangle run_balibase.sh :noweb yes :exports code :results none :noweb yes :shebang #!/usr/bin/env bash
+       <<path>>
+       ./run_muscle.sh
+       ./run_kalign.sh
+       ./run_clustalo.sh 
+     #+END_SRC
+
+**** score alignments 
+
+     #+BEGIN_SRC bash 
+       ./score_bb3_kalign.sh > scores_kalign.csv 
+       ./score_bb3_muscle.sh > scores_muscle.csv 
+       ./score_bb3_clustalo.sh > scores_clustalo.csv 
+     #+END_SRC
+
+**** Plot 
+
+     #+BEGIN_SRC R :session  one :results none :export none :noweb yes 
+       <<Rlibraries>> 
+       readBaliscores <-function(file,name){
+         mat  <- read.table(file);
+         colnames(mat) <- c("Type","Name","SP","TC")
+         mat$Type <- name
+         mat$Name <- sub(".*/" ,"", mat$Name)
+         mat$Name <- sub("[A-Z,_]*[.]{1}[A-Z]*$" ,"", mat$Name,ignore.case = TRUE)
+         mat <- as.tibble(mat)
+         x = str_split(mat$Name, "_", n = Inf, simplify = TRUE)
+         mat$Group <- x[,1] 
+         return(mat)
+
+       }
+
+
+     #+END_SRC
+
+
+     #+BEGIN_SRC R :session one :results output graphics :file Balibase_scores.jpeg :exports both :noweb yes 
+
+       mat <- readBaliscores("scores_kalign.csv","kalign");
+       mat <- rbind(mat,readBaliscores("scores_muscle.csv","muscle"));
+       mat <- rbind(mat,readBaliscores("scores_clustalo.csv","clustalo"));
+       ##      mat <- rbind(mat,readBaliscores("scores_kalign_3.csv","kalign 3"));
+
+       ## mata
+       ## <- rbind(mat,readBaliscores("scores_kalign_bibpm.csv","bibpm"));
+       ## mat 
+       ## <- rbind(mat,readBaliscores("scores_kalign_bibpm_zero.csv","bibpm_zero"));
+
+
+       p1 <- ggplot(mat, aes(Group, SP))
+       p1 <- p1 + geom_boxplot(aes(colour = Type))
+
+       means <- aggregate(SP ~  Type, mat, median)
+       means$SP <- round(means$SP,digits = 4)
+       p2 <- ggplot(mat, aes(Type, SP))
+       p2 <- p2 + geom_boxplot(aes(colour = Type))
+       p2 <- p2 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
+       p2 <- p2 + geom_text(data = means, aes(label = SP, y = SP + 0.08))
+
+       p3 <- ggplot(mat, aes(Group, TC))
+       p3 <- p3 + geom_boxplot(aes(colour = Type))
+
+       means <- aggregate(TC ~  Type, mat, median)
+       means$TC <- round(means$TC,digits = 4)
+
+       p4 <- ggplot(mat, aes(Type, TC))
+       p4 <- p4 + geom_boxplot(aes(colour = Type))
+       p4 <- p4 + geom_boxplot(aes(colour = Type))
+       p4 <- p4 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
+       p4 <- p4 + geom_text(data = means, aes(label = TC, y = TC + 0.08))
+
+       p  = plot_grid(p1,p2,p3,p4, labels=c("SP", "TC"), ncol = 2, nrow= 2)
+
+       ggsave("Balibase_scores.jpeg", p,width = 16,  height = 12,  dpi = 300, units = c( "cm"))
+
+     #+END_SRC
+
+     #+RESULTS:
+     [[file:Balibase_scores.jpeg]]
