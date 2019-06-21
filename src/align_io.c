@@ -148,18 +148,21 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
 
         RUN(read_all_aligned_sequences(aln, b));
 
-        aln->max_len = 0;
+
+                aln->max_len = 0;
         for(i = 0; i < aln->numseq;i++){
                 if(aln->sl[i] > aln->max_len){
                         aln->max_len = aln->sl[i];
                 }
 
         }
+
         aln->gaps = galloc(aln->gaps,aln->numseq,aln->max_len+1,0);
 
         //RUN(read_all_sequences(aln,b));
         //RUN(test_if_aligned(aln));
         RUN(detect_alphabet(aln));
+
         //LOG_MSG("%s %s", param->outfile, param->format);
         if(!param->format && param->outfile){
                 if (byg_start("msf",param->outfile) != -1){
@@ -2868,7 +2871,7 @@ int detect_alphabet(struct alignment* aln)
         uint8_t protein[256];
         uint8_t query[256];
         int diff[3];
-        char DNA_letters[]= "acgtACGTnN";
+        char DNA_letters[]= "acgtuACGTUnN";
         char protein_letters[] = "acdefghiklmnpqrstvwyACDEFGHIKLMNPQRSTVWY";
 
         ASSERT(aln != NULL, "No alignment");

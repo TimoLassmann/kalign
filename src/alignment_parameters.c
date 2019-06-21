@@ -35,7 +35,7 @@ struct aln_param* init_ap(int numseq,int L)
         //if(param->param_set == -1){
 
         if(L == defDNA){
-                LOG_MSG("DNADNADNA");
+
                 //exit(0);
                 RUN(set_subm_gaps_DNA(ap));
         }else if(L == defPROTEIN){

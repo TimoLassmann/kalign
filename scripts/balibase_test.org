@@ -653,3 +653,157 @@
 
      #+RESULTS:
      [[file:Balibase_scores.jpeg]]
+
+
+*** Bralibase 
+
+
+    #+BEGIN_SRC bash -n :tangle gen_run_bralibase.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
+      <<scratchdir>>
+    #+END_SRC
+
+    #+BEGIN_SRC bash -n :tangle gen_run_bralibase.sh :noweb yes :exports code :results none :noweb yes 
+
+      DIR=`pwd`
+      function usage()
+      {
+          printf "This script will generate scripts to run kalign, clustal omega and muscle on the balibase MSA benchmark data set.\n\n" ;
+          printf "usage: $0\n\n" ;
+          exit 1;
+      }
+
+      while getopts h  opt
+      do
+          case ${opt} in
+              h) usage;;
+              ,*) usage;;
+          esac
+      done
+
+      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2  -name "*_test.fa" -exec rm -rf {} \;
+      printf "Generate commands to reformat the reference alignments\n\n";
+
+
+      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*.fa"  -o -name '*.fasta' | grep structural |  awk -v outdir="$SCRATCHDIR" '{printf "kalign %s --rename -r -f msf -o %s.msf\n", $1,$1 }' > run_kalign_reformat.sh
+      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*.fa"  -o -name '*.fasta' | grep unaligned |  awk -v outdir="$SCRATCHDIR" '{printf "kalign %s --rename -r -f fasta -o %s_test.fa\n", $1,$1 }' >> run_kalign_reformat.sh
+      chmod 755 run_kalign_reformat.sh
+      ./run_kalign_reformat.sh
+
+      printf "Generating kalign run script\n";
+      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2  -name "*_test.fa" | grep unaligned |  awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign %s -o %s/%s_%s_%s_kalign.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2] }' > run_kalign_bralibase.sh
+      chmod 755 run_kalign_bralibase.sh
+
+      printf "Generating muscle run script\n";
+      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*_test.fa" -o -name '*.fasta' | grep unaligned | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "muscle3.8.31_i86linux32 -msf -in %s -out  %s/%s_%s_%s_muscle.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2] }' > run_muscle_bralibase.sh
+      chmod 755 run_muscle_bralibase.sh
+
+      printf "Generating clustalo run script\n";
+      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*_test.fa" -o -name '*.fasta' | grep unaligned | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "clustalo-1.2.4-Ubuntu-x86_64 --outfmt=msf  --in %s --force --out %s/%s_%s_%s_clustalo.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2] }' > run_clustalo_bralibase.sh
+      chmod 755 run_clustalo_bralibase.sh
+
+      printf "Generating kalign scoring run script\n";
+      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*.msf" | grep structural | awk -v outdir="$SCRATCHDIR" '{name=$1; gsub(/structural/, "unaligned"); n=split ($1,a,/[\/,.]/); printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%s_%s_kalign.msf | grep auto\n", name,outdir,a[n-4],a[n-3],a[n-2] }' > score_kalign_bralibase.sh
+      chmod 755  score_kalign_bralibase.sh
+
+      printf "Generating muscle scoring run script\n";
+      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*.msf" | grep structural | awk -v outdir="$SCRATCHDIR" '{name=$1; gsub(/structural/, "unaligned"); n=split ($1,a,/[\/,.]/); printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%s_%s_muscle.msf | grep auto\n", name,outdir,a[n-4],a[n-3],a[n-2] }' > score_muscle_bralibase.sh
+      chmod 755  score_muscle_bralibase.sh
+
+      printf "Generating clustalo scoring run script\n";
+      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*.msf" | grep structural | awk -v outdir="$SCRATCHDIR" '{name=$1; gsub(/structural/, "unaligned"); n=split ($1,a,/[\/,.]/); printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%s_%s_clustalo.msf | grep auto\n", name,outdir,a[n-4],a[n-3],a[n-2] }' > score_clustalo_bralibase.sh
+      chmod 755  score_clustalo_bralibase.sh
+
+
+    #+END_SRC
+
+**** Kick off jobs 
+
+
+     #+BEGIN_SRC bash -n :tangle run_bralibase.sh :noweb yes :exports code :results none :noweb yes :shebang  #!/usr/bin/env bash
+       <<path>>
+       
+       ./run_kalign_bralibase.sh   
+       ./run_muscle_bralibase.sh
+       ./run_clustalo_bralibase.sh       
+
+
+     #+END_SRC
+
+
+
+
+**** score alignments 
+
+     #+BEGIN_SRC bash 
+       ./score_kalign_bralibase.sh > scores_kalign_bralibase.csv 
+       ./score_muscle_bralibase.sh > scores_muscle_bralibase.csv 
+       ./score_clustalo_bralibase.sh > scores_clustalo_bralibase.csv 
+     #+END_SRC
+
+     #+RESULTS:
+
+**** Plot 
+
+     #+BEGIN_SRC R :session  one :results none :export none :noweb yes 
+       <<Rlibraries>> 
+       readBaliscores <-function(file,name){
+         mat  <- read.table(file);
+         colnames(mat) <- c("Type","Name","SP","TC")
+         mat$Type <- name
+         mat$Name <- sub(".*/" ,"", mat$Name)
+         mat$Name <- sub("[A-Z,_]*[.]{1}[A-Z]*$" ,"", mat$Name,ignore.case = TRUE)
+         mat <- as.tibble(mat)
+         x = str_split(mat$Name, "_", n = Inf, simplify = TRUE)
+         mat$Group <- x[,1] 
+         return(mat)
+
+       }
+
+
+     #+END_SRC
+
+
+     #+BEGIN_SRC R :session one :results output graphics :file Bralibase_scores.jpeg :exports both :noweb yes 
+
+       mat <- readBaliscores("scores_kalign_bralibase.csv","kalign");
+       mat <- rbind(mat,readBaliscores("scores_muscle_bralibase.csv","muscle"));
+       mat <- rbind(mat,readBaliscores("scores_clustalo_bralibase.csv","clustalo"));
+       ##      mat <- rbind(mat,readBaliscores("scores_kalign_3.csv","kalign 3"));
+
+       ## mata
+       ## <- rbind(mat,readBaliscores("scores_kalign_bibpm.csv","bibpm"));
+       ## mat 
+       ## <- rbind(mat,readBaliscores("scores_kalign_bibpm_zero.csv","bibpm_zero"));
+
+
+       p1 <- ggplot(mat, aes(Group, SP))
+       p1 <- p1 + geom_boxplot(aes(colour = Type))
+
+       means <- aggregate(SP ~  Type, mat, median)
+       means$SP <- round(means$SP,digits = 4)
+       p2 <- ggplot(mat, aes(Type, SP))
+       p2 <- p2 + geom_boxplot(aes(colour = Type))
+       p2 <- p2 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
+       p2 <- p2 + geom_text(data = means, aes(label = SP, y = SP + 0.08))
+
+       p3 <- ggplot(mat, aes(Group, TC))
+       p3 <- p3 + geom_boxplot(aes(colour = Type))
+
+       means <- aggregate(TC ~  Type, mat, median)
+       means$TC <- round(means$TC,digits = 4)
+
+       p4 <- ggplot(mat, aes(Type, TC))
+       p4 <- p4 + geom_boxplot(aes(colour = Type))
+       p4 <- p4 + geom_boxplot(aes(colour = Type))
+       p4 <- p4 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
+       p4 <- p4 + geom_text(data = means, aes(label = TC, y = TC + 0.08))
+
+       p  = plot_grid(p1,p2,p3,p4, labels=c("SP", "TC"), ncol = 2, nrow= 2)
+
+       ggsave("Bralibase_scores.jpeg", p,width = 16,  height = 12,  dpi = 300, units = c( "cm"))
+
+     #+END_SRC
+
+     #+RESULTS:
+     [[file:Bralibase_scores.jpeg]]
+

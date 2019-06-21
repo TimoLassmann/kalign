@@ -74,6 +74,7 @@ int make_seq(struct alignment* aln,int a,int b,int* path)
         }
         c = 1;
         while(path[c] != 3){
+
                 if (!path[c]){
                         posa++;
                         posb++;

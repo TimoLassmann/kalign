@@ -13,9 +13,10 @@
 #include "misc.h"
 #include <getopt.h>
 #include "alphabet.h"
-#define OPT_SET 1
 
+#define OPT_SET 1
 #define OPT_ALNPARAM 2
+#define OPT_RENAME 3
 
 int run_kalign(struct parameters* param);
 int detect_dna(struct alignment* aln);
@@ -34,6 +35,7 @@ int main(int argc, char *argv[])
                         {"set", required_argument,0,OPT_SET},
                         {"format",  required_argument, 0, 'f'},
                         {"reformat",  0, 0, 'r'},
+                        {"rename",  0, 0, OPT_RENAME},
                         {"input",  required_argument, 0, 'i'},
                         {"infile",  required_argument, 0, 'i'},
                         {"in",  required_argument, 0, 'i'},
@@ -61,6 +63,10 @@ int main(int argc, char *argv[])
                 case OPT_SET:
                         param->param_set = atoi(optarg);
                         break;
+                case  OPT_RENAME:
+                        param->rename = 1;
+                        break;
+
                 case 'f':
                         param->format = optarg;
                         break;
@@ -173,6 +179,19 @@ int run_kalign(struct parameters* param)
                                 aln->s[i][j] = 0;
                         }
                 }
+                if(param->rename){
+                        for (i = 0 ;i < aln->numseq;i++){
+                                for(j = 0; j < aln->lsn[i];j++){
+                                        aln->sn[i][j] =0;
+                                }
+                                if(aln->lsn[i] < 128){
+                                        MREALLOC(aln->sn[i],sizeof(char)*128);
+                                }
+
+                                snprintf(aln->sn[i], 128, "SEQ%d", i+1);
+                                aln->lsn[i] = strnlen(aln->sn[i], 128);
+                        }
+                }
                 //sparam->format = param->reformat;
                 RUN(output(aln, param));
                 free_aln(aln);
@@ -207,8 +226,9 @@ int run_kalign(struct parameters* param)
         //RUN(build_tree(aln,param,ap));
         //RUN(convert_alignment_to_internal(aln,redPROTEIN));
         RUN(build_tree_kmeans(aln,ap));
-        RUN(convert_alignment_to_internal(aln,defPROTEIN ));
-
+        if(aln->L == redPROTEIN){
+                RUN(convert_alignment_to_internal(aln,defPROTEIN ));
+        }
 
 
         STOP_TIMER(t1);

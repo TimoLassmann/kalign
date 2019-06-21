@@ -5,7 +5,7 @@
 
 
 
-struct parameters* init_param(void)
+struct parameters*init_param(void)
 {
         struct parameters* param = NULL;
 
@@ -20,6 +20,7 @@ struct parameters* init_param(void)
         param->outfile = NULL;
         param->format = NULL;
         param->reformat = 0;
+        param->rename = 1;
         param->help_flag = 0;
         param->quiet = 0;
         return param;

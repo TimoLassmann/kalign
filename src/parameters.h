@@ -34,6 +34,7 @@ struct parameters{
         int dist_method;
         int num_infiles;
         int reformat;
+        int rename;             /* rename sequences - to make bali_score swallow the alignments */
         /* int id; */
         /* int aa; */
         /* int alter_gaps; */
