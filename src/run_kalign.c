@@ -17,6 +17,7 @@
 #define OPT_SET 1
 #define OPT_ALNPARAM 2
 #define OPT_RENAME 3
+#define OPT_REFORMAT 4
 
 int run_kalign(struct parameters* param);
 int detect_dna(struct alignment* aln);
@@ -34,7 +35,7 @@ int main(int argc, char *argv[])
                         {"alnp", required_argument,0,OPT_ALNPARAM},
                         {"set", required_argument,0,OPT_SET},
                         {"format",  required_argument, 0, 'f'},
-                        {"reformat",  0, 0, 'r'},
+                        {"reformat",  0, 0, OPT_REFORMAT},
                         {"rename",  0, 0, OPT_RENAME},
                         {"input",  required_argument, 0, 'i'},
                         {"infile",  required_argument, 0, 'i'},
@@ -48,7 +49,7 @@ int main(int argc, char *argv[])
                 };
 
                 int option_index = 0;
-                c = getopt_long_only (argc, argv,"i:o:rf:hq",long_options, &option_index);
+                c = getopt_long_only (argc, argv,"i:o:f:hq",long_options, &option_index);
                 //c = getopt (argc, argv, "hi:o:");
                 /* Detect the end of the options. */
 
@@ -70,10 +71,9 @@ int main(int argc, char *argv[])
                 case 'f':
                         param->format = optarg;
                         break;
-                case 'r':
+                case OPT_REFORMAT:
                         param->reformat = 1;
                         break;
-
                 case 'h':
                         param->help_flag = 1;
                         break;
@@ -95,6 +95,7 @@ int main(int argc, char *argv[])
                         abort ();
                 }
         }
+
 
 
 
@@ -193,6 +194,9 @@ int run_kalign(struct parameters* param)
                         }
                 }
                 //sparam->format = param->reformat;
+                if (byg_start(param->format,"fastaFASTAfaFA") != -1){
+                        RUN(dealign(aln));
+                }
                 RUN(output(aln, param));
                 free_aln(aln);
                 return OK;

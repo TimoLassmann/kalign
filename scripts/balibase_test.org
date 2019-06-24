@@ -274,7 +274,6 @@
     [[file:BalibaseSP_scores.jpeg]]
 
 
-
 * Benchmarking 
 
   Programs to test: 
@@ -290,12 +289,14 @@
 
   Benchmarks: 
   #+NAME: Benchmarkdata 
-  | Name           | Download                                                          |
-  |----------------+-------------------------------------------------------------------|
-  | Balibase1-5    | http://www.lbgi.fr/balibase/BalibaseDownload/BAliBASE_R1-5.tar.gz |
-  | Balifam        | http://clustal.org/omega/bali3fam-26.tar.gz                       |
-  | Bralibaseset1  | http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz    |
-  | Bralibaseset2  | http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz    |
+  | Name          | Download                                                          |
+  |---------------+-------------------------------------------------------------------|
+  | Balibase1-5   | http://www.lbgi.fr/balibase/BalibaseDownload/BAliBASE_R1-5.tar.gz |
+  | Balifam       | http://clustal.org/omega/bali3fam-26.tar.gz                       |
+  | Bralibaseset1 | http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz    |
+  | Bralibaseset2 | http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz    |
+  | HomFam        | http://www.clustal.org/omega/homfam-20110613-25.tar.gz            |
+  
 
 ** Step one: create test directory and download all data
 
@@ -324,10 +325,7 @@
     #+END_SRC
 
     #+RESULTS:
-    wget http://clustal.org/omega/bali3fam-26.tar.gz
-    wget http://www.lbgi.fr/balibase/BalibaseDownload/BAliBASE_R1-5.tar.gz
-    wget http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz
-    wget http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz
+    wget http://www.clustal.org/omega/homfam-20110613-25.tar.gz
     wget http://clustal.org/omega/bali3fam-26.tar.gz
     wget http://www.lbgi.fr/balibase/BalibaseDownload/BAliBASE_R1-5.tar.gz
     wget http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz
@@ -338,7 +336,10 @@
     #+BEGIN_SRC bash  :results none :exports code 
       cd
       cd ~/kalignbenchmark/data
-
+      mkdir -p homfam 
+      mv homfam-20110613-25.tar.gz homfam 
+      cd homfam 
+      tar -zxvf homfam-20110613-25.tar.gz
       for filename in *.tar.gz; do
           tar -zxvf  $filename
       done
@@ -645,6 +646,11 @@
        p4 <- p4 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
        p4 <- p4 + geom_text(data = means, aes(label = TC, y = TC + 0.08))
 
+       p1 <- p1 + theme(legend.position="none")
+       p2 <- p2 + theme(legend.position="none")
+       p3 <- p3 + theme(legend.position="none")
+       p4 <- p4 + theme(legend.position="none")
+
        p  = plot_grid(p1,p2,p3,p4, labels=c("SP", "TC"), ncol = 2, nrow= 2)
 
        ggsave("Balibase_scores.jpeg", p,width = 16,  height = 12,  dpi = 300, units = c( "cm"))
@@ -721,7 +727,7 @@
 
      #+BEGIN_SRC bash -n :tangle run_bralibase.sh :noweb yes :exports code :results none :noweb yes :shebang  #!/usr/bin/env bash
        <<path>>
-       
+
        ./run_kalign_bralibase.sh   
        ./run_muscle_bralibase.sh
        ./run_clustalo_bralibase.sh       
@@ -787,16 +793,24 @@
        p2 <- p2 + geom_text(data = means, aes(label = SP, y = SP + 0.08))
 
        p3 <- ggplot(mat, aes(Group, TC))
-       p3 <- p3 + geom_boxplot(aes(colour = Type))
+       p3 <- p3 + geom_boxplot(aes(colour = Type)) 
+
 
        means <- aggregate(TC ~  Type, mat, median)
        means$TC <- round(means$TC,digits = 4)
+
 
        p4 <- ggplot(mat, aes(Type, TC))
        p4 <- p4 + geom_boxplot(aes(colour = Type))
        p4 <- p4 + geom_boxplot(aes(colour = Type))
        p4 <- p4 + stat_summary(fun.y=mean, colour="darkred", geom="point", shape=18, size=3,show.legend = FALSE) 
        p4 <- p4 + geom_text(data = means, aes(label = TC, y = TC + 0.08))
+
+       p1 <- p1 + theme(legend.position="none")
+       p2 <- p2 + theme(legend.position="none")
+       p3 <- p3 + theme(legend.position="none")
+       p4 <- p4 + theme(legend.position="none")
+
 
        p  = plot_grid(p1,p2,p3,p4, labels=c("SP", "TC"), ncol = 2, nrow= 2)
 
@@ -807,3 +821,87 @@
      #+RESULTS:
      [[file:Bralibase_scores.jpeg]]
 
+*** Homfam
+
+
+****  Create test alignments 
+     create script to merge =*_ref.vie= and =*_test-only.vie= alignments.
+     #+BEGIN_SRC bash -n :tangle create_homfam_tests.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
+       <<scratchdir>>
+     #+END_SRC
+
+
+     #+BEGIN_SRC bash -n :tangle create_homfam_tests.sh :noweb yes :exports code :results none :noweb yes
+
+
+       DIR=`pwd`
+       function usage()
+       {
+           printf "This script will merge *_ref.vie and *_test-only.vie alignments and convert them into msf format.\n\n" ;
+           printf "usage: $0\n\n" ;
+           exit 1;
+       }
+
+       while getopts h  opt
+       do
+           case ${opt} in
+               h) usage;;
+               ,*) usage;;
+           esac
+       done
+       find ~/kalignbenchmark/data/homfam  -name "*_test-only.vie" | awk '{test_aln=$1;ref=$1 ;gsub("_test-only.vie", "_ref.vie", ref);gsub("_test-only.vie", "_testaln.fa", test_aln); printf "kalign %s %s --reformat --rename -f fasta -o %s\n",ref, $1, test_aln }' > homfam_reformat.sh
+       find ~/kalignbenchmark/data/homfam  -name "*_ref.vie" | awk '{ref=$1;gsub("_ref.vie", "_ref.msf", ref);printf "kalign %s --reformat --rename  -f msf -o %s\n", $1,ref}' >> homfam_reformat.sh
+
+ chmod 755 homfam_reformat.sh
+     #+END_SRC     
+
+
+**** 
+
+
+    #+BEGIN_SRC bash -n :tangle gen_run_homfam.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
+      <<scratchdir>>
+    #+END_SRC
+
+    #+BEGIN_SRC bash -n :tangle gen_run_homfam.sh :noweb yes :exports code :results none :noweb yes
+
+      DIR=`pwd`
+      function usage()
+      {
+          printf "This script will generate scripts to run kalign, clustal omega and muscle on the balibase MSA benchmark data set.\n\n" ;
+          printf "usage: $0\n\n" ;
+          exit 1;
+      }
+
+      while getopts h  opt
+      do
+          case ${opt} in
+              h) usage;;
+              ,*) usage;;
+          esac
+      done
+
+      printf "#!/usr/bin/env zsh\n" > run_homfam.sh
+      printf "Generating kalign run script\n";
+      find ~/kalignbenchmark/data/homfam  -name "*_test-only.vie" | awk -v outdir="$SCRATCHDIR" '{ printf "(time kalign %s -o %s/kalign.msf) 2>> homfam_timing.txt \n", $1,outdir }' >> run_homfam.sh
+      
+
+      printf "Generating muscle run script\n";
+      find ~/kalignbenchmark/data/homfam  -name "*_test-only.vie" |  awk -v outdir="$SCRATCHDIR" '{printf "(time muscle3.8.31_i86linux32 -msf -in %s -out  %s/muscle.msf) 2>> homfam_timing.txt\n", $1,outdir}' >> run_homfam.sh
+      chmod 755 run_homfam.sh
+
+      
+
+#+END_SRC
+
+     #+BEGIN_SRC bash -n :tangle run_bralibase.sh :noweb yes :exports code :results none :noweb yes :shebang  #!/usr/bin/env bash
+       <<path>>
+       ./run_homfam.sh
+     #+END_SRC
+
+
+/home/user/kalignbenchmark/data/homfam
+
+printf "Generating clustalo run script\n";
+      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*_test.fa" -o -name '*.fasta' | grep unaligned | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "clustalo-1.2.4-Ubuntu-x86_64 --outfmt=msf  --in %s --force --out %s/%s_%s_%s_clustalo.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2] }' > run_clustalo_bralibase.sh
+      chmod 755 run_clustalo_bralibase.sh

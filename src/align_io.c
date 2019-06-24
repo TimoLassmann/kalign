@@ -2747,6 +2747,9 @@ int fasta_output(struct alignment* aln,char* outfile)
         int i,j,c,f;
         int tmp;
         FILE *fout = NULL;
+
+
+
         if(outfile){
                 if ((fout = fopen(outfile, "w")) == NULL){
                         ERROR_MSG("can't open output\n");
