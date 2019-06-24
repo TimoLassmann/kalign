@@ -13,13 +13,12 @@
 #define OPT_REFALN 2
 #define OPT_PROGRAM 3
 #define OPT_TMPDIR 4
+#define OPT_OUTPUT 5
 
 
-int timescore(char* test,char* ref, char* program,char* scratch);
 
+int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_name);
 int print_help_score_and_align(char **argv);
-
-
 
 int main(int argc, char *argv[])
 {
@@ -27,7 +26,7 @@ int main(int argc, char *argv[])
         char* refseq = NULL;
         char* program = NULL;
         char* scratch = NULL;
-
+        char* output = NULL;
         int help = 0;
         int c;
 
@@ -37,6 +36,7 @@ int main(int argc, char *argv[])
                         {"ref", required_argument,0,OPT_REFALN},
                         {"program",  required_argument, 0, OPT_PROGRAM},
                         {"scratch",  required_argument, 0, OPT_TMPDIR},
+                        {"output",  required_argument, 0, OPT_OUTPUT},
                         {"help",   no_argument,0,'h'},
                         {"quiet",  0, 0, 'q'},
                         {0, 0, 0, 0}
@@ -64,6 +64,10 @@ int main(int argc, char *argv[])
                 case OPT_TMPDIR:
                         scratch  = optarg;
                         break;
+                case OPT_OUTPUT:
+                        output  = optarg;
+                        break;
+
                 case 'h':
                         help = 1;
                         break;
@@ -84,19 +88,19 @@ int main(int argc, char *argv[])
         if(!testseq){
 
                 RUN(print_help_score_and_align(argv));
-                ERROR_MSG("No test file");
+                ERROR_MSG("No test file\n");
 
 
         }else{
                 if(!my_file_exists(testseq)){
-                        ERROR_MSG("test file: %s does not exist",testseq);
+                        ERROR_MSG("test file: %s does not exist\n",testseq);
                 }
         }
 
         if(!refseq){
 
                 RUN(print_help_score_and_align(argv));
-                ERROR_MSG("No ref file");
+                ERROR_MSG("No ref file\n");
 
 
         }else{
@@ -107,7 +111,12 @@ int main(int argc, char *argv[])
 
         if(!program){
                 RUN(print_help_score_and_align(argv));
-                ERROR_MSG("No program specified");
+                ERROR_MSG("No program specified\n");
+        }
+        if(!output){
+                RUN(print_help_score_and_align(argv));
+                ERROR_MSG("No output specified\n");
+
         }
 
         if(scratch){
@@ -119,7 +128,7 @@ int main(int argc, char *argv[])
                 }
         }
 
-        RUN(timescore(testseq, refseq, program, scratch));
+        RUN(timescore(testseq, refseq, program, scratch,output));
         return EXIT_SUCCESS;
 ERROR:
         WARNING_MSG("Something went wrong. Use this program like this:\n\n");
@@ -127,9 +136,10 @@ ERROR:
         return EXIT_FAILURE;
 }
 
-int timescore(char* test,char* ref, char* program,char* scratch)
+int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_name)
 {
 
+        FILE* out_ptr = NULL;
         struct alignment* ref_aln = NULL;
         struct alignment* test_aln = NULL;
         struct parameters* param = NULL;
@@ -146,6 +156,8 @@ int timescore(char* test,char* ref, char* program,char* scratch)
         int pos_test;
         int i,j,c;
 
+        char *envpaths = getenv("PATH");
+
         path = realpath(scratch, path_buffer);
         if (path) {
                 LOG_MSG("scratch is: %s", path);
@@ -157,7 +169,25 @@ int timescore(char* test,char* ref, char* program,char* scratch)
 
 
         if(!strcmp(program , "kalign")){
+                if (system("which kalign")){
+                        ERROR_MSG("kalign is not found in your path:\n%s\n",envpaths);
+                }
+
                 snprintf(cmd, BUFFER_LEN, "kalign %s -o %s/test.msf",test,path);
+        }else if(!strcmp(program,"muscle")){
+                if (system("which muscle3.8.31_i86linux32")){
+                        ERROR_MSG("muscle3.8.31_i86linux32 is not found in your path:\n%s\n",envpaths);
+                }
+                snprintf(cmd, BUFFER_LEN, "muscle3.8.31_i86linux32 -msf -in %s -out %s/test.msf",test,path);
+        }else if(!strcmp(program,"clustalo")){
+                if (system("which clustalo-1.2.4-Ubuntu-x86_64")){
+                        ERROR_MSG("clustalo-1.2.4-Ubuntu-x86_64 is not found in your path:\n%s\n",envpaths);
+                }
+
+                snprintf(cmd, BUFFER_LEN, "clustalo-1.2.4-Ubuntu-x86_64 --outfmt=msf  --in %s --force --out %s/test.msf",test,path);
+
+        }else{
+                ERROR_MSG("Program %s not recognize\n", program);
         }
 
         LOG_MSG("Running: %s", cmd);
@@ -166,7 +196,7 @@ int timescore(char* test,char* ref, char* program,char* scratch)
 
         /* run program */
         RUNP(pipe = popen(cmd,"r"));
-
+        //if (system("which gnuplot"))
         while (fgets(ret, BUFFER_LEN, pipe)){
                 fprintf(stderr,"%s", ret);
         }
@@ -204,40 +234,40 @@ int timescore(char* test,char* ref, char* program,char* scratch)
 
         pos_test = 0;
         for(i = 0; i < ref_aln->numseq;i++){
-                LOG_MSG("Searching for: %s", ref_aln->sn[i]);
+                //LOG_MSG("Searching for: %s", ref_aln->sn[i]);
                 for(j = 0; j < test_aln->numseq;j++){
                         if(  ref_aln->lsn[i] == test_aln->lsn[j]){
-                        if(!strcmp( ref_aln->sn[i],  test_aln->sn[j])){
-                                if(pos_test != j){
-                                LOG_MSG("Found:: %s (%d)", test_aln->sn[j], pos_test);
+                                if(!strcmp( ref_aln->sn[i],  test_aln->sn[j])){
+                                        if(pos_test != j){
+                                                //LOG_MSG("Found:: %s (%d)", test_aln->sn[j], pos_test);
 
-                                /* copy name */
-                                if(test_aln->lsn[pos_test] < test_aln->lsn[j]){
-                                        MREALLOC(test_aln->sn[pos_test], test_aln->lsn[j]);
+                                                /* copy name */
+                                                if(test_aln->lsn[pos_test] < test_aln->lsn[j]){
+                                                        MREALLOC(test_aln->sn[pos_test], test_aln->lsn[j]);
 
 
-                                        test_aln->lsn[pos_test] = test_aln->lsn[j];
+                                                        test_aln->lsn[pos_test] = test_aln->lsn[j];
+                                                }
+                                                snprintf(test_aln->sn[pos_test] ,test_aln->lsn[pos_test],"%s",test_aln->sn[j]);
+                                                /* copy sequence */
+
+                                                if(test_aln->sl[pos_test] < test_aln->sl[j]){
+                                                        MREALLOC(test_aln->seq[pos_test]  , test_aln->sl[j]);
+
+
+                                                        test_aln->sl[pos_test] = test_aln->sl[j];
+                                                }
+                                                snprintf(test_aln->seq[pos_test],test_aln->sl[pos_test],"%s",test_aln->seq[j]);
+
+                                                /* copy gaps  */
+
+                                                for(c = 0; c < test_aln->sl[pos_test]+1;c++){
+                                                        test_aln->gaps[pos_test][c] = test_aln->gaps[j][c];
+                                                }
+                                        }
+                                        pos_test++;
+                                        break;
                                 }
-                                snprintf(test_aln->sn[pos_test] ,test_aln->lsn[pos_test],"%s",test_aln->sn[j]);
-                                /* copy sequence */
-
-                                if(test_aln->sl[pos_test] < test_aln->sl[j]){
-                                        MREALLOC(test_aln->seq[pos_test]  , test_aln->sl[j]);
-
-
-                                        test_aln->sl[pos_test] = test_aln->sl[j];
-                                }
-                                snprintf(test_aln->seq[pos_test],test_aln->sl[pos_test],"%s",test_aln->seq[j]);
-
-                                /* copy gaps  */
-
-                                for(c = 0; c < test_aln->sl[pos_test]+1;c++){
-                                        test_aln->gaps[pos_test][c] = test_aln->gaps[j][c];
-                                }
-                                }
-                                pos_test++;
-                                break;
-                        }
                         }
 
                 }
@@ -263,8 +293,6 @@ int timescore(char* test,char* ref, char* program,char* scratch)
 
 
         /* score */
-
-
         snprintf(cmd, BUFFER_LEN, "bali_score %s %s",  ref, param->outfile);
         // Execute a process listing
 
@@ -281,10 +309,19 @@ int timescore(char* test,char* ref, char* program,char* scratch)
                 //fprintf(stdout,"%s", ret);
         }
 
-        fprintf(stdout,"-%s-", ret);
 
         sscanf(ret, "%*s %*s %lf %lf", &SP,&TC);
         pclose(pipe);
+
+        if(!my_file_exists(out_file_name)){
+                RUNP(out_ptr = fopen(out_file_name,"w"));
+                fprintf(out_ptr,"Program,Alignment,SP,TC,Time\n");
+        }else{
+                RUNP(out_ptr = fopen(out_file_name,"a"));
+        }
+
+        fprintf(out_ptr,"%s,%s,%f,%f,%f\n",program,basename(ref),SP,TC,time);
+        fclose(out_ptr);
 
         LOG_MSG("SP:%f TC:%f", SP,TC);
 
@@ -303,8 +340,9 @@ ERROR:
 
 int print_help_score_and_align(char **argv)
 {
-        const char usage[] = "  -test <test sequences> -ref <reference alignment> -program <kalign|clustalo|muscle>";
+        const char usage[] = "  -test <test sequences> -ref <reference alignment> -program <kalign|clustalo|muscle> -o <outfile>";
         fprintf(stdout,"\nUsage: %s [-options] %s\n\n",basename(argv[0]) ,usage);
+        fprintf(stdout,"NOTE: the program appends results to the output file.\n\n");
         fprintf(stdout,"Options:\n\n");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--scratch","Scratch directory." ,"[NA]"  );
 

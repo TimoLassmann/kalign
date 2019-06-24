@@ -740,6 +740,7 @@
 
 **** score alignments 
 
+
      #+BEGIN_SRC bash 
        ./score_kalign_bralibase.sh > scores_kalign_bralibase.csv 
        ./score_muscle_bralibase.sh > scores_muscle_bralibase.csv 
