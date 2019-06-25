@@ -1,6 +1,6 @@
 #include "global.h"
 
-
+#include "alphabet.h"
 #define MSA_NAME_LEN 128
 
 struct msa_seq{
@@ -35,7 +35,8 @@ struct out_line{
         int seq_id;
 };
 
-
+/* convert */
+int convert_msa_to_internal(struct msa* msa, int type);
 /* rw functions */
 
 struct msa* read_fasta(char* infile);
@@ -44,6 +45,8 @@ struct msa* read_clu(char* infile);
 
 int write_msa_fasta(struct msa* msa,char* outfile);
 int write_msa_clustal(struct msa* msa,char* outfile);
+int write_msa_msf(struct msa* msa,char* outfile);
+
 /* memory functions  */
 struct msa* alloc_msa(void);
 int resize_msa(struct msa* msa);
@@ -60,19 +63,35 @@ int resize_line_buffer(struct line_buffer* lb);
 void free_line_buffer(struct line_buffer* lb);
 
 /* local helper functions  */
+static int detect_alphabet(struct msa* msa);
 static int null_terminate_sequences(struct msa* msa);
 static int sort_out_lines(const void *a, const void *b);
+static int make_linear_sequence(struct msa_seq* seq, char* linear_seq);
+int GCGMultchecksum(struct msa* msa);
+/* Taken from squid library by Sean Eddy  */
+int GCGchecksum(char *seq, int len);
+
+
 
 int print_msa(struct msa* msa);
 int main(int argc, char *argv[])
 {
         struct msa* msa = NULL;
         LOG_MSG("Start io tests.");
-        RUNP(msa = read_clu(argv[1]));
-        print_msa(msa);
-        write_msa_clustal(msa,NULL);
+        DECLARE_TIMER(timer);
 
-        write_msa_fasta(msa, NULL);
+        START_TIMER(timer);
+        RUNP(msa = read_msf(argv[1]));
+        detect_alphabet(msa);
+
+        STOP_TIMER(timer);
+        LOG_MSG("done reading in %f", GET_TIMING(timer));
+        //print_msa(msa);
+        write_msa_clustal(msa,"rwtest.clu");
+
+        write_msa_fasta(msa, "rwtest.fasta");
+
+        write_msa_msf(msa,"rwtest.msf");
         free_msa(msa);
         return EXIT_SUCCESS;
 ERROR:
@@ -102,6 +121,102 @@ int print_msa(struct msa* msa)
 }
 
 
+
+/* detectalphabet */
+
+
+int detect_alphabet(struct msa* msa)
+{
+        int i;
+        int min,c;
+        uint8_t DNA[128];
+        uint8_t protein[128];
+        int diff[3];
+        char DNA_letters[]= "acgtuACGTUnN";
+        char protein_letters[] = "acdefghiklmnpqrstvwyACDEFGHIKLMNPQRSTVWY";
+
+        ASSERT(msa != NULL, "No alignment");
+
+        for(i = 0; i <128;i++){
+                DNA[i] = 0;
+                protein[i] = 0;
+        }
+
+        for(i = 0 ; i < strlen(DNA_letters);i++){
+                DNA[(int) DNA_letters[i]] = 1;
+        }
+
+        for(i = 0 ; i < strlen(protein_letters);i++){
+                protein[(int) protein_letters[i]] = 1;
+        }
+
+        diff[0] = 0;
+        diff[1] = 0;
+        for(i = 0; i < 128;i++){
+                if((msa->letter_freq[i]) && (!DNA[i])){
+                        diff[0]++;
+                }
+                        if((msa->letter_freq[i]) && (!protein[i])){
+                        diff[1]++;
+                }
+        }
+        LOG_MSG("%d %d", diff[0],diff[1]);
+        c = -1;
+        min = 2147483647;
+        for(i = 0; i < 2;i++){
+                if(diff[i] < min){
+                        min = diff[i];
+                        c = i;
+                }
+        }
+        if(c == 0){
+                LOG_MSG("Detected DNA sequences.");
+                msa->L = defDNA;
+                RUN(convert_msa_to_internal(msa, defDNA));
+        }else if(c == 1){
+                LOG_MSG("Detected protein sequences.");
+                msa->L = redPROTEIN;
+                RUN(convert_msa_to_internal(msa, redPROTEIN));
+        }else{
+                ERROR_MSG("Alphabet not recognized.");
+        }
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+int convert_msa_to_internal(struct msa* msa, int type)
+{
+        struct alphabet* a = NULL;
+        struct msa_seq* seq = NULL;
+        int8_t* t = NULL;
+        int i,j;
+
+        RUNP(a = create_alphabet(type));
+
+        t = a->to_internal;
+        msa->L = a->L;
+        for(i = 0; i <  msa->numseq;i++){
+                seq = msa->sequences[i];
+                for(j =0 ; j < seq->len;j++){
+                        if(t[(int)  seq->seq[j]] == -1){
+                                WARNING_MSG("there should be no character not matching the alphabet");
+                        }else{
+                                seq->s[j] = t[(int)  seq->seq[j]];
+
+                        }
+                }
+
+        }
+        MFREE(a);
+        return OK;
+ERROR:
+        if(a){
+                MFREE(a);
+        }
+        return FAIL;
+}
+
 /* rw functions; I wand fasta, msf and clustal */
 
 int write_msa_fasta(struct msa* msa,char* outfile)
@@ -111,8 +226,9 @@ int write_msa_fasta(struct msa* msa,char* outfile)
 
         if(!outfile){
                 f_ptr = stdout;
+        }else{
+                RUNP(f_ptr = fopen(outfile, "w"));
         }
-
 
         for(i = 0; i < msa->numseq;i++){
                 fprintf(f_ptr,">%s\n", msa->sequences[i]->name);
@@ -146,18 +262,22 @@ int write_msa_fasta(struct msa* msa,char* outfile)
                         fprintf(f_ptr,"\n");
                 }
         }
+        if(outfile){
+                fclose(f_ptr);
+        }
 
         return OK;
 ERROR:
         return FAIL;
 }
 
-int write_msa_clustal(struct msa* msa,char* outfile)
+int write_msa_msf(struct msa* msa,char* outfile)
 {
         struct line_buffer* lb = NULL;
         struct out_line* ol= NULL;
         struct msa_seq* seq = NULL;
-
+        time_t now;			/* current time as a time_t */
+        char   date[64];		/* today's date in GCG's format "October 3, 1996 15:57" */
         char* linear_seq = NULL;
         char* ptr;
         FILE* f_ptr = NULL;
@@ -165,11 +285,13 @@ int write_msa_clustal(struct msa* msa,char* outfile)
         int aln_len;
         int i,j,c,f;
         int block;
-        int pos;
         int max_name_len = 0;
         int line_length;
+        int header_index;
         if(!outfile){
                 f_ptr = stdout;
+        }else{
+                RUNP(f_ptr = fopen(outfile, "w"));
         }
 
         for(i = 0; i < msa->numseq;i++){
@@ -188,51 +310,131 @@ int write_msa_clustal(struct msa* msa,char* outfile)
         /* length of write line buffer should be:
            max_name_len + 5 +
            60 (for sequences) +
-           1 for newline character
+           1 for newline character +
+           6 for spaces every 10 letters
         */
-        line_length = max_name_len +5 + 60 + 2;
+        line_length = max_name_len +5 + 60 + 2+6 ;
 
         RUNP(lb = alloc_line_buffer(line_length));
 
         /* print header line
            here I will use seq index -1 to make sure this ends up on top.
          */
-        ol = lb->lines[lb->num_line];
+        /*
+!!AA_MULTIPLE_ALIGNMENT 1.0
 
-        snprintf(ol->line, line_length,"Kalign (%s) multiple sequence alignment", PACKAGE_VERSION);
+  stdout MSF:  131 Type: P 16/01/02 CompCheck: 3003 ..
+
+  Name: IXI_234 Len: 131  Check: 6808 Weight: 1.00
+  Name: IXI_235 Len: 131  Check: 4032 Weight: 1.00
+  Name: IXI_236 Len: 131  Check: 2744 Weight: 1.00
+  Name: IXI_237 Len: 131  Check: 9419 Weight: 1.00
+//
+        */
+        header_index = -1 * (msa->numseq+10);
+        ol = lb->lines[lb->num_line];
+        if(msa->L == defPROTEIN){
+                snprintf(ol->line, line_length,"!!AA_MULTIPLE_ALIGNMENT 1.0");
+        }else if(msa->L == defDNA){
+                snprintf(ol->line, line_length,"!!NA_MULTIPLE_ALIGNMENT 1.0");
+        }else{
+                snprintf(ol->line, line_length,"!!NA_MULTIPLE_ALIGNMENT 1.0");
+        }
         ol->block = -1;
-        ol->seq_id = -2;
+        ol->seq_id = header_index;
+        header_index++;
+        lb->num_line++;
+        /* a space */
+        ol = lb->lines[lb->num_line];
+        ol->line[0] = 0;
+        ol->block = -1;
+        ol->seq_id = header_index;
+        header_index++;
         lb->num_line++;
 
+        /* The msf line*/
+        now = time(NULL);
+        if (strftime(date, 64, "%B %d, %Y %H:%M", localtime(&now)) == 0){
+                ERROR_MSG("time failed???");
+        }
         ol = lb->lines[lb->num_line];
+        snprintf(ol->line, line_length," %s  MSF: %d  Type: %c  %s  Check: %d  ..", outfile == NULL ? "kalign" : outfile,aln_len, msa->L == defPROTEIN ? 'P' : 'N', date, GCGMultchecksum(msa));
 
-        snprintf(ol->line, line_length,"\n");
         ol->block = -1;
-        ol->seq_id = -1;
+        ol->seq_id = header_index;
+        header_index++;
+        lb->num_line++;
+
+        /* another space */
+        ol = lb->lines[lb->num_line];
+        ol->line[0] = 0;
+        ol->block = -1;
+        ol->seq_id = header_index;
+        header_index++;
+        lb->num_line++;
+
+        //Name: IXI_234 Len: 131  Check: 6808 Weight: 1.00
+        for(i = 0; i < msa->numseq;i++){
+                if(lb->alloc_num_lines == lb->num_line){
+                        resize_line_buffer(lb);
+                }
+
+                ol = lb->lines[lb->num_line];
+
+                snprintf(ol->line, line_length," Name: %-*.*s  Len:  %5d  Check: %4d  Weight: %.2f",
+                         max_name_len,max_name_len,
+                         msa->sequences[i]->name ,
+                         aln_len,
+                         GCGchecksum(msa->sequences[i]->seq, msa->sequences[i]->len),
+                         1.0);
+
+                ol->block = -1;
+                ol->seq_id = header_index;
+                header_index++;
+                lb->num_line++;
+
+        }
+                /* another space */
+        if(lb->alloc_num_lines == lb->num_line){
+                resize_line_buffer(lb);
+        }
+        ol = lb->lines[lb->num_line];
+        ol->line[0] = 0;
+        ol->block = -1;
+        ol->seq_id = header_index;
+        header_index++;
+        lb->num_line++;
+
+        /* header section finished */
+
+        if(lb->alloc_num_lines == lb->num_line){
+                resize_line_buffer(lb);
+        }
+        ol = lb->lines[lb->num_line];
+        snprintf(ol->line, line_length,"//");
+        ol->block = -1;
+        ol->seq_id = header_index;
+        header_index++;
+        lb->num_line++;
+
+        /* another space */
+        if(lb->alloc_num_lines == lb->num_line){
+                resize_line_buffer(lb);
+        }
+        ol = lb->lines[lb->num_line];
+        ol->line[0] = 0;
+        ol->block = -1;
+        ol->seq_id = header_index;
+        header_index++;
         lb->num_line++;
 
 
-        /* now the actual sequence lines  */
+/* now the actual sequence lines  */
 
         for(i = 0; i < msa->numseq;i++){
                 block = 0;
                 seq = msa->sequences[i];
-                f = 0;
-                for(j = 0;j < seq->len;j++){
-                        for(c = 0;c < seq->gaps[j];c++){
-                                linear_seq[f] = '-';
-                                f++;
-
-                        }
-                        linear_seq[f] = seq->seq[j];
-                        f++;
-                }
-                for(c = 0;c < seq->gaps[ seq->len];c++){
-                        linear_seq[f] = '-';
-                        f++;
-                }
-                linear_seq[f] = 0;
-                fprintf(stdout,"LINEAR:%s\n",linear_seq);
+                RUN(make_linear_sequence(seq,linear_seq));
 
                 f = 0;
                 while(1){
@@ -294,10 +496,153 @@ int write_msa_clustal(struct msa* msa,char* outfile)
         qsort(lb->lines , lb->num_line, sizeof(struct out_line *), sort_out_lines);
         for(i = 0; i < lb->num_line;i++){
                 ol = lb->lines[i];
-                fprintf(stdout,"%d %d %s\n",ol->seq_id,ol->block,ol->line);
+                //fprintf(stdout,"%d %d %s\n",ol->seq_id,ol->block,ol->line);
+                fprintf(f_ptr, "%s\n", ol->line);
+        }
+        if(outfile){
+                fclose(f_ptr);
+        }
+        free_line_buffer(lb);
+        MFREE(linear_seq);
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+int write_msa_clustal(struct msa* msa,char* outfile)
+{
+        struct line_buffer* lb = NULL;
+        struct out_line* ol= NULL;
+        struct msa_seq* seq = NULL;
+
+        char* linear_seq = NULL;
+        char* ptr;
+        FILE* f_ptr = NULL;
+
+        int aln_len;
+        int i,j,c,f;
+        int block;
+        int max_name_len = 0;
+        int line_length;
+        if(!outfile){
+                f_ptr = stdout;
+        }else{
+                RUNP(f_ptr = fopen(outfile, "w"));
+        }
+
+        for(i = 0; i < msa->numseq;i++){
+                max_name_len = MACRO_MAX(max_name_len, strnlen( msa->sequences[i]->name,MSA_NAME_LEN));
+        }
+
+        aln_len = 0;
+        for (j = 0; j <= msa->sequences[0]->len;j++){
+                aln_len+=  msa->sequences[0]->gaps[j];
+        }
+        aln_len += msa->sequences[0]->len;
+
+        MMALLOC(linear_seq, sizeof(char)* (aln_len+1));
+
+
+        /* length of write line buffer should be:
+           max_name_len + 5 +
+           60 (for sequences) +
+           1 for newline character
+        */
+        line_length = max_name_len +5 + 60 + 2;
+
+        RUNP(lb = alloc_line_buffer(line_length));
+
+        /* print header line
+           here I will use seq index -1 to make sure this ends up on top.
+         */
+        ol = lb->lines[lb->num_line];
+
+        snprintf(ol->line, line_length,"Kalign (%s) multiple sequence alignment", PACKAGE_VERSION);
+        ol->block = -1;
+        ol->seq_id = -2;
+        lb->num_line++;
+
+        ol = lb->lines[lb->num_line];
+        ol->line[0] = 0;
+        ol->block = -1;
+        ol->seq_id = -1;
+        lb->num_line++;
+
+
+        /* now the actual sequence lines  */
+
+        for(i = 0; i < msa->numseq;i++){
+                block = 0;
+                seq = msa->sequences[i];
+                RUN(make_linear_sequence(seq,linear_seq));
+
+                f = 0;
+                while(1){
+                        if(lb->alloc_num_lines == lb->num_line){
+                                resize_line_buffer(lb);
+                        }
+                        ol = lb->lines[lb->num_line];
+                        c = strnlen(seq->name, MSA_NAME_LEN);
+
+
+                        for(j = 0;j < c;j++){
+                                ol->line[j] = seq->name[j];
+                        }
+                        for(j = c;j <  max_name_len+5;j++){
+                                ol->line[j] = ' ';
+                        }
+                        ptr = ol->line + max_name_len+5;
+                        for(j = 0;j < 60;j++){
+                                if(f == aln_len){
+
+                                        ptr[j] = 0;
+                                        break;
+                                }
+                                ptr[j] = linear_seq[f];
+                                f++;
+                        }
+                        ptr[j] = 0;
+
+
+
+                        ol->block = block;
+                        ol->seq_id = i;
+
+                        lb->num_line++;
+
+                        if(i == 0){
+                                if(lb->alloc_num_lines == lb->num_line){
+                                        resize_line_buffer(lb);
+                                }
+
+                                ol = lb->lines[lb->num_line];
+                                ol->block = block;
+                                ol->seq_id = msa->numseq;
+                                ol->line[0] = '\n';
+                                ol->line[1] = 0;
+                                lb->num_line++;
+                        }
+
+                        block++;
+                        if(f == aln_len){
+                                break;
+                        }
+                }
+
 
         }
 
+
+        qsort(lb->lines , lb->num_line, sizeof(struct out_line *), sort_out_lines);
+        for(i = 0; i < lb->num_line;i++){
+                ol = lb->lines[i];
+                fprintf(f_ptr, "%s\n", ol->line);
+                //fprintf(stdout,"%d %d %s\n",ol->seq_id,ol->block,ol->line);
+
+        }
+        if(outfile){
+                fclose(f_ptr);
+        }
         free_line_buffer(lb);
         MFREE(linear_seq);
         return OK;
@@ -348,7 +693,7 @@ struct msa* read_clu(char* infile)
                                 seq_ptr = msa->sequences[active_seq];
                                 //p = strstr(line,seq_ptr->name);
                                 //if(p){
-                                //LOG_MSG("Found bitsof seq %s", seq_ptr->name);
+                                LOG_MSG("Found bitsof seq %s", seq_ptr->name);
                                 p = line;
                                 for(i = 0;i < line_len;i++){
                                         if(isspace((int)p[i])){
@@ -377,7 +722,7 @@ struct msa* read_clu(char* infile)
                         }
 
                 }
-                fprintf(stdout,"%d \"%s\"\n",line_len,line);
+                //fprintf(stdout,"%d \"%s\"\n",line_len,line);
         }
         RUN(null_terminate_sequences(msa));
 
@@ -574,6 +919,28 @@ int null_terminate_sequences(struct msa* msa)
         return OK;
 }
 
+int make_linear_sequence(struct msa_seq* seq, char* linear_seq)
+{
+        int c,j,f;
+        f = 0;
+        for(j = 0;j < seq->len;j++){
+                for(c = 0;c < seq->gaps[j];c++){
+                        linear_seq[f] = '-';
+                        f++;
+
+                }
+                linear_seq[f] = seq->seq[j];
+                f++;
+        }
+        for(c = 0;c < seq->gaps[ seq->len];c++){
+                linear_seq[f] = '-';
+                f++;
+        }
+        linear_seq[f] = 0;
+        //fprintf(stdout,"LINEAR:%s\n",linear_seq);
+        return OK;
+}
+
 
 /* memory functions */
 struct msa* alloc_msa(void)
@@ -730,6 +1097,8 @@ int resize_line_buffer(struct line_buffer* lb)
         old_len = lb->alloc_num_lines;
         lb->alloc_num_lines = lb->alloc_num_lines + 1024;
 
+        MREALLOC(lb->lines, sizeof(struct out_line*) * lb->alloc_num_lines);
+
         for(i = old_len; i < lb->alloc_num_lines;i++){
                 lb->lines[i] = NULL;
                 MMALLOC(lb->lines[i], sizeof(struct out_line));
@@ -781,4 +1150,28 @@ int sort_out_lines(const void *a, const void *b)
         }else{
                 return -1;
         }
+}
+
+/* alignment checksum  */
+int GCGMultchecksum(struct msa* msa)
+{
+        int chk = 0;
+        int idx;
+
+        for (idx = 0; idx < msa->numseq; idx++){
+                chk = (chk + GCGchecksum(msa->sequences[idx]->seq,  msa->sequences[idx]->len)) % 10000;
+        }
+        return chk;
+}
+
+/* Taken from squid library by Sean Eddy  */
+int GCGchecksum(char *seq, int len)
+{
+        int i;			/* position in sequence */
+        int chk = 0;			/* calculated checksum  */
+
+        for (i = 0; i < len; i++){
+                chk = (chk + (i % 57 + 1) * (toupper((int) seq[i]))) % 10000;
+        }
+        return chk;
 }

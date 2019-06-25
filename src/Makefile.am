@@ -41,7 +41,9 @@ AM_CPPFLAGS=${MYINCDIRS} ${HDF5_CPPFLAGS}
 bin_PROGRAMS =  kalign phmm get_param edist alphabet heap_test misc_test bpm_test pbil timescorealn rwaln
 
 rwaln_SOURCES = \
-rwalign.c
+rwalign.c \
+alphabet.h \
+alphabet.c
 
 timescorealn_SOURCES = \
 time_and_score_aln.c \
@@ -49,7 +51,7 @@ parameters.h \
 parameters.c \
 alphabet.h \
 alphabet.c \
-align_io.h \
+palign_io.h \
 align_io.c \
 misc.h \
 misc.c
