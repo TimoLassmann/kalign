@@ -857,43 +857,51 @@
      #+END_SRC     
 
 
-**** 
+**** Run alignment programs on Homfam 
 
 
-    #+BEGIN_SRC bash -n :tangle gen_run_homfam.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
-      <<scratchdir>>
-    #+END_SRC
 
-    #+BEGIN_SRC bash -n :tangle gen_run_homfam.sh :noweb yes :exports code :results none :noweb yes
 
-      DIR=`pwd`
-      function usage()
-      {
-          printf "This script will generate scripts to run kalign, clustal omega and muscle on the balibase MSA benchmark data set.\n\n" ;
-          printf "usage: $0\n\n" ;
-          exit 1;
-      }
 
-      while getopts h  opt
-      do
-          case ${opt} in
-              h) usage;;
-              ,*) usage;;
-          esac
-      done
+     #+BEGIN_SRC bash -n :tangle gen_run_homfam.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
+       <<scratchdir>>
+     #+END_SRC
 
-      printf "#!/usr/bin/env zsh\n" > run_homfam.sh
-      printf "Generating kalign run script\n";
-      find ~/kalignbenchmark/data/homfam  -name "*_test-only.vie" | awk -v outdir="$SCRATCHDIR" '{ printf "(time kalign %s -o %s/kalign.msf) 2>> homfam_timing.txt \n", $1,outdir }' >> run_homfam.sh
-      
+     #+BEGIN_SRC bash -n :tangle gen_run_homfam.sh :noweb yes :exports code :results none :noweb yes
 
-      printf "Generating muscle run script\n";
-      find ~/kalignbenchmark/data/homfam  -name "*_test-only.vie" |  awk -v outdir="$SCRATCHDIR" '{printf "(time muscle3.8.31_i86linux32 -msf -in %s -out  %s/muscle.msf) 2>> homfam_timing.txt\n", $1,outdir}' >> run_homfam.sh
-      chmod 755 run_homfam.sh
+       DIR=`pwd`
+       function usage()
+       {
+           printf "This script will generate scripts to run kalign, clustal omega and muscle on the balibase MSA benchmark data set.\n\n" ;
+           printf "usage: $0\n\n" ;
+           exit 1;
+       }
 
-      
+       while getopts h  opt
+       do
+           case ${opt} in
+               h) usage;;
+               ,*) usage;;
+           esac
+       done
 
-#+END_SRC
+       
+
+       printf "Generating kalign run script\n"
+       printf "export PATH=~/kalignbenchmark/programs:$PATH\n\n" > run_homfam.sh
+       find ~/kalignbenchmark/data/homfam  -name "*_testaln.fa" | awk -v outdir="$SCRATCHDIR" '{
+       ref_aln=$1;gsub("_testaln.fa", "_ref.msf",ref_aln);
+       printf "timescorealn -test %s -ref %s -program kalign --scratch ~/kalignbenchmark/scratch -out scores_homfam.csv\n", $1,ref_aln;
+       printf "timescorealn -test %s -ref %s -program muscle --scratch ~/kalignbenchmark/scratch -out scores_homfam.csv\n", $1,ref_aln;
+       printf "timescorealn -test %s -ref %s -program clustalo --scratch ~/kalignbenchmark/scratch -out scores_homfam.csv\n", $1,ref_aln;
+       }' >> run_homfam.sh
+
+       chmod 755 run_homfam.sh
+
+
+
+
+     #+END_SRC
 
      #+BEGIN_SRC bash -n :tangle run_bralibase.sh :noweb yes :exports code :results none :noweb yes :shebang  #!/usr/bin/env bash
        <<path>>
@@ -901,8 +909,8 @@
      #+END_SRC
 
 
-/home/user/kalignbenchmark/data/homfam
+     /home/user/kalignbenchmark/data/homfam
 
-printf "Generating clustalo run script\n";
-      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*_test.fa" -o -name '*.fasta' | grep unaligned | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "clustalo-1.2.4-Ubuntu-x86_64 --outfmt=msf  --in %s --force --out %s/%s_%s_%s_clustalo.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2] }' > run_clustalo_bralibase.sh
-      chmod 755 run_clustalo_bralibase.sh
+     printf "Generating clustalo run script\n";
+     find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*_test.fa" -o -name '*.fasta' | grep unaligned | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "clustalo-1.2.4-Ubuntu-x86_64 --outfmt=msf  --in %s --force --out %s/%s_%s_%s_clustalo.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2] }' > run_clustalo_bralibase.sh
+     chmod 755 run_clustalo_bralibase.sh

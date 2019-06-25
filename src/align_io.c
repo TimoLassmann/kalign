@@ -123,7 +123,6 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
         struct align_io_buffer* b = NULL;
         int i = 0;
 
-
         ASSERT(param!= NULL, "No parameters");
         /* if profile do something else... */
         /* allocate input buffers  */
@@ -138,6 +137,7 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
                 }
         }
         /* count  */
+        LOG_MSG("Counting");
         RUN(count_sequences_and_detect(b));
         /* detect errors  */
         RUN(check_out_and_errors(b,param));
@@ -145,11 +145,11 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
         /* allocate alignment structure */
         RUNP(aln = aln_alloc(b->numseq));
         /* read sequences */
-
+        LOG_MSG("reading");
         RUN(read_all_aligned_sequences(aln, b));
 
 
-                aln->max_len = 0;
+        aln->max_len = 0;
         for(i = 0; i < aln->numseq;i++){
                 if(aln->sl[i] > aln->max_len){
                         aln->max_len = aln->sl[i];
@@ -161,8 +161,9 @@ struct alignment* detect_and_read_sequences(struct parameters* param)
 
         //RUN(read_all_sequences(aln,b));
         //RUN(test_if_aligned(aln));
+        LOG_MSG("Detect ");
         RUN(detect_alphabet(aln));
-
+        LOG_MSG("Done");
         //LOG_MSG("%s %s", param->outfile, param->format);
         if(!param->format && param->outfile){
                 if (byg_start("msf",param->outfile) != -1){
@@ -287,6 +288,19 @@ int count_sequences_stockholm(char* string)
                 return 0;
         }
         return n;
+}
+
+
+int count_sequnces_clustal_gcg_msf(char* string)
+{
+
+        int numseq = 0;
+
+        // logic:
+
+        return numseq;
+ERROR:
+        return 0;
 }
 
 int count_sequences_clustalw(char* string)
@@ -2024,8 +2038,10 @@ int count_sequences_and_detect(struct align_io_buffer* b)
                                 in->input_numseq = count_sequences_clustalw(in->input);
                                 in->input_type = 4;
                         }else if (byg_start("PileUp",in->input) != -1){
+                                LOG_MSG("is pile");
                                 in->input_numseq = count_sequences_clustalw(in->input);
                                 in->input_type = 4;
+                                LOG_MSG("Count done");
                         }else if (byg_start("MSF:",in->input) != -1){
                                 in->input_numseq = count_sequences_clustalw(in->input);
                                 in->input_type = 4;
@@ -2320,7 +2336,7 @@ int msf_output(struct alignment* aln,char* outfile)
         }
         fprintf(fout,"\n\n//\n\n");
 
-        for (i = 0; i+60 < aln_len;i +=60){
+        for (i = 0; i+50 < aln_len;i +=50){
                 for (j = 0; j < aln->numseq;j++){
                         f = aln->nsip[j];
                         for (c = 0; c < aln->lsn[f];c++){
@@ -2333,7 +2349,7 @@ int msf_output(struct alignment* aln,char* outfile)
                                 c++;
                         }
                         g = 1;
-                        for (c = 0; c < 60;c++){
+                        for (c = 0; c < 50;c++){
                                 fprintf(fout,"%c",linear_seq[f][c+i]);
                                 if (g == 10){
                                         fprintf(fout," ");
@@ -2448,7 +2464,7 @@ int clustal_output(struct alignment* aln,char* outfile)
         fprintf(fout,"Kalign (2.0) alignment in ClustalW format\n\n\n");
 
 
-        for (i = 0; i+60 < aln_len;i +=60){
+        for (i = 0; i+50 < aln_len;i +=50){
                 for (j = 0; j < aln->numseq;j++){
                         f = aln->nsip[j];
                         for (c = 0; c < aln->lsn[f];c++){
@@ -2461,7 +2477,7 @@ int clustal_output(struct alignment* aln,char* outfile)
                                 c++;
                         }
 
-                        for (c = 0; c < 60;c++){
+                        for (c = 0; c < 50;c++){
                                 fprintf(fout,"%c",linear_seq[f][c+i]);
                         }
                         fprintf(fout,"\n");

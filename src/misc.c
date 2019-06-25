@@ -167,6 +167,7 @@ int byg_end(char* pattern,char*text)
 
 int byg_start(char* pattern,char*text)
 {
+        LOG_MSG("searching for: %s",pattern);
         int Tc;
         int i  = 0;
         int s = 0;
@@ -190,6 +191,10 @@ int byg_start(char* pattern,char*text)
                 s &= Tc;
                 if(s & mb){
                         return i-m+1;
+                }
+                fprintf(stdout,"%c %d %d\n", text[i], i, s);
+                if(i == 100){
+                        return -1;
                 }
         }
         return -1;

@@ -144,13 +144,14 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
         struct alignment* test_aln = NULL;
         struct parameters* param = NULL;
 
-        char path_buffer[BUFFER_LEN+BUFFER_LEN];
-        char cmd[BUFFER_LEN];
+        char path_buffer[BUFFER_LEN];
+        char cmd[BUFFER_LEN*2];
         char ret[BUFFER_LEN];
         char* path = NULL;
         FILE* pipe = NULL;
         double time;
         double SP,TC;
+        double average_seq_len = 0.0;
 
         struct timeval  tv1, tv2;
         int pos_test;
@@ -173,18 +174,18 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
                         ERROR_MSG("kalign is not found in your path:\n%s\n",envpaths);
                 }
 
-                snprintf(cmd, BUFFER_LEN, "kalign %s -o %s/test.msf",test,path);
+                snprintf(cmd, BUFFER_LEN*2, "kalign %s -o %s/test.msf",test,path);
         }else if(!strcmp(program,"muscle")){
                 if (system("which muscle3.8.31_i86linux32")){
                         ERROR_MSG("muscle3.8.31_i86linux32 is not found in your path:\n%s\n",envpaths);
                 }
-                snprintf(cmd, BUFFER_LEN, "muscle3.8.31_i86linux32 -msf -in %s -out %s/test.msf",test,path);
+                snprintf(cmd, BUFFER_LEN*2, "muscle3.8.31_i86linux32 -msf -in %s -out %s/test.msf",test,path);
         }else if(!strcmp(program,"clustalo")){
                 if (system("which clustalo-1.2.4-Ubuntu-x86_64")){
                         ERROR_MSG("clustalo-1.2.4-Ubuntu-x86_64 is not found in your path:\n%s\n",envpaths);
                 }
 
-                snprintf(cmd, BUFFER_LEN, "clustalo-1.2.4-Ubuntu-x86_64 --outfmt=msf  --in %s --force --out %s/test.msf",test,path);
+                snprintf(cmd, BUFFER_LEN*2, "clustalo-1.2.4-Ubuntu-x86_64 --outfmt=msf  --in %s --force --out %s/test.msf",test,path);
 
         }else{
                 ERROR_MSG("Program %s not recognize\n", program);
@@ -217,14 +218,14 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
         MMALLOC(param->infile, sizeof(char*) * param->num_infiles);
 
         param->infile[0] = NULL;
-        MMALLOC(param->infile[0], sizeof(char) * BUFFER_LEN);
+        MMALLOC(param->infile[0], sizeof(char) * BUFFER_LEN*2);
 
-        snprintf(param->infile[0], BUFFER_LEN, "%s",ref);
-
+        snprintf(param->infile[0], BUFFER_LEN*2, "%s",ref);
+        LOG_MSG("read reference alignment");
         RUNP(ref_aln = detect_and_read_sequences(param));
 
-        snprintf(param->infile[0], BUFFER_LEN, "%s/test.msf",path);
-
+        snprintf(param->infile[0], BUFFER_LEN*2, "%s/test.msf",path);
+        LOG_MSG("read test alignment");
         RUNP(test_aln = detect_and_read_sequences(param));
 
         /* find all reference sequences in the test alignment  */
@@ -232,9 +233,16 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
         /* print out the ref sequences now aligned with the test MSA program */
 
 
+        average_seq_len = 0.0;
+        for(j = 0; j < test_aln->numseq;j++){
+                average_seq_len += test_aln->sl[j];
+        }
+
+        average_seq_len = average_seq_len / (double) test_aln->numseq;
         pos_test = 0;
+        LOG_MSG("Search for matching sequences ");
         for(i = 0; i < ref_aln->numseq;i++){
-                //LOG_MSG("Searching for: %s", ref_aln->sn[i]);
+                LOG_MSG("Searching for: %s", ref_aln->sn[i]);
                 for(j = 0; j < test_aln->numseq;j++){
                         if(  ref_aln->lsn[i] == test_aln->lsn[j]){
                                 if(!strcmp( ref_aln->sn[i],  test_aln->sn[j])){
@@ -279,9 +287,9 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
         org_len = test_aln->numseq;
         test_aln->numseq = pos_test;
 
-        MMALLOC(param->outfile, sizeof(char) * BUFFER_LEN);
+        MMALLOC(param->outfile, sizeof(char) * BUFFER_LEN*2);
 
-        snprintf(param->outfile, BUFFER_LEN, "%s/evalaln.msf",path);
+        snprintf(param->outfile, BUFFER_LEN*2, "%s/evalaln.msf",path);
         param->format = "msf";
         for (i = 0; i < test_aln->numseq;i++){
                 test_aln->nsip[i] = i;
@@ -315,12 +323,12 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
 
         if(!my_file_exists(out_file_name)){
                 RUNP(out_ptr = fopen(out_file_name,"w"));
-                fprintf(out_ptr,"Program,Alignment,SP,TC,Time\n");
+                fprintf(out_ptr,"Program,Alignment,AVGLEN,NUMSEQ,SP,TC,Time\n");
         }else{
                 RUNP(out_ptr = fopen(out_file_name,"a"));
         }
 
-        fprintf(out_ptr,"%s,%s,%f,%f,%f\n",program,basename(ref),SP,TC,time);
+        fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f\n",program,basename(ref), average_seq_len,test_aln->numseq,SP,TC,time);
         fclose(out_ptr);
 
         LOG_MSG("SP:%f TC:%f", SP,TC);
