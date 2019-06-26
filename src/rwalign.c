@@ -394,7 +394,7 @@ int write_msa_msf(struct msa* msa,char* outfile)
                 lb->num_line++;
 
         }
-                /* another space */
+        /* another space */
         if(lb->alloc_num_lines == lb->num_line){
                 resize_line_buffer(lb);
         }
@@ -406,7 +406,6 @@ int write_msa_msf(struct msa* msa,char* outfile)
         lb->num_line++;
 
         /* header section finished */
-
         if(lb->alloc_num_lines == lb->num_line){
                 resize_line_buffer(lb);
         }
@@ -429,8 +428,7 @@ int write_msa_msf(struct msa* msa,char* outfile)
         lb->num_line++;
 
 
-/* now the actual sequence lines  */
-
+        /* now the actual sequence lines  */
         for(i = 0; i < msa->numseq;i++){
                 block = 0;
                 seq = msa->sequences[i];
