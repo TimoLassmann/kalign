@@ -38,59 +38,20 @@ AM_CPPFLAGS=${MYINCDIRS} ${HDF5_CPPFLAGS}
 
 #LOGO_SOURCES = motif_logo.c motif_logo.h
 
-bin_PROGRAMS =  kalign phmm get_param edist alphabet heap_test misc_test bpm_test pbil timescorealn rwaln
-
-rwaln_SOURCES = \
-rwalign.c \
-alphabet.h \
-alphabet.c
+bin_PROGRAMS =  kalign phmm get_param edist alphabet heap_test misc_test bpm_test  timescorealn
 
 timescorealn_SOURCES = \
 time_and_score_aln.c \
+msa.h \
 parameters.h \
 parameters.c \
 alphabet.h \
 alphabet.c \
 palign_io.h \
-align_io.c \
+rwalign.c \
 misc.h \
 misc.c
 
-pbil_SOURCES = \
-pbil.c \
-global.h \
-parameters.h \
-parameters.c \
-aln_data.h \
-aln_data.c \
-align_io.h \
-align_io.c \
-alphabet.h \
-alphabet.c \
-alignment_parameters.h \
-alignment_parameters.c \
-estimate_aln_param.h \
-estimate_aln_param.c \
-phmm.h \
-phmm.c \
-pick_anchor.h \
-pick_anchor.c \
-tree_building.h \
-tree_building.c \
-bisectingKmeans.h \
-bisectingKmeans.c \
-sequence_distance.h \
-sequence_distance.c \
-euclidean_dist.h \
-euclidean_dist.c \
-alignment.h \
-alignment.c \
-weave_alignment.h \
-weave_alignment.c \
-misc.h \
-misc.c \
-bpm.h \
-bpm.c
 
 bpm_test_SOURCES = \
 bpm.h \
@@ -125,8 +86,8 @@ edist_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
 
 
 get_param_SOURCES = run_get_param.c \
-align_io.h \
-align_io.c \
+msa.h \
+rwalign.c \
 parameters.h \
 parameters.c \
 global.h \
@@ -146,26 +107,17 @@ phmm_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
 
 kalign_SOURCES = run_kalign.c \
 global.h \
+msa.h \
 parameters.h \
 parameters.c \
 aln_data.h \
 aln_data.c \
-align_io.h \
-align_io.c \
 alphabet.h \
 alphabet.c \
 alignment_parameters.h \
 alignment_parameters.c \
-counts_from_random_trees.h \
-counts_from_random_trees.c \
-estimate_aln_param.h \
-estimate_aln_param.c \
-phmm.h \
-phmm.c \
 pick_anchor.h \
 pick_anchor.c \
-tree_building.h \
-tree_building.c \
 bisectingKmeans.h \
 bisectingKmeans.c \
 sequence_distance.h \
@@ -176,6 +128,7 @@ alignment.h \
 alignment.c \
 weave_alignment.h \
 weave_alignment.c \
+rwalign.c \
 misc.h \
 misc.c \
 bpm.h \

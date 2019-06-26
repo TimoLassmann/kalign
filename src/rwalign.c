@@ -2,7 +2,7 @@
 
 #include "msa.h"
 #include "alphabet.h"
-#define MSA_NAME_LEN 128
+
 
 
 /* only local; */
@@ -19,8 +19,6 @@ struct out_line{
         int seq_id;
 };
 
-/* convert */
-int convert_msa_to_internal(struct msa* msa, int type);
 
 
 
@@ -61,7 +59,7 @@ int GCGMultchecksum(struct msa* msa);
 int GCGchecksum(char *seq, int len);
 
 
-
+#ifdef RWALIGN_TEST
 int print_msa(struct msa* msa);
 int main(int argc, char *argv[])
 {
@@ -104,13 +102,13 @@ int print_msa(struct msa* msa)
         }
         return OK;
 }
-
+#endif
 
 struct msa* read_input(char* infile)
 {
         struct msa* msa = NULL;
         int type;
-        int i;
+
         ASSERT(infile != NULL,"No input file");
         /* sanity checks  */
         if(!my_file_exists(infile)){
@@ -300,7 +298,7 @@ int detect_alphabet(struct msa* msa)
         if( diff[0] + diff[1] == 0){
                 ERROR_MSG("Could not detect any AA or nucleotides.");
         }
-        LOG_MSG("%d %d", diff[0],diff[1]);
+        //LOG_MSG("%d %d", diff[0],diff[1]);
         c = -1;
         min = 2147483647;
         for(i = 0; i < 2;i++){
@@ -386,11 +384,12 @@ int set_sip_nsip(struct msa* msa)
         ASSERT(msa!= NULL, "No msa");
 
         msa->num_profiles = (msa->numseq << 1 )-1;
-
+        msa->plen = NULL;
 
 
         MMALLOC(msa->sip,sizeof(int*)* msa->num_profiles);
         MMALLOC(msa->nsip,sizeof(int)* msa->num_profiles);
+        MMALLOC(msa->plen,sizeof(int)* msa->num_profiles);
 
 
         for (i =0;i < msa->num_profiles;i++){
@@ -404,6 +403,7 @@ int set_sip_nsip(struct msa* msa)
                 MMALLOC(msa->sip[i],sizeof(int));
                 msa->nsip[i] = 1;
                 msa->sip[i][0] = i;
+                msa->plen[i] = 0;
         }
         return OK;
 ERROR:
@@ -1187,6 +1187,10 @@ struct msa* alloc_msa(void)
         msa->numseq = 0;
         msa->L = 0;
         msa->aligned = 0;
+        msa->plen = NULL;
+        msa->sip = NULL;
+        msa->nsip = NULL;
+
         MMALLOC(msa->sequences, sizeof(struct msa_seq*) * msa->alloc_numseq);
 
         for(i = 0; i < msa->alloc_numseq;i++){
@@ -1228,6 +1232,16 @@ void free_msa(struct msa* msa)
                 for(i = 0; i < msa->alloc_numseq;i++){
                         free_msa_seq(msa->sequences[i]);
                 }
+
+                for (i = msa->num_profiles;i--;){
+                        if(msa->sip[i]){
+                                MFREE(msa->sip[i]);
+                        }
+                }
+                MFREE(msa->plen);
+                MFREE(msa->sip);
+                MFREE(msa->nsip);
+
                 MFREE(msa->sequences);
                 MFREE(msa);
         }

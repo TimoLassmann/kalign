@@ -76,99 +76,8 @@ int calc_seq_id(const int* path,int* a, int*b,float* dist);
 
 
 
-float** pair_aln_dist(struct alignment* aln, struct aln_param* ap, int* num_anchors)
-{
-        struct hirsch_mem* hm = NULL;
-        float** dm = NULL;
-        int* anchors = NULL;
-        int* map = NULL;
 
-        int numseq;
-        //int numprofiles;
-        int i,j,c;
-        int len_a;
-        int len_b;
-        uint8_t* a = NULL;
-        uint8_t* b = NULL;
-
-        ASSERT(aln != NULL,"No alignment");
-
-        numseq = aln->numseq;
-        //numprofiles = aln->num_profiles;
-
-        RUNP(anchors = pick_anchor(aln, num_anchors));
-
-        //RUNP(dm = galloc(dm,i,i,0.0f));
-
-        MMALLOC(dm, sizeof(float*)* numseq);
-
-        c = *num_anchors / 8;
-        if( *num_anchors%8){
-                c++;
-        }
-        c = c << 3;
-
-        for(i = 0; i < numseq;i++){
-                dm[i] = NULL;
-                dm[i] = _mm_malloc(sizeof(float) * c,32);
-                for(j = 0; j < c;j++){
-                        dm[i][j] = 0.0f;
-                }
-        }
-        //fprintf(stdout,"%d C \n",c);
-        i  = aln->sl[anchors[0]] + 2;
-        RUNP(hm = hirsch_mem_alloc(i));
-        for(i = 0; i < aln->numseq;i++){
-                a = aln->s[i];
-                len_a = aln->sl[i];
-                for(j = 0;j < *num_anchors;j++){
-
-                        b = aln->s[anchors[j]];
-                        len_b = aln->sl[anchors[j]];
-                        MMALLOC(map,sizeof(int) * (len_a+len_b+2));
-
-                        for (c = 0; c < (len_a+len_b+2);c++){
-                                map[c]= -1;
-                        }
-
-                        hm->starta = 0;
-                        hm->startb = 0;
-                        hm->enda = len_a;
-                        hm->endb = len_b;
-                        hm->len_a = len_a;
-                        hm->len_b = len_b;
-
-                        hm->f[0].a = 0.0;
-                        hm->f[0].ga =  -FLT_MAX;
-                        hm->f[0].gb = -FLT_MAX;
-                        hm->b[0].a = 0.0;
-                        hm->b[0].ga =  -FLT_MAX;
-                        hm->b[0].gb =  -FLT_MAX;
-                        hirsch_ss_dyn_score(ap, a, b, hm, map, &dm[i][j]);
-                        //hirsch_ss_dyn(ap,a,b,hm,map);
-                        //fprintf(stdout,"%d %d %f\n",i,anchors[j],dm[i][j]);
-                        //map  = add_gap_info_to_hirsch_path(map,len_a,len_b);
-                        //calc_seq_id(map,a,b, &dm[i][j]);
-                        //dm[i][j] =  1.0f - dm[i][j];
-
-
-//                    fprintf(stdout,"ID: %f\n", dm[i][j]);
-                        //fprintf(stdout,"%f %d %d %d\n",dm[i][j],i,j, anchors[j]);
-
-                        MFREE(map);
-//                        exit(0);
-                }
-        }
-        hirsch_mem_free(hm);
-        MFREE(anchors);
-        return dm;
-ERROR:
-        hirsch_mem_free(hm);
-        return NULL;
-}
-
-
-int** hirschberg_alignment(struct alignment* aln, struct aln_param* ap)
+int** hirschberg_alignment(struct msa* msa, struct aln_param* ap)
 {
         struct hirsch_mem* hm = NULL;
         int i,j,g,a,b,c;
@@ -180,8 +89,8 @@ int** hirschberg_alignment(struct alignment* aln, struct aln_param* ap)
         int* tree = NULL;
         int numseq;
 
-        g = aln->num_profiles;
-        numseq = aln->numseq;
+        g = msa->num_profiles;
+        numseq = msa->numseq;
 
         tree = ap->tree;
         MMALLOC(profile,sizeof(float*)*g);
@@ -194,14 +103,25 @@ int** hirschberg_alignment(struct alignment* aln, struct aln_param* ap)
         RUNP(hm = hirsch_mem_alloc(2048));
 
 
+
+
         for (i = 0; i < (numseq-1);i++){
                 a = tree[i*3];
                 b = tree[i*3+1];
                 c = tree[i*3+2];
                 //fprintf(stderr,"\r%8.0f percent done",(float)(i) /(float)numseq * 100);
                 //fprintf(stderr,"Aligning:%d %d->%d	done:%f\n",a,b,c,((float)(i+1)/(float)numseq)*100);
-                len_a = aln->sl[a];
-                len_b = aln->sl[b];
+                if(a < numseq){
+                        len_a = msa->sequences[a]->len;//  aln->sl[a];
+                }else{
+                        len_a = msa->plen[a];
+                }
+                if(b < numseq){
+
+                        len_b = msa->sequences[b]->len;// aln->sl[b];
+                }else{
+                        len_b = msa->plen[b];
+                }
 
 
                 g = (len_a > len_b)? len_a:len_b;
@@ -214,17 +134,17 @@ int** hirschberg_alignment(struct alignment* aln, struct aln_param* ap)
                 }
 
                 if (a < numseq){
-                        RUNP(profile[a] = make_profile(ap,aln->s[a],len_a));
+                        RUNP(profile[a] = make_profile(ap,msa->sequences[a]->s,len_a));
                 }else{
-                        RUN(set_gap_penalties(profile[a],len_a,aln->nsip[b]));
+                        RUN(set_gap_penalties(profile[a],len_a,msa->nsip[b]));
                         //smooth_gaps(profile[a],len_a,window,strength);
 
                         //increase_gaps(profile[a],len_a,window,strength);
                 }
                 if (b < numseq){
-                        RUNP(profile[b] = make_profile(ap,aln->s[b],len_b));
+                        RUNP(profile[b] = make_profile(ap,msa->sequences[b]->s,len_b));
                 }else{
-                        RUN(set_gap_penalties(profile[b],len_b,aln->nsip[a]));
+                        RUN(set_gap_penalties(profile[b],len_b,msa->nsip[a]));
                         //smooth_gaps(profile[b],len_b,window,strength);
                         //increase_gaps(profile[b],len_b,window,strength);
                 }
@@ -245,18 +165,18 @@ int** hirschberg_alignment(struct alignment* aln, struct aln_param* ap)
                 //fprintf(stderr,"LENA:%d	LENB:%d	numseq:%d\n",len_a,len_b,numseq);
                 if(a < numseq){
                         if(b < numseq){
-                                hirsch_ss_dyn(ap,aln->s[a],aln->s[b],hm,map[c]);
+                                hirsch_ss_dyn(ap,msa->sequences[a]->s, msa->sequences[b]->s,hm,map[c]);
                         }else{
                                 hm->enda = len_b;
                                 hm->endb = len_a;
                                 hm->len_a = len_b;
                                 hm->len_b = len_a;
-                                hirsch_ps_dyn(ap,profile[b],aln->s[a],hm,map[c],aln->nsip[b]);
+                                hirsch_ps_dyn(ap,profile[b], msa->sequences[a]->s,hm,map[c],msa->nsip[b]);
                                 RUNP(map[c] = mirror_hirsch_path(map[c],len_a,len_b));
                         }
                 }else{
                         if(b < numseq){
-                                hirsch_ps_dyn(ap,profile[a],aln->s[b],hm,map[c],aln->nsip[a]);
+                                hirsch_ps_dyn(ap,profile[a],msa->sequences[b]->s ,hm,map[c],msa->nsip[a]);
                         }else{
                                 if(len_a < len_b){
                                         hirsch_pp_dyn(profile[a],profile[b],hm,map[c]);
@@ -277,20 +197,20 @@ int** hirschberg_alignment(struct alignment* aln, struct aln_param* ap)
                         //MREALLOC(profile_ptr, sizeof(float)*64*(map[c][0]+2));
                         MMALLOC(profile[c],sizeof(float)*64*(map[c][0]+2));
                         //update(profile[a],profile[b],profile[c],map[c]);
-                        update(profile[a],profile[b],profile[c],ap,map[c],aln->nsip[a],aln->nsip[b]);
+                        update(profile[a],profile[b],profile[c],ap,map[c],msa->nsip[a],msa->nsip[b]);
                 }
 
-                aln->sl[c] = map[c][0];
+                msa->plen[c] = map[c][0];
 
-                aln->nsip[c] = aln->nsip[a] + aln->nsip[b];
-                MMALLOC(aln->sip[c],sizeof(int)*(aln->nsip[a] + aln->nsip[b]));
+                msa->nsip[c] = msa->nsip[a] + msa->nsip[b];
+                MMALLOC(msa->sip[c],sizeof(int)*(msa->nsip[a] + msa->nsip[b]));
                 g =0;
-                for (j = aln->nsip[a];j--;){
-                        aln->sip[c][g] = aln->sip[a][j];
+                for (j = msa->nsip[a];j--;){
+                        msa->sip[c][g] = msa->sip[a][j];
                         g++;
                 }
-                for (j = aln->nsip[b];j--;){
-                        aln->sip[c][g] = aln->sip[b][j];
+                for (j = msa->nsip[b];j--;){
+                        msa->sip[c][g] = msa->sip[b][j];
                         g++;
                 }
 

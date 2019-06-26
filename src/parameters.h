@@ -29,7 +29,7 @@ struct parameters{
         /* float zlevel; */
         /* float same_feature_score; */
         /* float diff_feature_score; */
-
+        int out_format;
         int param_set;
         int dist_method;
         int num_infiles;

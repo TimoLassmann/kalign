@@ -2,9 +2,9 @@
 #define WEAVE_ALIGNMENT_H
 
 #include "global.h"
+#include "msa.h"
+extern int weave(struct msa* msa, int** map, int* tree);
 
-extern int weave(struct alignment* aln, int** map, int* tree);
-
-extern int clean_aln(struct alignment* aln);
+extern int clean_aln(struct msa* msa);
 
 #endif

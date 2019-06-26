@@ -1,8 +1,11 @@
 
 
+
+
 #include "global.h"
+#include "msa.h"
 #include <getopt.h>
-#include "align_io.h"
+//#include "align_io.h"
 
 #include "alphabet.h"
 #include "kmeans.h"
@@ -29,16 +32,16 @@ int normalize_counts(struct counts*ap);
 int print_counts(struct counts* ap);
 int print_counts_to_file(struct counts* ap,char* out);
 int print_counts_flat(struct counts* ap,double* raw);
-int fill_counts(struct counts* ap, struct alignment* aln);
-
+int fill_counts(struct counts* ap, struct msa* msa);
+int make_aliged_seq(uint8_t* aligned, uint8_t* unaligned, int* gaps,int len);
 int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len,double id_threshold);
 int print_probabilies(struct counts*ap);
 
 
 int main(int argc, char *argv[])
 {
-        struct alignment* aln = NULL;
-
+        //struct alignment* aln = NULL;
+        struct msa* msa = NULL;
 
         struct counts* ap = NULL;
 
@@ -107,13 +110,15 @@ int main(int argc, char *argv[])
         ap->id_threshold = id_threshold;
         if(print_all){
                 /* get L */
-                RUNP(aln = read_alignment(infile[0]));
+                RUNP(msa = read_input(infile[0]));
+                //RUNP(aln = read_alignment(infile[0]));
 
-
-                RUN(convert_alignment_to_internal(aln, defPROTEIN));
-                ap->L = aln->L;
+                RUN(convert_msa_to_internal(msa, defPROTEIN));
+                //RUN(convert_alignment_to_internal(aln, defPROTEIN));
+                ap->L = msa->L;
                 int len = (ap->L *( ap->L-1)) / 2 + ap->L + 3;
-                free_aln(aln);
+
+                free_msa(msa);
 
 
 
@@ -128,15 +133,20 @@ int main(int argc, char *argv[])
                 for(i = 0; i < num_infiles;i++){
                         clean_counts(ap);
                         //fprintf(stdout,"%s\n",infile[i]);
-                        RUNP(aln = read_alignment(infile[i]));
+                        RUNP(msa = read_input(infile[0]));
+                        //RUNP(aln = read_alignment(infile[0]));
 
-                        RUN(convert_alignment_to_internal(aln, defPROTEIN));
+                        RUN(convert_msa_to_internal(msa, defPROTEIN));
+
+                        //RUNP(aln = read_alignment(infile[i]));
+
+                        //RUN(convert_alignment_to_internal(aln, defPROTEIN));
                         //fprintf(stdout,"%d L \n", aln->L);
-                        RUN(fill_counts(ap, aln));
+                        RUN(fill_counts(ap, msa));
                         //ap->L = aln->L;
                         normalize_counts(ap);
                         print_counts_flat(ap,raw[i]);
-                        free_aln(aln);
+                        free_msa(msa);
                 }
                 /*
                 for(i = 0; i < num_infiles;i++){
@@ -158,13 +168,17 @@ int main(int argc, char *argv[])
                         for(i = 0; i < num_infiles;i++){
                                 if(assignment[i] == j){
                                         //                fprintf(stdout,"%s %d\n",infile[i],assignment[i]);
-                                        RUNP(aln = read_alignment(infile[i]));
+                                        //RUNP(aln = read_alignment(infile[i]));
+                                        RUNP(msa = read_input(infile[i]));
+                                        RUN(convert_msa_to_internal(msa, defPROTEIN));
 
-                                        RUN(convert_alignment_to_internal(aln, defPROTEIN));
+                                        //RUN(convert_alignment_to_internal(aln, defPROTEIN));
                                         //fprintf(stdout,"%d L \n", aln->L);
-                                        RUN(fill_counts(ap, aln));
+                                        RUN(fill_counts(ap, msa));
                                         //ap->L = aln->L;
-                                        free_aln(aln);
+                                        free_msa(msa);
+
+                                        //free_aln(aln);
                                 }
 
 
@@ -192,13 +206,16 @@ int main(int argc, char *argv[])
         }else{
                 for(i = 0; i < num_infiles;i++){
                         fprintf(stdout,"%s\n",infile[i]);
-                        RUNP(aln = read_alignment(infile[i]));
+                        RUNP(msa = read_input(infile[i]));
+                        //RUNP(aln = read_alignment(infile[i]));
                         //dealign(aln);
-                        RUN(convert_alignment_to_internal(aln, defPROTEIN));
+                        RUN(convert_msa_to_internal(msa, defPROTEIN));
+                        //RUN(convert_alignment_to_internal(aln, defPROTEIN));
                         //fprintf(stdout,"%d L \n", aln->L);
-                        RUN(fill_counts(ap, aln));
-                        ap->L = aln->L;
-                        free_aln(aln);
+                        RUN(fill_counts(ap, msa));
+                        ap->L = msa->L;
+                        free_msa(msa);
+                        //free_aln(aln);
                 }
                 normalize_counts(ap);
                 if(outfile){
@@ -221,7 +238,7 @@ ERROR:
         return EXIT_FAILURE;
 }
 
-int fill_counts(struct counts* ap, struct alignment* aln)
+int fill_counts(struct counts* ap, struct msa* msa)
 {
         int i,j;
         int aln_len;
@@ -230,24 +247,27 @@ int fill_counts(struct counts* ap, struct alignment* aln)
         uint8_t* aligned_b = NULL;
 
 
-        for(i = 0; i <= aln->sl[0];i++){
-                aln_len += aln->gaps[0][i];
+        for(i = 0; i <= msa->sequences[0]->len;i++){
+                aln_len += msa->sequences[0]->gaps[i];//  aln->gaps[0][i];
         }
-        aln_len += aln->sl[0];
+        aln_len += msa->sequences[0]->len;//  aln->sl[0];
         LOG_MSG("Aln len: %d.",aln_len);
 
         MMALLOC(aligned_a, sizeof(uint8_t) * aln_len);
         MMALLOC(aligned_b, sizeof(uint8_t) * aln_len);
 
-        for(i = 0; i < aln->numseq;i++){
+        for(i = 0; i < msa->numseq;i++){
                 ap->num_seq++;
-                ap->eta += aln->sl[i];
-                RUN(make_aliged_seq(aligned_a, aln->s[i], aln->gaps[i], aln->sl[i]));
-                for(j = i+1; j < aln->numseq;j++){
+                ap->eta +=  msa->sequences[i]->len;//  aln->sl[i];
+                RUN(make_aliged_seq(aligned_a, msa->sequences[i]->s, msa->sequences[i]->gaps, msa->sequences[i]->len));
+
+                //RUN(make_aliged_seq(aligned_a, aln->s[i], aln->gaps[i], aln->sl[i]));
+                for(j = i+1; j < msa->numseq;j++){
                         //ASSERT(aln->sl[i] == aln->sl[j], "Sequences not aligned?");
 
 
-                        RUN(make_aliged_seq(aligned_b, aln->s[j], aln->gaps[j], aln->sl[j]));
+                        RUN(make_aliged_seq(aligned_b, msa->sequences[j]->s, msa->sequences[j]->gaps, msa->sequences[j]->len));
+                        //RUN(make_aliged_seq(aligned_b, aln->s[j], aln->gaps[j], aln->sl[j]));
 
                         RUN(pair_fill(ap, aligned_a, aligned_b, aln_len, ap->id_threshold));
                 }
@@ -643,5 +663,32 @@ int print_counts(struct counts* ap)
         //;
         //sum = ap->MM / ((ap->eta)*(ap->eta));
         //fprintf(stdout,"%f\n",sum);
+        return OK;
+}
+
+
+int make_aliged_seq(uint8_t* aligned, uint8_t* unaligned, int* gaps,int len)
+{
+        int c;
+        int i;
+        int tmp;
+        c= 0;
+        for(i = 0; i < len;i++){
+                tmp = gaps[i];
+                while(tmp){
+                        aligned[c] = 255;
+                        tmp--;
+                        c++;
+                }
+                aligned[c] = unaligned[i];
+                c++;
+
+        }
+        tmp = gaps[len];
+        while(tmp){
+                aligned[c] = 255;
+                tmp--;
+                c++;
+        }
         return OK;
 }

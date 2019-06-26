@@ -36,7 +36,7 @@ int sort_by_kmer_then_seq(const void *a, const void *b);
 int sort_by_hash(const void *a, const void *b);
 
 
-float** aln_distance(struct alignment* aln,struct aln_param* ap)
+float** aln_distance(struct msa* msa,struct aln_param* ap)
 {
         float** dm = NULL;
         uint8_t* aligned_a = NULL;
@@ -47,28 +47,29 @@ float** aln_distance(struct alignment* aln,struct aln_param* ap)
 
         int aln_len = 0;
 
-        numseq = aln->numseq;
+        numseq = msa->numseq;
 
-        for(i = 0; i <= aln->sl[0];i++){
-                aln_len += aln->gaps[0][i];
+        for(i = 0; i <= msa->sequences[0]->len;i++){
+                aln_len += msa->sequences[0]->gaps[i];//  msa->gaps[0][i];
         }
-        aln_len += aln->sl[0];
+        aln_len += msa->sequences[0]->len;//  aln->sl[0];
         LOG_MSG("Aln len: %d.",aln_len);
 
         MMALLOC(aligned_a, sizeof(uint8_t) * aln_len);
         MMALLOC(aligned_b, sizeof(uint8_t) * aln_len);
 
         float avg = 0;
-        for(i = 0; i< aln->L;i++){
+        for(i = 0; i< msa->L;i++){
                 avg += ap->subm[i][i];
         }
         float max_a,max_b;
 
         RUNP(dm = galloc(dm,numseq,numseq,0.0f));
         for(i = 0; i < numseq;i++){
-                RUN(make_aliged_seq(aligned_a, aln->s[i], aln->gaps[i], aln->sl[i]));
+                RUN(make_aliged_seq(aligned_a,msa->sequences[i]->s, msa->sequences[i]->gaps, msa->sequences[i]->len));
                 for(j = i+1;j < numseq;j++){
-                        RUN(make_aliged_seq(aligned_b, aln->s[j], aln->gaps[j], aln->sl[j]));
+                        RUN(make_aliged_seq(aligned_b,msa->sequences[j]->s, msa->sequences[j]->gaps, msa->sequences[j]->len));
+                        //RUN(make_aliged_seq(aligned_b, aln->s[j], aln->gaps[j], aln->sl[j]));
                         dm[i][j] = 0.0f;
 
                         d = 0;
@@ -117,7 +118,7 @@ ERROR:
 }
 
 
-float** kmer_distance(struct alignment* aln, int* seeds, int num_seeds, int kmer_len)
+float** kmer_distance(struct msa* msa, int* seeds, int num_seeds, int kmer_len)
 {
         struct alphabet* alphabet = NULL;
         struct kmer** kmer_list = NULL;
@@ -134,10 +135,10 @@ float** kmer_distance(struct alignment* aln, int* seeds, int num_seeds, int kmer
         int numseq;
         //int numprofiles;
         int i,j,a,c;
-        ASSERT(aln != NULL,"No alignment");
+        ASSERT(msa != NULL,"No alignment");
 
         set_broadcast_mask();
-        numseq = aln->numseq;
+        numseq = msa->numseq;
         //numprofiles = aln->num_profiles;
 
         //alphabet =  create_alphabet( redPROTEIN);
@@ -164,11 +165,11 @@ float** kmer_distance(struct alignment* aln, int* seeds, int num_seeds, int kmer
         int len_b;
 
         for(i = 0; i < numseq;i++){
-                seq_a = aln->s[i];
-                len_a = aln->sl[i];
+                seq_a = msa->sequences[i]->s;// aln->s[i];
+                len_a = msa->sequences[i]->len;// aln->sl[i];
                 for(j = 0; j < num_seeds;j++){
-                        seq_b = aln->s[seeds[j]];
-                        len_b = aln->sl[seeds[j]];
+                        seq_b = msa->sequences[seeds[j]]->s;
+                        len_b = msa->sequences[seeds[j]]->len;
                         if(len_a >= len_b){
                                 dist = bpm_256(seq_a,seq_b, len_a, len_b);
                                 dm[i][j] = dist;//((float) MACRO_MIN(len_b, 255) - (float) dist);
@@ -183,10 +184,10 @@ float** kmer_distance(struct alignment* aln, int* seeds, int num_seeds, int kmer
         /* allocate kmerlist */
         len = 0;
         for(i = 0; i<  num_seeds;i++){
-                len += aln->sl[seeds[i]] - (kmer_len-1);
+                len += msa->sequences[seeds[i]]->len - (kmer_len-1);
         }
-        for(i = 0; i < aln->numseq;i++){
-                len += aln->sl[i] - (kmer_len-1);
+        for(i = 0; i < msa->numseq;i++){
+                len += msa->sequences[i]->len - (kmer_len-1);
         }
 
         MMALLOC(kmer_list, sizeof(struct kmer*) * len);
@@ -202,16 +203,16 @@ float** kmer_distance(struct alignment* aln, int* seeds, int num_seeds, int kmer
         p-= len;
 
         /* read in seeds  */
-        LOG_MSG("len:%d L:%d",len, aln->L);
-        ASSERT(aln->L <= 21, "alphabetmismatch");
+        LOG_MSG("len:%d L:%d",len, msa->L);
+        ASSERT(msa->L <= 21, "alphabetmismatch");
 
         kmer_idx = 0;
-        for(i = 0; i < aln->numseq;i++){
+        for(i = 0; i < msa->numseq;i++){
                 kmer_old_idx = kmer_idx;
                 code = 0;
-                s = aln->s[i];
-
-                len = aln->sl[i];
+                s = msa->sequences[i]->s;//  aln->s[i];
+                len = msa->sequences[i]->len;///
+                //len = aln->sl[i];
                 for(j = 0; j < kmer_len;j++){
                         code = code << 4L;
                         code |= s[j];
@@ -313,7 +314,7 @@ int sort_by_hash(const void *a, const void *b)
         }
 }
 
-float** kmer_bpm_distance(struct alignment* aln, int kmer_len, int num_seeds)
+float** kmer_bpm_distance(struct msa* msa, int kmer_len, int num_seeds)
 {
         struct kmer** kmer_list = NULL;
         int kmer_idx;
@@ -332,15 +333,16 @@ float** kmer_bpm_distance(struct alignment* aln, int kmer_len, int num_seeds)
         int numseq;
         //int numprofiles;
         int i,j,a,b,c,f;
-        ASSERT(aln != NULL,"No alignment");
+        ASSERT(msa != NULL,"No alignment");
 
         /* Very important to call before bpm_256 */
         set_broadcast_mask();
 
-        numseq = aln->numseq;
+        numseq = msa->numseq;
         //numprofiles = aln->num_profiles;
 
-        RUN(convert_alignment_to_internal(aln, redPROTEIN));
+        RUN(convert_msa_to_internal(msa, redPROTEIN));
+        //RUN(convert_alignment_to_internal(aln, redPROTEIN));
 
         i = numseq;
 
@@ -365,14 +367,14 @@ float** kmer_bpm_distance(struct alignment* aln, int kmer_len, int num_seeds)
 
         /* allocate kmerlist */
         len = 0;
-        for(i = 0; i < aln->numseq;i++){
+        for(i = 0; i < msa->numseq;i++){
 
-                if(aln->sl[i] > len){
-                        len = aln->sl[i];
+                if(msa->sequences[i]->len > len){
+                        len = msa->sequences[i]->len;
                 }
         }
 
-        len += num_seeds * aln->numseq;
+        len += num_seeds * msa->numseq;
 
 
 
@@ -390,12 +392,14 @@ float** kmer_bpm_distance(struct alignment* aln, int kmer_len, int num_seeds)
         /* read in seeds  */
 
         kmer_idx = 0;
-        for(i = 0; i < aln->numseq;i++){
+        for(i = 0; i < msa->numseq;i++){
                 kmer_old_idx = kmer_idx;
                 code = 0;
-                s = aln->s[i];
+                s = msa->sequences[i]->s;
+                //s = aln->s[i];
+                len = msa->sequences[i]->len;
+                //len = aln->sl[i];
 
-                len = aln->sl[i];
                 for(j = 0; j < kmer_len;j++){
                         code = code << 4L;
                         code |= s[j];
@@ -513,13 +517,13 @@ float** kmer_bpm_distance(struct alignment* aln, int kmer_len, int num_seeds)
 
                         }else{*/
 
-                                len_a = MACRO_MIN(aln->sl[i], 255);
-                                len_b = MACRO_MIN(aln->sl[j], 255);
+                                len_a = MACRO_MIN(msa->sequences[i]->len, 255);
+                                len_b = MACRO_MIN(msa->sequences[j]->len, 255);
                                 if(len_a >= len_b){
-                                        dist = bpm_256(aln->s[i], aln->s[j], len_a, len_b);
+                                        dist = bpm_256(msa->sequences[i]->s,msa->sequences[j]->s, len_a, len_b);
                                         dm[i][j] =((float) MACRO_MIN(len_b, 255) - (float) dist);
                                 }else{
-                                        dist = bpm_256(aln->s[j], aln->s[i], len_b, len_a);
+                                        dist = bpm_256(msa->sequences[j]->s,msa->sequences[i]->s, len_b, len_a);
                                         dm[i][j] = ((float) MACRO_MIN(len_a, 255) - (float) dist);
                                 }
 
@@ -546,7 +550,8 @@ float** kmer_bpm_distance(struct alignment* aln, int kmer_len, int num_seeds)
                 }
         }
 
-        RUN(convert_alignment_to_internal(aln, defPROTEIN));
+        RUN(convert_msa_to_internal(msa, defPROTEIN));
+        //RUN(convert_alignment_to_internal(aln, defPROTEIN));
 
         MFREE(p);
         MFREE(kmer_list);
@@ -560,7 +565,7 @@ ERROR:
 }
 
 
-float** bpm_distance_thin(struct alignment* aln, int* seeds, int num_seeds)
+float** bpm_distance_thin(struct msa* msa, int* seeds, int num_seeds)
 {
         float** dm = NULL;
         uint8_t* seq_a;
@@ -572,12 +577,12 @@ float** bpm_distance_thin(struct alignment* aln, int* seeds, int num_seeds)
         int len_b;
 
         int i,j, numseq;
-        ASSERT(aln != NULL, "No alignment");
+        ASSERT(msa != NULL, "No alignment");
         /* Very important to call before bpm_256 */
         set_broadcast_mask();
 
 
-        numseq = aln->numseq;
+        numseq = msa->numseq;
         int a;
         MMALLOC(dm, sizeof(float*)* numseq);
         //fprintf(stdout,"MASK: %lx\n", mask);
@@ -597,13 +602,13 @@ float** bpm_distance_thin(struct alignment* aln, int* seeds, int num_seeds)
 
 
         for(i = 0; i < numseq;i++){
-                seq_a = aln->s[i];
-                len_a = aln->sl[i];
+                seq_a = msa->sequences[i]->s;// aln->s[i];
+                len_a = msa->sequences[i]->len;//  aln->sl[i];
                 for(j = 0;j < num_seeds;j++){
                         //fprintf(stdout, "Working on %d %d\n", i,j);
 
-                        seq_b = aln->s[ seeds[j]];
-                        len_b = aln->sl[seeds[j]];
+                        seq_b = msa->sequences[seeds[j]]->s;// aln->s[ seeds[j]];
+                        len_b = msa->sequences[seeds[j]]->len;// aln->sl[seeds[j]];
                         /*dm[i][j] = MACRO_MIN(len_a, len_b) - MACRO_MIN(
                           bpm_256(seq_a, seq_b, len_a, len_b),
                           bpm_256(seq_b, seq_a, len_b, len_a)
@@ -626,7 +631,7 @@ ERROR:
         return NULL;
 }
 
-float** bpm_distance_pair(struct alignment* aln, int* selection, int num_sel)
+float** bpm_distance_pair(struct msa* msa, int* selection, int num_sel)
 {
         float** dm = NULL;
         uint8_t* seq_a;
@@ -638,22 +643,23 @@ float** bpm_distance_pair(struct alignment* aln, int* selection, int num_sel)
         int len_b;
 
         int i,j, numseq;
-        ASSERT(aln != NULL, "No alignment");
+        ASSERT(msa != NULL, "No alignment");
         /* Very important to call before bpm_256 */
         set_broadcast_mask();
 
-        numseq = aln->numseq;
+        numseq = msa->numseq;
 
         if(num_sel){
                 RUNP(dm = galloc(dm,num_sel,num_sel,0.0f));
                 for(i = 0; i < num_sel;i++){
-                        seq_a = aln->s[selection[i]];
-                        len_a = aln->sl[selection[i]];
+
+                        seq_a = msa->sequences[selection[i]]->s;// aln->s[selection[i]];
+                        len_a = msa->sequences[selection[i]]->len;//aln->sl[selection[i]];
                         for(j = 0;j < num_sel;j++){
                                 //fprintf(stdout, "Working on %d %d\n", i,j);
 
-                                seq_b = aln->s[ selection[j]];
-                                len_b = aln->sl[selection[j]];
+                                seq_b = msa->sequences[selection[j]]->s; //aln->s[ selection[j]];
+                                len_b = msa->sequences[selection[j]]->len;//aln->sl[selection[j]];
                                 /*dm[i][j] = MACRO_MIN(len_a, len_b) - MACRO_MIN(
                                   bpm_256(seq_a, seq_b, len_a, len_b),
                                   bpm_256(seq_b, seq_a, len_b, len_a)
@@ -677,13 +683,18 @@ float** bpm_distance_pair(struct alignment* aln, int* selection, int num_sel)
         }else{
                 RUNP(dm = galloc(dm,numseq,numseq,0.0f));
                 for(i = 0; i < numseq;i++){
-                        seq_a = aln->s[i];
-                        len_a = aln->sl[i];
+                        seq_a = msa->sequences[i]->s;// aln->s[selection[i]];
+                        len_a = msa->sequences[i]->len;//aln->sl[selection[i]];
+
+                        //seq_a = aln->s[i];
+                        //len_a = aln->sl[i];
                         for(j = 0;j < numseq;j++){
                                 //fprintf(stdout, "Working on %d %d\n", i,j);
+                                seq_b = msa->sequences[j]->s;
+                                len_b = msa->sequences[j]->len;
 
-                                seq_b = aln->s[j];
-                                len_b = aln->sl[j];
+                                //seq_b = aln->s[j];
+                                //len_b = aln->sl[j];
                                 /*dm[i][j] = MACRO_MIN(len_a, len_b) - MACRO_MIN(
                                   bpm_256(seq_a, seq_b, len_a, len_b),
                                   bpm_256(seq_b, seq_a, len_b, len_a)
@@ -716,7 +727,7 @@ ERROR:
 
 }
 
-float** protein_wu_distance(struct alignment* aln, float zlevel, int nj, int* seeds, int num_anchors)
+float** protein_wu_distance(struct msa* msa, float zlevel, int nj, int* seeds, int num_anchors)
 {
         struct bignode* hash[1024];
         float** dm = NULL;
@@ -728,10 +739,10 @@ float** protein_wu_distance(struct alignment* aln, float zlevel, int nj, int* se
         //float min;
         float cutoff;
 
-        ASSERT(aln != NULL,"No alignment");
+        ASSERT(msa != NULL,"No alignment");
 
-        numseq = aln->numseq;
-        numprofiles = aln->num_profiles;
+        numseq = msa->numseq;
+        numprofiles = msa->num_profiles;
 
         for (i = 0;i < 1024;i++){
                 hash[i] = 0;
@@ -755,10 +766,12 @@ float** protein_wu_distance(struct alignment* aln, float zlevel, int nj, int* se
 
                 }
 
-                for(i = 0; i < aln->numseq;i++){
-                        p = aln->s[i];
+                for(i = 0; i < msa->numseq;i++){
+                        //p = aln->s[i];
+                        p = msa->sequences[i]->s;
 
-                        for (j = aln->sl[i]-2;j--;){
+                        //for (j = aln->sl[i]-2;j--;){
+                        for (j = msa->sequences[i]->len-2;j--;){
                                 //for(j = 0; j < si->sl[i]-2;j++){
                                 //hv = (p[j+1] << 5) + p[j+2];
                                 //hash[hv] = big_insert_hash(hash[hv],j);
@@ -772,8 +785,8 @@ float** protein_wu_distance(struct alignment* aln, float zlevel, int nj, int* se
 
                                 cutoff = zlevel;
                                 //cutoff = param->zlevel;
-                                p = aln->s[seeds[j]];
-                                dm[i][j] = protein_wu_distance_calculation(hash,p,aln->sl[seeds[j]],aln->sl[seeds[j]]+aln->sl[i],cutoff);
+                                p = msa->sequences[seeds[j]]->s;// aln->s[seeds[j]];
+                                dm[i][j] = protein_wu_distance_calculation(hash,p, msa->sequences[seeds[j]]->len,msa->sequences[seeds[j]]->len + msa->sequences[i]->len,cutoff);
                         }
 
                         for (j = 1024;j--;){
@@ -797,9 +810,9 @@ float** protein_wu_distance(struct alignment* aln, float zlevel, int nj, int* se
                 a = 1;
 
                 for (i = 0; i < numseq-1;i++){
-                        p = aln->s[i];
-
-                        for (j = aln->sl[i]-2;j--;){
+                        p = msa->sequences[i]->s;// aln->s[i];
+                        //for (j = aln->sl[i]-2;j--;){
+                        for (j = msa->sequences[i]->len-2;j--;){
                                 //for(j = 0; j < si->sl[i]-2;j++){
                                 //hv = (p[j+1] << 5) + p[j+2];
                                 //hash[hv] = big_insert_hash(hash[hv],j);
@@ -812,8 +825,9 @@ float** protein_wu_distance(struct alignment* aln, float zlevel, int nj, int* se
                                 //min =  (aln->sl[i] > aln->sl[j]) ? aln->sl[j] :aln->sl[i];
                                 cutoff = zlevel;
                                 //cutoff = param->zlevel;
-                                p = aln->s[j];
-                                dm[i][j] = protein_wu_distance_calculation(hash,p,aln->sl[j],aln->sl[j]+aln->sl[i],cutoff);
+                                //p = aln->s[j];
+                                p = msa->sequences[j]->s;
+                                dm[i][j] = protein_wu_distance_calculation(hash,p,msa->sequences[j]->len,msa->sequences[j]->len + msa->sequences[i]->len,cutoff);
                                 //fprintf(stderr,"%d-%d:%f\n",i,j,dm[i][j]);
                                 //exit(0);
                                 //dm[i][j] /= min;
@@ -920,7 +934,7 @@ float protein_wu_distance_calculation(struct bignode* hash[],const uint8_t* seq,
 
 
 
-float** dna_distance(struct alignment* aln, float zlevel, int nj)
+float** dna_distance(struct msa* msa, float zlevel, int nj)
 {
         struct bignode* hash[1024];
         float** dm = NULL;
@@ -930,10 +944,10 @@ float** dna_distance(struct alignment* aln, float zlevel, int nj)
         int numseq;
         int numprofiles;
 
-        ASSERT(aln != NULL,"No alignment");
+        ASSERT(msa != NULL,"No alignment");
 
-        numseq = aln->numseq;
-        numprofiles = aln->num_profiles;
+        numseq = msa->numseq;
+        numprofiles = msa->num_profiles;
 
         //fprintf(stderr,"Distance Calculation:\n");
 
@@ -954,8 +968,10 @@ float** dna_distance(struct alignment* aln, float zlevel, int nj)
         a = 1;
 
         for (i = 0; i < numseq-1;i++){
-                p = aln->s[i];
-                for (j = aln->sl[i]-5;j--;){
+                //p = aln->s[i];
+                p = msa->sequences[i]->s;
+                //for (j = aln->sl[i]-5;j--;){
+                for (j = msa->sequences[i]->len-5;j--;){
                         hv = ((p[j]&3)<<8) + ((p[j+1]&3)<<6) + ((p[j+2]&3)<<4)  + ((p[j+3]&3)<<2) + (p[j+4]&3);//ABCDE
                         hash[hv] = big_insert_hash(hash[hv],j);
                         hv = ((p[j]&3)<<8) + ((p[j+1]&3)<<6) + ((p[j+2]&3)<<4)  + ((p[j+3]&3)<<2) + (p[j+5]&3);//ABCDF
@@ -971,8 +987,9 @@ float** dna_distance(struct alignment* aln, float zlevel, int nj)
 
 
                         //min =  (aln->sl[i] > aln->sl[j]) ?aln->sl[j] :aln->sl[i];
-                        dm[i][j] = dna_distance_calculation(hash,aln->s[j],aln->sl[j],aln->sl[j]+aln->sl[i],zlevel);
-                        dm[i][j] /= (aln->sl[i] > aln->sl[j]) ?aln->sl[j] :aln->sl[i];
+                        //dm[i][j] = dna_distance_calculation(hash,aln->s[j],aln->sl[j],aln->sl[j]+aln->sl[i],zlevel);
+                        dm[i][j] = dna_distance_calculation(hash,msa->sequences[j]->s, msa->sequences[j]->len, msa->sequences[j]->len + msa->sequences[i]->len,zlevel);
+                        dm[i][j] /= ( msa->sequences[i]->len >  msa->sequences[j]->len) ?  msa->sequences[j]->len  :  msa->sequences[i]->len;
                         dm[j][i] = dm[i][j];
                         //fprintf(stderr,"\r%8.0f percent done",(float)a /(float)b * 100);
                         a++;

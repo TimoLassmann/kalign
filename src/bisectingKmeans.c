@@ -1,5 +1,6 @@
 #include <xmmintrin.h>
 
+#include "msa.h"
 #include "sequence_distance.h"
 #include "bisectingKmeans.h"
 
@@ -21,9 +22,9 @@ struct node* alloc_node(void);
 int label_internal(struct node*n, int label);
 int* readbitree(struct node* p,int* tree);
 void printTree(struct node* curr,int depth);
-struct node* bisecting_kmeans(struct alignment*aln, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct rng_state* rng);
+struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct rng_state* rng);
 
-float** pair_wu_fast_dist(struct alignment* aln, struct aln_param* ap, int* num_anchors);
+float** pair_wu_fast_dist(struct msa* msa, struct aln_param* ap, int* num_anchors);
 
 int unit_zero(float** d, int len_a, int len_b);
 
@@ -97,7 +98,7 @@ int sort_int_desc(const void *a, const void *b)
 
 
 
-int build_tree_kmeans(struct alignment* aln, struct aln_param* ap)
+int build_tree_kmeans(struct msa* msa, struct aln_param* ap)
 {
         //struct drand48_data randBuffer;
         struct node* root = NULL;
@@ -110,7 +111,7 @@ int build_tree_kmeans(struct alignment* aln, struct aln_param* ap)
 
         int i;
 
-        ASSERT(aln != NULL, "No alignment.");
+        ASSERT(msa != NULL, "No alignment.");
         //ASSERT(param != NULL, "No input parameters.");
         ASSERT(ap != NULL, "No alignment parameters.");
 
@@ -118,14 +119,14 @@ int build_tree_kmeans(struct alignment* aln, struct aln_param* ap)
         tree = ap->tree;
 
 
-        numseq = aln->numseq;
+        numseq = msa->numseq;
 
         /* pick anchors . */
 
-        RUNP(anchors = pick_anchor(aln, &num_anchors));
+        RUNP(anchors = pick_anchor(msa, &num_anchors));
 
         //RUNP(dm = kmer_distance(aln,  anchors, num_anchors,10));
-        RUNP(dm = bpm_distance_thin(aln, anchors, num_anchors));
+        RUNP(dm = bpm_distance_thin(msa, anchors, num_anchors));
 //RUNP(dm = bpm_distance(aln,anchors,num_anchors));
 /* normalize  */
         MFREE(anchors);
@@ -182,7 +183,7 @@ int build_tree_kmeans(struct alignment* aln, struct aln_param* ap)
 
 
 
-        RUNP(root = bisecting_kmeans(aln,root, dm, samples, numseq, num_anchors, numseq, ap->rng));
+        RUNP(root = bisecting_kmeans(msa,root, dm, samples, numseq, num_anchors, numseq, ap->rng));
 
 //        MFREE(samples);
         label_internal(root, numseq);
@@ -199,7 +200,7 @@ int build_tree_kmeans(struct alignment* aln, struct aln_param* ap)
         }
 
         MFREE(root);
-        for(i =0 ; i < aln->numseq;i++){
+        for(i =0 ; i < msa->numseq;i++){
                 _mm_free(dm[i]);
         }
         MFREE(dm);
@@ -247,20 +248,20 @@ int unit_zero(float** d, int len_a, int len_b)
         return OK;
 }
 
-float** pair_wu_fast_dist(struct alignment* aln, struct aln_param* ap, int* num_anchors)
+float** pair_wu_fast_dist(struct msa* msa, struct aln_param* ap, int* num_anchors)
 {
         float** dm = NULL;
         int* anchors = NULL;
-        ASSERT(aln != NULL,"No alignment");
+        ASSERT(msa != NULL,"No alignment");
 
 
 
 
-        RUNP(anchors = pick_anchor(aln, num_anchors));
+        RUNP(anchors = pick_anchor(msa, num_anchors));
 
         //dm = protein_wu_distance(aln, 59.0,0, anchors, *num_anchors);
         //dm = bpm_distance(aln,anchors,*num_anchors);
-        dm = kmer_distance(aln,  anchors, *num_anchors,10);
+        dm = kmer_distance(msa,  anchors, *num_anchors,10);
         /* normalize  */
         MFREE(anchors);
         return dm;
@@ -269,7 +270,7 @@ ERROR:
 }
 
 
-struct node* bisecting_kmeans(struct alignment*aln, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct rng_state* rng)
+struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct rng_state* rng)
 {
         int r;
         int* sl = NULL;
@@ -289,7 +290,7 @@ struct node* bisecting_kmeans(struct alignment*aln, struct node* n, float** dm,i
         if(num_samples < 100){
                 float** dm = NULL;
                 //dm = protein_wu_distance(aln, 58, 0, samples, num_samples);
-                dm = bpm_distance_pair(aln, samples, num_samples);
+                dm = bpm_distance_pair(msa, samples, num_samples);
 //                MFREE(n);
                 //RUN(unit_zero(dm, num_samples, num_samples));
                 n = upgma(dm,samples, num_samples);
@@ -396,9 +397,9 @@ struct node* bisecting_kmeans(struct alignment*aln, struct node* n, float** dm,i
                 MFREE(samples);
                 n = alloc_node();
                 //n->left = alloc_node();
-                RUNP(n->left = bisecting_kmeans(aln,n->left, dm, sl, numseq, num_anchors, num_l,rng));
+                RUNP(n->left = bisecting_kmeans(msa,n->left, dm, sl, numseq, num_anchors, num_l,rng));
                 //n->right = alloc_node();
-                RUNP(n->right = bisecting_kmeans(aln,n->right, dm, sr, numseq, num_anchors, num_r,rng));
+                RUNP(n->right = bisecting_kmeans(msa,n->right, dm, sr, numseq, num_anchors, num_r,rng));
                 return n;
         }
 
@@ -538,9 +539,9 @@ struct node* bisecting_kmeans(struct alignment*aln, struct node* n, float** dm,i
         MFREE(samples);
         n = alloc_node();
         //n->left = alloc_node();
-        RUNP(n->left = bisecting_kmeans(aln,n->left, dm, sl, numseq, num_anchors, num_l,rng));
+        RUNP(n->left = bisecting_kmeans(msa,n->left, dm, sl, numseq, num_anchors, num_l,rng));
         //n->right = alloc_node();
-        RUNP(n->right = bisecting_kmeans(aln,n->right, dm, sr, numseq, num_anchors, num_r,rng));
+        RUNP(n->right = bisecting_kmeans(msa,n->right, dm, sr, numseq, num_anchors, num_r,rng));
 
 
         return n;

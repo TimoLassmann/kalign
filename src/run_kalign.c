@@ -1,5 +1,6 @@
 
 #include "global.h"
+#include "msa.h"
 #include "parameters.h"
 #include "align_io.h"
 #include "alignment_parameters.h"
@@ -64,7 +65,7 @@ int main(int argc, char *argv[])
                 case OPT_SET:
                         param->param_set = atoi(optarg);
                         break;
-                case  OPT_RENAME:
+                case OPT_RENAME:
                         param->rename = 1;
                         break;
 
@@ -130,7 +131,22 @@ int main(int argc, char *argv[])
         }
         //exit(0);
 
+        if(!param->format){
 
+                param->out_format = FORMAT_FA;
+        }else{
+                if(strstr(param->format,"msf")){
+                        param->out_format = FORMAT_MSF;
+                }else if(strstr(param->format,"clu")){
+                        param->out_format = FORMAT_CLU;
+                }else if(strstr(param->format,"fasta")){
+                        param->out_format  =FORMAT_FA;
+                }else if(strstr(param->format,"fa")){
+                        param->out_format  =FORMAT_FA;
+                }else{
+                        ERROR_MSG("Format %s not recognized.",param->format);
+                }
+        }
         //LOG_MSG("SET: %d",param->param_set);
 
         if (param->num_infiles == 0){
@@ -154,7 +170,8 @@ ERROR:
 
 int run_kalign(struct parameters* param)
 {
-        struct alignment* aln = NULL;
+        struct msa* msa = NULL;
+        //struct alignment* aln = NULL;
         struct aln_param* ap = NULL;
         //float** dm;
         int** map = NULL;       /* holds all alignment paths  */
@@ -163,58 +180,58 @@ int run_kalign(struct parameters* param)
         DECLARE_TIMER(t1);
         /* Step 1: read all input sequences & figure out output  */
         //LOG_MSG("Reading input.");
-        RUNP(aln = detect_and_read_sequences(param));
+        RUNP(msa = read_input(param->infile[0]));
+
+        //RUNP(aln = detect_and_read_sequences(param));
         /* copy dna parameter to alignment */
         //aln->dna = param->dna;
 
-        LOG_MSG("Detected: %d sequences.", aln->numseq);
+        LOG_MSG("Detected: %d sequences.", msa->numseq);
         //LOG_MSG("Output is %s in format %s.", param->outfile,param->format);
         //LOG_MSG("Is DNA: %d", aln->dna);
         //param->dna = aln->dna;
         /* If we just want to reformat end here */
         if(param->reformat){
                 //LOG_MSG("%s reformat",param->reformat);
-                for (i = 0 ;i < aln->numseq;i++){
-                        aln->nsip[i] = i;
-                        for (j = 0; j < aln->sl[i];j++){
+                for (i = 0 ;i < msa->numseq;i++){
+                        msa->nsip[i] = i;
+                        // No idea what this was supposed to do */
+                        /*for (j = 0; j < aln->sl[i];j++){
                                 aln->s[i][j] = 0;
-                        }
+                                }*/
                 }
                 if(param->rename){
-                        for (i = 0 ;i < aln->numseq;i++){
-                                for(j = 0; j < aln->lsn[i];j++){
-                                        aln->sn[i][j] =0;
-                                }
-                                if(aln->lsn[i] < 128){
-                                        MREALLOC(aln->sn[i],sizeof(char)*128);
-                                }
+                        for (i = 0 ;i < msa->numseq;i++){
 
-                                snprintf(aln->sn[i], 128, "SEQ%d", i+1);
-                                aln->lsn[i] = strnlen(aln->sn[i], 128);
+                                snprintf(msa->sequences[i]->name, 128, "SEQ%d", i+1);
+                                //aln->lsn[i] = strnlen(aln->sn[i], 128);
                         }
                 }
                 //sparam->format = param->reformat;
+
                 if (byg_start(param->format,"fastaFASTAfaFA") != -1){
-                        RUN(dealign(aln));
+                        RUN(dealign_msa(msa));
                 }
-                RUN(output(aln, param));
-                free_aln(aln);
+                RUN(write_msa(msa, param->outfile, param->out_format));
+                //RUN(output(aln, param));
+                free_msa(msa);
                 return OK;
         }
-        RUN(dealign(aln));
-
+        if(msa->aligned){
+                RUN(dealign_msa(msa));
+        }
 
         //param->param_set = 4;
         /* allocate aln parameters  */
 
-        RUNP(ap = init_ap(aln->numseq,aln->L));
+        RUNP(ap = init_ap(msa->numseq,msa->L ));
 
         //counts_from_random_trees(aln, ap, 10);
 
 
 
 
-//fprintf(stderr,"        %0.8f	gap open penalty\n",ap->gpo);
+        //fprintf(stderr,"        %0.8f	gap open penalty\n",ap->gpo);
         //fprintf(stderr,"        %0.8f	gap extension\n",(float)gpe/10);
         //fprintf(stderr,"        %0.8f	gap extension\n",ap->gpe);
         //fprintf(stderr,"        %0.8f	terminal gap penalty\n",(float)tgpe/10);
@@ -229,9 +246,9 @@ int run_kalign(struct parameters* param)
         //param->dist_method = KALIGNDIST_WU;
         //RUN(build_tree(aln,param,ap));
         //RUN(convert_alignment_to_internal(aln,redPROTEIN));
-        RUN(build_tree_kmeans(aln,ap));
-        if(aln->L == redPROTEIN){
-                RUN(convert_alignment_to_internal(aln,defPROTEIN ));
+        RUN(build_tree_kmeans(msa,ap));
+        if(msa->L == redPROTEIN){
+                RUN(convert_msa_to_internal(msa, defPROTEIN));
         }
 
 
@@ -246,40 +263,17 @@ int run_kalign(struct parameters* param)
         /* Start alignment stuff */
         LOG_MSG("Aligning");
         START_TIMER(t1);
-        RUNP(map = hirschberg_alignment(aln, ap));
+        RUNP(map = hirschberg_alignment(msa, ap));
         STOP_TIMER(t1);
         LOG_MSG("Took %f sec.", GET_TIMING(t1));
 
-        int iter;
-        for(iter = 0; iter < 0;iter++){
-                RUN(weave(aln , map, ap->tree));
-                param->dist_method = KALIGNDIST_ALN;
-                build_tree(aln, param,ap);
-                clean_aln(aln);
+        /* set to aligned */
+        msa->aligned = 1;
 
-                for(i = 0; i < aln->num_profiles ;i++){
-                        if(map[i]){
-                                MFREE(map[i]);
-                        }
-
-                }
-                MFREE(map);
-                map = NULL;
-
-                LOG_MSG("Aligning");
-
-                START_TIMER(t1);
-                RUNP(map = hirschberg_alignment(aln, ap));
-                STOP_TIMER(t1);
-                LOG_MSG("Took %f sec.", GET_TIMING(t1));
-        }
-
-
-
-        RUN(weave(aln , map, ap->tree));
+        RUN(weave(msa , map, ap->tree));
 
         /* clean up map */
-        for(i = 0; i < aln->num_profiles ;i++){
+        for(i = 0; i < msa->num_profiles ;i++){
                if(map[i]){
                        MFREE(map[i]);
                }
@@ -287,14 +281,9 @@ int run_kalign(struct parameters* param)
         MFREE(map);
         map = NULL;
 
-        /* alignment output order .... */
-        for (i = 0; i < aln->numseq;i++){
-                aln->nsip[i] = i;
-        }
-
-        RUN(output(aln, param));
-
-        free_aln(aln);
+        RUN(write_msa(msa, param->outfile, param->out_format));
+        //RUN(output(aln, param));
+        free_msa(msa);
         free_ap(ap);
         return OK;
 ERROR:

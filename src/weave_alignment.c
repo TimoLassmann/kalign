@@ -2,20 +2,20 @@
 
 
 //struct alignment* make_seq(struct alignment* aln,int a,int b,int* path);
-int make_seq(struct alignment* aln,int a,int b,int* path);
+int make_seq(struct msa* msa,int a,int b,int* path);
 int update_gaps(int old_len,int*gis,int new_len,int *newgaps);
 
-int weave(struct alignment* aln, int** map, int* tree)
+int weave(struct msa* msa, int** map, int* tree)
 {
         int i;
         int a,b;
 
         //RUN(clean_aln(aln));
 
-        for (i = 0; i < (aln->numseq-1)*3;i +=3){
+        for (i = 0; i < (msa->numseq-1)*3;i +=3){
                 a = tree[i];
                 b = tree[i+1];
-                RUN(make_seq(aln,a,b,map[tree[i+2]]));
+                RUN(make_seq(msa,a,b,map[tree[i+2]]));
         }
 
         return OK;
@@ -23,28 +23,28 @@ ERROR:
         return FAIL;
 }
 
-int clean_aln(struct alignment* aln)
+int clean_aln(struct msa* msa)
 {
         int i,j;
         int* p = NULL;
-        for (i = 0; i < aln->numseq;i++){
-                p = aln->gaps[i];
-                for (j = 0; j <= aln->sl[i];j++){
+        for (i = 0; i < msa->numseq;i++){
+                p = msa->sequences[i]->gaps;//  aln->gaps[i];
+                for (j = 0; j <= msa->sequences[i]->len;j++){
                         p[j] = 0;
                 }
         }
-        for(i =0;i < aln->numseq;i++){
-                aln->nsip[i] = 1;
-                aln->sip[i][0] = i;
+        for(i =0;i < msa->numseq;i++){
+                msa->nsip[i] = 1;
+                msa->sip[i][0] = i;
         }
 
-        for (i =aln->numseq;i < aln->num_profiles ;i++){
-                if(aln->sip[i]){
-                        MFREE(aln->sip[i]);
+        for (i = msa->numseq;i < msa->num_profiles ;i++){
+                if(msa->sip[i]){
+                        MFREE(msa->sip[i]);
 
-                        aln->sip[i] = NULL;
+                        msa->sip[i] = NULL;
                 }
-                aln->nsip[i] =0;
+                msa->nsip[i] =0;
         }
 
 
@@ -54,7 +54,7 @@ int clean_aln(struct alignment* aln)
 
 }
 
-int make_seq(struct alignment* aln,int a,int b,int* path)
+int make_seq(struct msa* msa,int a,int b,int* path)
 {
         int* gap_a = NULL;
         int* gap_b = NULL;
@@ -89,11 +89,13 @@ int make_seq(struct alignment* aln,int a,int b,int* path)
                 }
                 c++;
         }
-        for (i = aln->nsip[a];i--;){
-                RUN(update_gaps(aln->sl[aln->sip[a][i]],aln->gaps[aln->sip[a][i]],path[0],gap_a));
+        for (i = msa->nsip[a];i--;){
+                RUN(update_gaps(msa->sequences[msa->sip[a][i]]->len, msa->sequences[msa->sip[a][i]]->gaps ,path[0],gap_a));
+                //RUN(update_gaps(aln->sl[aln->sip[a][i]],aln->gaps[aln->sip[a][i]],path[0],gap_a));
         }
-        for (i = aln->nsip[b];i--;){
-                RUN(update_gaps(aln->sl[aln->sip[b][i]],aln->gaps[aln->sip[b][i]],path[0],gap_b));
+        for (i = msa->nsip[b];i--;){
+                RUN(update_gaps(msa->sequences[msa->sip[b][i]]->len,msa->sequences[msa->sip[b][i]]->gaps,path[0],gap_b));
+                //RUN(update_gaps(aln->sl[aln->sip[b][i]],aln->gaps[aln->sip[b][i]],path[0],gap_b));
         }
         MFREE(gap_a);
         MFREE(gap_b);

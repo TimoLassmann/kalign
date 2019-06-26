@@ -2,11 +2,13 @@
 #define BISECTINGKMEANS_H
 
 #include "global.h"
-
+#include "msa.h"
 #include "rng.h"
 #include "alignment_parameters.h"
 
 
+
+
 extern int random_tree(struct aln_param* ap, int numseq);
-extern int build_tree_kmeans(struct alignment* aln, struct aln_param* ap);
+extern int build_tree_kmeans(struct msa* msa, struct aln_param* ap);
 #endif

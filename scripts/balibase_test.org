@@ -544,7 +544,7 @@
 
 
       printf "Generating kalign run script\n";
-      find ~/kalignbenchmark/data/bb3_release -name "*.xml" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign %s -o %s/%s_%s_kalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_kalign.sh
+      find ~/kalignbenchmark/data/bb3_release -name "*.tfa" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign %s -f msf -o %s/%s_%s_kalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_kalign.sh
       chmod 755 run_kalign.sh
 
       printf "Generating muscle run script\n";
@@ -690,13 +690,13 @@
       printf "Generate commands to reformat the reference alignments\n\n";
 
 
-      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*.fa"  -o -name '*.fasta' | grep structural |  awk -v outdir="$SCRATCHDIR" '{printf "kalign %s --rename -r -f msf -o %s.msf\n", $1,$1 }' > run_kalign_reformat.sh
-      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*.fa"  -o -name '*.fasta' | grep unaligned |  awk -v outdir="$SCRATCHDIR" '{printf "kalign %s --rename -r -f fasta -o %s_test.fa\n", $1,$1 }' >> run_kalign_reformat.sh
+      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*.fa"  -o -name '*.fasta' | grep structural |  awk -v outdir="$SCRATCHDIR" '{printf "kalign %s --rename -reformat -f msf -o %s.msf\n", $1,$1 }' > run_kalign_reformat.sh
+      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*.fa"  -o -name '*.fasta' | grep unaligned |  awk -v outdir="$SCRATCHDIR" '{printf "kalign %s --rename -reformat -f fasta -o %s_test.fa\n", $1,$1 }' >> run_kalign_reformat.sh
       chmod 755 run_kalign_reformat.sh
       ./run_kalign_reformat.sh
 
       printf "Generating kalign run script\n";
-      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2  -name "*_test.fa" | grep unaligned |  awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign %s -o %s/%s_%s_%s_kalign.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2] }' > run_kalign_bralibase.sh
+      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2  -name "*_test.fa" | grep unaligned |  awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign %s -f msf -o %s/%s_%s_%s_kalign.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2] }' > run_kalign_bralibase.sh
       chmod 755 run_kalign_bralibase.sh
 
       printf "Generating muscle run script\n";
@@ -745,6 +745,7 @@
        ./score_kalign_bralibase.sh > scores_kalign_bralibase.csv 
        ./score_muscle_bralibase.sh > scores_muscle_bralibase.csv 
        ./score_clustalo_bralibase.sh > scores_clustalo_bralibase.csv 
+
      #+END_SRC
 
      #+RESULTS:
@@ -903,10 +904,10 @@
 
      #+END_SRC
 
-     #+BEGIN_SRC bash -n :tangle run_bralibase.sh :noweb yes :exports code :results none :noweb yes :shebang  #!/usr/bin/env bash
+     #+BEGIN_EXAMPLE bash -n :tangle run_homfam.sh :noweb yes :exports code :results none :noweb yes :shebang #!/usr/bin/env bash
        <<path>>
        ./run_homfam.sh
-     #+END_SRC
+     #+END_EXAMPLE
 
 
      /home/user/kalignbenchmark/data/homfam

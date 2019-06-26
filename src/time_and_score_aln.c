@@ -1,5 +1,5 @@
 #include "global.h"
-
+#include "msa.h"
 #include <sys/time.h>
 #include <getopt.h>
 
@@ -140,8 +140,10 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
 {
 
         FILE* out_ptr = NULL;
-        struct alignment* ref_aln = NULL;
-        struct alignment* test_aln = NULL;
+        struct msa* ref_aln = NULL;
+        struct msa* test_aln = NULL;
+
+        struct msa_seq* seq_ptr = NULL;
         struct parameters* param = NULL;
 
         char path_buffer[BUFFER_LEN];
@@ -174,7 +176,7 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
                         ERROR_MSG("kalign is not found in your path:\n%s\n",envpaths);
                 }
 
-                snprintf(cmd, BUFFER_LEN*2, "kalign %s -o %s/test.msf",test,path);
+                snprintf(cmd, BUFFER_LEN*2, "kalign %s -f msf -o %s/test.msf",test,path);
         }else if(!strcmp(program,"muscle")){
                 if (system("which muscle3.8.31_i86linux32")){
                         ERROR_MSG("muscle3.8.31_i86linux32 is not found in your path:\n%s\n",envpaths);
@@ -222,11 +224,11 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
 
         snprintf(param->infile[0], BUFFER_LEN*2, "%s",ref);
         LOG_MSG("read reference alignment");
-        RUNP(ref_aln = detect_and_read_sequences(param));
+        RUNP(ref_aln = read_input(param->infile[0]));//  detect_and_read_sequences(param));
 
         snprintf(param->infile[0], BUFFER_LEN*2, "%s/test.msf",path);
         LOG_MSG("read test alignment");
-        RUNP(test_aln = detect_and_read_sequences(param));
+        RUNP(test_aln = read_input(param->infile[0]));//  detect_and_read_sequences(param));
 
         /* find all reference sequences in the test alignment  */
         /* delete all other sequences  */
@@ -235,46 +237,24 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
 
         average_seq_len = 0.0;
         for(j = 0; j < test_aln->numseq;j++){
-                average_seq_len += test_aln->sl[j];
+                average_seq_len += test_aln->sequences[j]->len;//   test_aln->sl[j];
         }
 
         average_seq_len = average_seq_len / (double) test_aln->numseq;
         pos_test = 0;
         LOG_MSG("Search for matching sequences ");
         for(i = 0; i < ref_aln->numseq;i++){
-                LOG_MSG("Searching for: %s", ref_aln->sn[i]);
+                //LOG_MSG("Searching for: %s", ref_aln->sequences[i]->name);// sn[i]);
                 for(j = 0; j < test_aln->numseq;j++){
-                        if(  ref_aln->lsn[i] == test_aln->lsn[j]){
-                                if(!strcmp( ref_aln->sn[i],  test_aln->sn[j])){
-                                        if(pos_test != j){
-                                                //LOG_MSG("Found:: %s (%d)", test_aln->sn[j], pos_test);
-
-                                                /* copy name */
-                                                if(test_aln->lsn[pos_test] < test_aln->lsn[j]){
-                                                        MREALLOC(test_aln->sn[pos_test], test_aln->lsn[j]);
-
-
-                                                        test_aln->lsn[pos_test] = test_aln->lsn[j];
-                                                }
-                                                snprintf(test_aln->sn[pos_test] ,test_aln->lsn[pos_test],"%s",test_aln->sn[j]);
-                                                /* copy sequence */
-
-                                                if(test_aln->sl[pos_test] < test_aln->sl[j]){
-                                                        MREALLOC(test_aln->seq[pos_test]  , test_aln->sl[j]);
-
-
-                                                        test_aln->sl[pos_test] = test_aln->sl[j];
-                                                }
-                                                snprintf(test_aln->seq[pos_test],test_aln->sl[pos_test],"%s",test_aln->seq[j]);
-
-                                                /* copy gaps  */
-
-                                                for(c = 0; c < test_aln->sl[pos_test]+1;c++){
-                                                        test_aln->gaps[pos_test][c] = test_aln->gaps[j][c];
-                                                }
-                                        }
+                        if(strnlen(ref_aln->sequences[i]->name, MSA_NAME_LEN) == strnlen(test_aln->sequences[j]->name, MSA_NAME_LEN)){
+                                //if(  ref_aln->lsn[i] == test_aln->lsn[j]){
+                                if(!strcmp( ref_aln->sequences[i]->name, test_aln->sequences[j]->name)){
+                                        /* swap test sequences to beginning.  */
+                                        //LOG_MSG("Found: %s",ref_aln->sequences[i]->name);
+                                        seq_ptr = test_aln->sequences[pos_test];
+                                        test_aln->sequences[pos_test] = test_aln->sequences[j];
+                                        test_aln->sequences[j] = seq_ptr;
                                         pos_test++;
-                                        break;
                                 }
                         }
 
@@ -295,7 +275,8 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
                 test_aln->nsip[i] = i;
         }
 
-        output(test_aln,param);
+        write_msa(test_aln, param->outfile, FORMAT_MSF);
+        //output(test_aln,param);
 
         test_aln->numseq = org_len;
 
@@ -332,9 +313,10 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
         fclose(out_ptr);
 
         LOG_MSG("SP:%f TC:%f", SP,TC);
+        free_msa(ref_aln);
+        free_msa(test_aln );
 
-        free_aln(ref_aln);
-        free_aln(test_aln);
+        //free_aln(test_aln);
         MFREE(param->outfile);
         MFREE(param->infile[0]);
         free_parameters(param);
