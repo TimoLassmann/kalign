@@ -1,5 +1,4 @@
 #include "global.h"
-
 #include "msa.h"
 #include "alphabet.h"
 
@@ -22,9 +21,9 @@ struct out_line{
 
 
 
-struct msa* read_fasta(char* infile);
-struct msa* read_msf(char* infile);
-struct msa* read_clu(char* infile);
+struct msa* read_fasta(char* infile, struct msa* msa);
+struct msa* read_msf(char* infile, struct msa* msa);
+struct msa* read_clu(char* infile, struct msa* msa);
 
 int write_msa_fasta(struct msa* msa,char* outfile);
 int write_msa_clustal(struct msa* msa,char* outfile);
@@ -104,9 +103,9 @@ int print_msa(struct msa* msa)
 }
 #endif
 
-struct msa* read_input(char* infile)
+struct msa* read_input(char* infile,struct msa* msa)
 {
-        struct msa* msa = NULL;
+
         int type;
 
         ASSERT(infile != NULL,"No input file");
@@ -122,11 +121,11 @@ struct msa* read_input(char* infile)
 
 
         if(type == FORMAT_FA){
-                RUNP(msa = read_fasta(infile));
+                RUNP(msa = read_fasta(infile,msa));
         }else if(type == FORMAT_MSF){
-                RUNP(msa = read_msf(infile));
+                RUNP(msa = read_msf(infile,msa));
         }else if(type == FORMAT_CLU){
-                RUNP(msa = read_clu(infile));
+                RUNP(msa = read_clu(infile,msa));
         }
 
 
@@ -383,9 +382,23 @@ int set_sip_nsip(struct msa* msa)
         int i;
         ASSERT(msa!= NULL, "No msa");
 
-        msa->num_profiles = (msa->numseq << 1 )-1;
-        msa->plen = NULL;
 
+
+        if(msa->plen){
+                for (i = msa->num_profiles;i--;){
+                        if(msa->sip[i]){
+                                MFREE(msa->sip[i]);
+                        }
+                }
+                MFREE(msa->plen);
+                MFREE(msa->sip);
+                MFREE(msa->nsip);
+                msa->plen = NULL;
+                msa->sip = NULL;
+                msa->nsip = NULL;
+        }
+
+        msa->num_profiles = (msa->numseq << 1 )-1;
 
         MMALLOC(msa->sip,sizeof(int*)* msa->num_profiles);
         MMALLOC(msa->nsip,sizeof(int)* msa->num_profiles);
@@ -426,6 +439,7 @@ int convert_msa_to_internal(struct msa* msa, int type)
                 for(j =0 ; j < seq->len;j++){
                         if(t[(int)  seq->seq[j]] == -1){
                                 WARNING_MSG("there should be no character not matching the alphabet");
+                                WARNING_MSG("offending character: >>>%c<<<", seq->seq[j]);
                         }else{
                                 seq->s[j] = t[(int)  seq->seq[j]];
 
@@ -883,9 +897,9 @@ ERROR:
         return FAIL;
 }
 
-struct msa* read_clu(char* infile)
+struct msa* read_clu(char* infile, struct msa* msa)
 {
-        struct msa* msa = NULL;
+        //struct msa* msa = NULL;
         struct msa_seq* seq_ptr = NULL;
         FILE* f_ptr = NULL;
         char line[BUFFER_LEN];
@@ -898,8 +912,9 @@ struct msa* read_clu(char* infile)
         if(!my_file_exists(infile)){
                 ERROR_MSG("File: %s does not exist.",infile);
         }
-
-        msa = alloc_msa();
+        if(msa == NULL){
+                msa = alloc_msa();
+        }
 
         RUNP(f_ptr = fopen(infile, "r"));
 
@@ -968,9 +983,9 @@ ERROR:
 
 
 
-struct msa* read_msf(char* infile)
+struct msa* read_msf(char* infile,struct msa* msa)
 {
-        struct msa* msa = NULL;
+        //struct msa* msa = NULL;
         struct msa_seq* seq_ptr = NULL;
         FILE* f_ptr = NULL;
         char line[BUFFER_LEN];
@@ -983,8 +998,9 @@ struct msa* read_msf(char* infile)
         if(!my_file_exists(infile)){
                 ERROR_MSG("File: %s does not exist.",infile);
         }
-
-        msa = alloc_msa();
+        if(msa == NULL){
+                msa = alloc_msa();
+        }
 
         RUNP(f_ptr = fopen(infile, "r"));
 
@@ -1070,9 +1086,9 @@ ERROR:
         return NULL;
 }
 
-struct msa* read_fasta(char* infile)
+struct msa* read_fasta(char* infile,struct msa* msa)
 {
-        struct msa* msa = NULL;
+        //struct msa* msa = NULL;
         struct msa_seq* seq_ptr = NULL;
         FILE* f_ptr = NULL;
         char line[BUFFER_LEN];
@@ -1083,8 +1099,9 @@ struct msa* read_fasta(char* infile)
         if(!my_file_exists(infile)){
                 ERROR_MSG("File: %s does not exist.",infile);
         }
-
-        msa = alloc_msa();
+        if(msa == NULL){
+                msa = alloc_msa();
+        }
 
         RUNP(f_ptr = fopen(infile, "r"));
 

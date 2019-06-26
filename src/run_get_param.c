@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
         ap->id_threshold = id_threshold;
         if(print_all){
                 /* get L */
-                RUNP(msa = read_input(infile[0]));
+                RUNP(msa = read_input(infile[0],msa));
                 //RUNP(aln = read_alignment(infile[0]));
 
                 RUN(convert_msa_to_internal(msa, defPROTEIN));
@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
                 for(i = 0; i < num_infiles;i++){
                         clean_counts(ap);
                         //fprintf(stdout,"%s\n",infile[i]);
-                        RUNP(msa = read_input(infile[0]));
+                        RUNP(msa = read_input(infile[0],msa));
                         //RUNP(aln = read_alignment(infile[0]));
 
                         RUN(convert_msa_to_internal(msa, defPROTEIN));
@@ -169,7 +169,7 @@ int main(int argc, char *argv[])
                                 if(assignment[i] == j){
                                         //                fprintf(stdout,"%s %d\n",infile[i],assignment[i]);
                                         //RUNP(aln = read_alignment(infile[i]));
-                                        RUNP(msa = read_input(infile[i]));
+                                        RUNP(msa = read_input(infile[i],msa));
                                         RUN(convert_msa_to_internal(msa, defPROTEIN));
 
                                         //RUN(convert_alignment_to_internal(aln, defPROTEIN));
@@ -206,7 +206,7 @@ int main(int argc, char *argv[])
         }else{
                 for(i = 0; i < num_infiles;i++){
                         fprintf(stdout,"%s\n",infile[i]);
-                        RUNP(msa = read_input(infile[i]));
+                        RUNP(msa = read_input(infile[i],msa));
                         //RUNP(aln = read_alignment(infile[i]));
                         //dealign(aln);
                         RUN(convert_msa_to_internal(msa, defPROTEIN));

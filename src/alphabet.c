@@ -143,6 +143,14 @@ int create_default_protein(struct alphabet* a)
         a->to_internal[(int) 'Z'] = code;
         a->to_internal[(int) 'X'] = code;
 
+        /* Some protein sequences contain 'U' - a non-IUPAC code
+           I will treat these as an ambiguous aa
+           e.g:
+           >Q74EN2_GEOSL/108-206
+           TRELEALVAKGTEEGGYLLIDSRPAGKYNEAHIPTAVSIPFAELEKNPALLTASKDRLLVFYCGGVTUVLSPKSAGLAKKSGYEKVRVYLDGEPEWKKA
+
+        */
+        a->to_internal[(int) 'U'] = code;
         code++;
         return OK;
 }

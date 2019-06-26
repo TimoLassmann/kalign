@@ -181,7 +181,7 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
                 if (system("which muscle3.8.31_i86linux32")){
                         ERROR_MSG("muscle3.8.31_i86linux32 is not found in your path:\n%s\n",envpaths);
                 }
-                snprintf(cmd, BUFFER_LEN*2, "muscle3.8.31_i86linux32 -msf -in %s -out %s/test.msf",test,path);
+                snprintf(cmd, BUFFER_LEN*2, "muscle3.8.31_i86linux32  -maxiters 2 -msf -in %s -out %s/test.msf",test,path);
         }else if(!strcmp(program,"clustalo")){
                 if (system("which clustalo-1.2.4-Ubuntu-x86_64")){
                         ERROR_MSG("clustalo-1.2.4-Ubuntu-x86_64 is not found in your path:\n%s\n",envpaths);
@@ -224,11 +224,11 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
 
         snprintf(param->infile[0], BUFFER_LEN*2, "%s",ref);
         LOG_MSG("read reference alignment");
-        RUNP(ref_aln = read_input(param->infile[0]));//  detect_and_read_sequences(param));
+        RUNP(ref_aln = read_input(param->infile[0],ref_aln));//  detect_and_read_sequences(param));
 
         snprintf(param->infile[0], BUFFER_LEN*2, "%s/test.msf",path);
         LOG_MSG("read test alignment");
-        RUNP(test_aln = read_input(param->infile[0]));//  detect_and_read_sequences(param));
+        RUNP(test_aln = read_input(param->infile[0],test_aln));//  detect_and_read_sequences(param));
 
         /* find all reference sequences in the test alignment  */
         /* delete all other sequences  */

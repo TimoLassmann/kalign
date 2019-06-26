@@ -180,7 +180,10 @@ int run_kalign(struct parameters* param)
         DECLARE_TIMER(t1);
         /* Step 1: read all input sequences & figure out output  */
         //LOG_MSG("Reading input.");
-        RUNP(msa = read_input(param->infile[0]));
+
+        for(i = 0; i < param->num_infiles;i++){
+                RUNP(msa = read_input(param->infile[i],msa));
+        }
 
         //RUNP(aln = detect_and_read_sequences(param));
         /* copy dna parameter to alignment */
