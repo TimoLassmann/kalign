@@ -1,25 +1,9 @@
 #include "global.h"
 
+#include "msa.h"
 #include "alphabet.h"
 #define MSA_NAME_LEN 128
 
-struct msa_seq{
-        char* name;
-        char* seq;
-        uint8_t* s;
-        int* gaps;
-        int len;
-        int alloc_len;
-};
-
-struct msa{
-        struct msa_seq** sequences;
-        int letter_freq[128];
-        int numseq;
-        int alloc_numseq;
-        int L;
-
-};
 
 /* only local; */
 struct line_buffer{
@@ -37,7 +21,8 @@ struct out_line{
 
 /* convert */
 int convert_msa_to_internal(struct msa* msa, int type);
-/* rw functions */
+
+
 
 struct msa* read_fasta(char* infile);
 struct msa* read_msf(char* infile);
@@ -50,7 +35,7 @@ int write_msa_msf(struct msa* msa,char* outfile);
 /* memory functions  */
 struct msa* alloc_msa(void);
 int resize_msa(struct msa* msa);
-void free_msa(struct msa* msa);
+
 
 struct msa_seq* alloc_msa_seq(void);
 int resize_msa_seq(struct msa_seq* seq);
@@ -63,7 +48,11 @@ int resize_line_buffer(struct line_buffer* lb);
 void free_line_buffer(struct line_buffer* lb);
 
 /* local helper functions  */
+
+static int detect_alignment_format(char* infile,int* type);
+static int detect_aligned(struct msa* msa);
 static int detect_alphabet(struct msa* msa);
+static int set_sip_nsip(struct msa* msa);
 static int null_terminate_sequences(struct msa* msa);
 static int sort_out_lines(const void *a, const void *b);
 static int make_linear_sequence(struct msa_seq* seq, char* linear_seq);
@@ -77,16 +66,12 @@ int print_msa(struct msa* msa);
 int main(int argc, char *argv[])
 {
         struct msa* msa = NULL;
+
         LOG_MSG("Start io tests.");
-        DECLARE_TIMER(timer);
 
-        START_TIMER(timer);
-        RUNP(msa = read_msf(argv[1]));
-        detect_alphabet(msa);
 
-        STOP_TIMER(timer);
-        LOG_MSG("done reading in %f", GET_TIMING(timer));
-        //print_msa(msa);
+        RUNP(msa = read_input(argv[1]));
+//print_msa(msa);
         write_msa_clustal(msa,"rwtest.clu");
 
         write_msa_fasta(msa, "rwtest.fasta");
@@ -121,10 +106,158 @@ int print_msa(struct msa* msa)
 }
 
 
+struct msa* read_input(char* infile)
+{
+        struct msa* msa = NULL;
+        int type;
+        int i;
+        ASSERT(infile != NULL,"No input file");
+        /* sanity checks  */
+        if(!my_file_exists(infile)){
+                ERROR_MSG("File: %s does not exist.",infile);
+        }
 
-/* detectalphabet */
+        DECLARE_TIMER(timer);
+
+        START_TIMER(timer);
+        RUN(detect_alignment_format(infile, &type));
 
 
+        if(type == FORMAT_FA){
+                RUNP(msa = read_fasta(infile));
+        }else if(type == FORMAT_MSF){
+                RUNP(msa = read_msf(infile));
+        }else if(type == FORMAT_CLU){
+                RUNP(msa = read_clu(infile));
+        }
+
+
+
+        RUN(detect_alphabet(msa));
+        RUN(detect_aligned(msa));
+
+        RUN(set_sip_nsip(msa));
+
+        STOP_TIMER(timer);
+        LOG_MSG("done reading in %f", GET_TIMING(timer));
+        return msa;
+ERROR:
+        return NULL;
+}
+
+int write_msa(struct msa* msa, char* outfile, int type)
+{
+
+        ASSERT(msa!= NULL, "No alignment");
+
+        if(type == FORMAT_FA){
+                RUN(write_msa_fasta(msa, outfile));
+        }else if(type == FORMAT_MSF){
+                RUN(write_msa_msf(msa, outfile));
+        }else if(type == FORMAT_CLU){
+                RUN(write_msa_clustal(msa, outfile));
+        }else{
+                ERROR_MSG("Output format not recognized.");
+        }
+
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+/* detect alignment format  */
+
+int detect_alignment_format(char* infile,int* type)
+{
+        FILE* f_ptr = NULL;
+        char line[BUFFER_LEN];
+        int hints[3];
+        int line_len;
+        int line_number;
+        int set;
+        int i;
+        ASSERT(infile != NULL,"No input file");
+        /* sanity checks  */
+        if(!my_file_exists(infile)){
+                ERROR_MSG("File: %s does not exist.",infile);
+        }
+
+        line_number = 0;
+        for(i = 0; i < 3; i++){
+                hints[i] =0;
+        }
+        RUNP(f_ptr = fopen(infile, "r"));
+
+        /* scan through first line header  */
+        while(fgets(line, BUFFER_LEN, f_ptr)){
+                line_len = strnlen(line, BUFFER_LEN);
+                line[line_len-1] = 0;
+
+                line_len--;
+                if(line[0] == '>'){
+                        hints[0]++; /* fasta */
+                }
+
+                if(strstr(line, "multiple sequence alignment")){
+                        hints[2]++; /* clustal format  */
+                }
+                if(strstr(line, "CLUSTAL W")){
+                        hints[2]++; /* clustal format  */
+                }
+
+                if(strstr(line, "CLUSTAL O")){
+                        hints[2]++; /* clustal format  */
+                }
+                if(strstr(line, "!!AA_MULTIPLE_ALIGNMENT")){
+                        hints[1]++;
+                }
+
+                if(strstr(line, "!!NA_MULTIPLE_ALIGNMENT")){
+                        hints[1]++;
+                }
+                if(strstr(line, "MSF:")){
+                        hints[1]++;
+                }
+                line_number++;
+                if(line_number == 100){
+                        break;
+                }
+        }
+
+        fclose(f_ptr);
+        set = 0;
+
+        for(i = 0; i < 3;i++){
+                if(hints[i]){
+                        set++;
+                }
+        }
+        if(set == 0){
+                ERROR_MSG("Input alignment format could not be detected.");
+        }
+        if(set > 1){
+                ERROR_MSG("Input format could not be unambiguously detected");
+        }
+
+
+        if(hints[0]){
+                *type = FORMAT_FA;
+        }
+        if(hints[1]){
+                *type = FORMAT_MSF;
+        }
+        if(hints[2]){
+                *type = FORMAT_CLU;
+        }
+        //fprintf(stdout,"fa: %d msf:%d clu:%d", hints[0],hints[1],hints[2]);
+
+        return OK;
+ERROR:
+        return FAIL;
+
+}
+
+/* detect alphabet */
 int detect_alphabet(struct msa* msa)
 {
         int i;
@@ -153,12 +286,19 @@ int detect_alphabet(struct msa* msa)
         diff[0] = 0;
         diff[1] = 0;
         for(i = 0; i < 128;i++){
+                /* if(i > 16){ */
+                /*         fprintf(stdout,"%d %c\t%d\n",i ,(char)i , msa->letter_freq[i]); */
+                /* } */
                 if((msa->letter_freq[i]) && (!DNA[i])){
                         diff[0]++;
                 }
-                        if((msa->letter_freq[i]) && (!protein[i])){
+                if((msa->letter_freq[i]) && (!protein[i])){
                         diff[1]++;
                 }
+        }
+
+        if( diff[0] + diff[1] == 0){
+                ERROR_MSG("Could not detect any AA or nucleotides.");
         }
         LOG_MSG("%d %d", diff[0],diff[1]);
         c = -1;
@@ -179,6 +319,91 @@ int detect_alphabet(struct msa* msa)
                 RUN(convert_msa_to_internal(msa, redPROTEIN));
         }else{
                 ERROR_MSG("Alphabet not recognized.");
+        }
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+int detect_aligned(struct msa* msa)
+{
+        /* Here I look for gap character in the character frequency vector
+           if they are there we know the input sequences were aligned. This is not strictly
+           necessary for .clu and .msf infiles - but better safe than sorry. */
+        int min_len;
+        int max_len;
+        int i;
+        int gaps = 0;
+        /* assume that sequences are not aligned */
+        msa->aligned = 0;
+
+        gaps += msa->letter_freq[ (int) '-'];
+        gaps += msa->letter_freq[ (int) '.'];
+        gaps += msa->letter_freq[ (int) '_'];
+        gaps += msa->letter_freq[ (int) '~'];
+
+
+
+        if(gaps){
+                msa->aligned = 1;
+        }
+        /* if all sequences are the same length they could be considered
+           aligned (at least for the purpose of writing out a .msf / .clu
+           file) */
+        min_len = INT32_MAX;
+        max_len = INT32_MIN;
+        for(i = 0; i < msa->numseq;i++){
+                min_len = MACRO_MIN(min_len, msa->sequences[i]->len);
+                max_len = MACRO_MAX(max_len, msa->sequences[i]->len);
+        }
+        //LOG_MSG("%d %d",min_len,max_len);
+        if(min_len == max_len){
+                msa->aligned = 1;
+        }
+        return OK;
+}
+
+
+int dealign_msa(struct msa* msa)
+{
+        struct msa_seq* seq = NULL;
+        int i;
+        int j;
+
+        for(i = 0; i < msa->numseq;i++){
+                seq = msa->sequences[i];
+                for(j = 0; j <=  seq->len;j++){
+                        seq->gaps[j] = 0;
+                }
+        }
+        return OK;
+}
+
+
+int set_sip_nsip(struct msa* msa)
+{
+        int i;
+        ASSERT(msa!= NULL, "No msa");
+
+        msa->num_profiles = (msa->numseq << 1 )-1;
+
+
+
+        MMALLOC(msa->sip,sizeof(int*)* msa->num_profiles);
+        MMALLOC(msa->nsip,sizeof(int)* msa->num_profiles);
+
+
+        for (i =0;i < msa->num_profiles;i++){
+                msa->sip[i] = NULL;
+                msa->nsip[i] = 0;
+
+        }
+
+        for(i = 0;i < msa->numseq;i++){
+
+                MMALLOC(msa->sip[i],sizeof(int));
+                msa->nsip[i] = 1;
+                msa->sip[i][0] = i;
         }
         return OK;
 ERROR:
@@ -288,6 +513,11 @@ int write_msa_msf(struct msa* msa,char* outfile)
         int max_name_len = 0;
         int line_length;
         int header_index;
+
+        if(!msa->aligned){
+                ERROR_MSG("Sequences appear to be unaligned!");
+        }
+
         if(!outfile){
                 f_ptr = stdout;
         }else{
@@ -522,6 +752,11 @@ int write_msa_clustal(struct msa* msa,char* outfile)
         int block;
         int max_name_len = 0;
         int line_length;
+
+        if(!msa->aligned){
+                ERROR_MSG("Sequences appear to be unaligned!");
+        }
+
         if(!outfile){
                 f_ptr = stdout;
         }else{
@@ -702,11 +937,11 @@ struct msa* read_clu(char* infile)
                                 }
                                 seq_ptr->name[j] =0;
                                 for(i = j;i < line_len;i++){
+                                        msa->letter_freq[(int)p[i]]++;
                                         if(isalpha((int)p[i])){
                                                 if(seq_ptr->alloc_len == seq_ptr->len){
                                                         resize_msa_seq(seq_ptr);
                                                 }
-                                                msa->letter_freq[(int)p[i]]++;
                                                 seq_ptr->seq[seq_ptr->len] = p[i];
                                                 seq_ptr->len++;
                                         }
@@ -806,11 +1041,11 @@ struct msa* read_msf(char* infile)
                                 j = strnlen(seq_ptr->name, MSA_NAME_LEN);
                                 p += j;
                                 for(i = 0;i < line_len-j;i++){
+                                        msa->letter_freq[(int)p[i]]++;
                                         if(isalpha((int)p[i])){
                                                 if(seq_ptr->alloc_len == seq_ptr->len){
                                                         resize_msa_seq(seq_ptr);
                                                 }
-                                                msa->letter_freq[(int)p[i]]++;
                                                 seq_ptr->seq[seq_ptr->len] = p[i];
                                                 seq_ptr->len++;
                                         }
@@ -877,12 +1112,13 @@ struct msa* read_fasta(char* infile)
                 }else{
 
                         for(i = 0;i < line_len;i++){
+                                msa->letter_freq[(int)line[i]]++;
                                 if(isalpha((int)line[i])){
 
                                         if(seq_ptr->alloc_len == seq_ptr->len){
                                                 resize_msa_seq(seq_ptr);
                                         }
-                                        msa->letter_freq[(int)line[i]]++;
+
                                         seq_ptr->seq[seq_ptr->len] = line[i];
                                         seq_ptr->len++;
                                 }
@@ -950,7 +1186,7 @@ struct msa* alloc_msa(void)
         msa->alloc_numseq = 512;
         msa->numseq = 0;
         msa->L = 0;
-
+        msa->aligned = 0;
         MMALLOC(msa->sequences, sizeof(struct msa_seq*) * msa->alloc_numseq);
 
         for(i = 0; i < msa->alloc_numseq;i++){

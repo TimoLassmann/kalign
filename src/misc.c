@@ -192,7 +192,7 @@ int byg_start(char* pattern,char*text)
                 if(s & mb){
                         return i-m+1;
                 }
-                fprintf(stdout,"%c %d %d\n", text[i], i, s);
+                //fprintf(stdout,"%c %d %d\n", text[i], i, s);
                 if(i == 100){
                         return -1;
                 }
