@@ -485,7 +485,7 @@ int re_estimate(struct phmm* phmm)
         int i,j;
         int L;
         float sum;
-        float priorXY;
+        //float priorXY;
         float priorM;
         /* first for match state  */
         /*  */

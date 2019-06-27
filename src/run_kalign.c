@@ -10,7 +10,7 @@
 #include "alignment.h"
 #include "weave_alignment.h"
 
-#include "counts_from_random_trees.h"
+//#include "counts_from_random_trees.h"
 #include "misc.h"
 #include <getopt.h>
 #include "alphabet.h"
@@ -175,7 +175,7 @@ int run_kalign(struct parameters* param)
         struct aln_param* ap = NULL;
         //float** dm;
         int** map = NULL;       /* holds all alignment paths  */
-        int i,j;
+        int i;
 
         DECLARE_TIMER(t1);
         /* Step 1: read all input sequences & figure out output  */
@@ -230,17 +230,6 @@ int run_kalign(struct parameters* param)
         RUNP(ap = init_ap(msa->numseq,msa->L ));
 
         //counts_from_random_trees(aln, ap, 10);
-
-
-
-
-        //fprintf(stderr,"        %0.8f	gap open penalty\n",ap->gpo);
-        //fprintf(stderr,"        %0.8f	gap extension\n",(float)gpe/10);
-        //fprintf(stderr,"        %0.8f	gap extension\n",ap->gpe);
-        //fprintf(stderr,"        %0.8f	terminal gap penalty\n",(float)tgpe/10);
-        //fprintf(stderr,"        %0.8f	terminal gap penalty\n",ap->tgpe);
-        //fprintf(stderr,"        %0.8f	bonus\n",param->secret/10);
-        //fprintf(stderr,"        %0.8f	bonus\n",param->secret);
 
         LOG_MSG("Building guide tree.");
         START_TIMER(t1);

@@ -943,6 +943,7 @@ struct msa* read_clu(char* infile, struct msa* msa)
                                 //if(p){
                                 LOG_MSG("Found bitsof seq %s", seq_ptr->name);
                                 p = line;
+                                j = 0;
                                 for(i = 0;i < line_len;i++){
                                         if(isspace((int)p[i])){
                                                 j = i;

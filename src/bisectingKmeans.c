@@ -16,6 +16,17 @@ struct node{
 };
 
 
+struct kmeans_result{
+        int* sl;
+        int* sr;
+        int nl;
+        int nr;
+        float score;
+};
+
+static struct kmeans_result* alloc_kmeans_result(int num_samples);
+static void free_kmeans_results(struct kmeans_result* k);
+
 struct node* upgma(float **dm,int* samples, int numseq);
 struct node* alloc_node(void);
 
@@ -272,6 +283,14 @@ ERROR:
 
 struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct rng_state* rng)
 {
+
+
+        struct kmeans_result* res_tmp = NULL;
+        struct kmeans_result* best = NULL;
+        struct kmeans_result* res_ptr = NULL;
+
+        int tries = 10;
+        int t_iter;
         int r;
         int* sl = NULL;
         int* sr = NULL;
@@ -283,7 +302,9 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
         float* cr = NULL;
         float dl = 0.0f;
         float dr = 0.0f;
+        float score;
         int i,j,s;
+        int num_var;
 /* Pick random point (in samples !! ) */
         int stop = 0;
 
@@ -299,226 +320,248 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
                 return n;
         }
         /*if(num_samples == 1){
-                n->id = samples[0];
-                MFREE(samples);
-                return n;
-        }
-        if(num_samples == 2){
-                n = alloc_node();
-                n->left = alloc_node();
-                n->right = alloc_node();
-                n->left->id = samples[0];
-                n->right->id = samples[1];
+          n->id = samples[0];
+          MFREE(samples);
+          return n;
+          }
+          if(num_samples == 2){
+          n = alloc_node();
+          n->left = alloc_node();
+          n->right = alloc_node();
+          n->left->id = samples[0];
+          n->right->id = samples[1];
 
-                MFREE(samples);
-                return n;
+          MFREE(samples);
+          return n;
 
-                }*/
-        s = num_anchors / 8;
+          }*/
+        num_var = num_anchors / 8;
         if( num_anchors%8){
-                s++;
+                num_var++;
         }
-        s = s << 3;
-
-        w = _mm_malloc(sizeof(float) *s,32);
-        wr = _mm_malloc(sizeof(float) *s,32);
-        wl = _mm_malloc(sizeof(float) *s,32);
-
-        cr = _mm_malloc(sizeof(float) *s,32);
-        cl = _mm_malloc(sizeof(float) *s,32);
-
-        MMALLOC(sl, sizeof(int) * num_samples);
-        MMALLOC(sr, sizeof(int) * num_samples);
-
-        for(i = 0; i < s;i++){
-                w[i] = 0.0f;
-                wr[i] = 0.0f;
-                wl[i] = 0.0f;
-                cr[i] = 0.0f;
-                cl[i] = 0.0f;
-        }
-        for(i = 0; i < num_samples;i++){
-                s = samples[i];
-                for(j = 0; j < num_anchors;j++){
-                        w[j] += dm[s][j];
-                }
-        }
-
-        for(j = 0; j < num_anchors;j++){
-                w[j] /= num_samples;
-        }
-
-        r = tl_random_int(rng  , num_samples);
+        num_var = num_var << 3;
 
 
-        s = samples[r];
-        //LOG_MSG("Selected %d\n",s);
-        for(j = 0; j < num_anchors;j++){
-                cl[j] = dm[s][j];
-        }
-
-        for(j = 0; j < num_anchors;j++){
-                cr[j] = w[j] - (cl[j] - w[j]);
-                //      fprintf(stdout,"%f %f  %f\n", cl[j],cr[j],w[j]);
-        }
+        wr = _mm_malloc(sizeof(float) * num_var,32);
+        wl = _mm_malloc(sizeof(float) * num_var,32);
+        cr = _mm_malloc(sizeof(float) * num_var,32);
+        cl = _mm_malloc(sizeof(float) * num_var,32);
 
 
+        RUNP(best = alloc_kmeans_result(num_samples));
+        RUNP(res_tmp = alloc_kmeans_result(num_samples));
 
-        /* check if cr == cl - we have identical sequences  */
-        s = 0;
-        //LOG_MSG("COMP");
-        for(j = 0; j < num_anchors;j++){
-                //fprintf(stdout,"%d\t%f %f  %f %d %e\n",j, cl[j],cr[j],w[j],s,cl[j] - cr[j]);
-                //if(cl[j] != cr[j]){
-                //fprintf(stdout," diff: %e  cutoff %e\n",fabsf(cl[j]-cr[j]),1.0E-5);
-                if(fabsf(cl[j]-cr[j]) >  1.0E-6){
-                        s = 1;
-                        break;
-                }
+        best->score = FLT_MAX;
 
-        }
-        _mm_free(w);
-        if(!s){
-                //      LOG_MSG("Identical!!!");
-                num_l = 0;
-                num_r = 0;
-                sl[num_l] = samples[0];
-                num_l++;
 
-                for(i =1 ; i <num_samples;i++){
-                        sr[num_r] = samples[i];
-                        num_r++;
-                }
-                _mm_free(wr);
-                _mm_free(wl);
-                _mm_free(cr);
-                _mm_free(cl);
+        //MMALLOC(sl, sizeof(int) * num_samples);
+        //MMALLOC(sr, sizeof(int) * num_samples);
 
-                MFREE(samples);
-                n = alloc_node();
-                //n->left = alloc_node();
-                RUNP(n->left = bisecting_kmeans(msa,n->left, dm, sl, numseq, num_anchors, num_l,rng));
-                //n->right = alloc_node();
-                RUNP(n->right = bisecting_kmeans(msa,n->right, dm, sr, numseq, num_anchors, num_r,rng));
-                return n;
-        }
+        for(t_iter = 0;t_iter < tries;t_iter++){
+                res_tmp->score = FLT_MAX;
+                sl = res_tmp->sl;
+                sr = res_tmp->sr;
 
-        w = NULL;
-        while(1){
-                stop++;
-                if(stop == 10000){
-                        ERROR_MSG("Failed.");
-                }
-                num_l = 0;
-                num_r = 0;
-
-                for(i = 0; i < num_anchors;i++){
-
+                w = _mm_malloc(sizeof(float) * num_var,32);
+                for(i = 0; i < num_var;i++){
+                        w[i] = 0.0f;
                         wr[i] = 0.0f;
                         wl[i] = 0.0f;
+                        cr[i] = 0.0f;
+                        cl[i] = 0.0f;
                 }
-                /*fprintf(stdout,"\ncentroids:\n");
-
-                for(j = 0; j < num_anchors;j++){
-                        fprintf(stdout,"%f ",cl[j]);
-
-                }
-                fprintf(stdout,"\n");
-                for(j = 0; j < num_anchors;j++){
-                        fprintf(stdout,"%f ",cr[j]);
-
-                }
-                fprintf(stdout,"\n");
-                fprintf(stdout,"\n");*/
                 for(i = 0; i < num_samples;i++){
                         s = samples[i];
-
-                        //edist_serial(dm[s], cl, num_anchors, &dl);
-                        //edist_serial(dm[s], cr, num_anchors, &dr);
-
-                        edist_256(dm[s], cl, num_anchors, &dl);
-                        edist_256(dm[s], cr, num_anchors, &dr);
-                        //fprintf(stdout,"Dist: %f %f\n",dl,dr);
-                        if(dr < dl){
-                                w = wr;
-                                sr[num_r] = s;
-                                num_r++;
-                        }else{
-                                w = wl;
-                                sl[num_l] = s;
-                                num_l++;
-                        }
-
                         for(j = 0; j < num_anchors;j++){
                                 w[j] += dm[s][j];
                         }
-
                 }
-                //LOG_MSG("%d %d", num_l,num_r);
+
                 for(j = 0; j < num_anchors;j++){
-                        wl[j] /= num_l;
-
-                        wr[j] /= num_r;
+                        w[j] /= num_samples;
                 }
-                //fprintf(stdout,"\nLeft:\n");
+                r = tl_random_int(rng  , num_samples);
 
-                /*for(j = 0; j < num_anchors;j++){
-                        fprintf(stdout,"%f ",wl[j]);
 
-                }
-                fprintf(stdout,"\n");
+                s = samples[r];
+                //LOG_MSG("Selected %d\n",s);
                 for(j = 0; j < num_anchors;j++){
-                        fprintf(stdout,"%f ",cl[j]);
-
+                        cl[j] = dm[s][j];
                 }
-                fprintf(stdout,"\n");
-                fprintf(stdout,"\nRight:\n");
+
                 for(j = 0; j < num_anchors;j++){
-                        fprintf(stdout,"%f ",wr[j]);
-
+                        cr[j] = w[j] - (cl[j] - w[j]);
+                        //      fprintf(stdout,"%f %f  %f\n", cl[j],cr[j],w[j]);
                 }
-                fprintf(stdout,"\n");
-                for(j = 0; j < num_anchors;j++){
-                        fprintf(stdout,"%f ",cr[j]);
 
-                }
-                fprintf(stdout,"\n");
-                */
+                _mm_free(w);
+
+                /* check if cr == cl - we have identical sequences  */
                 s = 0;
+                //LOG_MSG("COMP");
                 for(j = 0; j < num_anchors;j++){
-                        if(wl[j] != cl[j]){
+                        //fprintf(stdout,"%d\t%f %f  %f %d %e\n",j, cl[j],cr[j],w[j],s,cl[j] - cr[j]);
+                        //if(cl[j] != cr[j]){
+                        //fprintf(stdout," diff: %e  cutoff %e\n",fabsf(cl[j]-cr[j]),1.0E-5);
+                        if(fabsf(cl[j]-cr[j]) >  1.0E-6){
                                 s = 1;
                                 break;
                         }
-                        if(wr[j] != cr[j]){
-                                s = 1;
-                                break;
 
-                        }
                 }
-                if(s){
 
-                        w = cl;
-                        cl = wl;
-                        wl = w;
+                if(!s){
+                        //      LOG_MSG("Identical!!!");
+                        score = 0;
+                        num_l = 0;
+                        num_r = 0;
+                        sl[num_l] = samples[0];
+                        num_l++;
 
-                        w = cr;
-                        cr = wr;
-                        wr = w;
+                        for(i =1 ; i <num_samples;i++){
+                                sr[num_r] = samples[i];
+                                num_r++;
+                        }
+
+
+
+                        /*_mm_free(wr);
+                          _mm_free(wl);
+                          _mm_free(cr);
+                          _mm_free(cl);
+
+                          MFREE(samples);
+                          n = alloc_node();
+                          //n->left = alloc_node();
+                          RUNP(n->left = bisecting_kmeans(msa,n->left, dm, sl, numseq, num_anchors, num_l,rng));
+                          //n->right = alloc_node();
+                          RUNP(n->right = bisecting_kmeans(msa,n->right, dm, sr, numseq, num_anchors, num_r,rng));
+                          return n;*/
                 }else{
-                        //LOG_MSG("FINISHED");
-                        break;
+
+                        //LOG_MSG("Start run");
+                        w = NULL;
+                        while(1){
+                                stop++;
+                                if(stop == 10000){
+                                        ERROR_MSG("Failed.");
+                                }
+                                num_l = 0;
+                                num_r = 0;
+
+                                for(i = 0; i < num_anchors;i++){
+
+                                        wr[i] = 0.0f;
+                                        wl[i] = 0.0f;
+                                }
+                                /*fprintf(stdout,"\ncentroids:\n");
+
+                                  for(j = 0; j < num_anchors;j++){
+                                  fprintf(stdout,"%f ",cl[j]);
+
+                                  }
+                                  fprintf(stdout,"\n");
+                                  for(j = 0; j < num_anchors;j++){
+                                  fprintf(stdout,"%f ",cr[j]);
+
+                                  }
+                                  fprintf(stdout,"\n");
+                                  fprintf(stdout,"\n");*/
+                                score = 0.0f;
+                                for(i = 0; i < num_samples;i++){
+                                        s = samples[i];
+
+                                        //edist_serial(dm[s], cl, num_anchors, &dl);
+                                        //edist_serial(dm[s], cr, num_anchors, &dr);
+
+                                        edist_256(dm[s], cl, num_anchors, &dl);
+                                        edist_256(dm[s], cr, num_anchors, &dr);
+                                        score += MACRO_MIN(dl,dr);
+                                        //fprintf(stdout,"Dist: %f %f\n",dl,dr);
+                                        if(dr < dl){
+                                                w = wr;
+                                                sr[num_r] = s;
+                                                num_r++;
+                                        }else{
+                                                w = wl;
+                                                sl[num_l] = s;
+                                                num_l++;
+                                        }
+
+                                        for(j = 0; j < num_anchors;j++){
+                                                w[j] += dm[s][j];
+                                        }
+
+                                }
+                                //LOG_MSG("%d\tscore: %f",t_iter, score);
+                                //LOG_MSG("%d %d", num_l,num_r);
+                                for(j = 0; j < num_anchors;j++){
+                                        wl[j] /= num_l;
+                                        wr[j] /= num_r;
+                                }
+                                //fprintf(stdout,"\nLeft:\n");
+
+                                /*for(j = 0; j < num_anchors;j++){
+                                  fprintf(stdout,"%f ",wl[j]);
+
+                                  }
+                                  fprintf(stdout,"\n");
+                                  for(j = 0; j < num_anchors;j++){
+                                  fprintf(stdout,"%f ",cl[j]);
+
+                                  }
+                                  fprintf(stdout,"\n");
+                                  fprintf(stdout,"\nRight:\n");
+                                  for(j = 0; j < num_anchors;j++){
+                                  fprintf(stdout,"%f ",wr[j]);
+
+                                  }
+                                  fprintf(stdout,"\n");
+                                  for(j = 0; j < num_anchors;j++){
+                                  fprintf(stdout,"%f ",cr[j]);
+
+                                  }
+                                  fprintf(stdout,"\n");
+                                */
+                                s = 0;
+                                for(j = 0; j < num_anchors;j++){
+                                        if(wl[j] != cl[j]){
+                                                s = 1;
+                                                break;
+                                        }
+                                        if(wr[j] != cr[j]){
+                                                s = 1;
+                                                break;
+
+                                        }
+                                }
+                                if(s){
+
+                                        w = cl;
+                                        cl = wl;
+                                        wl = w;
+
+                                        w = cr;
+                                        cr = wr;
+                                        wr = w;
+                                }else{
+                                        //LOG_MSG("FINISHED");
+                                        break;
+                                }
+                        }
                 }
-/* If LLcw  and RRcw, stop. Otherwise, let LLwc:, RRwc: and go back to Step 2 */
-        /*         if(wl = cl and wr - cl stop ) */
+                res_tmp->nl =  num_l;
+                res_tmp->nr =  num_r;
+                res_tmp->score = score;
 
-
-
-        /*         else */
-        /*                 cl = wl */
-        /*                         cr - wr */
+                //LOG_MSG("%d\t%f\t%f", t_iter,  res_tmp->score,best->score);
+                if(res_tmp->score < best->score){
+                        //LOG_MSG("New best: %f", best->score);
+                        res_ptr = res_tmp;
+                        res_tmp = best;
+                        best = res_ptr;
+                }
         }
-
         /*fprintf(stdout,"Samples left (%d):\n", num_l);
         for(i = 0; i < num_l;i++){
                 fprintf(stdout,"%d ",sl[i]);
@@ -530,8 +573,17 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
                 fprintf(stdout,"%d ",sr[i]);
         }
         fprintf(stdout,"\n");*/
+        free_kmeans_results(res_tmp);
 
-        //_mm_free(w);
+        sl = best->sl;
+        sr = best->sr;
+
+        num_l = best->nl;
+
+        num_r = best->nr;
+
+        MFREE(best);
+
         _mm_free(wr);
         _mm_free(wl);
         _mm_free(cr);
@@ -542,7 +594,6 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
         RUNP(n->left = bisecting_kmeans(msa,n->left, dm, sl, numseq, num_anchors, num_l,rng));
         //n->right = alloc_node();
         RUNP(n->right = bisecting_kmeans(msa,n->right, dm, sr, numseq, num_anchors, num_r,rng));
-
 
         return n;
 ERROR:
@@ -682,6 +733,41 @@ int* readbitree(struct node* p,int* tree)
                 }
         }
         return tree;
+}
+
+
+struct kmeans_result* alloc_kmeans_result(int num_samples)
+{
+        struct kmeans_result* k = NULL;
+        ASSERT(num_samples!= 0, "No samples???");
+
+
+        MMALLOC(k, sizeof(struct kmeans_result));
+
+        k->nl = 0;
+        k->nr = 0;
+        k->sl = NULL;
+        k->sr = NULL;
+        MMALLOC(k->sl, sizeof(int) * num_samples);
+        MMALLOC(k->sr, sizeof(int) * num_samples);
+        k->score = FLT_MAX;
+        return k;
+ERROR:
+        free_kmeans_results(k);
+        return NULL;
+}
+
+void free_kmeans_results(struct kmeans_result* k)
+{
+        if(k){
+                if(k->sl){
+                        MFREE(k->sl);
+                }
+                if(k->sr){
+                        MFREE(k->sr);
+                }
+                MFREE(k);
+        }
 }
 
 /*

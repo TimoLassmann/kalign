@@ -134,9 +134,9 @@ int edist_256(const float* a,const float* b, const int len, float* ret)
 {
 
         float d = 0.0f;
-        int i;
-        __m256 xmm1 = _mm256_load_ps(a);
-        __m256 xmm2 = _mm256_load_ps(b);
+        register int i;
+        __m256 xmm1;// = _mm256_load_ps(a);
+        __m256 xmm2;// = _mm256_load_ps(b);
         __m256 r = _mm256_set1_ps(0.0f);
         for(i = 0;i < len;i+=8){
                 xmm1 = _mm256_load_ps(a);

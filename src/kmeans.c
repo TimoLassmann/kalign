@@ -15,7 +15,7 @@ double** kmeans(double** data,int* cluster_assignment, int len_a,int len_b, int 
         double d;
         int min_index;
         int i,j;
-        int change;
+
         int num_attempts = 10000;
         int a_item;
 
@@ -67,7 +67,7 @@ double** kmeans(double** data,int* cluster_assignment, int len_a,int len_b, int 
                                 tmp2[i][j] = 0.0;
                         }
                 }
-                change = 1;
+
                 score =1.0;
                 old_score = 0.0;
                 while(score != old_score){
@@ -80,7 +80,7 @@ double** kmeans(double** data,int* cluster_assignment, int len_a,int len_b, int 
                                         tmp2[i][j] = 0.0;
                                 }
                         }
-                        change = 0;
+
                         score = 0.0;
                         for(i= 0; i < len_a;i++){
                                 min = DBL_MAX;

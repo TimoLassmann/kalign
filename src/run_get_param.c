@@ -246,7 +246,7 @@ int fill_counts(struct counts* ap, struct msa* msa)
         uint8_t* aligned_a = NULL;
         uint8_t* aligned_b = NULL;
 
-
+        aln_len = 0;
         for(i = 0; i <= msa->sequences[0]->len;i++){
                 aln_len += msa->sequences[0]->gaps[i];//  aln->gaps[0][i];
         }

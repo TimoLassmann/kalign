@@ -861,9 +861,6 @@
 **** Run alignment programs on Homfam 
 
 
-
-
-
      #+BEGIN_SRC bash -n :tangle gen_run_homfam.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
        <<scratchdir>>
      #+END_SRC
@@ -915,3 +912,20 @@
      printf "Generating clustalo run script\n";
      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*_test.fa" -o -name '*.fasta' | grep unaligned | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "clustalo-1.2.4-Ubuntu-x86_64 --outfmt=msf  --in %s --force --out %s/%s_%s_%s_clustalo.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2] }' > run_clustalo_bralibase.sh
      chmod 755 run_clustalo_bralibase.sh
+**** plot scores
+
+#+BEGIN_SRC R :session one :results output graphics :file homfam_scores.jpeg :exports both :noweb yes
+  <<Rlibraries>> 
+         mat  <- read.csv("scores_homfam.csv");
+
+       p <- ggplot(mat, aes(NUMSEQ,Time))
+       p <- p + geom_point(aes(colour = Program,size = AVGLEN))
+       p <- p + scale_x_continuous(trans = 'log10')
+       p <- p + scale_y_continuous(trans = 'log10')
+       
+#+END_SRC
+
+#+RESULTS:
+[[file:homfam_scores.jpeg]]
+
+#+END_SRC

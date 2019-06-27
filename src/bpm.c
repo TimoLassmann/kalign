@@ -776,7 +776,7 @@ __m256i add256(uint32_t carry, __m256i A, __m256i B)
 
 void bitShiftLeft256ymm (__m256i *data, int count)
 {
-        __m256i innerCarry, carryOut, rotate;
+        __m256i innerCarry, rotate;
 
         innerCarry = _mm256_srli_epi64 (*data, 64 - count);                        // carry outs in bit 0 of each qword
         rotate     = _mm256_permute4x64_epi64 (innerCarry, 0x93);                  // rotate ymm left 64 bits
