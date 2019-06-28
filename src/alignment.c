@@ -1979,7 +1979,7 @@ int foward_hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_mem
                 prof1 += 64;
                 //c = 1;
                 f = 0;
-                for (j = 0;j < 32; j++){
+                for (j = 0;j < 21; j++){
                         if(prof1[j]){
                                 freq[f] = j;
                                 f++;
@@ -2112,7 +2112,7 @@ int backward_hirsch_pp_dyn(const float* prof1,const float* prof2,struct hirsch_m
 
                 //c = 1;
                 f = 0;
-                for (j = 0;j < 32; j++){
+                for (j = 0;j < 21; j++){
                         if(prof1[j]){
                                 freq[f] = j;
                                 f++;
