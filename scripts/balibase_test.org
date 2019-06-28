@@ -340,6 +340,8 @@
       mv homfam-20110613-25.tar.gz homfam 
       cd homfam 
       tar -zxvf homfam-20110613-25.tar.gz
+
+      cd ~/kalignbenchmark/data
       for filename in *.tar.gz; do
           tar -zxvf  $filename
       done
@@ -377,6 +379,7 @@
 
       tar -zxvf qscore_src.tar.gz
     #+END_SRC
+
 
 
 *** Compile q-score 
@@ -434,16 +437,6 @@
 
     #+END_SRC
 
-    #+RESULTS:
-    Using GCG format reference alignment
-
-    Comparing test alignment in /home/user/kalignbenchmark/scratch/BB11002_muscle.msf
-    with reference alignment in /home/user/kalignbenchmark/data/bb3_release/RV11/BB11002.msf
-
-	  SP score= 0.572
-
-	  TC score= 0.270
-    auto /home/user/kalignbenchmark/scratch/BB11002_muscle.msf 0.572 0.270
 
 
     Let's try on a balifam 
@@ -454,6 +447,7 @@
       IN=~/kalignbenchmark/data/BB20021-package.vie
       ADD=~/kalignbenchmark/data/bb3_release/RV20/BB20021.tfa
       REF=~/kalignbenchmark/data/bb3_release/RV20/BB20021.msf
+
       OUT=~/kalignbenchmark/scratch/BB20021_muscle.fa
 
       cd ~/kalignbenchmark/scratch
@@ -557,15 +551,15 @@
 
 
       printf "Generating kalign scoring run script\n";
-      find ~/kalignbenchmark/data/bb3_release -name "*.xml" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%s_kalign.msf | grep auto\n", $1,outdir,a[n-2],a[n-1] }' > score_bb3_kalign.sh
+      find ~/kalignbenchmark/data/bb3_release -name "*.xml" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/kalignbenchmark/programs/bali_score %s %s/%s_%s_kalign.msf | grep auto\n", $1,outdir,a[n-2],a[n-1] }' > score_bb3_kalign.sh
       chmod 755  score_bb3_kalign.sh
 
       printf "Generating muscle scoring run script\n";
-      find ~/kalignbenchmark/data/bb3_release -name "*.xml" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%s_muscle.msf | grep auto\n", $1,outdir,a[n-2],a[n-1] }' > score_bb3_muscle.sh
+      find ~/kalignbenchmark/data/bb3_release -name "*.xml" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/kalignbenchmark/programs/bali_score %s %s/%s_%s_muscle.msf | grep auto\n", $1,outdir,a[n-2],a[n-1] }' > score_bb3_muscle.sh
       chmod 755  score_bb3_muscle.sh
 
       printf "Generating clustalo scoring run script\n";
-      find ~/kalignbenchmark/data/bb3_release -name "*.xml" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%s_clustalo.msf | grep auto\n", $1,outdir,a[n-2],a[n-1] }' > score_bb3_clustalo.sh
+      find ~/kalignbenchmark/data/bb3_release -name "*.xml" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/kalignbenchmark/programs/bali_score %s %s/%s_%s_clustalo.msf | grep auto\n", $1,outdir,a[n-2],a[n-1] }' > score_bb3_clustalo.sh
       chmod 755  score_bb3_clustalo.sh
 
 
@@ -708,7 +702,7 @@
       chmod 755 run_clustalo_bralibase.sh
 
       printf "Generating kalign scoring run script\n";
-      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*.msf" | grep structural | awk -v outdir="$SCRATCHDIR" '{name=$1; gsub(/structural/, "unaligned"); n=split ($1,a,/[\/,.]/); printf "~/data/bb3_release/bali_score_src/bali_score %s %s/%s_%s_%s_kalign.msf | grep auto\n", name,outdir,a[n-4],a[n-3],a[n-2] }' > score_kalign_bralibase.sh
+      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*.msf" | grep structural | awk -v outdir="$SCRATCHDIR" '{name=$1; gsub(/structural/, "unaligned"); n=split ($1,a,/[\/,.]/); printf "~/kalignbenchmark/programs/bali_score  %s %s/%s_%s_%s_kalign.msf | grep auto\n", name,outdir,a[n-4],a[n-3],a[n-2] }' > score_kalign_bralibase.sh
       chmod 755  score_kalign_bralibase.sh
 
       printf "Generating muscle scoring run script\n";
