@@ -165,7 +165,7 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
         if (path) {
                 LOG_MSG("scratch is: %s", path);
         }else{
-                snprintf(path_buffer, BUFFER_LEN+BUFFER_LEN, "%s",".");
+                snprintf(path_buffer, BUFFER_LEN, "%s",".");
                 path= path_buffer;
         }
 
