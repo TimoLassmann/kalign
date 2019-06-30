@@ -203,7 +203,19 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
         while (fgets(ret, BUFFER_LEN, pipe)){
                 fprintf(stderr,"%s", ret);
         }
-        pclose(pipe);
+
+        auto rc = pclose(pipe);
+
+        if (rc == EXIT_SUCCESS) { // == 0
+                LOG_MSG("Running:\n%s was a success", cmd);
+        } else if (rc == EXIT_FAILURE) {  // EXIT_FAILURE is not used by all programs, maybe needs some adaptation.
+                WARNING_MSG("Running:\n%s failed.", cmd);
+
+        }
+        /*return result;
+          pclose(pipe);*/
+
+
 
         gettimeofday(&tv2, NULL);
 

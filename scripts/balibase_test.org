@@ -908,18 +908,34 @@
      chmod 755 run_clustalo_bralibase.sh
 **** plot scores
 
-#+BEGIN_SRC R :session one :results output graphics :file homfam_scores.jpeg :exports both :noweb yes
+#+BEGIN_SRC R :session one :results output graphics :file homfam_runtime.jpeg :exports both :noweb yes
   <<Rlibraries>> 
-         mat  <- read.csv("scores_homfam.csv");
+  mat  <- read.csv("scores_homfam.csv");
 
-       p <- ggplot(mat, aes(NUMSEQ,Time))
-       p <- p + geom_point(aes(colour = Program,size = AVGLEN))
-       p <- p + scale_x_continuous(trans = 'log10')
-       p <- p + scale_y_continuous(trans = 'log10')
-       
+  p <- ggplot(mat, aes(NUMSEQ,Time))
+  p <- p + geom_point(aes(colour = Program,size = AVGLEN))
+  p <- p + scale_x_continuous(trans = 'log10')
+  p <- p + scale_y_continuous(trans = 'log10')
+ggsave("homfam_runtime.jpeg",p)
 #+END_SRC
 
 #+RESULTS:
 [[file:homfam_scores.jpeg]]
 
+
+
+
+
+#+BEGIN_SRC R :session one :results output graphics :file homfam_scores.jpeg :exports both :noweb yes
+
+
+       p <- ggplot(mat, aes(Program, TC))
+       p <- p + geom_boxplot(aes(colour = Program))
+
+  p <- ggplot(mat, aes(NUMSEQ,Time))
+  p <- p + geom_point(aes(colour = Program,size = AVGLEN))
+  p <- p + scale_x_continuous(trans = 'log10')
+  p <- p + scale_y_continuous(trans = 'log10')
+ggsave("homfam_scores.jpeg",p)
 #+END_SRC
+
