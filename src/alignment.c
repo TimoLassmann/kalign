@@ -2447,8 +2447,6 @@ int update(const float* profa, const float* profb,float* newp, struct aln_param*
                         for (i = 64; i--;){
                                 newp[i] = profa[i] + profb[i];
                         }
-
-
                         profa += 64;
                         profb += 64;
                 }

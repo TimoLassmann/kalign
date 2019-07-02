@@ -584,6 +584,8 @@
        ./score_bb3_clustalo.sh > scores_clustalo.csv 
      #+END_SRC
 
+     #+RESULTS:
+
 **** Plot 
 
      #+BEGIN_SRC R :session  one :results none :export none :noweb yes 
@@ -848,7 +850,7 @@
        find ~/kalignbenchmark/data/homfam  -name "*_test-only.vie" | awk '{test_aln=$1;ref=$1 ;gsub("_test-only.vie", "_ref.vie", ref);gsub("_test-only.vie", "_testaln.fa", test_aln); printf "kalign %s %s --reformat --rename -f fasta -o %s\n",ref, $1, test_aln }' > homfam_reformat.sh
        find ~/kalignbenchmark/data/homfam  -name "*_ref.vie" | awk '{ref=$1;gsub("_ref.vie", "_ref.msf", ref);printf "kalign %s --reformat --rename  -f msf -o %s\n", $1,ref}' >> homfam_reformat.sh
 
- chmod 755 homfam_reformat.sh
+       chmod 755 homfam_reformat.sh
      #+END_SRC     
 
 
@@ -877,7 +879,7 @@
            esac
        done
 
-       
+
 
        printf "Generating kalign run script\n"
        printf "export PATH=~/kalignbenchmark/programs:$PATH\n\n" > run_homfam.sh
@@ -908,34 +910,30 @@
      chmod 755 run_clustalo_bralibase.sh
 **** plot scores
 
-#+BEGIN_SRC R :session one :results output graphics :file homfam_runtime.jpeg :exports both :noweb yes
-  <<Rlibraries>> 
-  mat  <- read.csv("scores_homfam.csv");
+     #+BEGIN_SRC R :session one :results output graphics :file homfam_runtime.jpeg :exports both :noweb yes
+       mat  <- read.csv("scores_homfam.csv");
+       p <- ggplot(mat, aes(NUMSEQ,Time))
+       p <- p + geom_point(aes(colour = Program,size = AVGLEN))
+       p <- p + scale_x_continuous(trans = 'log10')
+       p <- p + scale_y_continuous(trans = 'log10')
+       ggsave("homfam_runtime.jpeg",p)
+     #+END_SRC
 
-  p <- ggplot(mat, aes(NUMSEQ,Time))
-  p <- p + geom_point(aes(colour = Program,size = AVGLEN))
-  p <- p + scale_x_continuous(trans = 'log10')
-  p <- p + scale_y_continuous(trans = 'log10')
-ggsave("homfam_runtime.jpeg",p)
-#+END_SRC
-
-#+RESULTS:
-[[file:homfam_scores.jpeg]]
+     #+RESULTS:
+     [[file:homfam_runtime.jpeg]]
 
 
 
 
 
-#+BEGIN_SRC R :session one :results output graphics :file homfam_scores.jpeg :exports both :noweb yes
+     #+BEGIN_SRC R :session one :results output graphics :file homfam_scores.jpeg :exports both :noweb yes
 
 
-       p <- ggplot(mat, aes(Program, TC))
+       p <- ggplot(mat, aes(Program, SP))
        p <- p + geom_boxplot(aes(colour = Program))
+       ggsave("homfam_scores.jpeg",p)
+     #+END_SRC
 
-  p <- ggplot(mat, aes(NUMSEQ,Time))
-  p <- p + geom_point(aes(colour = Program,size = AVGLEN))
-  p <- p + scale_x_continuous(trans = 'log10')
-  p <- p + scale_y_continuous(trans = 'log10')
-ggsave("homfam_scores.jpeg",p)
-#+END_SRC
+     #+RESULTS:
+     [[file:homfam_scores.jpeg]]
 

@@ -108,7 +108,6 @@ int sort_int_desc(const void *a, const void *b)
 }
 
 
-
 int build_tree_kmeans(struct msa* msa, struct aln_param* ap)
 {
         //struct drand48_data randBuffer;
@@ -132,21 +131,27 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap)
 
         numseq = msa->numseq;
 
+        DECLARE_TIMER(timer);
         /* pick anchors . */
-
+        LOG_MSG("Calculating pairwise distances");
+        START_TIMER(timer);
         RUNP(anchors = pick_anchor(msa, &num_anchors));
 
         //RUNP(dm = kmer_distance(aln,  anchors, num_anchors,10));
         RUNP(dm = bpm_distance_thin(msa, anchors, num_anchors));
 //RUNP(dm = bpm_distance(aln,anchors,num_anchors));
-/* normalize  */
+        /* normalize  */
+        STOP_TIMER(timer);
+
+        LOG_MSG("Done in %f sec.", GET_TIMING(timer));
+        //unit_zero(dm, msa->numseq , num_anchors);
         MFREE(anchors);
 
 
         //dm = pair_wu_fast_dist(aln, ap, &num_anchors);
 
 
-        //unit_zero(dm, aln->numseq, num_anchors);
+
 
         /*int j;
         double r;
@@ -191,11 +196,15 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap)
 
         //RUNP(root = alloc_node());
 
+        START_TIMER(timer);
 
+        LOG_MSG("Building guide tree.");
 
 
         RUNP(root = bisecting_kmeans(msa,root, dm, samples, numseq, num_anchors, numseq, ap->rng));
+        STOP_TIMER(timer);
 
+        LOG_MSG("Done in %f sec.", GET_TIMING(timer));
 //        MFREE(samples);
         label_internal(root, numseq);
         //      printTree(root, 0);
@@ -289,7 +298,7 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
         struct kmeans_result* best = NULL;
         struct kmeans_result* res_ptr = NULL;
 
-        int tries = 10;
+        int tries = 50;
         int t_iter;
         int r;
         int* sl = NULL;
@@ -305,16 +314,19 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
         float score;
         int i,j,s;
         int num_var;
-/* Pick random point (in samples !! ) */
+        /* Pick random point (in samples !! ) */
         int stop = 0;
 
         if(num_samples < 100){
                 float** dm = NULL;
                 //dm = protein_wu_distance(aln, 58, 0, samples, num_samples);
                 dm = bpm_distance_pair(msa, samples, num_samples);
-//                MFREE(n);
+//
+                //unit_zero(dm,  num_samples ,num_samples);
+                //MFREE(n);
                 //RUN(unit_zero(dm, num_samples, num_samples));
                 n = upgma(dm,samples, num_samples);
+
                 gfree(dm);
                 MFREE(samples);
                 return n;

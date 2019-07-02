@@ -231,21 +231,22 @@ int run_kalign(struct parameters* param)
 
         //counts_from_random_trees(aln, ap, 10);
 
-        LOG_MSG("Building guide tree.");
-        START_TIMER(t1);
+        //LOG_MSG("Building guide tree.");
+        //START_TIMER(t1);
         //random_tree(ap, aln->numseq);
         //RUN(convert_alignment_to_internal(aln,defPROTEIN ));
         //param->dist_method = KALIGNDIST_WU;
         //RUN(build_tree(aln,param,ap));
         //RUN(convert_alignment_to_internal(aln,redPROTEIN));
         RUN(build_tree_kmeans(msa,ap));
+
         if(msa->L == redPROTEIN){
                 RUN(convert_msa_to_internal(msa, defPROTEIN));
         }
 
 
-        STOP_TIMER(t1);
-        LOG_MSG("Took %f sec.", GET_TIMING(t1));
+        //STOP_TIMER(t1);
+        //LOG_MSG("Took %f sec.", GET_TIMING(t1));
 
         //LOG_MSG("Building guide tree.");
         //START_TIMER(t1);
