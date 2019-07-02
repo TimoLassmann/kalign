@@ -73,6 +73,30 @@ Alignment 21 characters loops.
 
 * Results 
 
+#+BEGIN_SRC latex
+\begin{figure}[!tpb]%figure1
+
+\centerline{\includegraphics[scale = 0.5]{../../scripts/Figure1.jpeg}}
+\caption{
+Balibase benchmark results. The sums of pairs scores of all tested alignment programs across all 6 alignment categores (RVXX) are not significantly different.}\label{fig:01}
+\end{figure}
+
+
+#+END_SRC
+
+
+
+#+BEGIN_SRC latex
+\begin{figure}[!tpb]%figure1
+
+\centerline{\includegraphics[scale = 0.5]{../../scripts/Figure2.jpeg}}
+\caption{
+Bralibase benchmark results. The sums of pairs scores of all tested alignment programs across all 6 alignment categores are not significantly different.}\label{fig:01}
+\end{figure}
+
+
+#+END_SRC
+
 * Discussion
 
 
@@ -86,14 +110,17 @@ Alignment 21 characters loops.
 
 * Conclusion
 * Acknowledgements
-
-Text Text Text Text Text Text  Text Text.  \citealp{Boffelli03} might want to know about  text
-text text text\vspace*{-12pt}
+:PROPERTIES:
+:UNNUMBERED: t
+:END:
+I would like to thank Max Burroughs for providing feedback on kalign and Fabian Sievers for comments on how to runclustal omega as well as on kalign.
 
 * Funding
+:PROPERTIES:
+:UNNUMBERED: t
+:END:
 
-
-* Discussion
+This work was supported by a Blue Sky Grant from BHP. T.L. is supported by a fellowship from the Feilman Foundation.
 
 
 #+BEGIN_SRC latex
