@@ -2,25 +2,24 @@
 #+BIND: org-latex-title-command ""
 #+LATEX_CMD: pdflatex
 #+Latex_Class: bioinfo
-
+#+LaTeX_CLASS_OPTIONS: [nocrop]
 # Nice code-blocks
 #+BEGIN_SRC elisp :noweb no-export :exports results
-(setq org-latex-hyperref-template "")
+  (setq org-latex-hyperref-template "")
   (setq org-latex-minted-options
-    '(("bgcolor" "mintedbg") ("frame" "single") ("framesep" "6pt") 
-      ("mathescape" "true") ("fontsize" "\\footnotesize")))
+        '(("bgcolor" "mintedbg") ("frame" "single") ("framesep" "6pt") 
+          ("mathescape" "true") ("fontsize" "\\footnotesize")))
   nil
 #+END_SRC
 
 #+BEGIN_SRC latex
-\abstract{\textbf{Motivation:} Kalign is an efficient multiple sequence alignment program capable of aligning thousands of protein or nucleotide sequences. However, current alignment problems involving large number of sequences are becoming bigger that what kalign was designed for. Here I present a completely re-written and updated version to meet current and future challenges. Kalign now uses a SIMD accelerated version of the bit-parallel Gene Myers algotithm to estimate pariwise distances and adopts a sequence embedding strategy to repidly construct guide trees for millions of sequences.\\
-\textbf{Results:} Text  Text Text Text Text Text Text Text Text Text  Text Text Text Text Text
-Text Text Text Text Text Text Text Text Text Text Text Text Text  Text Text Text Text Text Text\\
-\textbf{Availability:} The source code of kalign and code to reproduce the results are found here: https://github.com/timolassmann/kalign\\
-\textbf{Contact:} \href{timolassmann@icloud.com}{timolassmann@icloud.com}\\
-\textbf{Supplementary information:} Supplementary data are available at \textit{Bioinformatics}
-online.}
-
+  \abstract{\textbf{Motivation:} Kalign is an efficient multiple sequence alignment program capable of aligning thousands of protein or nucleotide sequences. However, current alignment problems involving large number of sequences are becoming bigger that what kalign was designed for. Here we present a completely re-written and updated version to meet current and future challenges. Kalign now uses a SIMD accelerated version of the bit-parallel Gene Myers algotithm to estimate pariwise distances and adopts a sequence embedding strategy to rapidly construct guide trees for millions of sequences.\\
+    \textbf{Results:} Text  Text Text Text Text Text Text Text Text Text  Text Text Text Text Text
+    ext Text Text Text Text Text Text Text Text Text Text Text Text  Text Text Text Text Text Text\\
+    \textbf{Availability:} The source code of kalign and code to reproduce the results are found here: https://github.com/timolassmann/kalign\\
+    \textbf{Contact:} \href{timolassmann@icloud.com}{timolassmann@icloud.com}\\
+    \textbf{Supplementary information:} Supplementary data are available at \textit{Bioinformatics}
+    online.}
 #+END_SRC
 #+TOC: headlines 2
 #+Latex: \subtitle{Sequence Analysis}
@@ -29,7 +28,7 @@ online.}
 
 #+Latex: \author[Sample \textit{et~al}.]{Timo Lassmann$^{\text{\sfb 1,}*}$}
 
-#+Latex: \address{$^{\text{\sf 1}}$Department, Institution, City, Post Code, Country and $^{\text{\sf2}}$Department, Institution, City, Post Code,Country.}
+#+Latex: \address{$^{\text{\sf 1}}$Telethon Kids Institute, University of Western Australia, Nedlands, WA, Australia.}
 
 #+Latex: \corresp{$^\ast$To whom correspondence should be addressed.}
 
@@ -42,89 +41,63 @@ online.}
 #+Latex: \maketitle
 
 #+BEGIN_SRC emacs-lisp :exports none :results none 
-(setq org-ref-default-citation-link "citep")
+  (setq org-ref-default-citation-link "citep")
 #+END_SRC
 
 
 * Introduction
-Multiple sequence alignment (MSA) remains an important task in biological sequence analysis. Since the publication of the original kalign algorithm in 2006 citep:lassmann2005kalign a multitude of MSA algorithm have been developed including at four directly based on kalign citep:yang2009improving,shu2011kalignp,deorowicz2014kalign,deorowicz2016famsa. Despite having aged well kalign was not designed to align tens of thousands of sequences. In particular, kalign uses the unweighted pair group method with arithmetic mean (UPGMA) algorithm to construct a guide tree giving it quadratic time complexity. Other more recent alignment programs have overcome this hurdle by implementing heuristics into the guide tree construction citep:katoh2006parttree,blackshields2010sequence. 
+  Multiple sequence alignment (MSA) remains an important task in biological sequence analysis. Since the publication of the original kalign algorithm in 2006 citep:lassmann2005kalign a multitude of MSA algorithm have been developed including at four directly based on kalign citep:yang2009improving,shu2011kalignp,deorowicz2014kalign,deorowicz2016famsa. Despite having aged well kalign was not designed to handle the tens of thousands of sequences frequently encountered today. In particular, kalign uses the unweighted pair group method with arithmetic mean (UPGMA) algorithm to construct a guide tree giving it quadratic time complexity. Other more recent alignment programs have overcome this hurdle by implementing heuristics into the guide tree construction citep:katoh2006parttree,blackshields2010sequence. 
 
-Here we present a new version of kalign, updating the pairwise distance estimation, guide tree construction as well as updating the code. 
+  Here we present a new version of kalign, with a new algorithm to calculate pairwise distances, an updated guide tree construction algorithm and a number of important code fixed and improvements. 
 
 * Methods 
-Kalign is a progressive alignment method. First, pairwise sequences distances are calculated, based on those a guide tree is constructed and sequences are aligned following the order of the tree. In this version of kalign we kept the alignment code but completely re-wrote the first two stages as discussed below: 
+  Kalign is a progressive alignment method. First, pairwise sequences distances are calculated, based on those a guide tree is constructed and sequences are aligned following the order of the tree. In this version of kalign I kept the alignment code virtually unchanged but completely re-wrote the first two stages as discussed below: 
 
 ** Pairwise Distance estimation 
-We replaced the fast string matching algorithm used in kalign2 citep:muth1996approximate with a new implementation of Gene Myers approximate string matching algorithm citep:myers1999fast. The algorithm calculates the exact edit distance between two strings using bit-parallel instructions. In the standard implementation the maximum length of a query is equivalent to the size of a computer word (64 characters on 64 bit architectures). However the algorithm lends itself to further parallelization using SIMD (single instruction, multiple data) instructions including the AVX and AVX2 instructions available on the vast majority of modern computers. Using these instructions is becomes possible of comparing sequences of length 256 extremely quickly. The implementation of the Gene Myers algorithm is very straight forward using AVX instructions although some operations including 256 wide bit-shifts have to be implemented using multiple instructions. A stand alone documented implementation of the algorithm is distributed together with kalign to facilitate downstream adoption and development.
+   We replaced the fast string matching algorithm used in kalign2 citep:muth1996approximate with a new implementation of Gene Myers approximate string matching algorithm citep:myers1999fast. The algorithm calculates the exact edit distance between two strings using bit-parallel instructions. In the standard implementation the maximum length of a query is equivalent to the size of a computer word (64 characters on 64 bit architectures). However the algorithm lends itself to further parallelization using SIMD (single instruction, multiple data) instructions including the AVX and AVX2 instructions available on the vast majority of modern computers. Using these instructions it becomes possible of comparing sequences of length 256 extremely quickly. While the implementation of the Gene Myers algorithm is fairly straight forward using AVX instructions some operations are absent from the AVX instruction set and have to be implemented using multiple instructions. A stand alone documented implementation of the algorithm is distributed together with kalign to facilitate downstream adoption and development.
 
-To estimate sequences distances in kalign the first 256 characters of the shorter sequence are scanned across the longer sequence. The number of edits required to turn one sequence into the other is the distance. For distantly related protein sequences the sequence similarity is too low for the algorithm to detect meaningful distances. Therefore, following the method by cite:steinegger2018clustering, kalign converts all sequences into a reduced alphabet by merging (L, M), (I, V), (K, R), (E, Q), (A, S, T), (N, D), and (F, Y).
+   To estimate sequences distances in kalign the first 256 characters of the shorter sequence are scanned across the longer sequence. The number of edits required to turn one sequence into the other is the distance. For distantly related protein sequences the sequence similarity is too low for the algorithm to detect meaningful distances. Therefore, following the method by cite:steinegger2018clustering, kalign converts all sequences into a reduced alphabet by merging (L, M), (I, V), (K, R), (E, Q), (A, S, T), (N, D), and (F, Y). 
+
+   #+BEGIN_SRC latex
+     \begin{figure}[!tpb]%figure1
+       \centerline{\includegraphics[scale = 0.5]{../../scripts/Paper_figure.jpeg}}
+       \caption{Benchmark results. a) Sum of pairs scores (SP) of all tested alignment programs on Balibase protein alignment data sets. b) SP scores of RNA bralibase alignments. c) Computational performance assessed on the BaliFam data set.}\label{fig:01}
+     \end{figure}
+   #+END_SRC
+
 
 ** Guide Tree construction 
 
-Kalign 3 adopts the guide tree construction methods used in clustal omega  citep:sievers2011fast. A number of seed sequences are selected and all sequences are compared against those forming for each sequence a vector of distances to all seeds. The bi-secting kmeans algorithm is used to cluster sequences based on the euclidean distance between these vectors until clusters containing fewer than 100 sequences are found. Here kalign again uses AVX/ AVX2 instructions to accelerate the distance calculation. Finally, the UPGMA method is used to cluster the remaining sequences.
+   Kalign 3 adopts the guide tree construction methods used in clustal omega  citep:sievers2011fast. A number of seed sequences are selected and all sequences are compared against those forming for each sequence a vector of distances to all seeds. The bi-secting kmeans algorithm is used to cluster sequences based on the euclidean distance between these vectors until clusters containing fewer than 100 sequences are found. Here kalign again uses AVX/ AVX2 instructions to accelerate the distance calculation. Finally, the UPGMA method is used to cluster the remaining sequences.
 
-Since the bi-section kmeans algorithm is not guaranteed to discover the optional split of sequence we run the algorithm ten times using randomly selected sequences to seed the calculation. 
-
-** Additional improvements and optimizations 
-
-I/o 
-
-Alignment 21 characters loops. 
+   Since the bi-section kmeans algorithm is not guaranteed to discover the optional split of sequence kalign runs the algorithm ten times using randomly selected sequences to seed the calculation. 
 
 * Results 
 
-#+BEGIN_SRC latex
-\begin{figure}[!tpb]%figure1
+  We compared the performance of kalign against two other popular progressive alignment methods muscle citep:edgar2004muscle and clustal omega citep:sievers2011fast. We used the Balibase citep:thompson1999balibase, Bralibase citep:gardner2005benchmark and BaliFam benchmark data sets. Kalign's performance on all 6 balibase categories is statistically indistinguishable from the other two programs (Student t-test). Kalign is the top performer in 4 out of the 6 Bralibase data sets ( <= 0.05 corrected p-value). Given the relatively low number of test alignments in either dataset we conclude that kalign is as accurate as the other two programs. When examining the running time of the BaliFam dataset.... 
 
-\centerline{\includegraphics[scale = 0.5]{../../scripts/Figure1.jpeg}}
-\caption{
-Balibase benchmark results. The sums of pairs scores of all tested alignment programs across all 6 alignment categores (RVXX) are not significantly different.}\label{fig:01}
-\end{figure}
-
-
-#+END_SRC
-
-
-
-#+BEGIN_SRC latex
-\begin{figure}[!tpb]%figure1
-
-\centerline{\includegraphics[scale = 0.5]{../../scripts/Figure2.jpeg}}
-\caption{
-Bralibase benchmark results. The sums of pairs scores of all tested alignment programs across all 6 alignment categores are not significantly different.}\label{fig:01}
-\end{figure}
-
-
-#+END_SRC
-
+  Blah 
+ 
 * Discussion
-
-
-
-
-
-
-
-
 
 
 * Conclusion
 * Acknowledgements
-:PROPERTIES:
-:UNNUMBERED: t
-:END:
-I would like to thank Max Burroughs for providing feedback on kalign and Fabian Sievers for comments on how to runclustal omega as well as on kalign.
+  :PROPERTIES:
+  :UNNUMBERED: t
+  :END:
+  I would like to thank Max Burroughs for providing feedback on kalign and Fabian Sievers for comments on how to runclustal omega as well as on kalign.
 
 * Funding
-:PROPERTIES:
-:UNNUMBERED: t
-:END:
+  :PROPERTIES:
+  :UNNUMBERED: t
+  :END:
 
-This work was supported by a Blue Sky Grant from BHP. T.L. is supported by a fellowship from the Feilman Foundation.
+  This work was supported by a Blue Sky Grant from BHP. T.L. is supported by a fellowship from the Feilman Foundation.
 
 
-#+BEGIN_SRC latex
-\bibliographystyle{plainnat}
-\bibliography{kalign3}
-#+END_SRC
+  #+BEGIN_SRC latex
+    \bibliographystyle{plainnat}
+    \bibliography{kalign3}
+  #+END_SRC
 

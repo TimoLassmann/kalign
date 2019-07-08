@@ -81,7 +81,7 @@ int bpm_test(void)
         //fprintf(stdout,"LEN: %d\n", len);
 
 
-        LOG_MSG("Testing correctness of serial bpm.");
+        //LOG_MSG("Testing correctness of serial bpm.");
 //        len = 63;
         calc_errors = 0;
         total_calc = 0;
@@ -129,8 +129,8 @@ int bpm_test(void)
                 }
 
         }
-        fprintf(stdout,"%d errors out of %d\n", calc_errors , total_calc);
-        LOG_MSG("Testing correctness of AVX bpm.");
+        //fprintf(stdout,"%d errors out of %d\n", calc_errors , total_calc);
+        //LOG_MSG("Testing correctness of AVX bpm.");
         len = strlen(seq);
         if(len > 255){
                 len = 255;
@@ -181,7 +181,7 @@ int bpm_test(void)
                 }
 
         }
-        fprintf(stdout,"%d errors out of %d\n", calc_errors , total_calc);
+        //fprintf(stdout,"%d errors out of %d\n", calc_errors , total_calc);
 
 
         len = strlen(seq);
@@ -195,8 +195,9 @@ int bpm_test(void)
         double dyn_timing;
         double bpm_timing;
         int timing_iter = 10000;
+        fprintf(stdout,"Dyn\tAVX\tDYN/AVX\n");
         DECLARE_TIMER(t);
-        for(i = 0; i < 100;i+=5){
+        for(i = 0; i < 100;i+=10){
                 RUN(mutate_seq(b,len,i,alphabet->L,rng));
                 START_TIMER(t);
                 for(j = 0; j < timing_iter;j++){
@@ -220,7 +221,7 @@ int bpm_test(void)
 //      fprintf(stdout,"%f\tbpm\n", GET_TIMING(t));
 //fprintf(stdout,"\t%ld\n",res);
                 ASSERT(dyn_score == bpm_score, "Scores differ: %d %d.",dyn_score, bpm_score);
-                fprintf(stdout,"timing:\t%f\t%f\t%f\n",dyn_timing,bpm_timing,  dyn_timing / bpm_timing);
+                fprintf(stdout,"%f\t%f\t%f\n",dyn_timing,bpm_timing,  dyn_timing / bpm_timing);
                 //fprintf(stdout,"%d: %d %d\n",i, dyn_score, bpm_score);
 
                 /*for(j = 0; j < len;j++){

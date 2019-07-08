@@ -273,7 +273,6 @@
     #+RESULTS:
     [[file:BalibaseSP_scores.jpeg]]
 
-
 * Benchmarking 
 
   Programs to test: 
@@ -652,10 +651,10 @@
        ggsave("Balibase_scores.jpeg", p,width = 16,  height = 12,  dpi = 300, units = c( "cm"))
        p1 <- ggplot(mat, aes(Group, SP))
        p1 <- p1 + geom_boxplot(aes(colour = Type))
- p1 <- p1 + scale_color_discrete(name = "Program")      
-p1 <- p1 + theme(legend.position = c(0.25, 0.15),legend.text=element_text(size=16),  legend.direction = "horizontal")
-p1 <- p1 + xlab(label="")
- p1 <- p1 + theme(plot.margin = margin(t = 0, b = -0.4, unit  = "cm"))# unit(c(1,2,3,4), "cm")) # t = 0, r = 0, b = 0, l = 0 ("left", "right", "bottom", "top")
+       p1 <- p1 + scale_color_discrete(name = "Program")      
+       p1 <- p1 + theme(legend.position = c(0.25, 0.15),legend.text=element_text(size=16),  legend.direction = "horizontal")
+       p1 <- p1 + xlab(label="")
+       p1 <- p1 + theme(plot.margin = margin(t = 0, b = -0.4, unit  = "cm"))# unit(c(1,2,3,4), "cm")) # t = 0, r = 0, b = 0, l = 0 ("left", "right", "bottom", "top")
        ggsave("Figure1.jpeg",p1,width = 16,  height = 12,  dpi = 300, units = c( "cm"))
      #+END_SRC
 
@@ -924,6 +923,7 @@ p1 <- p1 + xlab(label="")
 **** plot scores
 
      #+BEGIN_SRC R :session one :results output graphics :file homfam_runtime.jpeg :exports both :noweb yes
+       <<Rlibraries>> 
        mat  <- read.csv("scores_homfam.csv");
        p <- ggplot(mat, aes(NUMSEQ,Time))
        p <- p + geom_point(aes(colour = Program,size = AVGLEN))
@@ -935,6 +935,7 @@ p1 <- p1 + xlab(label="")
 
      #+RESULTS:
      [[file:homfam_runtime.jpeg]]
+     q[[file:homfam_runtime.jpeg]]
 
 
 
@@ -951,3 +952,193 @@ p1 <- p1 + xlab(label="")
      #+RESULTS:
      [[file:homfam_scores.jpeg]]
 
+*** Rose
+    :PROPERTIES:
+    :ORDERED:  t
+    :END:
+
+
+    #+BEGIN_SRC bash -n :tangle create_rose_tests.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
+
+
+      DIR=`pwd`
+      function usage()
+      {
+          printf "This script will merge *_ref.vie and *_test-only.vie alignments and convert them into msf format.\n\n" ;
+          printf "usage: $0\n\n" ;
+          exit 1;
+      }
+
+      while getopts h  opt
+      do
+          case ${opt} in
+              h) usage;;
+              ,*) usage;;
+          esac
+      done
+
+
+      numseq=(100 1000 10000 100000 1000000 10000000)
+      for item in ${numseq[*]}
+      do
+          printf "# kalignbenchmark sample 1\n" > rose.in;
+          printf "\n" >> rose.in;
+          printf "%%include protein-defaults\n"  >> rose.in;
+          printf "\n"  >> rose.in;
+          printf "StdOut= False\n" >> rose.in
+          printf "OutputFilebase = \"rosetest%d\"\n" $item  >> rose.in;
+          printf "AlignmentFormat= \"FASTA\"\n" >> rose.in;
+          printf "SequenceLen = 500\n" >> rose.in;
+          printf "SequenceNum = %d\n" $item >> rose.in;
+          printf "ChooseFromLeaves = False\n" >> rose.in;
+          printf "TreeWithSequences = True\n" >> rose.in;
+          rose rose.in
+
+
+      done
+
+
+
+
+    #+END_SRC
+
+
+
+    # rose sample 1
+
+    %include protein-defaults
+
+    OutputFilename = "TIMO"
+    OutputFilebase = "timotest"
+    AlignmentFormat= "FASTA"
+    SequenceLen = 500
+    SequenceNum = 1000
+    ChooseFromLeaves = False
+    TreeWithSequences = True
+* Paper figure 
+
+
+  #+BEGIN_SRC R :session  one :results none :export none :noweb yes 
+    <<Rlibraries>> 
+    readBaliscores <-function(file,name){
+      mat  <- read.table(file);
+      colnames(mat) <- c("Type","Name","SP","TC")
+      mat$Type <- name
+      mat$Name <- sub(".*/" ,"", mat$Name)
+      mat$Name <- sub("[A-Z,_]*[.]{1}[A-Z]*$" ,"", mat$Name,ignore.case = TRUE)
+      mat <- as.tibble(mat)
+      x = str_split(mat$Name, "_", n = Inf, simplify = TRUE)
+      mat$Group <- x[,1] 
+      return(mat)
+
+    }
+
+
+  #+END_SRC
+
+
+  #+BEGIN_SRC R :session one :results output graphics :file Paper_figure.jpeg :exports both :noweb yes 
+
+    library(ggplot2)
+    library(ggsignif)
+    my_comparisons = list( c("clustalo", "kalign"), c("kalign", "muscle"), c("clustalo", "muscle") )
+
+    mat <- readBaliscores("scores_kalign.csv","kalign");
+    mat <- rbind(mat,readBaliscores("scores_muscle.csv","muscle"));
+    mat <- rbind(mat,readBaliscores("scores_clustalo.csv","clustalo"));
+    p1 <- ggplot(mat, aes(Group, SP))
+    p1 <- p1 + geom_boxplot(aes(colour = Type))
+    p1 <- p1 + scale_color_discrete(name = "Program")      
+    p1 <- p1 + theme(legend.position = c(0.25, 0.15),legend.text=element_text(size=16),  legend.direction = "horizontal")
+    p1 <- p1 + xlab(label="")
+    ##  p1 <- p1 +  geom_signif(comparisons = my_comparisons ,map_signif_level=TRUE)
+    mat <- readBaliscores("scores_kalign_bralibase.csv","kalign");
+    mat <- rbind(mat,readBaliscores("scores_muscle_bralibase.csv","muscle"));
+    mat <- rbind(mat,readBaliscores("scores_clustalo_bralibase.csv","clustalo"));
+    ##      mat <- rbind(mat,readBaliscores("scores_kalign_3.csv","kalign 3"));
+
+    ## mata
+    ## <- rbind(mat,readBaliscores("scores_kalign_bibpm.csv","bibpm"));
+    ## mat 
+    ## <- rbind(mat,readBaliscores("scores_kalign_bibpm_zero.csv","bibpm_zero"));
+
+
+    p2 <- ggplot(mat, aes(Group, SP))
+    p2 <- p2 + geom_boxplot(aes(colour = Type))
+    p2 <- p2 + scale_color_discrete(name = "Program")      
+    p2 <- p2 + theme(legend.position = c(0.25, 0.15),legend.text=element_text(size=16),  legend.direction = "horizontal")
+    p2 <- p2 + xlab(label="")
+                                            #      p2 <- p2 + theme(plot.margin = margin(t = 0, b = -0.2, unit  = "cm"))# unit(c(1,2,3,4), "cm")) # t = 0, r 
+
+    mat  <- read.csv("scores_homfam.csv");
+    p3 <- ggplot(mat, aes(NUMSEQ,Time))
+    p3 <- p3 + geom_point(aes(colour = Program,size = AVGLEN))
+    p3 <- p3 + scale_x_continuous(trans = 'log10', breaks=c(100,3000,10000,100000) ,labels = scales::comma)
+    p3 <- p3 + scale_y_continuous(trans = 'log10',breaks=c(0.01, 0.1, 1 , 10,100,1000,10000),labels=scales::comma )
+
+    p3 <- p3 + xlab("Number of sequences") 
+    p3 <- p3 + ylab("Time (s)") 
+    p = plot_grid(p1, p2, p3, labels = c('A','B','C'), ncol = 1, nrow = 3, rel_heights = c(0.7,0.7,1.0))
+    ggsave("Paper_figure.jpeg",p,width = 18,  height = 24,  dpi = 300, units = c( "cm")) 
+  #+END_SRC
+
+  #+RESULTS:
+  [[file:Paper_figure.jpeg]]
+  q[[file:Paper_figure.jpeg]]
+
+
+
+  Test for statistical significant differences: 
+
+  #+BEGIN_SRC R :session one 
+    assess_diff_alignment_scores <-function(mat, groupname,tests){
+      f <- filter(mat, Group == groupname)  %>% select(-TC,-Group)  %>% spread(Type, SP) %>% column_to_rownames("Name") 
+
+      t = t.test(f$clustalo,f$kalign, paired = TRUE, alternative = "two.sided")
+      if(t$p.value * tests <= 0.05){
+        message("sig diff: clustalo, kalign ", groupname," ", t$p.value);
+        message("Clustalo ", mean(f$clustalo));
+        message("Kalign ", mean(f$kalign));
+        message("Muscle ", mean(f$muscle));
+      }
+
+      t = t.test(f$clustalo,f$muscle, paired = TRUE, alternative = "two.sided")
+      if(t$p.value * tests  <= 0.05){
+        message("sig diff: clustalo, muscle ", groupname," ", t$p.value);
+        message("Clustalo ", mean(f$clustalo));
+        message("Kalign ", mean(f$kalign));
+        message("Muscle ", mean(f$muscle));
+      }
+
+      t =t.test(f$kalign,f$muscle, paired = TRUE, alternative = "two.sided")
+      if(t$p.value *tests <= 0.05){
+        message("sig diff: kalign, muscle ", groupname, " ",t$p.value);
+        message("Clustalo ", mean(f$clustalo));
+        message("Kalign ", mean(f$kalign));
+        message("Muscle ", mean(f$muscle));
+      }
+    }
+
+    mat <- readBaliscores("scores_kalign.csv","kalign");
+    mat <- rbind(mat,readBaliscores("scores_muscle.csv","muscle"));
+    mat <- rbind(mat,readBaliscores("scores_clustalo.csv","clustalo"));
+
+    g <- unique(mat$Group) 
+    tests = length(g) * length(unique(mat$Type))
+    for (i in g){
+      assess_diff_alignment_scores(mat,i,tests);
+    }
+
+    mat <- readBaliscores("scores_kalign_bralibase.csv","kalign");
+    mat <- rbind(mat,readBaliscores("scores_muscle_bralibase.csv","muscle"));
+    mat <- rbind(mat,readBaliscores("scores_clustalo_bralibase.csv","clustalo"));
+
+    g <- unique(mat$Group) 
+    tests = length(g) * length(unique(mat$Type))
+    for (i in g){
+      assess_diff_alignment_scores(mat,i,tests);
+    }
+
+  #+END_SRC
+
+  #+RESULTS:
