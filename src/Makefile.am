@@ -71,9 +71,16 @@ bpm.h \
 bpm.c
 
 
-check_PROGRAMS =  phmm get_param edist alphabet heap_test misc_test bpm_test
-TESTS =  phmm get_param edist alphabet heap_test misc_test bpm_test
+check_PROGRAMS =  phmm get_param edist alphabet heap_test misc_test bpm_test rwaln
+#TESTS =  phmm get_param edist alphabet heap_test misc_test bpm_test
 TESTS_ENVIRONMENT = $(VALGRIND)
+
+rwaln_SOURCES = \
+rwalign.c \
+alphabet.h \
+alphabet.c \
+msa.h
+rwaln_CPPFLAGS = $(AM_CPPFLAGS) -DRWALIGN_TEST
 
 timescorealn_SOURCES = \
 time_and_score_aln.c \
@@ -82,7 +89,7 @@ parameters.h \
 parameters.c \
 alphabet.h \
 alphabet.c \
-palign_io.h \
+align_io.h \
 rwalign.c \
 misc.h \
 misc.c

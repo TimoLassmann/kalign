@@ -3,7 +3,6 @@
 #include "alphabet.h"
 
 
-
 /* only local; */
 struct line_buffer{
         struct out_line** lines;
@@ -67,7 +66,7 @@ int main(int argc, char *argv[])
         LOG_MSG("Start io tests.");
 
 
-        RUNP(msa = read_input(argv[1]));
+        RUNP(msa = read_input(argv[1],NULL));
 //print_msa(msa);
         write_msa_clustal(msa,"rwtest.clu");
 
@@ -390,9 +389,15 @@ int set_sip_nsip(struct msa* msa)
                                 MFREE(msa->sip[i]);
                         }
                 }
-                MFREE(msa->plen);
-                MFREE(msa->sip);
-                MFREE(msa->nsip);
+                if(msa->plen){
+                        MFREE(msa->plen);
+                }
+                if(msa->sip){
+                        MFREE(msa->sip);
+                }
+                if(msa->nsip){
+                        MFREE(msa->nsip);
+                }
                 msa->plen = NULL;
                 msa->sip = NULL;
                 msa->nsip = NULL;
@@ -577,7 +582,10 @@ int write_msa_msf(struct msa* msa,char* outfile)
         */
         header_index = -1 * (msa->numseq+10);
         ol = lb->lines[lb->num_line];
+        LOG_MSG("Alphabet : %d", msa->L);
         if(msa->L == defPROTEIN){
+                snprintf(ol->line, line_length,"!!AA_MULTIPLE_ALIGNMENT 1.0");
+        }else if(msa->L == redPROTEIN){
                 snprintf(ol->line, line_length,"!!AA_MULTIPLE_ALIGNMENT 1.0");
         }else if(msa->L == defDNA){
                 snprintf(ol->line, line_length,"!!NA_MULTIPLE_ALIGNMENT 1.0");
@@ -917,12 +925,12 @@ struct msa* read_clu(char* infile, struct msa* msa)
         }
 
         RUNP(f_ptr = fopen(infile, "r"));
-
+        LOG_MSG("GAGA");
         /* scan through first line header  */
         while(fgets(line, BUFFER_LEN, f_ptr)){
+                fprintf(stdout,"LINE: %s", line);
                 line_len = strnlen(line, BUFFER_LEN);
                 line[line_len-1] = 0;
-
                 line_len--;
                 break;
         }
@@ -941,7 +949,7 @@ struct msa* read_clu(char* infile, struct msa* msa)
                                 seq_ptr = msa->sequences[active_seq];
                                 //p = strstr(line,seq_ptr->name);
                                 //if(p){
-                                LOG_MSG("Found bitsof seq %s", seq_ptr->name);
+                                //LOG_MSG("Found bitsof seq %s", seq_ptr->name);
                                 p = line;
                                 j = 0;
                                 for(i = 0;i < line_len;i++){
