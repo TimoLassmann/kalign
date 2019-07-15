@@ -6,7 +6,7 @@ EXTRA_DIST = run_io_test.sh
 TESTS_ENVIRONMENT = \
       myprog_abspath='$(top_srcdir)'/src/; \
          export myprog_abspath;\
-	      testdatafiledir='$(top_srcdir)'/dev/; \
+	      testdatafiledir='$(top_srcdir)'/dev/data/; \
          export testdatafiledir;
 	$(VALGRIND)
 

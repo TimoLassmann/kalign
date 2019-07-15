@@ -62,11 +62,16 @@ int print_msa(struct msa* msa);
 int main(int argc, char *argv[])
 {
         struct msa* msa = NULL;
-
+        char buffer[BUFFER_LEN];
         LOG_MSG("Start io tests.");
 
+        char* datadir;
 
-        RUNP(msa = read_input(argv[1],NULL));
+        datadir = getenv("testdatafiledir");
+
+        snprintf(buffer,BUFFER_LEN, "%s/%s", datadir, argv[1]);
+        LOG_MSG("reading: %s", buffer);
+        RUNP(msa = read_input(buffer,NULL));
 //print_msa(msa);
         write_msa_clustal(msa,"rwtest.clu");
 

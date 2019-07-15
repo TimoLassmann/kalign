@@ -9,9 +9,7 @@ for i in "${testfiles[@]}"
 do
 	  echo $i
 
-    
-
-    error=$( ../src/rwaln data/$i   2>&1 )
+    error=$( ../src/rwaln $i   2>&1 )
     status=$?
     if [[ $status -eq 0 ]]; then
 	      printf "%10s%10s%10s\n"  read/write $i SUCCESS;
