@@ -1094,29 +1094,23 @@
     assess_diff_alignment_scores <-function(mat, groupname,tests){
       f <- filter(mat, Group == groupname)  %>% select(-TC,-Group)  %>% spread(Type, SP) %>% column_to_rownames("Name") 
 
-      t = t.test(f$clustalo,f$kalign, paired = TRUE, alternative = "two.sided")
+      t = t.test(f$kalign,f$clustalo, paired = TRUE, alternative = "greater")
       if(t$p.value * tests <= 0.05){
-        message("sig diff: clustalo, kalign ", groupname," ", t$p.value);
+        message("sig diff:  kalign, clustalo ", groupname," ", t$p.value);
         message("Clustalo ", mean(f$clustalo));
         message("Kalign ", mean(f$kalign));
         message("Muscle ", mean(f$muscle));
       }
 
-      t = t.test(f$clustalo,f$muscle, paired = TRUE, alternative = "two.sided")
+      t = t.test(f$kalign,f$muscle, paired = TRUE, alternative = "greater")
       if(t$p.value * tests  <= 0.05){
-        message("sig diff: clustalo, muscle ", groupname," ", t$p.value);
+        message("sig diff: kalign, muscle ", groupname," ", t$p.value);
         message("Clustalo ", mean(f$clustalo));
         message("Kalign ", mean(f$kalign));
         message("Muscle ", mean(f$muscle));
       }
 
-      t =t.test(f$kalign,f$muscle, paired = TRUE, alternative = "two.sided")
-      if(t$p.value *tests <= 0.05){
-        message("sig diff: kalign, muscle ", groupname, " ",t$p.value);
-        message("Clustalo ", mean(f$clustalo));
-        message("Kalign ", mean(f$kalign));
-        message("Muscle ", mean(f$muscle));
-      }
+      
     }
 
     mat <- readBaliscores("scores_kalign.csv","kalign");
