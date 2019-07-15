@@ -38,72 +38,8 @@ AM_CPPFLAGS=${MYINCDIRS} ${HDF5_CPPFLAGS}
 
 #LOGO_SOURCES = motif_logo.c motif_logo.h
 
-bin_PROGRAMS =  kalign phmm get_param edist alphabet heap_test misc_test bpm_test  timescorealn
+bin_PROGRAMS =  kalign timescorealn 
 
-timescorealn_SOURCES = \
-time_and_score_aln.c \
-msa.h \
-parameters.h \
-parameters.c \
-alphabet.h \
-alphabet.c \
-palign_io.h \
-rwalign.c \
-misc.h \
-misc.c
-
-
-bpm_test_SOURCES = \
-bpm.h \
-bpm.c \
-alphabet.h \
-alphabet.c
-bpm_test_CPPFLAGS = $(AM_CPPFLAGS) -DBPM_UTEST
-
-misc_test_SOURCES = \
-misc.h \
-misc.c \
-alphabet.h \
-alphabet.c
-
-misc_test_CPPFLAGS = $(AM_CPPFLAGS) -DITEST_MISC
-
-heap_test_SOURCES = \
-heap.h \
-heap.c
-heap_test_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
-
-alphabet_SOURCES = \
-alphabet.h \
-alphabet.c
-alphabet_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
-
-edist_SOURCES = \
-euclidean_dist.h \
-euclidean_dist.c 
-
-edist_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
-
-
-get_param_SOURCES = run_get_param.c \
-msa.h \
-rwalign.c \
-parameters.h \
-parameters.c \
-global.h \
-misc.h \
-misc.c \
-alphabet.h \
-alphabet.c \
-euclidean_dist.h \
-euclidean_dist.c \
-kmeans.h \
-kmeans.c
-
-
-phmm_SOURCES = phmm.h phmm.c
-phmm_LDADD = $(MYLIBDIRS)
-phmm_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
 
 kalign_SOURCES = run_kalign.c \
 global.h \
@@ -135,15 +71,69 @@ bpm.h \
 bpm.c
 
 
+check_PROGRAMS =  phmm get_param edist alphabet heap_test misc_test bpm_test
+TESTS =  phmm get_param edist alphabet heap_test misc_test bpm_test
+TESTS_ENVIRONMENT = $(VALGRIND)
 
-# TESTS =  kalign_ITEST
-# TESTS_ENVIRONMENT = \
-# 	$(VALGRIND)
+timescorealn_SOURCES = \
+time_and_score_aln.c \
+msa.h \
+parameters.h \
+parameters.c \
+alphabet.h \
+alphabet.c \
+palign_io.h \
+rwalign.c \
+misc.h \
+misc.c
 
-# check_PROGRAMS = kalign_ITEST
-# kalign_ITEST_SOURCES = $(KALIGNSOURCE)
-# kalign_ITEST_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
-# kalign_ITEST_LDADD = $(MYLIBDIRS)
+bpm_test_SOURCES = \
+bpm.h \
+bpm.c \
+alphabet.h \
+alphabet.c
+bpm_test_CPPFLAGS = $(AM_CPPFLAGS) -DBPM_UTEST
+
+misc_test_SOURCES = \
+misc.h \
+misc.c \
+alphabet.h \
+alphabet.c
+
+misc_test_CPPFLAGS = $(AM_CPPFLAGS) -DITEST_MISC
+
+heap_test_SOURCES = \
+heap.h \
+heap.c
+heap_test_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
+
+alphabet_SOURCES = \
+alphabet.h \
+alphabet.c
+alphabet_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
+
+edist_SOURCES = \
+euclidean_dist.h \
+euclidean_dist.c
+
+edist_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
 
 
+get_param_SOURCES = run_get_param.c \
+msa.h \
+rwalign.c \
+parameters.h \
+parameters.c \
+global.h \
+misc.h \
+misc.c \
+alphabet.h \
+alphabet.c \
+euclidean_dist.h \
+euclidean_dist.c \
+kmeans.h \
+kmeans.c
 
+phmm_SOURCES = phmm.h phmm.c
+phmm_LDADD = $(MYLIBDIRS)
+phmm_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
