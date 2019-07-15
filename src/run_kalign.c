@@ -21,8 +21,40 @@
 #define OPT_REFORMAT 4
 
 int run_kalign(struct parameters* param);
-int detect_dna(struct alignment* aln);
 
+
+int print_kalign_header(void);
+int print_kalign_help(int argc, char * argv[]);
+
+int print_kalign_help(int argc, char * argv[])
+{
+        const char usage[] = " -i <seq file> -o <out aln> ";
+        fprintf(stdout,"\nUsage: %s %s\n\n",basename(argv[0]) ,usage);
+        fprintf(stdout,"Options:\n\n");
+
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--format","Output format." ,"[Fasta]"  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--reformat","Reformat existing alignment." ,"[NA]"  );
+        fprintf(stdout,"\n");
+        return OK;
+}
+
+int print_kalign_header(void)
+{
+        fprintf(stdout,"Kalign (%s)", PACKAGE_VERSION);
+
+        return OK;
+}
+/*
+Clustal Omega - 1.2.4 (AndreaGiacomo)
+
+If you like Clustal-Omega please cite:
+ Sievers F, Wilm A, Dineen D, Gibson TJ, Karplus K, Li W, Lopez R, McWilliam H, Remmert M, Söding J, Thompson JD, Higgins DG.
+ Fast, scalable generation of high-quality protein multiple sequence alignments using Clustal Omega.
+ Mol Syst Biol. 2011 Oct 11;7:539. doi: 10.1038/msb.2011.75. PMID: 21988835.
+If you don't like Clustal-Omega, please let us know why (and cite us anyway).
+
+Check http://www.clustal.org for more information and updates.
+*/
 
 int main(int argc, char *argv[])
 {
@@ -50,6 +82,7 @@ int main(int argc, char *argv[])
                 };
 
                 int option_index = 0;
+
                 c = getopt_long_only (argc, argv,"i:o:f:hq",long_options, &option_index);
                 //c = getopt (argc, argv, "hi:o:");
                 /* Detect the end of the options. */
@@ -97,6 +130,13 @@ int main(int argc, char *argv[])
                 }
         }
 
+        print_kalign_header();
+        if(param->help_flag){
+                RUN(print_kalign_help(argc, argv));
+                free_parameters(param);
+                return EXIT_SUCCESS;
+
+        }
 
 
 
@@ -159,8 +199,6 @@ int main(int argc, char *argv[])
         log_command_line(argc, argv);
         RUN(run_kalign(param));
         free_parameters(param);
-
-
         return EXIT_SUCCESS;
 ERROR:
         free_parameters(param);
