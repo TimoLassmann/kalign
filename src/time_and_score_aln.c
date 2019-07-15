@@ -146,7 +146,7 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
         struct msa_seq* seq_ptr = NULL;
         struct parameters* param = NULL;
         auto int rc;
-        char path_buffer[BUFFER_LEN];
+        //char path_buffer[BUFFER_LEN];
         char cmd[BUFFER_LEN*2];
         char ret[BUFFER_LEN];
         char* path = NULL;
