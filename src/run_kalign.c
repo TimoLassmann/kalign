@@ -1,3 +1,24 @@
+/*
+    Kalign - a multiple sequence alignment program
+
+    Copyright 2006, 2019 Timo Lassmann
+
+    This file is part of kalign.
+
+    Kalign is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+*/
 
 #include "global.h"
 #include "msa.h"
@@ -40,21 +61,19 @@ int print_kalign_help(int argc, char * argv[])
 
 int print_kalign_header(void)
 {
-        fprintf(stdout,"Kalign (%s)", PACKAGE_VERSION);
+        fprintf(stdout,"\n");
+        fprintf(stdout,"Kalign (%s)\n", PACKAGE_VERSION);
+        fprintf(stdout,"\n");
+        fprintf(stdout,"Please cite:\n");
+
+
+        fprintf(stdout,"Lassmann, Timo, Oliver Frings, and Erik LL Sonnhammer. \"Kalign2: high-performance multiple alignment of protein and nucleotide sequences allowing external features.\" Nucleic acids research 37.3 (2008): 858-865.\n");
+        fprintf(stdout,"Lassmann, Timo, and Erik LL Sonnhammer. \"Kalign–an accurate and fast multiple sequence alignment algorithm.\" BMC bioinformatics 6.1 (2005): 298.\n");
 
         return OK;
 }
-/*
-Clustal Omega - 1.2.4 (AndreaGiacomo)
 
-If you like Clustal-Omega please cite:
- Sievers F, Wilm A, Dineen D, Gibson TJ, Karplus K, Li W, Lopez R, McWilliam H, Remmert M, Söding J, Thompson JD, Higgins DG.
- Fast, scalable generation of high-quality protein multiple sequence alignments using Clustal Omega.
- Mol Syst Biol. 2011 Oct 11;7:539. doi: 10.1038/msb.2011.75. PMID: 21988835.
-If you don't like Clustal-Omega, please let us know why (and cite us anyway).
 
-Check http://www.clustal.org for more information and updates.
-*/
 
 int main(int argc, char *argv[])
 {
