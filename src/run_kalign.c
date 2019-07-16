@@ -40,12 +40,14 @@
 #define OPT_ALNPARAM 2
 #define OPT_RENAME 3
 #define OPT_REFORMAT 4
+#define OPT_SHOWW 5
 
 int run_kalign(struct parameters* param);
 
 
 int print_kalign_header(void);
 int print_kalign_help(int argc, char * argv[]);
+int print_kalign_warranty(void);
 
 int print_kalign_help(int argc, char * argv[])
 {
@@ -59,16 +61,47 @@ int print_kalign_help(int argc, char * argv[])
         return OK;
 }
 
+int print_kalign_warranty(void)
+{
+        fprintf(stdout,"Here is the Disclaimer of Warranty section of the GNU General Public License (GPL):\n");
+        fprintf(stdout,"\n");
+        fprintf(stdout,"15. Disclaimer of Warranty.\n");
+        fprintf(stdout,"THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY\n");
+        fprintf(stdout,"APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT\n");
+        fprintf(stdout,"HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM \"AS IS\" WITHOUT WARRANTY\n");
+        fprintf(stdout,"OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO,\n");
+        fprintf(stdout,"THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR\n");
+        fprintf(stdout,"PURPOSE.  THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM\n");
+        fprintf(stdout,"IS WITH YOU.  SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF\n");
+        fprintf(stdout,"ALL NECESSARY SERVICING, REPAIR OR CORRECTION.\n");
+        fprintf(stdout,"\n");
+        fprintf(stdout,"A complete copy of the GPL can be found in the \"COPYING\" file.\n");
+        return OK;
+}
+
 int print_kalign_header(void)
 {
         fprintf(stdout,"\n");
         fprintf(stdout,"Kalign (%s)\n", PACKAGE_VERSION);
         fprintf(stdout,"\n");
+        fprintf(stdout,"Copyright (C) 2006,2019 Timo Lassmann\n");
+        fprintf(stdout,"\n");
+        fprintf(stdout,"This program comes with ABSOLUTELY NO WARRANTY; for details type:\n");
+        fprintf(stdout,"`kalign -showw'.\n");
+        fprintf(stdout,"This is free software, and you are welcome to redistribute it\n");
+        fprintf(stdout,"under certain conditions; consult the COPYING file for details.\n");
+        fprintf(stdout,"\n");
         fprintf(stdout,"Please cite:\n");
 
 
-        fprintf(stdout,"Lassmann, Timo, Oliver Frings, and Erik LL Sonnhammer. \"Kalign2: high-performance multiple alignment of protein and nucleotide sequences allowing external features.\" Nucleic acids research 37.3 (2008): 858-865.\n");
-        fprintf(stdout,"Lassmann, Timo, and Erik LL Sonnhammer. \"Kalign–an accurate and fast multiple sequence alignment algorithm.\" BMC bioinformatics 6.1 (2005): 298.\n");
+        fprintf(stdout,"  Lassmann, Timo, Oliver Frings, and Erik LL Sonnhammer.\n");
+        fprintf(stdout,"  \"Kalign2: high-performance multiple alignment of protein and\n");
+        fprintf(stdout,"  nucleotide sequences allowing external features.\"\n");
+        fprintf(stdout,"  Nucleic acids research 37.3 (2008): 858-865.\n");
+        fprintf(stdout,"\n");
+        fprintf(stdout,"  Lassmann, Timo, and Erik LL Sonnhammer. \"Kalign–an accurate and\n");
+        fprintf(stdout,"  fast multiple sequence alignment algorithm.\"\n  BMC bioinformatics 6.1 (2005): 298.\n");
+        fprintf(stdout,"\n");
 
         return OK;
 }
@@ -78,12 +111,14 @@ int print_kalign_header(void)
 int main(int argc, char *argv[])
 {
         int c;
+        int showw = 0;
         struct parameters* param = NULL;
 
         RUNP(param = init_param());
 
         while (1){
                 static struct option long_options[] ={
+                        {"showw", 0,0,OPT_SHOWW },
                         {"alnp", required_argument,0,OPT_ALNPARAM},
                         {"set", required_argument,0,OPT_SET},
                         {"format",  required_argument, 0, 'f'},
@@ -110,6 +145,12 @@ int main(int argc, char *argv[])
                         break;
                 }
                 switch(c) {
+                case  OPT_SHOWW:
+                        showw = 1;
+
+
+                        break;
+
                 case  OPT_ALNPARAM:
                         param->aln_param_file = optarg;
                         break;
@@ -149,7 +190,17 @@ int main(int argc, char *argv[])
                 }
         }
 
+
+
+
         print_kalign_header();
+
+        if(showw){
+                print_kalign_warranty();
+                free_parameters(param);
+                return EXIT_SUCCESS;
+
+        }
         if(param->help_flag){
                 RUN(print_kalign_help(argc, argv));
                 free_parameters(param);

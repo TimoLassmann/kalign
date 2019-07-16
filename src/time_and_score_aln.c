@@ -209,7 +209,7 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
                         ERROR_MSG("clustalo-1.2.4-Ubuntu-x86_64 is not found in your path:\n%s\n",envpaths);
                 }
 
-                rc = snprintf(cmd, BUFFER_LEN*2, "clustalo-1.2.4-Ubuntu-x86_64 --threads=8 --MAC-RAM=48000 --iterations=2 --outfmt=msf  --in %s --force --out %s/test.msf --verbose ",test,path);
+                rc = snprintf(cmd, BUFFER_LEN*2, "clustalo-1.2.4-Ubuntu-x86_64 --threads=1 --iterations=2 --outfmt=msf  --in %s --force --out %s/test.msf --verbose ",test,path);
 
         }else{
                 ERROR_MSG("Program %s not recognize\n", program);

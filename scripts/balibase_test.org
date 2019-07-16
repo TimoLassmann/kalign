@@ -295,6 +295,7 @@
   | Bralibaseset1 | http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz    |
   | Bralibaseset2 | http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz    |
   | HomFam        | http://www.clustal.org/omega/homfam-20110613-25.tar.gz            |
+  | QuanTest2     | http://bioinf.ucd.ie/quantest2.tar                                |
   
 
 ** Step one: create test directory and download all data
@@ -344,6 +345,7 @@
       for filename in *.tar.gz; do
           tar -zxvf  $filename
       done
+      tar -xvf http://bioinf.ucd.ie/quantest2.tar
     #+END_SRC
 
 *** Compile baliscore program and place in program directory 
