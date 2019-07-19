@@ -145,23 +145,18 @@ int main(int argc, char *argv[])
                         break;
                 }
                 switch(c) {
-                case  OPT_SHOWW:
+                case OPT_SHOWW:
                         showw = 1;
-
-
                         break;
-
-                case  OPT_ALNPARAM:
+                case OPT_ALNPARAM:
                         param->aln_param_file = optarg;
                         break;
-
                 case OPT_SET:
                         param->param_set = atoi(optarg);
                         break;
                 case OPT_RENAME:
                         param->rename = 1;
                         break;
-
                 case 'f':
                         param->format = optarg;
                         break;
@@ -190,9 +185,6 @@ int main(int argc, char *argv[])
                 }
         }
 
-
-
-
         print_kalign_header();
 
         if(showw){
@@ -205,10 +197,7 @@ int main(int argc, char *argv[])
                 RUN(print_kalign_help(argc, argv));
                 free_parameters(param);
                 return EXIT_SUCCESS;
-
         }
-
-
 
         if (optind < argc){
                 c = 0;
@@ -216,7 +205,6 @@ int main(int argc, char *argv[])
                 c = param->num_infiles;
                 param->num_infiles += argc-optind;
                 MREALLOC(param->infile, sizeof(char*) * param->num_infiles);
-
                 while (optind < argc){
                         param->infile[c] =  argv[optind++];
                         c++;
@@ -242,7 +230,6 @@ int main(int argc, char *argv[])
         //exit(0);
 
         if(!param->format){
-
                 param->out_format = FORMAT_FA;
         }else{
                 if(strstr(param->format,"msf")){

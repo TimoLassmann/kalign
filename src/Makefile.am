@@ -38,8 +38,11 @@ AM_CPPFLAGS=${MYINCDIRS} ${HDF5_CPPFLAGS}
 
 #LOGO_SOURCES = motif_logo.c motif_logo.h
 
-bin_PROGRAMS =  kalign timescorealn 
+bin_PROGRAMS = timescorealn
+if HAVE_AVX2
+bin_PROGRAMS += kalign
 
+endif 
 
 kalign_SOURCES = run_kalign.c \
 global.h \

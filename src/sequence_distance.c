@@ -749,7 +749,7 @@ ERROR:
 
 }
 
-float** protein_wu_distance(struct msa* msa, float zlevel, int nj, int* seeds, int num_anchors)
+float** protein_wu_distance(struct msa* msa, float zlevel, int* seeds, int num_anchors)
 {
         struct bignode* hash[1024];
         float** dm = NULL;
@@ -757,14 +757,13 @@ float** protein_wu_distance(struct msa* msa, float zlevel, int nj, int* seeds, i
         int i,j,a;
         unsigned int hv;
         int numseq;
-        int numprofiles;
         //float min;
         float cutoff;
 
         ASSERT(msa != NULL,"No alignment");
 
         numseq = msa->numseq;
-        numprofiles = msa->num_profiles;
+
 
         for (i = 0;i < 1024;i++){
                 hash[i] = 0;
@@ -822,9 +821,6 @@ float** protein_wu_distance(struct msa* msa, float zlevel, int nj, int* seeds, i
 
         }else{
                 i = numseq;
-                if (nj){
-                        i = numprofiles;
-                }
 
                 RUNP(dm = galloc(dm,i,i,0.0f));
                 //fprintf(stderr,"Distance Calculation:\n");
@@ -956,7 +952,7 @@ float protein_wu_distance_calculation(struct bignode* hash[],const uint8_t* seq,
 
 
 
-float** dna_distance(struct msa* msa, float zlevel, int nj)
+float** dna_wu_distance(struct msa* msa, float zlevel,int* seeds, int num_anchors)
 {
         struct bignode* hash[1024];
         float** dm = NULL;
@@ -964,12 +960,10 @@ float** dna_distance(struct msa* msa, float zlevel, int nj)
         int i,j,a;
         unsigned int hv;
         int numseq;
-        int numprofiles;
 
         ASSERT(msa != NULL,"No alignment");
 
         numseq = msa->numseq;
-        numprofiles = msa->num_profiles;
 
         //fprintf(stderr,"Distance Calculation:\n");
 
@@ -979,9 +973,6 @@ float** dna_distance(struct msa* msa, float zlevel, int nj)
         }
 
         i = numseq;
-        if (nj){
-                i = numprofiles;
-        }
 
         RUNP(dm = galloc(dm,i,i,0.0f));
 
@@ -1031,7 +1022,6 @@ ERROR:
 
 float dna_distance_calculation(struct bignode* hash[],const uint8_t * p,const int seqlen,int diagonals,float mode)
 {
-
         struct bignode* node_p;
         float out = 0.0;
         unsigned int* tmp = NULL;

@@ -159,8 +159,18 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap)
         START_TIMER(timer);
         RUNP(anchors = pick_anchor(msa, &num_anchors));
 
+#ifdef HAVE_AVX2
+        LOG_MSG("Running AVX code");
+        if(msa->L > 5){
+                RUNP(dm = protein_wu_distance(msa, 58.8, anchors, num_anchors));
+        }else{
+                RUNP(dm = dna_wu_distance(msa, 58.8, anchors, num_anchors));
+        }
+#else
+        LOG_MSG("Running non AVX code");
         //RUNP(dm = kmer_distance(aln,  anchors, num_anchors,10));
         RUNP(dm = bpm_distance_thin(msa, anchors, num_anchors));
+#endif
 //RUNP(dm = bpm_distance(aln,anchors,num_anchors));
         /* normalize  */
         STOP_TIMER(timer);
