@@ -1215,3 +1215,40 @@
   #+END_SRC
 
   #+RESULTS:
+* Slurm scripts 
+
+
+
+  #+BEGIN_SRC bash -n :tangle srun_kalign.sh :shebang #!/usr/bin/env bash :exports code :results none :noweb yes
+    #SBATCH -N 1 # number of nodes
+    #SBATCH -n 1 # number of cores
+    #SBATCH -t 0-10:00 # time (D-HH:MM)
+    #SBATCH -o slurm.%N.%j.out # STDOUT
+    #SBATCH -e slurm.%N.%j.err # STDERR
+    DIR=`pwd`
+    OUTPUT=
+    INPUT=
+
+
+    function usage()
+    {
+
+        printf "Slurm script to run kalign.\n\n" ;
+        printf "usage: $0 -i input -o output\n\n" ;
+        exit 1;
+    }
+
+    while getopts i:o:  opt
+    do
+        case ${opt} in
+            i) INPUT=${OPTARG};;
+            o) OUTPUT=${OPTARG};;            
+            ,*) usage;;
+        esac
+    done
+    if [ "${INPUT}" == "" ]; then usage; fi
+    if [ "${OUTPUT}" == "" ]; then usage; fi
+
+    kalign -i $INPUT -f msf -o $OUTPUT
+  #+END_SRC
+

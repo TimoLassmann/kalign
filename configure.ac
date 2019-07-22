@@ -157,7 +157,6 @@ src/Makefile dev/Makefile])
 AC_CONFIG_HEADER([src/config.h])
 AC_CONFIG_SUBDIRS([tldevel])
 
-
 AC_OUTPUT
 
 AC_MSG_NOTICE([---------------------------------------------------------])

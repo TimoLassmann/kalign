@@ -40,9 +40,9 @@ extern float** kmer_distance(struct msa* msa, int* seeds, int num_seeds, int kme
 
 extern float** kmer_bpm_distance(struct msa* msa, int kmer_len, int num_seeds);
 
-extern float** protein_wu_distance(struct msa* msa, float zlevel, int nj,int* seeds, int num_anchors);
+extern float** protein_wu_distance(struct msa* msa, float zlevel,int* seeds, int num_anchors);
 
-extern float** dna_distance(struct msa* msa, float zlevel, int nj);
+extern float** dna_wu_distance(struct msa* msa, float zlevel, int* seeds, int num_anchors);
 
 
 
