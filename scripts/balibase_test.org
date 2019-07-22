@@ -325,6 +325,12 @@
     #+END_SRC
 
     #+RESULTS:
+    wget http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz
+    wget http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz
+    wget http://www.clustal.org/omega/homfam-20110613-25.tar.gz
+    wget http://clustal.org/omega/bali3fam-26.tar.gz
+    wget http://bioinf.ucd.ie/quantest2.tar
+    wget http://www.lbgi.fr/balibase/BalibaseDownload/BAliBASE_R1-5.tar.gz
     wget http://www.clustal.org/omega/homfam-20110613-25.tar.gz
     wget http://clustal.org/omega/bali3fam-26.tar.gz
     wget http://www.lbgi.fr/balibase/BalibaseDownload/BAliBASE_R1-5.tar.gz
@@ -345,7 +351,7 @@
       for filename in *.tar.gz; do
           tar -zxvf  $filename
       done
-      tar -xvf http://bioinf.ucd.ie/quantest2.tar
+      tar -xvf quantest2.tar
     #+END_SRC
 
 *** Compile baliscore program and place in program directory 
@@ -953,6 +959,77 @@
 
      #+RESULTS:
      [[file:homfam_scores.jpeg]]
+
+*** QuantTest 2 
+
+**** script to generate run and score commands
+
+    #+BEGIN_SRC bash -n :tangle gen_run_quanttest2.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
+      <<scratchdir>>
+
+    #+END_SRC
+
+    #+BEGIN_SRC bash -n :tangle gen_run_quanttest2.sh :noweb yes :exports code :results none :noweb yes 
+
+      DIR=`pwd`
+      function usage()
+      {
+          printf "This script will generate scripts to run kalign, clustal omega and muscle on the quanttest2 MSA benchmark data set.\n\n" ;
+          printf "usage: $0\n\n" ;
+          exit 1;
+      }
+
+      while getopts h  opt
+      do
+          case ${opt} in
+              h) usage;;
+              ,*) usage;;
+          esac
+      done
+
+      printf "Generating kalign run script\n";
+      find ~/kalignbenchmark/data/QuanTest2/Test -name "*.vie" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign -i %s -o %s/%s_kalign.afa\n", $1,outdir,a[n-1] }' > run_kalign_quanttest.sh
+      chmod 755 run_kalign_quanttest.sh
+
+      printf "Generating muscle run script\n";
+      find ~/kalignbenchmark/data/QuanTest2/Test -name "*.vie" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "muscle3.8.31_i86linux32 -in %s -out  %s/%s_muscle.afa\n", $1,outdir,a[n-1] }' > run_muscle_quanttest.sh
+      chmod 755 run_muscle_quanttest.sh
+
+      printf "Generating clustalo run script\n";
+      find ~/kalignbenchmark/data/QuanTest2/Test -name "*.vie" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "clustalo-1.2.4-Ubuntu-x86_64 --threads 8 --outfmt=a2m  --in %s  --out %s/%s_clustalo.afa\n", $1,outdir,a[n-1] }' > run_clustalo_quanttest.sh
+      chmod 755 run_clustalo_quanttest.sh
+
+
+      printf "Generating kalign scoring run script\n";
+      find ~/kalignbenchmark/data/QuanTest2/Test -name "*.vie" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/kalignbenchmark/data/QuanTest2/quantest2.py test@test  %s/%s_kalign.afa ~/kalignbenchmark/data/QuanTest2/SS/%s.ss  | grep kalignbenchmark \n", outdir,a[n-1],a[n-1] }' > score_kalign_quanttest.sh
+      chmod 755  score_kalign_quanttest.sh
+
+      printf "Generating muscle scoring run script\n";
+      find ~/kalignbenchmark/data/QuanTest2/Test -name "*.vie" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/kalignbenchmark/data/QuanTest2/quantest2.py test@test  %s/%s_muscle.afa ~/kalignbenchmark/data/QuanTest2/SS/%s.ss  | grep kalignbenchmark \n", outdir,a[n-1],a[n-1] }' > score_muscle_quanttest.sh
+      chmod 755  score_muscle_quanttest.sh
+
+
+      printf "Generating clustalo scoring run script\n";
+      find ~/kalignbenchmark/data/QuanTest2/Test -name "*.vie" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/kalignbenchmark/data/QuanTest2/quantest2.py test@test  %s/%s_clustalo.afa ~/kalignbenchmark/data/QuanTest2/SS/%s.ss  | grep kalignbenchmark \n", outdir,a[n-1],a[n-1] }' > score_clustalo_quanttest.sh
+      chmod 755  score_clustalo_quanttest.sh
+
+
+    #+END_SRC
+
+**** Run jobs and score alignments 
+
+     #+BEGIN_SRC bash -n :tangle run_quanttest.sh :noweb yes :exports code :results none :noweb yes :shebang #!/usr/bin/env bash
+       <<path>>
+
+       ./run_muscle_quanttest.sh
+       ./run_kalign_quanttest.sh
+       ./run_clustalo_quanttest.sh
+
+       ./score_kalign_quanttest.sh > scores_quanttest_kalign.csv
+       ./score_muscle_quanttest.sh > scores_quanttest_muscle.csv
+       ./score_clustalo_quanttest.sh > scores_quanttest_clustalo.csv
+     #+END_SRC
+
 
 *** Rose
     :PROPERTIES:
