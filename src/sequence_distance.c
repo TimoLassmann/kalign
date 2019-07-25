@@ -461,8 +461,6 @@ float** kmer_bpm_distance(struct msa* msa, int kmer_len, int num_seeds)
 
         code = 0UL;
 
-
-
         for(i = 0; i < kmer_idx;i++){
                 if(kmer_list[i]->kmer != code){
                         code = kmer_list[i]->kmer;
@@ -972,46 +970,112 @@ float** dna_wu_distance(struct msa* msa, float zlevel,int* seeds, int num_anchor
                 hash[i] = 0;
         }
 
-        i = numseq;
+        if(num_anchors){
+                MMALLOC(dm, sizeof(float*)* numseq);
 
-        RUNP(dm = galloc(dm,i,i,0.0f));
-
-
-        //b = (numseq*(numseq-1))/2;
-        a = 1;
-
-        for (i = 0; i < numseq-1;i++){
-                //p = aln->s[i];
-                p = msa->sequences[i]->s;
-                //for (j = aln->sl[i]-5;j--;){
-                for (j = msa->sequences[i]->len-5;j--;){
-                        hv = ((p[j]&3)<<8) + ((p[j+1]&3)<<6) + ((p[j+2]&3)<<4)  + ((p[j+3]&3)<<2) + (p[j+4]&3);//ABCDE
-                        hash[hv] = big_insert_hash(hash[hv],j);
-                        hv = ((p[j]&3)<<8) + ((p[j+1]&3)<<6) + ((p[j+2]&3)<<4)  + ((p[j+3]&3)<<2) + (p[j+5]&3);//ABCDF
-                        hash[hv] = big_insert_hash(hash[hv],j);
-                        hv = ((p[j]&3)<<8) + ((p[j+1]&3)<<6) + ((p[j+2]&3)<<4)  + ((p[j+4]&3)<<2) + (p[j+5]&3);//ABCEF
-                        hash[hv] = big_insert_hash(hash[hv],j);
-                        hv = ((p[j]&3)<<8) + ((p[j+1]&3)<<6) + ((p[j+3]&3)<<4)  + ((p[j+4]&3)<<2) + (p[j+5]&3);//ABDEF
-                        hash[hv] = big_insert_hash(hash[hv],j);
-                        hv = ((p[j]&3)<<8) + ((p[j+2]&3)<<6) + ((p[j+3]&3)<<4) + ((p[j+4]&3)<<2) + (p[j+5]&3);//ACDEF
-                        hash[hv] = big_insert_hash(hash[hv],j);
-                }
-                for (j = i+1; j < numseq;j++){
-
-
-                        //min =  (aln->sl[i] > aln->sl[j]) ?aln->sl[j] :aln->sl[i];
-                        //dm[i][j] = dna_distance_calculation(hash,aln->s[j],aln->sl[j],aln->sl[j]+aln->sl[i],zlevel);
-                        dm[i][j] = dna_distance_calculation(hash,msa->sequences[j]->s, msa->sequences[j]->len, msa->sequences[j]->len + msa->sequences[i]->len,zlevel);
-                        dm[i][j] /= ( msa->sequences[i]->len >  msa->sequences[j]->len) ?  msa->sequences[j]->len  :  msa->sequences[i]->len;
-                        dm[j][i] = dm[i][j];
-                        //fprintf(stderr,"\r%8.0f percent done",(float)a /(float)b * 100);
+                a = num_anchors / 8;
+                if( num_anchors%8){
                         a++;
                 }
+                a = a << 3;
 
-                for (j = 1024;j--;){
-                        if (hash[j]){
-                                big_remove_nodes(hash[j]);
-                                hash[j] = 0;
+                for(i = 0; i < numseq;i++){
+                        dm[i] = NULL;
+                        dm[i] = _mm_malloc(sizeof(float) * a,32);
+                        for(j = 0; j < a;j++){
+                                dm[i][j] = 0.0f;
+                        }
+
+                }
+
+                for(i = 0; i < msa->numseq;i++){
+                        //p = aln->s[i];
+                        p = msa->sequences[i]->s;
+
+                        //for (j = aln->sl[i]-2;j--;){
+                        for (j = msa->sequences[i]->len-5;j--;){
+                                hv = ((p[j]&3)<<8) + ((p[j+1]&3)<<6) + ((p[j+2]&3)<<4)  + ((p[j+3]&3)<<2) + (p[j+4]&3);//ABCDE
+                                hash[hv] = big_insert_hash(hash[hv],j);
+                                hv = ((p[j]&3)<<8) + ((p[j+1]&3)<<6) + ((p[j+2]&3)<<4)  + ((p[j+3]&3)<<2) + (p[j+5]&3);//ABCDF
+                                hash[hv] = big_insert_hash(hash[hv],j);
+                                hv = ((p[j]&3)<<8) + ((p[j+1]&3)<<6) + ((p[j+2]&3)<<4)  + ((p[j+4]&3)<<2) + (p[j+5]&3);//ABCEF
+                                hash[hv] = big_insert_hash(hash[hv],j);
+                                hv = ((p[j]&3)<<8) + ((p[j+1]&3)<<6) + ((p[j+3]&3)<<4)  + ((p[j+4]&3)<<2) + (p[j+5]&3);//ABDEF
+                                hash[hv] = big_insert_hash(hash[hv],j);
+                                hv = ((p[j]&3)<<8) + ((p[j+2]&3)<<6) + ((p[j+3]&3)<<4) + ((p[j+4]&3)<<2) + (p[j+5]&3);//ACDEF
+                                hash[hv] = big_insert_hash(hash[hv],j);
+                        }
+
+
+                        for(j = 0;j < num_anchors;j++){
+
+
+                                //cutoff = param->zlevel;
+                                p = msa->sequences[seeds[j]]->s;// aln->s[seeds[j]];
+
+                                        //min =  (aln->sl[i] > aln->sl[j]) ?aln->sl[j] :aln->sl[i];
+                                //dm[i][j] = dna_distance_calculation(hash,aln->s[j],aln->sl[j],aln->sl[j]+aln->sl[i],zlevel);
+                                dm[i][j] = dna_distance_calculation(hash,p, msa->sequences[seeds[j]]->len, msa->sequences[seeds[j]]->len + msa->sequences[i]->len,zlevel);
+                                dm[i][j] /= ( msa->sequences[i]->len >  msa->sequences[seeds[j]]->len) ?  msa->sequences[seeds[j]]->len  :  msa->sequences[i]->len;
+
+                                //fprintf(stderr,"\r%8.0f percent done",(float)a /(float)b * 100);
+                                a++;
+                        }
+
+
+
+                        for (j = 1024;j--;){
+                                if (hash[j]){
+                                        big_remove_nodes(hash[j]);
+                                        hash[j] = 0;
+                                }
+                        }
+
+                }
+
+        }else{
+
+                i = numseq;
+
+                RUNP(dm = galloc(dm,i,i,0.0f));
+
+
+                //b = (numseq*(numseq-1))/2;
+                a = 1;
+
+                for (i = 0; i < numseq-1;i++){
+                        //p = aln->s[i];
+                        p = msa->sequences[i]->s;
+                        //for (j = aln->sl[i]-5;j--;){
+                        for (j = msa->sequences[i]->len-5;j--;){
+                                hv = ((p[j]&3)<<8) + ((p[j+1]&3)<<6) + ((p[j+2]&3)<<4)  + ((p[j+3]&3)<<2) + (p[j+4]&3);//ABCDE
+                                hash[hv] = big_insert_hash(hash[hv],j);
+                                hv = ((p[j]&3)<<8) + ((p[j+1]&3)<<6) + ((p[j+2]&3)<<4)  + ((p[j+3]&3)<<2) + (p[j+5]&3);//ABCDF
+                                hash[hv] = big_insert_hash(hash[hv],j);
+                                hv = ((p[j]&3)<<8) + ((p[j+1]&3)<<6) + ((p[j+2]&3)<<4)  + ((p[j+4]&3)<<2) + (p[j+5]&3);//ABCEF
+                                hash[hv] = big_insert_hash(hash[hv],j);
+                                hv = ((p[j]&3)<<8) + ((p[j+1]&3)<<6) + ((p[j+3]&3)<<4)  + ((p[j+4]&3)<<2) + (p[j+5]&3);//ABDEF
+                                hash[hv] = big_insert_hash(hash[hv],j);
+                                hv = ((p[j]&3)<<8) + ((p[j+2]&3)<<6) + ((p[j+3]&3)<<4) + ((p[j+4]&3)<<2) + (p[j+5]&3);//ACDEF
+                                hash[hv] = big_insert_hash(hash[hv],j);
+                        }
+                        for (j = i+1; j < numseq;j++){
+
+
+                                //min =  (aln->sl[i] > aln->sl[j]) ?aln->sl[j] :aln->sl[i];
+                                //dm[i][j] = dna_distance_calculation(hash,aln->s[j],aln->sl[j],aln->sl[j]+aln->sl[i],zlevel);
+                                dm[i][j] = dna_distance_calculation(hash,msa->sequences[j]->s, msa->sequences[j]->len, msa->sequences[j]->len + msa->sequences[i]->len,zlevel);
+                                dm[i][j] /= ( msa->sequences[i]->len >  msa->sequences[j]->len) ?  msa->sequences[j]->len  :  msa->sequences[i]->len;
+                                dm[j][i] = dm[i][j];
+                                //fprintf(stderr,"\r%8.0f percent done",(float)a /(float)b * 100);
+                                a++;
+                        }
+
+                        for (j = 1024;j--;){
+                                if (hash[j]){
+                                        big_remove_nodes(hash[j]);
+                                        hash[j] = 0;
+                                }
                         }
                 }
         }
