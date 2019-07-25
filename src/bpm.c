@@ -21,11 +21,13 @@
 */
 
 #include "bpm.h"
-
-#include <immintrin.h>
 #include  <stdalign.h>
 
 #include "rng.h"
+
+#ifdef HAVE_AVX2
+#include <immintrin.h>
+
 __m256i BROADCAST_MASK[16];
 
 
@@ -35,7 +37,7 @@ __m256i bitShiftRight256ymm (__m256i *data, int count);
 
 /* taken from Alexander Yee: http://www.numberworld.org/y-cruncher/internals/addition.html#ks_add */
  __m256i add256(uint32_t carry, __m256i A, __m256i B);
-
+#endif
 
 #ifdef BPM_UTEST
 
@@ -527,6 +529,8 @@ uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m)
         return k;
 }
 
+
+#ifdef HAVE_AVX2
 uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
 {
         __m256i VP,VN,D0,HN,HP,X,NOTONE;
@@ -750,6 +754,7 @@ for(i = 0; i < 8;i++){
 
 
 
+
 /* Must be called before BPM_256 is!!!  */
 void set_broadcast_mask(void)
 {
@@ -770,6 +775,7 @@ void set_broadcast_mask(void)
         BROADCAST_MASK[14] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000001, 0x8000000000000001, 0x8000000000000000);
         BROADCAST_MASK[15] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000001, 0x8000000000000001, 0x8000000000000001);
 }
+
 
 __m256i add256(uint32_t carry, __m256i A, __m256i B)
 {
@@ -824,3 +830,4 @@ __m256i bitShiftRight256ymm (__m256i *data, int count)
         carryOut   = _mm256_xor_si256 (innerCarry, rotate);                        //FIXME: not sure if this is correct!!!
         return carryOut;
 }
+#endif

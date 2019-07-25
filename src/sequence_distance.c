@@ -1,4 +1,5 @@
 /*
+
     Kalign - a multiple sequence alignment program
 
     Copyright 2006, 2019 Timo Lassmann
@@ -57,6 +58,8 @@ float dna_distance_calculation(struct bignode* hash[], const uint8_t * p,const i
 int sort_by_kmer_then_seq(const void *a, const void *b);
 int sort_by_hash(const void *a, const void *b);
 
+
+float calc_distance(uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b, int L);
 
 float** aln_distance(struct msa* msa,struct aln_param* ap)
 {
@@ -651,6 +654,7 @@ ERROR:
         return NULL;
 }
 
+#ifdef HAVE_AVX2
 float** bpm_distance_pair(struct msa* msa, int* selection, int num_sel)
 {
         float** dm = NULL;
@@ -736,17 +740,145 @@ float** bpm_distance_pair(struct msa* msa, int* selection, int num_sel)
                 }
         }
 
-
-
-
-
         //RUN(convert_alignment_to_internal(aln, defPROTEIN));
         return dm;
 ERROR:
         return NULL;
 
 }
+#endif
 
+
+float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
+{
+        float** dm = NULL;
+        uint8_t* seq_a;
+        uint8_t* seq_b;
+
+        float dist;
+
+        int len_a;
+        int len_b;
+
+        int i,j;
+
+        if(pair){
+
+                RUNP(dm = galloc(dm,num_samples,num_samples,0.0f));
+                for(i = 0; i < num_samples;i++){
+
+                        seq_a = msa->sequences[samples[i]]->s;// aln->s[samples[i]];
+                        len_a = msa->sequences[samples[i]]->len;//aln->sl[samples[i]];
+                        for(j = 0;j < num_samples;j++){
+                                //fprintf(stdout, "Working on %d %d\n", i,j);
+
+                                seq_b = msa->sequences[samples[j]]->s; //aln->s[ samples[j]];
+                                len_b = msa->sequences[samples[j]]->len;//aln->sl[selection[j]];
+                                /*dm[i][j] = MACRO_MIN(len_a, len_b) - MACRO_MIN(
+                                  bpm_256(seq_a, seq_b, len_a, len_b),
+                                  bpm_256(seq_b, seq_a, len_b, len_a)
+                                  );*/
+                                dist = calc_distance(seq_a, seq_b, len_a, len_b,msa->L);
+
+                                dm[i][j] = dist;//*dist;
+                                dm[j][i] = dm[i][j];
+                        }
+                        //fprintf(stdout,"\n");
+                }
+        }else{
+                int a;
+                int numseq = msa->numseq;
+                MMALLOC(dm, sizeof(float*)* numseq);
+                //fprintf(stdout,"MASK: %lx\n", mask);
+                a = num_samples / 8;
+                if( num_samples%8){
+                        a++;
+                }
+                a = a << 3;
+
+                for(i = 0; i < numseq;i++){
+                        dm[i] = NULL;
+                        dm[i] = _mm_malloc(sizeof(float) * a,32);
+                        for(j = 0; j < a;j++){
+                                dm[i][j] = 0.0f;
+                        }
+                }
+
+
+                for(i = 0; i < numseq;i++){
+                        seq_a = msa->sequences[i]->s;// aln->s[i];
+                        len_a = msa->sequences[i]->len;//  aln->sl[i];
+                        for(j = 0;j < num_samples;j++){
+                                seq_b = msa->sequences[samples[j]]->s;// aln->s[ seeds[j]];
+                                len_b = msa->sequences[samples[j]]->len;// aln->sl[seeds[j]];
+
+                                dist = calc_distance(seq_a, seq_b, len_a, len_b,msa->L);
+                                dm[i][j] = dist;
+                        }
+                }
+        }
+        return dm;
+ERROR:
+        return NULL;
+        }
+
+float calc_distance(uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b, int L)
+{
+#ifdef HAVE_AVX2
+        uint8_t dist;
+        if(len_a > len_b){
+                dist = bpm_256(seq_a, seq_b, len_a, len_b);
+        }else{
+                dist = bpm_256(seq_b, seq_a, len_b, len_a);
+        }
+        return (float)dist;
+#else
+        struct bignode* hash[1024];
+        int i;
+        float dist;
+        unsigned int hv;
+        for (i = 0;i < 1024;i++){
+                hash[i] = 0;
+        }
+        /* Protein sequence  */
+        if( L > defDNA){
+
+                for (i = len_a-2;i--;){
+                        hv = (seq_a[i] << 5) + seq_a[i+1];
+                        hash[hv] = big_insert_hash(hash[hv],i);
+                        hv = (seq_a[i] << 5) + seq_a[i+2];
+                        hash[hv] = big_insert_hash(hash[hv],i);
+                }
+
+                dist = protein_wu_distance_calculation(hash,seq_b,len_b,len_a+len_b,58.9);
+        }else{
+
+                for (i = len_a-5;i--;){
+                        hv = ((seq_a[i]&3)<<8) + ((seq_a[i+1]&3)<<6) + ((seq_a[i+2]&3)<<4)  + ((seq_a[i+3]&3)<<2) + (seq_a[i+4]&3);//ABCDE
+                        hash[hv] = big_insert_hash(hash[hv],i);
+                        hv = ((seq_a[i]&3)<<8) + ((seq_a[i+1]&3)<<6) + ((seq_a[i+2]&3)<<4)  + ((seq_a[i+3]&3)<<2) + (seq_a[i+5]&3);//ABCDF
+                        hash[hv] = big_insert_hash(hash[hv],i);
+                        hv = ((seq_a[i]&3)<<8) + ((seq_a[i+1]&3)<<6) + ((seq_a[i+2]&3)<<4)  + ((seq_a[i+4]&3)<<2) + (seq_a[i+5]&3);//ABCEF
+                        hash[hv] = big_insert_hash(hash[hv],i);
+                        hv = ((seq_a[i]&3)<<8) + ((seq_a[i+1]&3)<<6) + ((seq_a[i+3]&3)<<4)  + ((seq_a[i+4]&3)<<2) + (seq_a[i+5]&3);//ABDEF
+                        hash[hv] = big_insert_hash(hash[hv],i);
+                        hv = ((seq_a[i]&3)<<8) + ((seq_a[i+2]&3)<<6) + ((seq_a[i+3]&3)<<4) + ((seq_a[i+4]&3)<<2) + (seq_a[i+5]&3);//ACDEF
+                        hash[hv] = big_insert_hash(hash[hv],i);
+                }
+                dist = dna_distance_calculation(hash,seq_b,len_b,len_a+len_b, 58.9);
+        }
+
+
+        for (i = 1024;i--;){
+                if (hash[i]){
+                        big_remove_nodes(hash[i]);
+                        hash[i] = 0;
+                }
+        }
+        return dist;
+#endif
+
+}
 float** protein_wu_distance(struct msa* msa, float zlevel, int* seeds, int num_anchors)
 {
         struct bignode* hash[1024];

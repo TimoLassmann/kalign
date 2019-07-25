@@ -160,16 +160,17 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap)
         RUNP(anchors = pick_anchor(msa, &num_anchors));
 
 #ifdef HAVE_AVX2
+
         LOG_MSG("Running AVX code");
+        //RUNP(dm = kmer_distance(aln,  anchors, num_anchors,10));
+        RUNP(dm = bpm_distance_thin(msa, anchors, num_anchors));
+#else
+        LOG_MSG("Running non AVX code");
         if(msa->L > 5){
                 RUNP(dm = protein_wu_distance(msa, 58.8, anchors, num_anchors));
         }else{
                 RUNP(dm = dna_wu_distance(msa, 58.8, anchors, num_anchors));
         }
-#else
-        LOG_MSG("Running non AVX code");
-        //RUNP(dm = kmer_distance(aln,  anchors, num_anchors,10));
-        RUNP(dm = bpm_distance_thin(msa, anchors, num_anchors));
 #endif
 //RUNP(dm = bpm_distance(aln,anchors,num_anchors));
         /* normalize  */
@@ -352,8 +353,16 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
         if(num_samples < 100){
                 float** dm = NULL;
                 //dm = protein_wu_distance(aln, 58, 0, samples, num_samples);
+#ifdef HAVE_AVX2
                 dm = bpm_distance_pair(msa, samples, num_samples);
-//
+#else
+                LOG_MSG("Running non AVX code");
+                if(msa->L > 5){
+                        RUNP(dm = protein_wu_distance(msa, 58.8, samples, num_samples));
+                }else{
+                        RUNP(dm = dna_wu_distance(msa, 58.8, samples, num_samples));
+                }
+#endif
                 //unit_zero(dm,  num_samples ,num_samples);
                 //MFREE(n);
                 //RUN(unit_zero(dm, num_samples, num_samples));
@@ -514,12 +523,13 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
                                 score = 0.0f;
                                 for(i = 0; i < num_samples;i++){
                                         s = samples[i];
-
-                                        //edist_serial(dm[s], cl, num_anchors, &dl);
-                                        //edist_serial(dm[s], cr, num_anchors, &dr);
-
+#ifdef HAVE_AVX2
                                         edist_256(dm[s], cl, num_anchors, &dl);
                                         edist_256(dm[s], cr, num_anchors, &dr);
+#else
+                                        edist_serial(dm[s], cl, num_anchors, &dl);
+                                        edist_serial(dm[s], cr, num_anchors, &dr);
+#endif
                                         score += MACRO_MIN(dl,dr);
                                         //fprintf(stdout,"Dist: %f %f\n",dl,dr);
                                         if(dr < dl){

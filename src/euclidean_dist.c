@@ -149,7 +149,7 @@ int edist_serial_d(const double* a,const double* b,const int len, double* ret)
         return OK;
 }
 
-
+#ifdef HAVE_AVX2
 
 int edist_256(const float* a,const float* b, const int len, float* ret)
 {
@@ -178,7 +178,7 @@ int edist_256(const float* a,const float* b, const int len, float* ret)
 }
 
 
-#ifdef HAVE_AVX2
+
 
 float hsum256_ps_avx(__m256 v)
 {
