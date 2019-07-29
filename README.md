@@ -1,7 +1,8 @@
 # Kalign
 
-Kalign is a fast multiple alignment program for protein and nucleotide sequences.
+Kalign is a fast multiple sequence alignment program for biological sequences.
 
+![Image of example output](https://user-images.githubusercontent.com/8110320/62088549-330d8880-b255-11e9-928d-e5cc8031da97.png)
 
 # Install
 
@@ -16,10 +17,11 @@ make install
 
 # Usage
 
-``` sh
 
+``` sh
 kalign -i <input sequences> -o <output alignment file> 
 ```
+
 
 # Please cite:
 

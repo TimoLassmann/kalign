@@ -2399,7 +2399,7 @@ float* make_profile(struct aln_param* ap,const uint8_t* seq,const int len)
 
                 prof += 32;
 
-                for(j = 23;j--;){
+                for(j = 21;j--;){
                         prof[j] = subm[c][j];
                 }
                 prof[23] = -gpo;

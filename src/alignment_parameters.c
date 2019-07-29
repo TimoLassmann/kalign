@@ -74,7 +74,7 @@ void free_ap(struct aln_param* ap)
         int i;
         if(ap){
                 if(ap->subm){
-                        for (i = 32;i--;){
+                        for (i = 21;i--;){
                                 MFREE(ap->subm[i]);
                         }
                         MFREE(ap->subm);
