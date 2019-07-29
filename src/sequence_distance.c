@@ -624,6 +624,7 @@ float** bpm_distance_thin(struct msa* msa, int* seeds, int num_seeds)
         }
 
 
+
         for(i = 0; i < numseq;i++){
                 seq_a = msa->sequences[i]->s;// aln->s[i];
                 len_a = msa->sequences[i]->len;//  aln->sl[i];
@@ -749,7 +750,7 @@ ERROR:
 #endif
 
 
-float** d_esimation(struct msa* msa, int* samples, int num_samples,int pair)
+float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
 {
         float** dm = NULL;
         uint8_t* seq_a;
@@ -761,6 +762,9 @@ float** d_esimation(struct msa* msa, int* samples, int num_samples,int pair)
         int len_b;
 
         int i,j;
+#if HAVE_AVX2
+        set_broadcast_mask();
+#endif
 
         if(pair){
 

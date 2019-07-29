@@ -47,6 +47,7 @@ int run_kalign(struct parameters* param);
 int print_kalign_header(void);
 int print_kalign_help(int argc, char * argv[]);
 int print_kalign_warranty(void);
+int print_AVX_warning(void);
 
 int print_kalign_help(int argc, char * argv[])
 {
@@ -105,6 +106,15 @@ int print_kalign_header(void)
         return OK;
 }
 
+int print_AVX_warning(void)
+{
+        fprintf(stdout,"\n");
+        fprintf(stdout,"WARNING: AVX2 instruction set not found!\n");
+        fprintf(stdout,"         Kalign will not run optimally.\n");
+        fprintf(stdout,"\n");
+
+        return OK;
+}
 
 
 int main(int argc, char *argv[])
@@ -251,6 +261,10 @@ int main(int argc, char *argv[])
 
 
         log_command_line(argc, argv);
+
+#ifndef HAVE_AVX2
+        RUN(print_AVX_warning());
+#endif
         RUN(run_kalign(param));
         free_parameters(param);
         return EXIT_SUCCESS;

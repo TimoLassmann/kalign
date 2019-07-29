@@ -38,11 +38,8 @@ AM_CPPFLAGS=${MYINCDIRS} ${HDF5_CPPFLAGS}
 
 #LOGO_SOURCES = motif_logo.c motif_logo.h
 
-bin_PROGRAMS = timescorealn
-if HAVE_AVX2
-bin_PROGRAMS += kalign
+bin_PROGRAMS = timescorealn kalign
 
-endif 
 
 kalign_SOURCES = run_kalign.c \
 global.h \
@@ -75,7 +72,7 @@ bpm.c
 
 
 check_PROGRAMS =  phmm get_param edist alphabet heap_test misc_test bpm_test rwaln
-#TESTS =  phmm get_param edist alphabet heap_test misc_test bpm_test
+TESTS =  phmm get_param edist alphabet heap_test misc_test bpm_test
 TESTS_ENVIRONMENT = $(VALGRIND)
 
 rwaln_SOURCES = \

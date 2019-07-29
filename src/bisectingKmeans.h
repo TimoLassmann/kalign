@@ -27,7 +27,7 @@
 #include "msa.h"
 #include "rng.h"
 #include "alignment_parameters.h"
-
+#include "sequence_distance.h"
 
 
 

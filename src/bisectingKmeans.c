@@ -23,7 +23,7 @@
 #include <xmmintrin.h>
 
 #include "msa.h"
-#include "sequence_distance.h"
+
 #include "bisectingKmeans.h"
 
 #include "euclidean_dist.h"
@@ -355,7 +355,7 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
         if(num_samples < 100){
                 float** dm = NULL;
                 //dm = protein_wu_distance(aln, 58, 0, samples, num_samples);
-                RUNP(dm = d_estimation(msa, samples, num_samples,1));// anchors, num_anchors,1));//les,int pair)
+                RUNP(dm = d_estimation(msa, samples, num_samples,1));// anchors, num_anchors,1));
 #ifdef HAVE_AVX2
                 LOG_MSG("Running AVX code");
                 //dm = bpm_distance_pair(msa, samples, num_samples);
