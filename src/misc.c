@@ -189,7 +189,7 @@ int byg_end(char* pattern,char*text)
 
 int byg_start(char* pattern,char*text)
 {
-        LOG_MSG("searching for: %s",pattern);
+        //LOG_MSG("searching for: %s",pattern);
         int Tc;
         int i  = 0;
         int s = 0;

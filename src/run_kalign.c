@@ -130,8 +130,8 @@ int main(int argc, char *argv[])
                         {"alnp", required_argument,0,OPT_ALNPARAM},
                         {"set", required_argument,0,OPT_SET},
                         {"format",  required_argument, 0, 'f'},
-                        {"reformat",  0, 0, OPT_REFORMAT},
-                        {"rename",  0, 0, OPT_RENAME},
+                        {"reformat",  required_argument, 0, OPT_REFORMAT},
+                        {"changename",  0, 0, OPT_RENAME},
                         {"input",  required_argument, 0, 'i'},
                         {"infile",  required_argument, 0, 'i'},
                         {"in",  required_argument, 0, 'i'},
@@ -168,6 +168,7 @@ int main(int argc, char *argv[])
                         param->format = optarg;
                         break;
                 case OPT_REFORMAT:
+                        param->format = optarg;
                         param->reformat = 1;
                         break;
                 case 'h':
@@ -193,6 +194,9 @@ int main(int argc, char *argv[])
         }
 
         print_kalign_header();
+#ifndef HAVE_AVX2
+        RUN(print_AVX_warning());
+#endif
 
         if(showw){
                 print_kalign_warranty();
@@ -236,13 +240,18 @@ int main(int argc, char *argv[])
                 LOG_MSG("No infiles");
                 return EXIT_SUCCESS;
         }
+        if (param->num_infiles >= 2){
+                LOG_MSG("Too many input files:");
+                for(c = 0; c < param->num_infiles;c++){
+                        LOG_MSG("  %s",param->infile[c]);
+                }
+                LOG_MSG("Version %s only accepts one input file!\n", PACKAGE_VERSION);
+                return EXIT_SUCCESS;
+        }
 
 
         log_command_line(argc, argv);
 
-#ifndef HAVE_AVX2
-        RUN(print_AVX_warning());
-#endif
         RUN(run_kalign(param));
         free_parameters(param);
         return EXIT_SUCCESS;
@@ -305,7 +314,7 @@ int run_kalign(struct parameters* param)
         START_TIMER(t1);
         RUNP(map = hirschberg_alignment(msa, ap));
         STOP_TIMER(t1);
-        LOG_MSG("Took %f sec.", GET_TIMING(t1));
+        LOG_MSG("Done in %f sec.", GET_TIMING(t1));
 
         /* set to aligned */
         msa->aligned = 1;

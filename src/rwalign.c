@@ -599,7 +599,7 @@ int write_msa_msf(struct msa* msa,char* outfile)
         */
         header_index = -1 * (msa->numseq+10);
         ol = lb->lines[lb->num_line];
-        LOG_MSG("Alphabet : %d", msa->L);
+        //LOG_MSG("Alphabet : %d", msa->L);
         if(msa->L == defPROTEIN){
                 snprintf(ol->line, line_length,"!!AA_MULTIPLE_ALIGNMENT 1.0");
         }else if(msa->L == redPROTEIN){
