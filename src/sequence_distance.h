@@ -28,6 +28,8 @@
 
 #include "alignment_parameters.h"
 
+extern float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair);
+
 extern float** aln_distance(struct msa* msa,struct aln_param* ap);
 
 extern float** bpm_distance_thin(struct msa* msa, int* seeds, int num_seeds);

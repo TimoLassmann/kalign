@@ -159,18 +159,20 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap)
         START_TIMER(timer);
         RUNP(anchors = pick_anchor(msa, &num_anchors));
 
+        RUNP(dm = d_estimation(msa, anchors, num_anchors,0));//les,int pair)
 #ifdef HAVE_AVX2
 
         LOG_MSG("Running AVX code");
         //RUNP(dm = kmer_distance(aln,  anchors, num_anchors,10));
-        RUNP(dm = bpm_distance_thin(msa, anchors, num_anchors));
+
+        //RUNP(dm = bpm_distance_thin(msa, anchors, num_anchors));
 #else
         LOG_MSG("Running non AVX code");
-        if(msa->L > 5){
-                RUNP(dm = protein_wu_distance(msa, 58.8, anchors, num_anchors));
-        }else{
-                RUNP(dm = dna_wu_distance(msa, 58.8, anchors, num_anchors));
-        }
+        //if(msa->L > 5){
+        //RUNP(dm = protein_wu_distance(msa, 58.8, anchors, num_anchors));
+        //}else{
+        //RUNP(dm = dna_wu_distance(msa, 61.08, anchors, num_anchors));
+        //}
 #endif
 //RUNP(dm = bpm_distance(aln,anchors,num_anchors));
         /* normalize  */
@@ -353,6 +355,7 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
         if(num_samples < 100){
                 float** dm = NULL;
                 //dm = protein_wu_distance(aln, 58, 0, samples, num_samples);
+                RUNP(dm = d_estimation(msa, samples, num_samples,1));// anchors, num_anchors,1));//les,int pair)
 #ifdef HAVE_AVX2
                 dm = bpm_distance_pair(msa, samples, num_samples);
 #else

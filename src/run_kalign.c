@@ -44,7 +44,6 @@
 
 int run_kalign(struct parameters* param);
 
-
 int print_kalign_header(void);
 int print_kalign_help(int argc, char * argv[]);
 int print_kalign_warranty(void);
@@ -224,10 +223,8 @@ int main(int argc, char *argv[])
 
         //fprintf(stderr,"%s", license);
         if (param->help_flag){
-               //fprintf(stderr,"%s\n", usage);
                 exit(1);
         }
-        //exit(0);
 
         if(!param->format){
                 param->out_format = FORMAT_FA;

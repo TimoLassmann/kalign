@@ -820,7 +820,7 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
         return dm;
 ERROR:
         return NULL;
-        }
+}
 
 float calc_distance(uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b, int L)
 {
@@ -879,6 +879,7 @@ float calc_distance(uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b, int L)
 #endif
 
 }
+
 float** protein_wu_distance(struct msa* msa, float zlevel, int* seeds, int num_anchors)
 {
         struct bignode* hash[1024];
