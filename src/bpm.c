@@ -47,9 +47,11 @@ uint8_t dyn_256(const uint8_t* t,const uint8_t* p,int n,int m);
 uint8_t dyn_256_print(const uint8_t* t,const uint8_t* p,int n,int m);
 int  mutate_seq(uint8_t* s, int len,int k,int L, struct rng_state* rng);
 
+#ifdef HAVE_AVX2
 /* For debugging */
 void print_256(__m256i X);
 void print_256_all(__m256i X);
+#endif
 
 /* The actual test.  */
 int bpm_test(void);
