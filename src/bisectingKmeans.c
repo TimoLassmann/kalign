@@ -357,14 +357,11 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
                 //dm = protein_wu_distance(aln, 58, 0, samples, num_samples);
                 RUNP(dm = d_estimation(msa, samples, num_samples,1));// anchors, num_anchors,1));//les,int pair)
 #ifdef HAVE_AVX2
-                dm = bpm_distance_pair(msa, samples, num_samples);
+                LOG_MSG("Running AVX code");
+                //dm = bpm_distance_pair(msa, samples, num_samples);
 #else
                 LOG_MSG("Running non AVX code");
-                if(msa->L > 5){
-                        RUNP(dm = protein_wu_distance(msa, 58.8, samples, num_samples));
-                }else{
-                        RUNP(dm = dna_wu_distance(msa, 58.8, samples, num_samples));
-                }
+
 #endif
                 //unit_zero(dm,  num_samples ,num_samples);
                 //MFREE(n);

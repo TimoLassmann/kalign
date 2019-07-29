@@ -749,7 +749,7 @@ ERROR:
 #endif
 
 
-float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
+float** d_esimation(struct msa* msa, int* samples, int num_samples,int pair)
 {
         float** dm = NULL;
         uint8_t* seq_a;
@@ -865,7 +865,7 @@ float calc_distance(uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b, int L)
                         hv = ((seq_a[i]&3)<<8) + ((seq_a[i+2]&3)<<6) + ((seq_a[i+3]&3)<<4) + ((seq_a[i+4]&3)<<2) + (seq_a[i+5]&3);//ACDEF
                         hash[hv] = big_insert_hash(hash[hv],i);
                 }
-                dist = dna_distance_calculation(hash,seq_b,len_b,len_a+len_b, 58.9);
+                dist = dna_distance_calculation(hash,seq_b,len_b,len_a+len_b, 61.08);
         }
 
 

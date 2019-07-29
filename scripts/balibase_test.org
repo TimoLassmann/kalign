@@ -324,18 +324,6 @@
       done
     #+END_SRC
 
-    #+RESULTS:
-    wget http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz
-    wget http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz
-    wget http://www.clustal.org/omega/homfam-20110613-25.tar.gz
-    wget http://clustal.org/omega/bali3fam-26.tar.gz
-    wget http://bioinf.ucd.ie/quantest2.tar
-    wget http://www.lbgi.fr/balibase/BalibaseDownload/BAliBASE_R1-5.tar.gz
-    wget http://www.clustal.org/omega/homfam-20110613-25.tar.gz
-    wget http://clustal.org/omega/bali3fam-26.tar.gz
-    wget http://www.lbgi.fr/balibase/BalibaseDownload/BAliBASE_R1-5.tar.gz
-    wget http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz
-    wget http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz
 
 
     inter all data sets 
@@ -545,7 +533,7 @@
 
 
       printf "Generating kalign run script\n";
-      find ~/kalignbenchmark/data/bb3_release -name "*.tfa" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign %s -f msf -o %s/%s_%s_kalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_kalign.sh
+      find ~/kalignbenchmark/data/bb3_release -name "*.tfa" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign -i %s -f msf -o %s/%s_%s_kalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_kalign.sh
       chmod 755 run_kalign.sh
 
       printf "Generating muscle run script\n";
