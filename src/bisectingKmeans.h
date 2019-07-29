@@ -29,8 +29,5 @@
 #include "alignment_parameters.h"
 #include "sequence_distance.h"
 
-
-
-extern int random_tree(struct aln_param* ap, int numseq);
 extern int build_tree_kmeans(struct msa* msa, struct aln_param* ap);
 #endif

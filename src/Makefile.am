@@ -71,8 +71,8 @@ bpm.h \
 bpm.c
 
 
-check_PROGRAMS =  phmm get_param edist alphabet heap_test misc_test bpm_test rwaln
-TESTS =  phmm get_param edist alphabet heap_test misc_test bpm_test
+check_PROGRAMS = edist alphabet heap_test misc_test bpm_test rwaln
+TESTS = edist alphabet heap_test misc_test bpm_test
 TESTS_ENVIRONMENT = $(VALGRIND)
 
 rwaln_SOURCES = \
@@ -109,11 +109,6 @@ alphabet.c
 
 misc_test_CPPFLAGS = $(AM_CPPFLAGS) -DITEST_MISC
 
-heap_test_SOURCES = \
-heap.h \
-heap.c
-heap_test_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
-
 alphabet_SOURCES = \
 alphabet.h \
 alphabet.c
@@ -124,23 +119,3 @@ euclidean_dist.h \
 euclidean_dist.c
 
 edist_CPPFLAGS = $(AM_CPPFLAGS) -DITEST
-
-
-get_param_SOURCES = run_get_param.c \
-msa.h \
-rwalign.c \
-parameters.h \
-parameters.c \
-global.h \
-misc.h \
-misc.c \
-alphabet.h \
-alphabet.c \
-euclidean_dist.h \
-euclidean_dist.c \
-kmeans.h \
-kmeans.c
-
-phmm_SOURCES = phmm.h phmm.c
-phmm_LDADD = $(MYLIBDIRS)
-phmm_CPPFLAGS = $(AM_CPPFLAGS) -DITEST

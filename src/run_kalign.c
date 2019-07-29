@@ -25,13 +25,12 @@
 #include "parameters.h"
 #include "align_io.h"
 #include "alignment_parameters.h"
-// #include "estimate_aln_param.h"
-// #include "tree_building.h"
+
 #include "bisectingKmeans.h"
 #include "alignment.h"
 #include "weave_alignment.h"
 
-//#include "counts_from_random_trees.h"
+
 #include "misc.h"
 #include <getopt.h>
 #include "alphabet.h"
@@ -147,9 +146,8 @@ int main(int argc, char *argv[])
                 int option_index = 0;
 
                 c = getopt_long_only (argc, argv,"i:o:f:hq",long_options, &option_index);
-                //c = getopt (argc, argv, "hi:o:");
-                /* Detect the end of the options. */
 
+                /* Detect the end of the options. */
                 if (c == -1){
                         break;
                 }
@@ -209,8 +207,6 @@ int main(int argc, char *argv[])
         }
 
         if (optind < argc){
-                c = 0;
-                //fprintf(stderr,"EXTRA :%d\n",argc - optind);
                 c = param->num_infiles;
                 param->num_infiles += argc-optind;
                 MREALLOC(param->infile, sizeof(char*) * param->num_infiles);
@@ -218,22 +214,6 @@ int main(int argc, char *argv[])
                         param->infile[c] =  argv[optind++];
                         c++;
                 }
-        }
-
-        /*for (i = 0; i< param->num_infiles; i++){
-                fprintf(stdout, "%d %s\n", i, param->infile[i]);
-
-                }*/
-
-        //exit(0);
-
-        if(param->quiet){
-                fclose(stderr);
-        }
-
-        //fprintf(stderr,"%s", license);
-        if (param->help_flag){
-                exit(1);
         }
 
         if(!param->format){
@@ -251,11 +231,9 @@ int main(int argc, char *argv[])
                         ERROR_MSG("Format %s not recognized.",param->format);
                 }
         }
-        //LOG_MSG("SET: %d",param->param_set);
 
         if (param->num_infiles == 0){
                 LOG_MSG("No infiles");
-//fprintf(stderr,"%s\n", usage);
                 return EXIT_SUCCESS;
         }
 
@@ -277,52 +255,34 @@ ERROR:
 int run_kalign(struct parameters* param)
 {
         struct msa* msa = NULL;
-        //struct alignment* aln = NULL;
         struct aln_param* ap = NULL;
-        //float** dm;
+
         int** map = NULL;       /* holds all alignment paths  */
         int i;
 
         DECLARE_TIMER(t1);
         /* Step 1: read all input sequences & figure out output  */
-        //LOG_MSG("Reading input.");
-
         for(i = 0; i < param->num_infiles;i++){
                 RUNP(msa = read_input(param->infile[i],msa));
         }
 
-        //RUNP(aln = detect_and_read_sequences(param));
-        /* copy dna parameter to alignment */
-        //aln->dna = param->dna;
-
         LOG_MSG("Detected: %d sequences.", msa->numseq);
-        //LOG_MSG("Output is %s in format %s.", param->outfile,param->format);
-        //LOG_MSG("Is DNA: %d", aln->dna);
-        //param->dna = aln->dna;
+
         /* If we just want to reformat end here */
         if(param->reformat){
                 //LOG_MSG("%s reformat",param->reformat);
                 for (i = 0 ;i < msa->numseq;i++){
                         msa->nsip[i] = i;
-                        // No idea what this was supposed to do */
-                        /*for (j = 0; j < aln->sl[i];j++){
-                                aln->s[i][j] = 0;
-                                }*/
                 }
                 if(param->rename){
                         for (i = 0 ;i < msa->numseq;i++){
-
                                 snprintf(msa->sequences[i]->name, 128, "SEQ%d", i+1);
-                                //aln->lsn[i] = strnlen(aln->sn[i], 128);
                         }
                 }
-                //sparam->format = param->reformat;
-
                 if (byg_start(param->format,"fastaFASTAfaFA") != -1){
                         RUN(dealign_msa(msa));
                 }
                 RUN(write_msa(msa, param->outfile, param->out_format));
-                //RUN(output(aln, param));
                 free_msa(msa);
                 return OK;
         }
@@ -330,35 +290,16 @@ int run_kalign(struct parameters* param)
                 RUN(dealign_msa(msa));
         }
 
-        //param->param_set = 4;
+
         /* allocate aln parameters  */
-
         RUNP(ap = init_ap(msa->numseq,msa->L ));
-
-        //counts_from_random_trees(aln, ap, 10);
-
-        //LOG_MSG("Building guide tree.");
-        //START_TIMER(t1);
-        //random_tree(ap, aln->numseq);
-        //RUN(convert_alignment_to_internal(aln,defPROTEIN ));
-        //param->dist_method = KALIGNDIST_WU;
-        //RUN(build_tree(aln,param,ap));
-        //RUN(convert_alignment_to_internal(aln,redPROTEIN));
+        /* Start bi-secting K-means sequence clustering */
         RUN(build_tree_kmeans(msa,ap));
-
+        /* by default all protein sequences are converted into a reduced alphabet
+           when read from file. Here we turn them back into the default representation. */
         if(msa->L == redPROTEIN){
                 RUN(convert_msa_to_internal(msa, defPROTEIN));
         }
-
-
-        //STOP_TIMER(t1);
-        //LOG_MSG("Took %f sec.", GET_TIMING(t1));
-
-        //LOG_MSG("Building guide tree.");
-        //START_TIMER(t1);
-        //STOP_TIMER(t1);
-        //LOG_MSG("Took %f sec.", GET_TIMING(t1));
-
         /* Start alignment stuff */
         LOG_MSG("Aligning");
         START_TIMER(t1);
@@ -379,9 +320,9 @@ int run_kalign(struct parameters* param)
         }
         MFREE(map);
         map = NULL;
-
+        /* We are done. */
         RUN(write_msa(msa, param->outfile, param->out_format));
-        //RUN(output(aln, param));
+
         free_msa(msa);
         free_ap(ap);
         return OK;

@@ -31,8 +31,6 @@
 struct parameters*init_param(void)
 {
         struct parameters* param = NULL;
-
-
         MMALLOC(param, sizeof(struct parameters));
         param->dist_method = KALIGNDIST_BPM;
         param->aln_param_file = NULL;
@@ -45,7 +43,6 @@ struct parameters*init_param(void)
         param->reformat = 0;
         param->rename = 0;
         param->help_flag = 0;
-        param->quiet = 0;
         return param;
 ERROR:
         free_parameters(param);

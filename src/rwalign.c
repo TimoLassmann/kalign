@@ -154,15 +154,13 @@ struct msa* read_input(char* infile,struct msa* msa)
                 RUNP(msa = read_clu(infile,msa));
         }
 
-
-
         RUN(detect_alphabet(msa));
         RUN(detect_aligned(msa));
 
         RUN(set_sip_nsip(msa));
 
         STOP_TIMER(timer);
-        LOG_MSG("done reading in %f", GET_TIMING(timer));
+        LOG_MSG("Done reading input sequences in %f seconds.", GET_TIMING(timer));
         return msa;
 ERROR:
         return NULL;
@@ -309,9 +307,6 @@ int detect_alphabet(struct msa* msa)
         diff[0] = 0;
         diff[1] = 0;
         for(i = 0; i < 128;i++){
-                /* if(i > 16){ */
-                /*         fprintf(stdout,"%d %c\t%d\n",i ,(char)i , msa->letter_freq[i]); */
-                /* } */
                 if((msa->letter_freq[i]) && (!DNA[i])){
                         diff[0]++;
                 }
@@ -323,7 +318,6 @@ int detect_alphabet(struct msa* msa)
         if( diff[0] + diff[1] == 0){
                 ERROR_MSG("Could not detect any AA or nucleotides.");
         }
-        //LOG_MSG("%d %d", diff[0],diff[1]);
         c = -1;
         min = 2147483647;
         for(i = 0; i < 2;i++){
@@ -407,9 +401,6 @@ int set_sip_nsip(struct msa* msa)
 {
         int i;
         ASSERT(msa!= NULL, "No msa");
-
-
-
         if(msa->plen){
                 for (i = msa->num_profiles;i--;){
                         if(msa->sip[i]){
@@ -469,12 +460,11 @@ int convert_msa_to_internal(struct msa* msa, int type)
         for(i = 0; i <  msa->numseq;i++){
                 seq = msa->sequences[i];
                 for(j =0 ; j < seq->len;j++){
-                        if(t[(int)  seq->seq[j]] == -1){
+                        if(t[(int) seq->seq[j]] == -1){
                                 WARNING_MSG("there should be no character not matching the alphabet");
                                 WARNING_MSG("offending character: >>>%c<<<", seq->seq[j]);
                         }else{
-                                seq->s[j] = t[(int)  seq->seq[j]];
-
+                                seq->s[j] = t[(int) seq->seq[j]];
                         }
                 }
 
