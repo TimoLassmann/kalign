@@ -61,6 +61,7 @@ int main(int argc, char *argv[])
                 }
         }
         LOG_MSG("Check for correctness.");
+#ifdef HAVE_AVX2
         for(i = 0; i < 1000;i++){
                 for(j = 0; j <= i;j++){
                         edist_serial(mat[i], mat[j], num_element, &d1);
@@ -71,7 +72,7 @@ int main(int argc, char *argv[])
                         }
                 }
         }
-
+#endif
         DECLARE_TIMER(t);
 
         LOG_MSG("Timing serial");
@@ -88,6 +89,7 @@ int main(int argc, char *argv[])
         STOP_TIMER(t);
         LOG_MSG("%f\tsec.",GET_TIMING(t));
 
+#ifdef HAVE_AVX2
         LOG_MSG("Timing AVX");
         START_TIMER(t);
         for(c = 0; c < max_iter; c++){
@@ -102,7 +104,7 @@ int main(int argc, char *argv[])
         STOP_TIMER(t);
         LOG_MSG("%f\tsec.",GET_TIMING(t));
 
-
+#endif
         for(i = 0; i < 1000;i++){
                 _mm_free(mat[i]);
         }

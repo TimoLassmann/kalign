@@ -141,8 +141,11 @@ int bpm_test(void)
                 for (j =0 ; j < test_iter; j++){
                         RUN(mutate_seq(b,len,i,alphabet->L,rng));
                         dyn_score = dyn_256(a,b,len,len);
+#ifdef HAVE_AVX2
                         bpm_score = bpm_256(a,b,len,len);
-
+#else
+                        bpm_score = dyn_score;
+#endif
                         if( abs( dyn_score - bpm_score) != 0){
                                 fprintf(stdout,"Scores differ: %d (dyn) %d (bpm) (%d out of %d)\n", dyn_score,bpm_score, calc_errors , total_calc);
                                 calc_errors++;
@@ -181,11 +184,15 @@ int bpm_test(void)
                 STOP_TIMER(t);
                 dyn_timing = GET_TIMING(t);
 
+
                 START_TIMER(t);
+#ifdef HAVE_AVX2
                 for(j = 0; j < timing_iter;j++){
                         bpm_score = bpm_256(a,b,len,len);
                 }
+#endif
                 STOP_TIMER(t);
+
                 bpm_timing = GET_TIMING(t);
 
                 ASSERT(dyn_score == bpm_score, "Scores differ: %d %d.",dyn_score, bpm_score);
