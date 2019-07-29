@@ -30,8 +30,6 @@
 
 __m256i BROADCAST_MASK[16];
 
-
-
  void bitShiftLeft256ymm (__m256i *data, int count);
 __m256i bitShiftRight256ymm (__m256i *data, int count);
 
@@ -39,6 +37,7 @@ __m256i bitShiftRight256ymm (__m256i *data, int count);
  __m256i add256(uint32_t carry, __m256i A, __m256i B);
 #endif
 
+/* Below are test functions  */
 #ifdef BPM_UTEST
 
 #include "alphabet.h"
@@ -118,30 +117,6 @@ int bpm_test(void)
 
                         if( abs( dyn_score - bpm_score) != 0){
                                 fprintf(stdout,"Scores differ: %d (dyn) %d (bpm) (%d out of %d)\n", dyn_score,bpm_score, calc_errors , total_calc);
-
-
-                                //dyn_256_print(a,b,len,len);
-
-                                /*for(c = 0; c < len;c++){
-                                        fprintf(stdout,"%*d",3,a[c]);
-                                }
-
-
-                                fprintf(stdout,"\n");
-                                for(c = 0; c < len;c++){
-                                        if(a[c] == b[c]){
-                                                fprintf(stdout,"  |");
-                                        }else{
-                                                fprintf(stdout,"   ");
-                                        }
-                                }
-                                fprintf(stdout,"\n");
-                                for(c = 0; c < len-5;c++){
-                                        fprintf(stdout,"%*d",3,b[c]);
-                                }
-                                fprintf(stdout,"\n");
-
-                                fprintf(stdout,"\n");*/
                                 calc_errors++;
                         }
                         /* restore sequence b */
@@ -170,30 +145,6 @@ int bpm_test(void)
 
                         if( abs( dyn_score - bpm_score) != 0){
                                 fprintf(stdout,"Scores differ: %d (dyn) %d (bpm) (%d out of %d)\n", dyn_score,bpm_score, calc_errors , total_calc);
-
-
-                                //dyn_256_print(a,b,len,len);
-
-                                /*for(c = 0; c < len;c++){
-                                        fprintf(stdout,"%*d",3,a[c]);
-                                }
-
-
-                                fprintf(stdout,"\n");
-                                for(c = 0; c < len;c++){
-                                        if(a[c] == b[c]){
-                                                fprintf(stdout,"  |");
-                                        }else{
-                                                fprintf(stdout,"   ");
-                                        }
-                                }
-                                fprintf(stdout,"\n");
-                                for(c = 0; c < len-5;c++){
-                                        fprintf(stdout,"%*d",3,b[c]);
-                                }
-                                fprintf(stdout,"\n");
-
-                                fprintf(stdout,"\n");*/
                                 calc_errors++;
                         }
                         /* restore sequence b */
@@ -229,36 +180,16 @@ int bpm_test(void)
                 }
                 STOP_TIMER(t);
                 dyn_timing = GET_TIMING(t);
-                //fprintf(stdout,"%f\tdyn\n", GET_TIMING(t));
-                //fprintf(stdout,"\t%ld\n",res);
-                //fprintf(stdout,"DYN:\t%d\tdiff:%ld\n",i,res);
 
-                //res= bpm(a,b,len,len);
-                //fprintf(stdout,"BPM:\t%d\tdiff:%ld\n",i,res);
-                //fprintf(stdout,"\t%ld\n",res);
                 START_TIMER(t);
                 for(j = 0; j < timing_iter;j++){
                         bpm_score = bpm_256(a,b,len,len);
                 }
                 STOP_TIMER(t);
                 bpm_timing = GET_TIMING(t);
-//      fprintf(stdout,"%f\tbpm\n", GET_TIMING(t));
-//fprintf(stdout,"\t%ld\n",res);
+
                 ASSERT(dyn_score == bpm_score, "Scores differ: %d %d.",dyn_score, bpm_score);
                 fprintf(stdout,"%f\t%f\t%f\n",dyn_timing,bpm_timing,  dyn_timing / bpm_timing);
-                //fprintf(stdout,"%d: %d %d\n",i, dyn_score, bpm_score);
-
-                /*for(j = 0; j < len;j++){
-                  fprintf(stdout,"%*d",3,a[j]);
-                  }
-
-
-                  fprintf(stdout,"\n");
-                  for(j = 0; j < len;j++){
-                  fprintf(stdout,"%*d",3,b[j]);
-                  }
-                  fprintf(stdout,"\n");
-                */
 
                 /* restore seq */
                 for(j = 0;j < len;j++){
@@ -274,7 +205,7 @@ ERROR:
         return FAIL;
 }
 
-int  mutate_seq(uint8_t* s, int len,int k,int L, struct rng_state* rng)
+int mutate_seq(uint8_t* s, int len,int k,int L, struct rng_state* rng)
 {
         int i,j;
         int r;
@@ -323,17 +254,9 @@ uint8_t dyn_256(const uint8_t* t,const uint8_t* p,int n,int m)
 
                         }
                         cur[j] = prev[j-1] +c ;
-
                         cur[j] = MACRO_MIN(cur[j], prev[j]+1);
                         cur[j] = MACRO_MIN(cur[j], cur[j-1]+1);
-
-
-
-                        //cur[j] = prev[j-1] + c;
-                        //cur[j] = MACRO_MIN(cur[j], cur[j-1] +1);
-                        //cur[j] = MACRO_MIN(cur[j], prev[j] +1);
-                        //fprintf(stdout,"%d ", cur[j]);
-                }
+             }
                 j = m;
 
                 c = 1;
@@ -359,6 +282,7 @@ ERROR:
         return 255;
 
 }
+
 uint8_t dyn_256_print(const uint8_t* t,const uint8_t* p,int n,int m)
 {
         uint8_t* prev = NULL;
@@ -372,7 +296,6 @@ uint8_t dyn_256_print(const uint8_t* t,const uint8_t* p,int n,int m)
         cur[0] = 0;
         fprintf(stdout,"%d ", cur[0]);
         for(j = 1; j <= m;j++){
-
                 cur[j] = cur[j-1] +1;
                 fprintf(stdout,"%d ", cur[j]);
         }
@@ -394,15 +317,6 @@ uint8_t dyn_256_print(const uint8_t* t,const uint8_t* p,int n,int m)
 
                         cur[j] = MACRO_MIN(cur[j], prev[j]+1);
                         cur[j] = MACRO_MIN(cur[j], cur[j-1]+1);
-
-
-
-
-
-
-                        //cur[j] = prev[j-1] + c;
-                        //cur[j] = MACRO_MIN(cur[j], cur[j-1] +1);
-                        //cur[j] = MACRO_MIN(cur[j], prev[j] +1);
                         fprintf(stdout,"%d ", cur[j]);
                 }
                 j =m;
@@ -478,18 +392,8 @@ uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m)
         for(i = 0; i < m;i++){
                 B[p[i]] |= (1ul << i);
         }
-        /*for(i = 0; i < 21;i++){
-                fprintf(stdout,"Letter: %d ",i);
-                for(int c = 0; c < 32;c++){
-                        if(B[i] & (1 << c)){
-                                fprintf(stdout,"%d,",c);
-                        }
-                }
-                fprintf(stdout,"\n");
-                }*/
 
-        VP = (1ul << (m))-1 ;//0xFFFFFFFFFFFFFFFFul;
-        //VP = 0xFFFFFFFFFFFFFFFFul;
+        VP = (1ul << (m))-1 ;
 
         VN = 0ul;
 
@@ -553,91 +457,21 @@ uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
         }
 
         for(i = 0; i < m;i++){
-                //fprintf(stdout,"pos:%d %*d\n",i,3,p[i]);
-                //fprintf(stdout,"\tb: %d\t",f[p[i]][i/32]);
                 f[p[i]][i/32] |= (1 << (i % 32));
-                //fprintf(stdout,"set bit %d in arr %d[%d]", i%32,p[i],i/32);
-                //fprintf(stdout,"\ta: %u\n",f[p[i]][i/32]);
         }
-
-        //fprintf(stdout,"\n");
-        /*
-        for(i = 0; i < 21;i++){
-                fprintf(stdout,"Letter: %d ",i);
-                for(j = 0;j < 8;j++){
-                        for(int c = 0; c < 32;c++){
-                                if(f[i][j] & (1 << c)){
-                                        fprintf(stdout,"%d(%d),",c,j);
-                                }
-
-                        }
-                }
-                fprintf(stdout,"\n");
-        }
-        */
 
         for(i = 0; i < 13;i++){
                 B[i] = _mm256_load_si256((__m256i const*) &f[i]);
         }
 
-        /*for(i = 0; i < 21;i++){
-                for(j = 0; j < 8;j++){
-                        f[i][j] = 0;
-
-                }
-                }
-        for(i = 0; i < 21;i++){
-                //left_shift_by_one_256(B[i]);
-                //bitShiftLeft256ymm
-                //B[i] = shift_left256(B[i],1);
-                for(j = 0; j < 251;j++){
-                        bitShiftLeft256ymm(&B[i],1);
-                }
-
-                for(j = 0; j < 251;j++){
-                        bitShiftRight256ymm(&B[i],1);
-                }
-
-
-        }
-
-        for(i = 0; i< 21;i++){
-                _mm256_store_si256((__m256i*) &f[0],B[i]);
-                fprintf(stdout,"Letter %d: ",i);
-                for(j = 7;j >= 0;j--){
-                        //fprintf(stdout,"%x,",f[0][j]);
-                        for(c =0;c < 32;c++){
-                                if(f[0][j] & (1 << c)){
-                                        fprintf(stdout,"%d(%d),",c,j);
-                                }else{
-                                        //fprintf(stdout,"----");
-                                }
-                        }
-                }
-                fprintf(stdout,"\n");
-        }
-        */
-
-        //S = _mm_set1_epi32(0);
-        //ZERO = _mm256_setzero_si256();
-        //one =  _mm256_set_epi64x (0ul,0ul,0ul,1ul);
-        //diff = _mm256_set_epi64x (0ul,0ul,0ul,m);
         diff = m;
         k = m;
 
-        //K = _mm256_set_epi64x (0ul,0ul,0ul,m);
         VP     = _mm256_set1_epi64x(0xFFFFFFFFFFFFFFFFul);
-        /*i = (256 -m ) / 64;
-        while(i){
-                bitShiftRight256ymm(&VP,64);
-                i--;
-        }
-        bitShiftRight256ymm(&VP, (256-(m-1))%64);*/
         VN     = _mm256_setzero_si256();
         NOTONE = _mm256_set1_epi64x(0xFFFFFFFFFFFFFFFFul);
         MASK   = _mm256_set_epi64x (0ul,0ul,0ul,1);
         m--;
-        //print_256_all(MASK);
 
         i = m / 64;
         while(i){
@@ -645,12 +479,8 @@ uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
                 i--;
         }
         bitShiftLeft256ymm(&MASK,m%64);
-        //uint32_t carry = 1;
-        //print_256_all(MASK);
 
         for(i = 0; i < n ;i++){
-                //fprintf(stdout,"%d:\t",i);
-//fprintf(stderr,"%c",*t + 65);
                 //X = (B[(int) *t] | VN);
 
                 X = _mm256_or_si256(B[t[i]], VN);
@@ -696,59 +526,15 @@ uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
 
 
                 //diff += (HP & MASK) >> m;
-                /*xmm1 = _mm256_and_si256(HP, MASK);
-                int c = m;
-                bitShiftRight256ymm(&xmm1, m);
-                print_256(xmm1);
-                diff = _mm256_add_epi64(diff, xmm1);
-                */
-
                 diff += 1- _mm256_testz_si256(HP, MASK);
 
                 ///diff -= (HN & MASK) >> m;
-                /*xmm1 = _mm256_and_si256(HN, MASK);
-                bitShiftRight256ymm(&xmm1, m);
-                print_256(xmm1);
-                diff = _mm256_sub_epi64(diff, xmm1);
-                */
-
                 diff -= 1- _mm256_testz_si256(HN,MASK);
 
                 //fprintf(stdout,"%d ",diff);
                 //xmm1 = _mm256_cmpgt_epi64(K, diff);
                 k = MACRO_MIN(k, diff);
-
-
-                //K = _mm256_min_epi32(diff,K);
-                //K = _mm256_xor_si256(diff, xmm1);
-                //xmm1 = _mm256_cmplt_epi64_mask(diff, K);
-                //xmm2 = _mm256_and_si256(xmm1, diff);
-                //K = _mm256_or_si256(xmm2, _mm256_andnot_si256(xmm1, K));
-
-/*
-                xmm1 = _mm_cmplt_epi32(diff, K);
-                xmm2 = _mm_and_si128(xmm1, diff);
-                K = _mm_or_si128(xmm2, _mm_andnot_si128  (xmm1,K));
-                xmm2 = _mm_and_si128(xmm1, _mm_set1_epi32(i));
-                POS = _mm_or_si128(xmm2, _mm_andnot_si128  (xmm1,POS));*/
-                /*_mm256_store_si256( (__m256i*)& debug,diff);
-                fprintf(stdout,"%d:\t",i);
-                for(j = 0; j < 8;j++){
-                        fprintf(stdout,"%d ",debug[j]);
-                }
-                fprintf(stdout,"\n");*/
-                //t--;
-                //fprintf(stdout,"\n");
         }
-
-
-
-        //_mm256_store_si256( (__m256i*)&f[0],K);
-        /*
-for(i = 0; i < 8;i++){
-                fprintf(stdout,"%d %ul\n", i , f[0][i]);
-                }*/
-
         return k;
 }
 

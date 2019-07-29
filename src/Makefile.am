@@ -71,8 +71,8 @@ bpm.h \
 bpm.c
 
 
-check_PROGRAMS = edist alphabet heap_test misc_test bpm_test rwaln
-TESTS = edist alphabet heap_test misc_test bpm_test
+check_PROGRAMS = edist alphabet misc_test bpm_test rwaln
+TESTS = edist alphabet  misc_test bpm_test
 TESTS_ENVIRONMENT = $(VALGRIND)
 
 rwaln_SOURCES = \
