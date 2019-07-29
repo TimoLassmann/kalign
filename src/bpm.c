@@ -60,7 +60,9 @@ int main(int argc, char *argv[])
 {
 
         /* Important set_broadcast_mask has to be called before using bpm_256!!! */
+#ifdef HAVE_AVX2
         set_broadcast_mask();
+#endif
         RUN(bpm_test());
         return EXIT_SUCCESS;
 ERROR:
@@ -192,6 +194,8 @@ int bpm_test(void)
                 for(j = 0; j < timing_iter;j++){
                         bpm_score = bpm_256(a,b,len,len);
                 }
+#else
+                bpm_score = dyn_score;
 #endif
                 STOP_TIMER(t);
 
