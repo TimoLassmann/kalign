@@ -24,6 +24,8 @@ m4_include([m4/ax_ext.m4])
 m4_include([m4/ax_openmp.m4])
 AX_EXT
 
+
+
 AC_ARG_ENABLE(openmp, [AC_HELP_STRING([--enable-openmp],[use OpenMP directives for parallelism])], enable_openmp=$enableval, enable_openmp=no)
 
 if test "$enable_openmp" = "yes"; then
@@ -52,6 +54,32 @@ AC_SUBST(OPENMP_CXXFLAGS)
 AC_PROG_AWK
 AC_PROG_CC
 AC_PROG_INSTALL
+
+# test for working C11 _Generic support
+AN_IDENTIFIER([_Generic], [AC_C__GENERIC])
+AC_DEFUN([AC_C__GENERIC],
+[AC_CACHE_CHECK([for _Generic], ac_cv_c__Generic,
+[AC_COMPILE_IFELSE(
+   [AC_LANG_SOURCE(
+      [[int
+        main (int argc, char **argv)
+        {
+          int a = _Generic (argc, int: argc = 1);
+          int *b = &_Generic (argc, default: argc);
+          char ***c = _Generic (argv, int: argc, default: argv ? &argv : 0);
+          _Generic (1 ? 0 : b, int: a, default: b) = &argc;
+          _Generic (a = 1, default: a) = 3;
+          return a + !b + !c;
+        }
+      ]])],
+   [ac_cv_c__Generic=yes],
+   [ac_cv_c__Generic=no])])
+if test $ac_cv_c__Generic = no; then
+AC_MSG_ERROR([We could not compile a simple C11 example. Install a new(er) compiler version (e.g.  GCC 4.9).])
+fi
+])# AC_C__GENERIC
+
+
 
 AC_CHECK_LIB([m], [sqrt])
 AC_CHECK_LIB([pthread], [main])
