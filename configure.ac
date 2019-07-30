@@ -49,12 +49,6 @@ AC_SUBST(OPENMP_CFLAGS)
 OPENMP_CXXFLAGS=$OPENMP_CFLAGS
 AC_SUBST(OPENMP_CXXFLAGS)
 
-
-# Checks for programs.
-AC_PROG_AWK
-AC_PROG_CC
-AC_PROG_INSTALL
-
 # test for working C11 _Generic support
 AN_IDENTIFIER([_Generic], [AC_C__GENERIC])
 AC_DEFUN([AC_C__GENERIC],
@@ -75,10 +69,26 @@ AC_DEFUN([AC_C__GENERIC],
    [ac_cv_c__Generic=yes],
    [ac_cv_c__Generic=no])])
 if test $ac_cv_c__Generic = no; then
+echo "-------------------------------------------"
+echo " Unable to compile C11 code on this system!"
+echo "-------------------------------------------"
+echo ""
+echo "Install a new(er) version of GCC (e.g. GCC 4.9+)"
+echo "or clang!"
+echo ""
+AC_MSG_ERROR([ERROR: C compiler too old!])
+
 AC_MSG_ERROR([We could not compile a simple C11 example. Install a new(er) compiler version (e.g.  GCC 4.9).])
 fi
 ])# AC_C__GENERIC
 
+
+# Checks for programs.
+AC_PROG_AWK
+AC_PROG_CC
+# Check for C11 _Generic support 
+AC_C__GENERIC
+AC_PROG_INSTALL
 
 
 AC_CHECK_LIB([m], [sqrt])
