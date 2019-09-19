@@ -153,6 +153,9 @@
    
     Here I define the list of libraries I'll be using. 
    
+
+
+
     #+NAME: liblist
     #+BEGIN_SRC R -n :exports code :results none
       libraries <- c("tidyverse","ggplot2","stringi","cowplot")
@@ -283,6 +286,7 @@
   | Muscle       | https://www.drive5.com/muscle/downloads3.8.31/muscle3.8.31_i86linux32.tar.gz |
   | Clustalomega | http://clustal.org/omega/clustalo-1.2.4-Ubuntu-x86_64                        |
   | q-score      | https://www.drive5.com/qscore/qscore_src.tar.gz                              |
+  | Kalign2      | http://msa.sbc.su.se/downloads/kalign/current.tar.gz                         |
   
   Since the clustal papers provide a great overview of alignment programs I think these two should suffice. Note I am not comparing kalign against consistency based methods as these are a) all more accurate and b) slower. Kalign is targeted at the accurate and fast niche. 
 
@@ -357,7 +361,7 @@
 
 *** Download  programs 
 
-    #+BEGIN_SRC bash -n :results raw :exports both :var tbl=Benchprograms :colnames yes
+    #+BEGIN_SRC bash -n :results none :exports none :var tbl=Benchprograms :colnames yes
       cd
       cd ~/kalignbenchmark/programs
       for idx in ${!tbl[*]}; do
@@ -368,12 +372,20 @@
               wget ${tbl[$idx]}
           fi
       done
+
       chmod 755 clustalo-1.2.4-Ubuntu-x86_64
-
       tar -zxvf muscle3.8.31_i86linux32.tar.gz 
-
       tar -zxvf qscore_src.tar.gz
+
+      mkdir -p kalign2_src
+      cd kalign2_src
+      mv ../current.tar.gz .
+      tar -zxvf current.tar.gz
+      ./configure
+      make 
+      cp kalign ../kalign2
     #+END_SRC
+
 
 
 
@@ -531,7 +543,6 @@
           esac
       done
 
-
       printf "Generating kalign run script\n";
       find ~/kalignbenchmark/data/bb3_release -name "*.tfa" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); printf "kalign -i %s -f msf -o %s/%s_%s_kalign.msf\n", $1,outdir,a[n-2],a[n-1] }' > run_kalign.sh
       chmod 755 run_kalign.sh
@@ -685,7 +696,6 @@
 
       find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2  -name "*_test.fa" -exec rm -rf {} \;
       printf "Generate commands to reformat the reference alignments\n\n";
-
 
       find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*.fa"  -o -name '*.fasta' | grep structural |  awk -v outdir="$SCRATCHDIR" '{printf "kalign %s --rename -reformat -f msf -o %s.msf\n", $1,$1 }' > run_kalign_reformat.sh
       find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*.fa"  -o -name '*.fasta' | grep unaligned |  awk -v outdir="$SCRATCHDIR" '{printf "kalign %s --rename -reformat -f fasta -o %s_test.fa\n", $1,$1 }' >> run_kalign_reformat.sh

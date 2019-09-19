@@ -37,8 +37,6 @@
 #define OPT_TMPDIR 4
 #define OPT_OUTPUT 5
 
-
-
 int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_name);
 int print_help_score_and_align(char **argv);
 
@@ -346,7 +344,6 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
         } else {  // EXIT_FAILURE is not used by all programs, maybe needs some adaptation.
                 WARNING_MSG("Running:\n%s failed.", cmd);
                 WARNING_MSG("Error code was: %d", rc);
-
         }
         /*return result;
           pclose(pipe);*/
