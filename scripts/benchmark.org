@@ -1,0 +1,305 @@
+#+TITLE:  Benchmark of MSA algorithms
+#+AUTHOR: Timo Lassmann
+#+EMAIL:  timo.lassmann@telethonkids.org.au
+#+DATE:   2019-09-27
+#+LATEX_CLASS: report
+#+OPTIONS:  toc:nil
+#+OPTIONS: H:4
+#+LATEX_CMD: pdflatex
+* Introduction 
+  This org mode document contains the code and scripts to generate the results presented in:
+
+
+  #+begin_quote
+  Kalign 3: multiple sequence alignment of large data sets.
+  #+end_quote
+
+* Benchmark
+** MSA programs 
+   Programs to test: 
+
+   #+NAME: Benchprograms
+   | Name         | Download                                                                     |
+   |--------------+------------------------------------------------------------------------------|
+   | Muscle       | https://www.drive5.com/muscle/downloads3.8.31/muscle3.8.31_i86linux32.tar.gz |
+   | Clustalomega | http://clustal.org/omega/clustalo-1.2.4-Ubuntu-x86_64                        |
+   | q-score      | https://www.drive5.com/qscore/qscore_src.tar.gz                              |
+   | Kalign2      | http://msa.sbc.su.se/downloads/kalign/current.tar.gz                         |
+  
+   Since the clustal papers provide a great overview of alignment programs I think these two should suffice. Note I am not comparing kalign against consistency based methods as these are a) all more accurate and b) slower. Kalign is targeted at the accurate and fast niche. 
+
+** Alignment benchmark datasets 
+
+
+   #+NAME: Benchmarkdata 
+   | Name          | Download                                                          |
+   |---------------+-------------------------------------------------------------------|
+   | Balibase1-5   | http://www.lbgi.fr/balibase/BalibaseDownload/BAliBASE_R1-5.tar.gz |
+   | Balifam       | http://clustal.org/omega/bali3fam-26.tar.gz                       |
+   | Bralibaseset1 | http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz    |
+   | Bralibaseset2 | http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz    |
+   | HomFam        | http://www.clustal.org/omega/homfam-20110613-25.tar.gz            |
+   | QuanTest2     | http://bioinf.ucd.ie/quantest2.tar                                |
+
+** Installation   
+
+*** Step one: create directory and download all data
+
+    #+BEGIN_SRC bash :exports both :results none 
+      cd 
+      mkdir -p kalignbenchmark
+      cd  kalignbenchmark
+      mkdir -p data
+      mkdir -p programs 
+      mkdir -p scratch
+    #+END_SRC
+
+*** Download data sets 
+     
+    #+BEGIN_SRC bash -n :results raw :exports both :var tbl=Benchmarkdata :colnames yes
+      cd
+      cd ~/kalignbenchmark/data
+      for idx in ${!tbl[*]}; do
+          #echo  ${tbl[$idx]} 
+          if [[ ${tbl[$idx]} =~ ^http* ]];
+          then
+              echo "wget ${tbl[$idx]}"
+              wget ${tbl[$idx]}
+          fi
+      done
+    #+END_SRC
+
+    #+RESULTS:
+    wget http://www.clustal.org/omega/homfam-20110613-25.tar.gz
+    wget http://clustal.org/omega/bali3fam-26.tar.gz
+    wget http://www.lbgi.fr/balibase/BalibaseDownload/BAliBASE_R1-5.tar.gz
+    wget http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz
+    wget http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz
+    wget http://bioinf.ucd.ie/quantest2.tar
+
+
+    Unpack data sets: 
+
+    #+BEGIN_SRC bash  :results none :exports code 
+      cd
+      cd ~/kalignbenchmark/data
+      mkdir -p homfam 
+      mv homfam-20110613-25.tar.gz homfam 
+      cd homfam 
+      tar -zxvf homfam-20110613-25.tar.gz
+
+      cd ~/kalignbenchmark/data
+      for filename in *.tar.gz; do
+          tar -zxvf  $filename
+      done
+      tar -xvf quantest2.tar
+    #+END_SRC
+
+**** Compile baliscore program and place in program directory 
+
+     #+BEGIN_SRC bash
+
+       cd ~/kalignbenchmark/data/bb3_release/bali_score_src
+
+       gcc *.c -lm -lexpat -o bali_score 
+       cp bali_score ~/kalignbenchmark/programs
+
+     #+END_SRC
+
+     #+RESULTS:
+
+*** Download  programs 
+
+    #+BEGIN_SRC bash -n :results none :exports none :var tbl=Benchprograms :colnames yes
+      cd
+      cd ~/kalignbenchmark/programs
+      for idx in ${!tbl[*]}; do
+          #echo  ${tbl[$idx]} 
+          if [[ ${tbl[$idx]} =~ ^http* ]];
+          then
+              echo "wget ${tbl[$idx]}"
+              wget ${tbl[$idx]}
+          fi
+      done
+
+      chmod 755 clustalo-1.2.4-Ubuntu-x86_64
+      tar -zxvf muscle3.8.31_i86linux32.tar.gz 
+      tar -zxvf qscore_src.tar.gz
+
+      mkdir -p kalign2_src
+      cd kalign2_src
+      mv ../current.tar.gz .
+      tar -zxvf current.tar.gz
+      ./configure
+      make 
+      cp kalign ../kalign2
+    #+END_SRC
+
+    And kalign3! 
+
+    #+BEGIN_SRC bash -n :results none :exports none 
+      cd ~/kalignbenchmark/programs 
+      mkdir -p kalign3_src 
+      cd kalign3_src 
+      git clone https://github.com/TimoLassmann/kalign.git
+      cd kalign 
+      ./autogen.sh 
+      ./configure --bindir=$HOME/kalignbenchmark/programs
+      make 
+      make check  
+      make install
+    #+END_SRC
+
+
+*** Compile q-score 
+
+    NOTE: this is manual! 
+
+    Add:
+
+    #+BEGIN_EXAMPLE C
+    #include <limits.h> 
+    #+END_EXAMPLE
+
+    to qscore header: =qscore.h=  
+
+    then: 
+    #+BEGIN_EXAMPLE bash
+    make
+    #+END_EXAMPLE
+
+
+
+
+
+
+
+
+
+
+** Scripts to run programs 
+
+
+   #+BEGIN_SRC sh :exports both :results none :noweb yes :tangle test.sh :shebang #!/usr/bin/env bash
+     export PATH=$HOME/kalignbenchmark/programs:$PATH
+     CPU=1
+     MEM=8
+     FMT=
+     IN=
+     OUT=
+     PROG= 
+     function usage()
+     {
+
+         printf "usage: $0  -p <prog> -i <in> -o <out>  \n\n" ;
+
+
+         printf "Options:\n-f <format>\n-t <threads>\n-m <mem>\n\n";
+         exit 1;
+     }
+
+     while getopts t:m:p:i:o:f:  opt
+     do
+         case ${opt} in
+             t) CPU=${OPTARG};;
+             m) MEM=${OPTARG};;
+             p) PROG=${OPTARG};;
+             i) IN=${OPTARG};;
+             o) OUT=${OPTARG};;
+             f) FMT=${OPTARG};;
+             ,*) usage;;
+         esac
+     done
+
+     if [ "${PROG}" == "" ]; then usage; fi
+     if [ "${IN}" == "" ]; then usage; fi
+     if [ "${OUT}" == "" ]; then usage; fi
+
+
+     SLURMMEM=$MEM"G"
+
+     CMD= 
+
+     if [ "${PROG}" == "kalign2" ]; then 
+         if [ "${FMT}" == "msf" ]; then 
+
+             CMD="kalign2 -i $IN -f msf -o $OUT"
+         else
+             CMD="kalign2 -i $IN -o $OUT"
+         fi
+     fi
+
+     if [ "${PROG}" == "kalign" ]; then 
+         if [ "${FMT}" == "msf" ]; then 
+
+             CMD="kalign -i $IN -f msf -o $OUT"
+         else
+             CMD="kalign -i $IN -o $OUT"
+         fi
+     fi
+
+     if [ "${PROG}" == "muscle" ]; then 
+         if [ "${FMT}" == "msf" ]; then 
+             CMD="muscle3.8.31_i86linux32 -msf -in $IN -out  $OUT"
+         else
+             CMD="muscle3.8.31_i86linux32 -in $IN -out  $OUT"
+         fi
+     fi
+
+     if [ "${PROG}" == "clustal" ]; then 
+         if [ "${FMT}" == "msf" ]; then 
+             CMD="clustalo-1.2.4-Ubuntu-x86_64 --outfmt=msf --in $IN --out $OUT"
+         else
+             CMD="clustalo-1.2.4-Ubuntu-x86_64 --outfmt=a2m --in $IN --out $OUT"
+         fi
+     fi
+
+
+     HAS_SLURM=0
+     printf "Running Sanity checks:\n";
+
+     if which sbatch >/dev/null; then
+         HAS_SLURM=1
+     fi
+
+     echo $HAS_SLURM
+     if [ $HAS_SLURM = 1 ]; then 
+         echo "YES"
+         sbatch <<EOT
+                    #!/usr/bin/env bash
+
+                    #SBATCH --cpus-per-task=$CPU
+                    #SBATCH --mem=$SLURMMEM
+                    #SBATCH -t 10-12:30 # time (D-HH:MM)
+                    #SBATCH -o slurm.%N.%j.out # STDOUT
+                    #SBATCH -e slurm.%N.%j.err # STDERR
+
+                    $CMD
+                    exit 0
+EOT
+     else 
+         echo $CMD 
+     fi
+
+   #+END_SRC
+
+   kalign -i %s -f msf -o %s/%s_%s_kalign.msf
+   muscle3.8.31_i86linux32 -msf -in %s -out  %s/%s_%s_muscle.msf
+   clustalo-1.2.4-Ubuntu-x86_64 --outfmt=msf  --in %s  --out %s/%s_%s_clustalo.msf
+
+
+   kalign %s -f msf -o %s/%s_%s_%s_kalign.msf
+   muscle3.8.31_i86linux32 -msf -in %s -out  %s/%s_%s_%s_muscle.msf
+   clustalo-1.2.4-Ubuntu-x86_64 --outfmt=msf  --in %s --force --out %s/%s_%s_%s_clustalo.msf
+
+   kalign -i %s -o %s/%s_kalign.afa
+   muscle3.8.31_i86linux32 -in %s -out  %s/%s_muscle.afa
+   clustalo-1.2.4-Ubuntu-x86_64 --threads 8 --outfmt=a2m  --in %s  --out %s/%s_clustalo.afa
+
+
+   //reformatting:
+
+   kalign %s --rename -reformat -f msf -o %s.msf
+
+
+
