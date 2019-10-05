@@ -180,7 +180,7 @@
 ** Scripts to run programs 
 
 
-   #+BEGIN_SRC sh :exports both :results none :noweb yes :tangle test.sh :shebang #!/usr/bin/env bash
+   #+BEGIN_SRC sh :exports both :results none :noweb yes :tangle run_aln.sh :shebang #!/usr/bin/env bash
      export PATH=$HOME/kalignbenchmark/programs:$PATH
      CPU=1
      MEM=8
@@ -192,9 +192,9 @@
      {
 
          printf "usage: $0  -p <prog> -i <in> -o <out>  \n\n" ;
-
-
          printf "Options:\n-f <format>\n-t <threads>\n-m <mem>\n\n";
+
+         printf "Valid options for <prog> include:\n   kalign\n   kalign2\n   muscle\n   clustal\n\n";
          exit 1;
      }
 
@@ -256,50 +256,86 @@
 
 
      HAS_SLURM=0
-     printf "Running Sanity checks:\n";
+     #    printf "Running Sanity checks:\n";
 
      if which sbatch >/dev/null; then
          HAS_SLURM=1
      fi
 
-     echo $HAS_SLURM
+     #     echo $HAS_SLURM
      if [ $HAS_SLURM = 1 ]; then 
          echo "YES"
          sbatch <<EOT
-                    #!/usr/bin/env bash
+#!/usr/bin/env bash
 
-                    #SBATCH --cpus-per-task=$CPU
-                    #SBATCH --mem=$SLURMMEM
-                    #SBATCH -t 10-12:30 # time (D-HH:MM)
-                    #SBATCH -o slurm.%N.%j.out # STDOUT
-                    #SBATCH -e slurm.%N.%j.err # STDERR
+#SBATCH --cpus-per-task=$CPU
+#SBATCH --mem=$SLURMMEM
+#SBATCH -t 10-12:30 # time (D-HH:MM)
+#SBATCH -o slurm.%N.%j.out # STDOUT
+#SBATCH -e slurm.%N.%j.err # STDERR
 
-                    $CMD
-                    exit 0
+$CMD
+exit 0
 EOT
      else 
-         echo $CMD 
+         $CMD 
      fi
 
    #+END_SRC
 
-   kalign -i %s -f msf -o %s/%s_%s_kalign.msf
-   muscle3.8.31_i86linux32 -msf -in %s -out  %s/%s_%s_muscle.msf
-   clustalo-1.2.4-Ubuntu-x86_64 --outfmt=msf  --in %s  --out %s/%s_%s_clustalo.msf
+   Place run script in =bin= of the benchmark directory . 
 
 
-   kalign %s -f msf -o %s/%s_%s_%s_kalign.msf
-   muscle3.8.31_i86linux32 -msf -in %s -out  %s/%s_%s_%s_muscle.msf
-   clustalo-1.2.4-Ubuntu-x86_64 --outfmt=msf  --in %s --force --out %s/%s_%s_%s_clustalo.msf
-
-   kalign -i %s -o %s/%s_kalign.afa
-   muscle3.8.31_i86linux32 -in %s -out  %s/%s_muscle.afa
-   clustalo-1.2.4-Ubuntu-x86_64 --threads 8 --outfmt=a2m  --in %s  --out %s/%s_clustalo.afa
+   #+BEGIN_SRC bash :exports both :results none
+     cp run_aln.sh $HOME/kalignbenchmark/programs/
+   #+END_SRC
 
 
-   //reformatting:
 
-   kalign %s --rename -reformat -f msf -o %s.msf
+** Scripts to create run commands 
+
+   #+NAME: scratchdir
+   #+BEGIN_SRC bash :results none :exports code :noweb yes
+     SCRATCHDIR="~/kalignbenchmark/scratch"
+   #+END_SRC
 
 
+
+*** Balibase 
+
+    #+BEGIN_SRC bash -n :tangle gen_cmd.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
+      <<scratchdir>>
+    #+END_SRC
+
+    #+BEGIN_SRC bash -n :tangle gen_cmd.sh :noweb yes :exports code :results none :noweb yes 
+
+      DIR=`pwd`
+      function usage()
+      {
+          printf "This script will generate scripts to run kalign, clustal omega and muscle on the balibase MSA benchmark data set.\n\n" ;
+          printf "usage: $0\n\n" ;
+          exit 1;
+      }
+
+      while getopts h  opt
+      do
+          case ${opt} in
+              h) usage;;
+              ,*) usage;;
+          esac
+      done
+
+      printf "Generating balibase run commands\n";
+
+      find ~/kalignbenchmark/data/bb3_release -name "*.tfa" |\
+          awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/);\
+            printf "run_aln.sh -p kalign -i %s -f msf -o %s/%s_%s_kalign.msf\n", $1,outdir,a[n-2],a[n-1];\
+            printf "run_aln.sh -p kalign2 -i %s -f msf -o %s/%s_%s_kalign2.msf\n", $1,outdir,a[n-2],a[n-1];\
+            printf "run_aln.sh -p muscle -i %s -f msf -o %s/%s_%s_muscle.msf\n", $1,outdir,a[n-2],a[n-1];\
+            printf "run_aln.sh -p clustal -i %s -f msf -o %s/%s_%s_clustal.msf\n", $1,outdir,a[n-2],a[n-1];\
+ }' > run_benchmark.sh
+      chmod 755 run_benchmark.sh
+
+
+    #+END_SRC
 

@@ -302,6 +302,7 @@
   | QuanTest2     | http://bioinf.ucd.ie/quantest2.tar                                |
   
 
+
 ** Step one: create test directory and download all data
 
    #+BEGIN_SRC bash :exports both :results none 
@@ -522,7 +523,6 @@
 
     #+BEGIN_SRC bash -n :tangle gen_run_balibase.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
       <<scratchdir>>
-
     #+END_SRC
 
     #+BEGIN_SRC bash -n :tangle gen_run_balibase.sh :noweb yes :exports code :results none :noweb yes 
