@@ -177,6 +177,22 @@
 
 
 
+*** Reformat datasets 
+
+
+   #+BEGIN_SRC bash :exports both :results none
+     export PATH=$HOME/kalignbenchmark/programs:$PATH
+     find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2  -name "*_test.fa" -exec rm -rf {} \;
+     printf "Generate commands to reformat the reference alignments\n\n";
+
+     find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*.fa"  -o -name '*.fasta' | grep structural |  awk -v outdir="$SCRATCHDIR" '{printf "kalign %s --changename -reformat msf -o %s.msf\n", $1,$1 }' > run_reformat.sh
+     find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name "*.fa"  -o -name '*.fasta' | grep unaligned |  awk -v outdir="$SCRATCHDIR" '{printf "kalign %s --changename -reformat fasta -o %s_test.fa\n", $1,$1 }' >> run_reformat.sh
+     chmod 755 run_reformat.sh
+     ./run_reformat.sh
+
+   #+END_SRC
+
+
 ** Scripts to run programs 
 
 
@@ -292,14 +308,17 @@ EOT
 
 
 
-** Scripts to create run commands 
+
+
+*** Scripts to create run commands 
+
+
+
 
    #+NAME: scratchdir
    #+BEGIN_SRC bash :results none :exports code :noweb yes
      SCRATCHDIR="~/kalignbenchmark/scratch"
    #+END_SRC
-
-
 
 *** Balibase 
 
@@ -329,13 +348,34 @@ EOT
 
       find ~/kalignbenchmark/data/bb3_release -name "*.tfa" |\
           awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/);\
-            printf "run_aln.sh -p kalign -i %s -f msf -o %s/%s_%s_kalign.msf\n", $1,outdir,a[n-2],a[n-1];\
-            printf "run_aln.sh -p kalign2 -i %s -f msf -o %s/%s_%s_kalign2.msf\n", $1,outdir,a[n-2],a[n-1];\
-            printf "run_aln.sh -p muscle -i %s -f msf -o %s/%s_%s_muscle.msf\n", $1,outdir,a[n-2],a[n-1];\
-            printf "run_aln.sh -p clustal -i %s -f msf -o %s/%s_%s_clustal.msf\n", $1,outdir,a[n-2],a[n-1];\
- }' > run_benchmark.sh
+                                          printf "run_aln.sh -p kalign -i %s -f msf -o %s/%s_%s_kalign.msf\n", $1,outdir,a[n-2],a[n-1];\
+                                          printf "run_aln.sh -p kalign2 -i %s -f msf -o %s/%s_%s_kalign2.msf\n", $1,outdir,a[n-2],a[n-1];\
+                                          printf "run_aln.sh -p muscle -i %s -f msf -o %s/%s_%s_muscle.msf\n", $1,outdir,a[n-2],a[n-1];\
+                                          printf "run_aln.sh -p clustal -i %s -f msf -o %s/%s_%s_clustal.msf\n", $1,outdir,a[n-2],a[n-1];\
+                               }' > run_benchmark.sh
+
+
+      printf "Generating bralibase run commands\n";
+
+      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2  -name "*_test.fa" |\
+          grep unaligned |\
+          awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/);\
+                                        printf "run_aln.sh -p kalign -i %s -f msf -o %s/%s_%s_%s_kalign.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2];\
+                                        printf "run_aln.sh -p kalign2 -i %s -f msf -o %s/%s_%s_%s_kalign2.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2];\
+                                        printf "run_aln.sh -p muscle -i %s -f msf -o %s/%s_%s_%s_muscle.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2];\
+                                        printf "run_aln.sh -p clustal -i %s -f msf -o %s/%s_%s_%s_clustal.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2];\
+                 }' >> run_benchmark.sh
+
+      printf "Generating Quantest2 run commands\n";
+
+      find ~/kalignbenchmark/data/QuanTest2/Test -name "*.vie" |\
+          awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/);\
+                    printf "run_aln.sh -p kalign -i %s -o %s/%s_kalign.afa\n", $1,outdir,a[n-1];\
+                    printf "run_aln.sh -p kalign2 -i %s -o %s/%s_kalign2.afa\n", $1,outdir,a[n-1];\
+                    printf "run_aln.sh -p muscle -i %s -o %s/%s_muscle.afa\n", $1,outdir,a[n-1];\
+                    printf "run_aln.sh -p clustal -i %s -o %s/%s_clustal.afa\n", $1,outdir,a[n-1];\
+      }' >>  run_benchmark.sh
+
       chmod 755 run_benchmark.sh
-
-
     #+END_SRC
 
