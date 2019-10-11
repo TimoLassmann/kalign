@@ -197,12 +197,18 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
                 }
 
                 rc = snprintf(cmd, BUFFER_LEN*2, "kalign %s -f msf -o %s/test.msf",test,path);
+        }else if(!strcmp(program,"kalign2")){
+                if (system("which kalign2")){
+                            ERROR_MSG("kalign2 is not found in your path:\n%s\n",envpaths);
+                }
+
+                rc = snprintf(cmd, BUFFER_LEN*2, "kalign2 -i  %s -f msf -o %s/test.msf",test,path);
         }else if(!strcmp(program,"muscle")){
                 if (system("which muscle3.8.31_i86linux32")){
                         ERROR_MSG("muscle3.8.31_i86linux32 is not found in your path:\n%s\n",envpaths);
                 }
                 rc = snprintf(cmd, BUFFER_LEN*2, "muscle3.8.31_i86linux32  -maxiters 2 -msf -in %s -out %s/test.msf",test,path);
-        }else if(!strcmp(program,"clustalo")){
+        }else if(!strcmp(program,"clustal")){
                 if (system("which clustalo-1.2.4-Ubuntu-x86_64")){
                         ERROR_MSG("clustalo-1.2.4-Ubuntu-x86_64 is not found in your path:\n%s\n",envpaths);
                 }
