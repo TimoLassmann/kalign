@@ -195,7 +195,6 @@
 
 ** Scripts to run programs 
 
-
    #+BEGIN_SRC sh :exports both :results none :noweb yes :tangle run_aln.sh :shebang #!/usr/bin/env bash
      export PATH=$HOME/kalignbenchmark/programs:$PATH
      CPU=1
@@ -206,10 +205,8 @@
      PROG= 
      function usage()
      {
-
          printf "usage: $0  -p <prog> -i <in> -o <out>  \n\n" ;
          printf "Options:\n-f <format>\n-t <threads>\n-m <mem>\n\n";
-
          printf "Valid options for <prog> include:\n   kalign\n   kalign2\n   muscle\n   clustal\n\n";
          exit 1;
      }
@@ -320,7 +317,7 @@ EOT
      SCRATCHDIR="~/kalignbenchmark/scratch"
    #+END_SRC
 
-*** Balibase 
+*** Run alignment programs  
 
     #+BEGIN_SRC bash -n :tangle gen_cmd.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
       <<scratchdir>>
@@ -379,3 +376,31 @@ EOT
       chmod 755 run_benchmark.sh
     #+END_SRC
 
+*** Score alignments 
+
+    #+BEGIN_SRC bash -n :tangle score_balibase.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
+      <<scratchdir>>
+    #+END_SRC
+
+    #+BEGIN_SRC bash -n :tangle score_balibase.sh :noweb yes :exports code :results none :noweb yes 
+      printf "Generating kalign scoring run script\n";
+      find ~/kalignbenchmark/data/bb3_release -name "*.xml" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/kalignbenchmark/programs/bali_score %s %s/%s_%s_kalign.msf | grep auto\n", $1,outdir,a[n-2],a[n-1] }' > score_bb3_kalign.sh
+      chmod 755  score_bb3_kalign.sh
+
+      find ~/kalignbenchmark/data/bb3_release -name "*.xml" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/kalignbenchmark/programs/bali_score %s %s/%s_%s_kalign2.msf | grep auto\n", $1,outdir,a[n-2],a[n-1] }' > score_bb3_kalign2.sh
+      chmod 755  score_bb3_kalign2.sh
+
+      printf "Generating muscle scoring run script\n";
+      find ~/kalignbenchmark/data/bb3_release -name "*.xml" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/kalignbenchmark/programs/bali_score %s %s/%s_%s_muscle.msf | grep auto\n", $1,outdir,a[n-2],a[n-1] }' > score_bb3_muscle.sh
+      chmod 755  score_bb3_muscle.sh
+
+      printf "Generating clustalo scoring run script\n";
+      find ~/kalignbenchmark/data/bb3_release -name "*.xml" | awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/); ;printf "~/kalignbenchmark/programs/bali_score %s %s/%s_%s_clustalo.msf | grep auto\n", $1,outdir,a[n-2],a[n-1] }' > score_bb3_clustalo.sh
+      chmod 755  score_bb3_clustalo.sh
+
+       ./score_bb3_kalign.sh > scores_kalign.csv
+       ./score_bb3_kalign.sh > scores_kalign2.csv
+       ./score_bb3_muscle.sh > scores_muscle.csv
+       ./score_bb3_clustalo.sh > scores_clustalo.csv
+
+#+END_SRC
