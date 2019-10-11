@@ -193,6 +193,47 @@
     #+END_SRC
 
 
+*** Reformat homfam 
+    create script to merge =*_ref.vie= and =*_test-only.vie= alignments.
+    #+BEGIN_SRC bash -n :tangle create_homfam_tests.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
+      <<scratchdir>>
+    #+END_SRC
+
+
+    #+BEGIN_SRC bash -n :tangle create_homfam_tests.sh :noweb yes :exports code :results none :noweb yes
+
+      export PATH=$HOME/kalignbenchmark/programs:$PATH
+      DIR=`pwd`
+      function usage()
+      {
+          printf "This script will merge *_ref.vie and *_test-only.vie alignments and convert them into msf format.\n\n" ;
+          printf "usage: $0\n\n" ;
+          exit 1;
+      }
+
+      while getopts h  opt
+      do
+          case ${opt} in
+              h) usage;;
+              ,*) usage;;
+          esac
+      done
+      find ~/kalignbenchmark/data/homfam  -name "*_test-only.vie" | awk '{\
+                    test_aln=$1;ref=$1 ;\
+                    gsub("_test-only.vie", "_ref.vie", ref);\
+                    gsub("_test-only.vie", "_testaln.fa", test_aln);\
+                    printf "cat %s %s > tmp.vie\n" ,ref, $1;\
+                    printf "kalign tmp.vie --reformat --rename -f fasta -o %s\n", test_aln }' > homfam_reformat.sh
+
+      find ~/kalignbenchmark/data/homfam  -name "*_ref.vie" | awk '{ref=$1;gsub("_ref.vie", "_ref.msf", ref);printf "kalign %s --reformat --rename  -f msf -o %s\n", $1,ref}' >> homfam_reformat.sh
+
+      chmod 755 homfam_reformat.sh
+
+      ./homfam_reformat.sh
+    #+END_SRC     
+
+
+
 ** Scripts to run programs 
    Alignment programs
    #+BEGIN_SRC sh :exports both :results none :noweb yes :tangle run_aln.sh :shebang #!/usr/bin/env bash
@@ -306,19 +347,19 @@
      PROG= 
      function usage()
      {
-         printf "usage: $0  -p <prog> -t <test aln> -r <ref aln>  \n\n" ;
+         printf "usage: $0  -p <prog> -i <test aln> -r <ref aln>  \n\n" ;
          printf "Options:\n-f <format>\n-t <threads>\n-m <mem>\n\n";
          printf "Valid options for <prog> include:\n   kalign\n   kalign2\n   muscle\n   clustal\n\n";
          exit 1;
      }
 
-     while getopts t:m:p:t:r:  opt
+     while getopts t:m:p:i:r:  opt
      do
          case ${opt} in
              t) CPU=${OPTARG};;
              m) MEM=${OPTARG};;
              p) PROG=${OPTARG};;
-             t) IN=${OPTARG};;
+             i) IN=${OPTARG};;
              r) OUT=${OPTARG};;             
              ,*) usage;;
          esac
@@ -334,7 +375,7 @@
      CMD= 
 
 
-     CMD="timescorealn -test $IN -ref $OUT -program $PROG --scratch ~/kalignbenchmark/scratch -out scores_homfam.csv"         
+     CMD="timescorealn -test $IN -ref $OUT -program $PROG --scratch $HOME/kalignbenchmark/scratch -out scores_homfam.csv"         
 
 
      HAS_SLURM=0
@@ -348,17 +389,17 @@
      if [ $HAS_SLURM = 1 ]; then 
          echo "YES"
          sbatch <<EOT
-     #!/usr/bin/env bash
+#!/usr/bin/env bash
 
-     #SBATCH --cpus-per-task=$CPU
-     #SBATCH --mem=$SLURMMEM
-     #SBATCH -t 10-12:30 # time (D-HH:MM)
-     #SBATCH -o slurm.%N.%j.out # STDOUT
-     #SBATCH -e slurm.%N.%j.err # STDERR
+#SBATCH --cpus-per-task=$CPU
+#SBATCH --mem=$SLURMMEM
+#SBATCH -t 10-12:30 # time (D-HH:MM)
+#SBATCH -o slurm.%N.%j.out # STDOUT
+#SBATCH -e slurm.%N.%j.err # STDERR
 
-     $CMD
-     exit 0
-     EOT
+$CMD
+exit 0
+EOT
      else 
          $CMD 
      fi
@@ -370,6 +411,7 @@
 
    #+BEGIN_SRC bash :exports both :results none
      cp run_aln.sh $HOME/kalignbenchmark/programs/
+     cp run_timealn.sh $HOME/kalignbenchmark/programs/
    #+END_SRC
 
 
@@ -445,6 +487,41 @@
 
       chmod 755 run_benchmark.sh
     #+END_SRC
+
+    Here is the script to run the homfam test: 
+    #+BEGIN_SRC bash -n :tangle gen_timecmd.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
+      <<scratchdir>>
+    #+END_SRC
+
+    #+BEGIN_SRC bash -n :tangle gen_timecmd.sh :noweb yes :exports code :results none :noweb yes 
+
+      DIR=`pwd`
+      function usage()
+      {
+          printf "This script will generate scripts to run kalign, clustal omega and muscle on the balibase MSA benchmark data set.\n\n" ;
+          printf "usage: $0\n\n" ;
+          exit 1;
+      }
+
+      while getopts h  opt
+      do
+          case ${opt} in
+              h) usage;;
+              ,*) usage;;
+          esac
+      done
+
+      printf "export PATH=~/kalignbenchmark/programs:$PATH\n\n" > run_homfam.sh
+      find ~/kalignbenchmark/data/homfam  -name "*_testaln.fa" | awk -v outdir="$SCRATCHDIR" '{
+      ref_aln=$1;gsub("_testaln.fa", "_ref.msf",ref_aln);
+      printf "run_timealn.sh -p kalign -i %s -r %s\n", $1,ref_aln;
+      printf "run_timealn.sh -p kalign2 -i %s -r %s\n", $1,ref_aln;
+      printf "run_timealn.sh -p muscle -i %s -r %s\n", $1,ref_aln;
+      printf "run_timealn.sh -p clustal -i %s -r %s\n", $1,ref_aln;
+                   }' >> run_homfam.sh
+
+      #+END_SRC
+
 
 * Score alignments 
 
@@ -619,37 +696,6 @@
 
 
 ** Homfam
-
-*** Script to reformat reference alignments 
-     create script to merge =*_ref.vie= and =*_test-only.vie= alignments.
-     #+BEGIN_SRC bash -n :tangle create_homfam_tests.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
-       <<scratchdir>>
-     #+END_SRC
-
-
-     #+BEGIN_SRC bash -n :tangle create_homfam_tests.sh :noweb yes :exports code :results none :noweb yes
-
-
-       DIR=`pwd`
-       function usage()
-       {
-           printf "This script will merge *_ref.vie and *_test-only.vie alignments and convert them into msf format.\n\n" ;
-           printf "usage: $0\n\n" ;
-           exit 1;
-       }
-
-       while getopts h  opt
-       do
-           case ${opt} in
-               h) usage;;
-               ,*) usage;;
-           esac
-       done
-       find ~/kalignbenchmark/data/homfam  -name "*_test-only.vie" | awk '{test_aln=$1;ref=$1 ;gsub("_test-only.vie", "_ref.vie", ref);gsub("_test-only.vie", "_testaln.fa", test_aln); printf "kalign %s %s --reformat --rename -f fasta -o %s\n",ref, $1, test_aln }' > homfam_reformat.sh
-       find ~/kalignbenchmark/data/homfam  -name "*_ref.vie" | awk '{ref=$1;gsub("_ref.vie", "_ref.msf", ref);printf "kalign %s --reformat --rename  -f msf -o %s\n", $1,ref}' >> homfam_reformat.sh
-
-       chmod 755 homfam_reformat.sh
-     #+END_SRC     
 
 
 *** Run tests
