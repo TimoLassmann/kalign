@@ -73,7 +73,8 @@ benchmark.org
 
 ## Quantest2
 
-![Quantest2_scores](https://user-images.githubusercontent.com/8110320/66698103-135cfc80-eca9-11e9-8bd9-5145fe23f6ce.jpeg)
+
+![Quantest2_scores](https://user-images.githubusercontent.com/8110320/66698153-6c2c9500-eca9-11e9-904c-3d6ea9a1c44d.jpeg)
 
 # Please cite:
 
