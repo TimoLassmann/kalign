@@ -58,7 +58,7 @@ kalign -i BB11001.msf -r afa -o out.afa
 # Benchmark results 
 
 ## Balibase
-![Optional Text](../master/doc/images/Balibase_scores.jpeg)
+![Optional Text](../master/doc/images/Balibase_scores.png)
 ## Bralibase
 
 ![Optional Text](../master/myFolder/image.png)
