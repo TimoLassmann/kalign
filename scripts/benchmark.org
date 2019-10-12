@@ -693,6 +693,42 @@ EOT
      ./score_quantest2_clustal.sh  > scores_quantest2_clustal.csv
    #+END_SRC 
 
+*** Plot
+
+   #+BEGIN_SRC R :session one :results output graphics :file Quantest2_scores.jpeg :exports both :noweb yes 
+               <<Rlibraries>> 
+         readquanttestscores <-function(file,name){
+           mat  <- read.table(file);
+           colnames(mat) <- c("Name","Score")
+           mat$Type <- name
+           mat$Name <- sub(".*/" ,"", mat$Name)
+           mat$Name <- sub("[_]{1}[A-Z]*[.]{1}[A-Z]*$" ,"", mat$Name,ignore.case = TRUE)
+           mat <- as_tibble(mat)
+      
+           return(mat)
+
+         }
+
+
+           library(ggplot2)
+         mat <- readquanttestscores("scores_quanttest_clustalo.csv","clustalo")
+         mat <- rbind(mat, readquanttestscores("scores_quanttest_kalign.csv","kalign3"));
+mat <- rbind(mat, readquanttestscores("scores_quantest2_kalign2.csv","kalign2"));
+  mat <- rbind(mat, readquanttestscores("scores_quanttest_muscle.csv","muscle"));
+     #mat <- mat  %>% mutate(Score = as.dbl(Score))      
+
+       
+            p4 <- ggplot(mat, aes(Type, Score))
+            p4 <- p4 + geom_boxplot(aes(colour = Type))
+     p4 <- p4 + ggtitle("Quantest2 benchmark")
+            
+            ggsave("Quantest2_scores.jpeg",p4,width = 16,  height = 12,  dpi = 300, units = c( "cm"))
+
+
+#+END_SRC
+
+#+RESULTS:
+[[file:Quantest2_scores.jpeg]]
 
 
 ** Homfam

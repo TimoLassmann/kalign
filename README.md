@@ -71,6 +71,9 @@ benchmark.org
 
 ![Homfam_scores](https://user-images.githubusercontent.com/8110320/66697425-895e6500-eca3-11e9-97e7-63f3a79133cf.jpeg)
 
+## Quantest2
+
+![Quantest2_scores](https://user-images.githubusercontent.com/8110320/66698103-135cfc80-eca9-11e9-8bd9-5145fe23f6ce.jpeg)
 
 # Please cite:
 
