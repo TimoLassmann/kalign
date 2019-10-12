@@ -55,6 +55,10 @@ kalign -i BB11001.msf -r afa -o out.afa
 
 # Benchmark results 
 
+  Here are some benchmark results. The code to reproduce these figures can be found [here](scripts/benchmark.org). 
+
+benchmark.org
+
 ## Balibase
 
 ![Balibase_scores](https://user-images.githubusercontent.com/8110320/66697423-7ea3d000-eca3-11e9-919a-995ca8e9f7c1.jpeg)
