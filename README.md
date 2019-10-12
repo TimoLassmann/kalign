@@ -2,8 +2,6 @@
 
 Kalign is a fast multiple sequence alignment program for biological sequences.
 
-![Image of example output](https://user-images.githubusercontent.com/8110320/62088549-330d8880-b255-11e9-928d-e5cc8031da97.png)
-
 # Install
 
 ``` bash
@@ -58,16 +56,17 @@ kalign -i BB11001.msf -r afa -o out.afa
 # Benchmark results 
 
 ## Balibase
-![Optional Text](/master/doc/images/Balibase_scores.png)
 
-<img src="/master/doc/images/Balibase_scores.png" alt="My cool logo"/>
+![Balibase_scores](https://user-images.githubusercontent.com/8110320/66697423-7ea3d000-eca3-11e9-919a-995ca8e9f7c1.jpeg)
 
 ## Bralibase
 
-![Optional Text](../master/myFolder/image.png)
+![Bralibase_scores](https://user-images.githubusercontent.com/8110320/66697424-86637480-eca3-11e9-90ea-238f82b0ac6b.jpeg)
+
 ## Homfam
 
-![Optional Text](../master/myFolder/image.png)
+![Homfam_scores](https://user-images.githubusercontent.com/8110320/66697425-895e6500-eca3-11e9-97e7-63f3a79133cf.jpeg)
+
 
 # Please cite:
 
