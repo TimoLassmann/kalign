@@ -55,6 +55,17 @@ Reformat existing alignment:
 kalign -i BB11001.msf -r afa -o out.afa
 ```
 
+# Benchmark results 
+
+## Balibase
+![Optional Text](../master/doc/images/Balibase_scores.jpeg)
+## Bralibase
+
+![Optional Text](../master/myFolder/image.png)
+## Homfam
+
+![Optional Text](../master/myFolder/image.png)
+
 # Please cite:
 
 Lassmann, Timo, Oliver Frings, and Erik LL Sonnhammer.
@@ -64,5 +75,6 @@ Nucleic acids research 37.3 (2008): 858-865.
         
 Lassmann, Timo, and Erik LL Sonnhammer. Kalign–an accurate and
 fast multiple sequence alignment algorithm.
+
 BMC bioinformatics 6.1 (2005): 298.
 
