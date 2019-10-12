@@ -900,10 +900,14 @@
 
 
        printf "Generating kalign run script\n"
-       printf "export PATH=~/kalignbenchmark/programs:$PATH\n\n" > run_homfam.sh
+       
+
+printf "export PATH=~/kalignbenchmark/programs:$PATH\n\n" > run_homfam.sh
        find ~/kalignbenchmark/data/homfam  -name "*_testaln.fa" | awk -v outdir="$SCRATCHDIR" '{
        ref_aln=$1;gsub("_testaln.fa", "_ref.msf",ref_aln);
-       printf "timescorealn -test %s -ref %s -program kalign --scratch ~/kalignbenchmark/scratch -out scores_homfam.csv\n", $1,ref_aln;
+       printf "timescorealn -test %s -ref %s -program kalign --scratch ~/kalignbenchmark/scratch -out scores_homfam.csv
+
+\n", $1,ref_aln;
        printf "timescorealn -test %s -ref %s -program muscle --scratch ~/kalignbenchmark/scratch -out scores_homfam.csv\n", $1,ref_aln;
        printf "timescorealn -test %s -ref %s -program clustalo --scratch ~/kalignbenchmark/scratch -out scores_homfam.csv\n", $1,ref_aln;
        }' >> run_homfam.sh
@@ -919,6 +923,10 @@
        <<path>>
        ./run_homfam.sh
      #+END_EXAMPLE
+
+
+
+
 
 
      /home/user/kalignbenchmark/data/homfam

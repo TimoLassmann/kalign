@@ -697,6 +697,29 @@ EOT
 
 ** Homfam
 
+*** Plot: 
+
+   #+BEGIN_SRC R :session one :results output graphics :file Homfam_scores.jpeg :exports both :noweb yes 
+      <<Rplotheader>>
+      library(ggplot2)
+     mat  <- read.csv("scores_homfam.csv");
+     p <- ggplot(mat, aes(NUMSEQ,Time))
+     p <- p + geom_point(aes(colour = Program,size = AVGLEN))
+     p <- p + scale_x_continuous(trans = 'log10', breaks=c(100,3000,10000,100000) ,labels = scales::comma)
+     p <- p + scale_y_continuous(trans = 'log10',breaks=c(0.01, 0.1, 1 , 10,100,1000,10000),labels=scales::comma )
+
+     p <- p + xlab("Number of sequences") 
+     p <- p + ylab("Time (s)") 
+     p <- p + ggtitle("HomFam benchmark")
+     p     
+     ggsave("Homfam_scores.jpeg",p,width = 18,  height = 12,  dpi = 300, units = c( "cm")) 
+
+#+END_SRC
+
+#+RESULTS:
+[[file:Homfam_scores.jpeg]]
+
+
 
 *** Run tests
 
