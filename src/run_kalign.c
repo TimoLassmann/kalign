@@ -147,7 +147,7 @@ int main(int argc, char *argv[])
 
                 int option_index = 0;
 
-                c = getopt_long_only (argc, argv,"i:o:f:hqv",long_options, &option_index);
+                c = getopt_long_only (argc, argv,"i:o:f:hqvV",long_options, &option_index);
 
                 /* Detect the end of the options. */
                 if (c == -1){
@@ -177,6 +177,7 @@ int main(int argc, char *argv[])
                         param->help_flag = 1;
                         break;
                 case 'v':
+                case 'V':
                         version = 1;
                         break;
 
