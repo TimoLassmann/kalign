@@ -118,6 +118,7 @@ int print_AVX_warning(void)
 
 int main(int argc, char *argv[])
 {
+        int version = 0;
         int c;
         int showw = 0;
         struct parameters* param = NULL;
@@ -139,13 +140,14 @@ int main(int argc, char *argv[])
                         {"outfile",  required_argument, 0, 'o'},
                         {"out",  required_argument, 0, 'o'},
                         {"help",   no_argument,0,'h'},
+                        {"version",   no_argument,0,'v'},
                         {"quiet",  0, 0, 'q'},
                         {0, 0, 0, 0}
                 };
 
                 int option_index = 0;
 
-                c = getopt_long_only (argc, argv,"i:o:f:hq",long_options, &option_index);
+                c = getopt_long_only (argc, argv,"i:o:f:hqv",long_options, &option_index);
 
                 /* Detect the end of the options. */
                 if (c == -1){
@@ -174,6 +176,10 @@ int main(int argc, char *argv[])
                 case 'h':
                         param->help_flag = 1;
                         break;
+                case 'v':
+                        version = 1;
+                        break;
+
                 case 'i':
                         param->num_infiles =1;
                         MMALLOC(param->infile, sizeof(char*));
@@ -192,7 +198,11 @@ int main(int argc, char *argv[])
                         abort ();
                 }
         }
-
+        if(version){
+                fprintf(stdout,"Kalign (%s)\n", PACKAGE_VERSION);
+                free_parameters(param);
+                return EXIT_SUCCESS;
+        }
         print_kalign_header();
 #ifndef HAVE_AVX2
         RUN(print_AVX_warning());
