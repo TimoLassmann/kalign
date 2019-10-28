@@ -31,7 +31,7 @@ float hsum256_ps_avx(__m256 v);
 float hsum_ps_sse3(__m128 v);
 
 
-#ifdef ITEST
+#ifdef ITEST_EDIST
 int main(int argc, char *argv[])
 {
         struct rng_state* rng;

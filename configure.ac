@@ -116,23 +116,6 @@ AC_FUNC_STRNLEN
 AC_CHECK_FUNCS([gettimeofday pow realpath sqrt strstr])
 
 
-tldevel_check_f=$ac_abs_confdir/tldevel/README
-
-AC_CHECK_FILE([$tldevel_check_f], [],[have_tldevel=no])
-
-
-if test "x${have_tldevel}" = xno; then
-echo "------------------------------------------"
-echo " Unable to find pthreads on this system.  "
-echo " Building a single-threaded version.      "
-echo "------------------------------------------"
-AC_MSG_ERROR([ASFSAF])
-fi
-
-LIB_TLDEVELDIR="tldevel"
-AC_SUBST(LIB_TLDEVELDIR)
-
-
 
 AC_CANONICAL_HOST
 case $host_os in
@@ -193,7 +176,7 @@ AC_CONFIG_FILES([Makefile
 src/Makefile dev/Makefile])
 
 AC_CONFIG_HEADER([src/config.h])
-AC_CONFIG_SUBDIRS([tldevel])
+
 
 AC_OUTPUT
 
