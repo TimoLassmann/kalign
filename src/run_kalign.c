@@ -56,6 +56,7 @@ int print_kalign_help(int argc, char * argv[])
 
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--format","Output format." ,"[Fasta]"  );
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--reformat","Reformat existing alignment." ,"[NA]"  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--version (-V/-v)","Prints version." ,"[NA]"  );
         fprintf(stdout,"\n");
         return OK;
 }
@@ -92,15 +93,24 @@ int print_kalign_header(void)
         fprintf(stdout,"\n");
         fprintf(stdout,"Please cite:\n");
 
+        /*        fprintf(stdout,"  Kalign 3: multiple sequence alignment of large data sets
+Timo Lassmann
+Bioinformatics, btz795, https://doi.org/10.1093/bioinformatics/btz795
+        */
+        fprintf(stdout,"  Lassmann, Timo.\n");
+        fprintf(stdout,"  \"Kalign 3: multiple sequence alignment of large data sets.\"\n");
+        fprintf(stdout,"  Bioinformatics (2019) \n");
+        fprintf(stdout,"  https://doi.org/10.1093/bioinformatics/btz795\n");
+        fprintf(stdout,"\n");
 
-        fprintf(stdout,"  Lassmann, Timo, Oliver Frings, and Erik LL Sonnhammer.\n");
+        /*fprintf(stdout,"  Lassmann, Timo, Oliver Frings, and Erik LL Sonnhammer.\n");
         fprintf(stdout,"  \"Kalign2: high-performance multiple alignment of protein and\n");
         fprintf(stdout,"  nucleotide sequences allowing external features.\"\n");
         fprintf(stdout,"  Nucleic acids research 37.3 (2008): 858-865.\n");
         fprintf(stdout,"\n");
         fprintf(stdout,"  Lassmann, Timo, and Erik LL Sonnhammer. \"Kalign–an accurate and\n");
         fprintf(stdout,"  fast multiple sequence alignment algorithm.\"\n  BMC bioinformatics 6.1 (2005): 298.\n");
-        fprintf(stdout,"\n");
+        fprintf(stdout,"\n");*/
 
         return OK;
 }
@@ -200,7 +210,7 @@ int main(int argc, char *argv[])
                 }
         }
         if(version){
-                fprintf(stdout,"Kalign (%s)\n", PACKAGE_VERSION);
+                fprintf(stdout,"%s %s\n",PACKAGE_NAME, PACKAGE_VERSION);
                 free_parameters(param);
                 return EXIT_SUCCESS;
         }

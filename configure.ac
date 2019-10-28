@@ -1,5 +1,5 @@
 
-AC_INIT([kalign], [m4_esyscmd_s([./version.sh])])
+AC_INIT(kalign, 3.1.1)
 
 #AC_CONFIG_AUX_DIR([.])
 
@@ -7,13 +7,11 @@ AC_USE_SYSTEM_EXTENSIONS
 AM_INIT_AUTOMAKE
 AC_PROG_CC
 AC_PROG_INSTALL
-AC_PROG_RANLIB
 AM_SILENT_RULES([no])
 
+LT_INIT
 
-
-#AC_CONFIG_MACRO_DIR([m4])
-
+AC_CONFIG_MACRO_DIRS([m4])
 
 
 # M4 macros for checking of CPU features.
@@ -23,7 +21,6 @@ m4_include([m4/ax_check_compile_flag.m4])
 m4_include([m4/ax_ext.m4])
 m4_include([m4/ax_openmp.m4])
 AX_EXT
-
 
 
 AC_ARG_ENABLE(openmp, [AC_HELP_STRING([--enable-openmp],[use OpenMP directives for parallelism])], enable_openmp=$enableval, enable_openmp=no)
