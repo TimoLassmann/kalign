@@ -4,6 +4,7 @@ Kalign is a fast multiple sequence alignment program for biological sequences.
 
 # Install
 
+## Source
 ``` bash
 git clone https://github.com/TimoLassmann/kalign.git 
 cd kalign
@@ -13,19 +14,25 @@ make check
 make install 
 ```
 
+## Homebrew
+``` bash
+brew install brewsci/bio/kalign
+```
+
 # Usage
 
 
-``` sh
+``` bash
 Usage: kalign  -i <seq file> -o <out aln> 
 
 Options:
 
    --format           : Output format. [Fasta]
    --reformat         : Reformat existing alignment. [NA]
+   --version          : Print version and exit
 ```
 
-Kalign expects the input to be a set of unaligned sequences in fasta format or aligned sequences in aligned fasta, MSF or clustal format. Kalign automatically detects whether the input sequences are proten, RNA or DNA.
+Kalign expects the input to be a set of unaligned sequences in fasta format or aligned sequences in aligned fasta, MSF or clustal format. Kalign automatically detects whether the input sequences are protein, RNA or DNA.
 
 # Examples
 
@@ -55,9 +62,7 @@ kalign -i BB11001.msf -r afa -o out.afa
 
 # Benchmark results 
 
-  Here are some benchmark results. The code to reproduce these figures can be found [here](scripts/benchmark.org). 
-
-benchmark.org
+Here are some benchmark results. The code to reproduce these figures can be found at [here](scripts/benchmark.org). 
 
 ## Balibase
 
@@ -73,18 +78,10 @@ benchmark.org
 
 ## Quantest2
 
-
 ![Quantest2_scores](https://user-images.githubusercontent.com/8110320/66698153-6c2c9500-eca9-11e9-904c-3d6ea9a1c44d.jpeg)
 
 # Please cite:
 
-Lassmann, Timo, Oliver Frings, and Erik LL Sonnhammer.
-Kalign2: high-performance multiple alignment of protein and
-nucleotide sequences allowing external features.
-Nucleic acids research 37.3 (2008): 858-865.
-        
-Lassmann, Timo, and Erik LL Sonnhammer. Kalign–an accurate and
-fast multiple sequence alignment algorithm.
-
-BMC bioinformatics 6.1 (2005): 298.
+1. Lassmann, Timo, Oliver Frings, and Erik LL Sonnhammer. _Kalign2: high-performance multiple alignment of protein and nucleotide sequences allowing external features._ **Nucleic acids research** 37.3 (2008): 858-865. [Pubmed](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2647288/)      
+2. Lassmann, Timo, and Erik LL Sonnhammer. _Kalign: an accurate and fast multiple sequence alignment algorithm._ **BMC bioinformatics** 6.1 (2005): 298. [Pubmed](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1325270/)
 
