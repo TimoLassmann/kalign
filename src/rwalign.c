@@ -95,11 +95,12 @@ int main(int argc, char *argv[])
         LOG_MSG("reading: %s", buffer);
         RUNP(msa = read_input(buffer,NULL));
 //print_msa(msa);
-        write_msa_clustal(msa,"rwtest.clu");
-
-        write_msa_fasta(msa, "rwtest.fasta");
-
-        write_msa_msf(msa,"rwtest.msf");
+        LOG_MSG("Writing in Clustal format");
+        RUN(write_msa_clustal(msa,"rwtest.clu"));
+        LOG_MSG("Writing in aligned fasta format");
+        RUN(write_msa_fasta(msa, "rwtest.fasta"));
+        LOG_MSG("Writing in MSF format");
+        RUN(write_msa_msf(msa,"rwtest.msf"));
         free_msa(msa);
         return EXIT_SUCCESS;
 ERROR:
