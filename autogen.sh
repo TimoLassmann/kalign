@@ -6,8 +6,10 @@ exists()
 }
 
 if ! exists libtoolize; then
-    echo 'libtool not found!'
-    exit 1
+    if ! exists glibtoolize; then
+        echo 'libtool/glibtool not found!'
+        exit 1
+    fi
 fi
 
 if ! exists aclocal; then
@@ -31,12 +33,16 @@ if ! exists autoconf; then
 fi
 
 
+
 test -n "$srcdir" || srcdir=`dirname "$0"`
 test -n "$srcdir" || srcdir=.
 
 cd "$srcdir"
 
-libtoolize --force --copy
+case `uname` in Darwin*) glibtoolize --force --copy ;;
+                 *) libtoolize --force  --copy ;;
+esac
+
 aclocal -I m4 $AL_OPTS
 autoheader $AH_OPTS
 automake --add-missing --copy --gnu $AM_OPTS
