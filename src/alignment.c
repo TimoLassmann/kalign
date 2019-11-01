@@ -344,7 +344,8 @@ int hirsch_align_two_ss_vector_score(const struct aln_param* ap,const uint8_t* s
         //for(i = hm->startb; i < hm->endb;i++){
         for(i = old_cor[2]; i < old_cor[3];i++){
 
-                sub = abs(middle -i);
+                sub = fabsf(middle -i);
+
                 sub /= 1000;
                 //	fprintf(stderr,"%d-%d	%f\n",hm->startb,hm->endb,sub);
                 if(f[i].a+b[i].a-sub > max){
@@ -397,7 +398,7 @@ int hirsch_align_two_ss_vector_score(const struct aln_param* ap,const uint8_t* s
         }
         //i = hm->endb;
         i = old_cor[3];
-        sub = abs(middle -i);
+        sub = fabsf(middle -i);
         sub /= 1000;
 
         if(f[i].a+b[i].gb-gpo-sub > max){
@@ -461,7 +462,7 @@ int hirsch_align_two_ss_vector(const struct aln_param* ap,const uint8_t* seq1,co
         //for(i = hm->startb; i < hm->endb;i++){
         for(i = old_cor[2]; i < old_cor[3];i++){
 
-                sub = abs(middle -i);
+                sub = fabsf(middle -i);
                 sub /= 1000;
                 //	fprintf(stderr,"%d-%d	%f\n",hm->startb,hm->endb,sub);
                 if(f[i].a+b[i].a-sub > max){
@@ -514,7 +515,7 @@ int hirsch_align_two_ss_vector(const struct aln_param* ap,const uint8_t* seq1,co
         }
         //i = hm->endb;
         i = old_cor[3];
-        sub = abs(middle -i);
+        sub = fabsf(middle -i);
         sub /= 1000;
 
         if(f[i].a+b[i].gb-gpo-sub > max){
@@ -1052,7 +1053,7 @@ int hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,con
         c = -1;
         //for(i = hm->startb; i < hm->endb;i++){
         for(i = old_cor[2]; i < old_cor[3];i++){
-                sub = abs(middle -i);
+                sub = fabsf(middle -i);
                 sub /= 1000;
                 if(f[i].a+b[i].a-sub> max){
                         max = f[i].a+b[i].a-sub;
@@ -1105,7 +1106,7 @@ int hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,con
         //i = hm->endb;
         i = old_cor[3];
 
-        sub = abs(middle -i);
+        sub = fabsf(middle -i);
         sub /= 1000;
         if(f[i].a+b[i].gb+prof1[27]-sub > max){
                 max = f[i].a+b[i].gb+prof1[27]-sub;
@@ -1642,7 +1643,7 @@ int hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hirs
         c = -1;
         //for(i = hm->startb; i < hm->endb;i++){
         for(i = old_cor[2]; i < old_cor[3];i++){
-                sub = abs(middle -i);
+                sub = fabsf(middle -i);
                 sub /= 1000;
                 prof2 += 64;
                 //fprintf(stderr,"%d	%d	%d \n",f[i].a,b[i].a,max);
@@ -1696,7 +1697,7 @@ int hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hirs
         }
         //i = hm->endb;
         i = old_cor[3];
-        sub = abs(middle -i);
+        sub = fabsf(middle -i);
         sub /= 1000;
         if(f[i].a+b[i].gb+prof1[27]-sub > max){
                 max = f[i].a+b[i].gb+prof1[27]-sub;

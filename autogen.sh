@@ -16,21 +16,29 @@ fi
 
 if ! exists aclocal; then
     echo 'aclocal not found!'
+    echo 'to install using homebrew:'
+    echo 'brew install automake'
     exit 1
 fi
 
 if ! exists autoheader; then
     echo 'autoheader not found!'
+    echo 'to install using homebrew:'
+    echo 'brew install automake'
     exit 1
 fi
 
 if ! exists automake; then
     echo 'automake not found!'
+    echo 'to install using homebrew:'
+    echo 'brew install automake'
     exit 1
 fi
 
 if ! exists autoconf; then
     echo 'autoconf not found!'
+    echo 'to install using homebrew:'
+    echo 'brew install automake'
     exit 1
 fi
 
