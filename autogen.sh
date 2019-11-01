@@ -8,6 +8,8 @@ exists()
 if ! exists libtoolize; then
     if ! exists glibtoolize; then
         echo 'libtool/glibtool not found!'
+        echo 'to install using homebrew:'
+        echo 'brew install libtool'
         exit 1
     fi
 fi
