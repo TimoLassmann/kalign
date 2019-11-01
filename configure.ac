@@ -160,6 +160,7 @@ if test "$opt_valgrind_tests" = "yes"; then
 AC_DEFINE(DEBUG,1,[Defines debugging .])
 CFLAGS="-ggdb -pedantic -Wall -m64 -std=gnu11"
 AC_CHECK_PROGS(VALGRIND, valgrind)
+
 VALGRIND="$VALGRIND $OPTS"
 else
 VALGRIND=

@@ -176,7 +176,7 @@ int bpm_test(void)
 
         double dyn_timing;
         double bpm_timing;
-        int timing_iter = 10000;
+        int timing_iter = 100;
         fprintf(stdout,"Dyn\tAVX\tDYN/AVX\n");
         DECLARE_TIMER(t);
         for(i = 0; i < 100;i+=10){

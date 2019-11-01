@@ -87,20 +87,33 @@ int main(int argc, char *argv[])
         char buffer[BUFFER_LEN];
         LOG_MSG("Start io tests.");
 
-        char* datadir;
+        char* datadir = NULL;
 
         datadir = getenv("testdatafiledir");
-
-        snprintf(buffer,BUFFER_LEN, "%s/%s", datadir, argv[1]);
+        if(!datadir){
+                snprintf(buffer,BUFFER_LEN, "%s",argv[1]);
+        }else{
+                snprintf(buffer,BUFFER_LEN, "%s/%s", datadir, argv[1]);
+        }
         LOG_MSG("reading: %s", buffer);
+
         RUNP(msa = read_input(buffer,NULL));
-//print_msa(msa);
-        LOG_MSG("Writing in Clustal format");
-        RUN(write_msa_clustal(msa,"rwtest.clu"));
-        LOG_MSG("Writing in aligned fasta format");
-        RUN(write_msa_fasta(msa, "rwtest.fasta"));
-        LOG_MSG("Writing in MSF format");
-        RUN(write_msa_msf(msa,"rwtest.msf"));
+        if(msa->aligned == 0){
+                RUN(dealign_msa(msa));
+        }
+        //LOG_MSG("ALIGNED???%d", msa->aligned);
+        if(msa->aligned){
+                LOG_MSG("Writing in Clustal format");
+                RUN(write_msa_clustal(msa,"rwtest.clu"));
+                LOG_MSG("Writing in aligned fasta format");
+                RUN(write_msa_fasta(msa, "rwtest.fasta"));
+                LOG_MSG("Writing in MSF format");
+                RUN(write_msa_msf(msa,"rwtest.msf"));
+        }else{
+                LOG_MSG("Writing in aligned fasta format");
+                RUN(write_msa_fasta(msa, "rwtest.fasta"));
+
+        }
         free_msa(msa);
         return EXIT_SUCCESS;
 ERROR:
@@ -362,9 +375,6 @@ int detect_aligned(struct msa* msa)
 
 
 
-        if(gaps){
-                msa->aligned = 1;
-        }
         /* if all sequences are the same length they could be considered
            aligned (at least for the purpose of writing out a .msf / .clu
            file) */
@@ -378,6 +388,7 @@ int detect_aligned(struct msa* msa)
         if(min_len == max_len){
                 msa->aligned = 1;
         }
+        //LOG_MSG("Aligned: %d",msa->aligned);
         return OK;
 }
 
@@ -812,7 +823,7 @@ int write_msa_clustal(struct msa* msa,char* outfile)
                 aln_len+=  msa->sequences[0]->gaps[j];
         }
         aln_len += msa->sequences[0]->len;
-
+        LOG_MSG("%d", aln_len);
         MMALLOC(linear_seq, sizeof(char)* (aln_len+1));
 
 
@@ -1202,6 +1213,7 @@ int make_linear_sequence(struct msa_seq* seq, char* linear_seq)
         int c,j,f;
         f = 0;
         for(j = 0;j < seq->len;j++){
+                //LOG_MSG("%d %d",j,seq->gaps[j]);
                 for(c = 0;c < seq->gaps[j];c++){
                         linear_seq[f] = '-';
                         f++;

@@ -8,7 +8,7 @@ LIB_TLDEVELDIR = @LIB_TLDEVELDIR@
 
 # top_builddir = @top_builddir@
 
-SUBDIRS = src dev 
+SUBDIRS = src dev
 
 
 count:
