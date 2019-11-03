@@ -6,13 +6,15 @@ AC_INIT(kalign, 3.1.1)
 AC_USE_SYSTEM_EXTENSIONS
 AM_INIT_AUTOMAKE
 AC_PROG_CC
+AC_PROG_CXX
+AC_PROG_RANLIB
 AC_PROG_INSTALL
 AM_SILENT_RULES([no])
 
 LT_INIT
 
-AC_CONFIG_MACRO_DIRS([m4])
-
+# AC_CONFIG_MACRO_DIRS([m4])
+AC_CONFIG_MACRO_DIR([m4])
 
 # M4 macros for checking of CPU features.
 m4_include([m4/ax_gcc_x86_avx_xgetbv.m4])
@@ -21,6 +23,11 @@ m4_include([m4/ax_check_compile_flag.m4])
 m4_include([m4/ax_ext.m4])
 m4_include([m4/ax_openmp.m4])
 AX_EXT
+
+
+
+
+
 
 
 AC_ARG_ENABLE(openmp, [AC_HELP_STRING([--enable-openmp],[use OpenMP directives for parallelism])], enable_openmp=$enableval, enable_openmp=no)
@@ -109,8 +116,10 @@ AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T
 # Checks for library functions.
 AC_FUNC_MALLOC
+AC_FUNC_REALLOC
 AC_FUNC_STRNLEN
-AC_CHECK_FUNCS([gettimeofday pow realpath sqrt strstr])
+AC_FUNC_ERROR_AT_LINE
+AC_CHECK_FUNCS([gettimeofday pow realpath sqrt strstr memset])
 
 
 
