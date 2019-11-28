@@ -12,7 +12,7 @@ AM_LDFLAGS += -Wno-undef
 
 
 
-LIBS =  -lpthread -lm 
+LIBS =  -lpthread -lm -lrt
 
 
 #     AC_SUBST(HDF5_CFLAGS)
