@@ -362,7 +362,6 @@ ERROR:
 
 }
 
-#ifdef HAVE_AVX2
 void print_256(__m256i X)
 {
         alignas(32) uint64_t debug[4];
@@ -383,7 +382,7 @@ void print_256_all(__m256i X)
 }
 #endif
 
-#endif
+
 
 
 uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m)

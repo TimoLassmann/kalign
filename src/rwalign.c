@@ -24,6 +24,16 @@
 #include "msa.h"
 #include "alphabet.h"
 
+struct in_line{
+        char* line;
+        int len;
+};
+
+struct in_buffer{
+        struct in_line** l;
+        int n_lines;
+        int alloc_lines;
+};
 
 /* only local; */
 struct line_buffer{
@@ -42,9 +52,9 @@ struct out_line{
 
 
 
-struct msa* read_fasta(char* infile, struct msa* msa);
-struct msa* read_msf(char* infile, struct msa* msa);
-struct msa* read_clu(char* infile, struct msa* msa);
+struct msa* read_fasta(struct in_buffer* b, struct msa* msa);
+struct msa* read_msf(struct in_buffer* b, struct msa* msa);
+struct msa* read_clu(struct in_buffer* b, struct msa* msa);
 
 int write_msa_fasta(struct msa* msa,char* outfile);
 int write_msa_clustal(struct msa* msa,char* outfile);
@@ -65,9 +75,13 @@ struct line_buffer* alloc_line_buffer(int max_line_len);
 int resize_line_buffer(struct line_buffer* lb);
 void free_line_buffer(struct line_buffer* lb);
 
+static int read_file_stdin(struct in_buffer** buffer,char* infile);
+static int alloc_in_buffer(struct in_buffer** buffer, int n);
+static int resize_in_buffer(struct in_buffer* b);
+static void free_in_buffer(struct in_buffer* b);
 /* local helper functions  */
 
-static int detect_alignment_format(char* infile,int* type);
+static int detect_alignment_format(struct in_buffer* b,int* type);
 static int detect_aligned(struct msa* msa);
 static int detect_alphabet(struct msa* msa);
 static int set_sip_nsip(struct msa* msa);
@@ -145,38 +159,51 @@ int print_msa(struct msa* msa)
 
 struct msa* read_input(char* infile,struct msa* msa)
 {
-
+        struct in_buffer* b = NULL;
         int type;
 
-        ASSERT(infile != NULL,"No input file");
+        //ASSERT(infile != NULL,"No input file");
         /* sanity checks  */
-        if(!my_file_exists(infile)){
-                ERROR_MSG("File: %s does not exist.",infile);
+        if(infile){
+                if(!my_file_exists(infile)){
+                        ERROR_MSG("File: %s does not exist.",infile);
+                }
         }
 
         DECLARE_TIMER(timer);
 
         START_TIMER(timer);
-        RUN(detect_alignment_format(infile, &type));
+
+        /* read everything into a in_buffer  */
+
+
+        RUN(read_file_stdin(&b,infile));
+        //exit(0);
+
+        RUN(detect_alignment_format(b, &type));
+        //exit(0);
 
 
         if(type == FORMAT_FA){
-                RUNP(msa = read_fasta(infile,msa));
+                //RUNP(msa = read_msf(infile,msa));
+                //RUNP(msa = read_clu(infile,msa));
+                RUNP(msa = read_fasta(b,msa));
         }else if(type == FORMAT_MSF){
-                RUNP(msa = read_msf(infile,msa));
+                RUNP(msa = read_msf(b,msa));
         }else if(type == FORMAT_CLU){
-                RUNP(msa = read_clu(infile,msa));
+                RUNP(msa = read_clu(b,msa));
         }
 
         RUN(detect_alphabet(msa));
         RUN(detect_aligned(msa));
 
         RUN(set_sip_nsip(msa));
-
+        free_in_buffer(b);
         STOP_TIMER(timer);
         LOG_MSG("Done reading input sequences in %f seconds.", GET_TIMING(timer));
         return msa;
 ERROR:
+        free_msa(msa);
         return NULL;
 }
 
@@ -202,31 +229,42 @@ ERROR:
 
 /* detect alignment format  */
 
-int detect_alignment_format(char* infile,int* type)
+int detect_alignment_format(struct in_buffer*b,int* type)
 {
-        FILE* f_ptr = NULL;
-        char line[BUFFER_LEN];
+        //FILE* f_ptr = NULL;
+
+        char* line = NULL;
+        //size_t b_len = 0;
+        //ssize_t nread;
+
+        //char line[BUFFER_LEN];
         int hints[3];
         int line_len;
         int line_number;
         int set;
         int i;
-        ASSERT(infile != NULL,"No input file");
+        ASSERT(b != NULL,"No input file");
         /* sanity checks  */
-        if(!my_file_exists(infile)){
-                ERROR_MSG("File: %s does not exist.",infile);
-        }
+        //if(!my_file_exists(infile)){
+        //ERROR_MSG("File: %s does not exist.",infile);
+        //}
 
         line_number = 0;
         for(i = 0; i < 3; i++){
                 hints[i] =0;
         }
-        RUNP(f_ptr = fopen(infile, "r"));
+        for(i = 0; i < MACRO_MIN(b->n_lines, 100);i++){
+                line = b->l[i]->line;
+                line_len = b->l[i]->len;
+
+                //}
+        //RUNP(f_ptr = fopen(infile, "r"));
 
         /* scan through first line header  */
-        while(fgets(line, BUFFER_LEN, f_ptr)){
-                line_len = strnlen(line, BUFFER_LEN);
-                line[line_len-1] = 0;
+        //while ((nread = getline(&line, &b_len, f_ptr)) != -1){
+                //while(fgets(line, BUFFER_LEN, f_ptr)){
+                //line_len =  nread;//strnlen(line, BUFFER_LEN);
+        //line[line_len-1] = 0;
 
                 line_len--;
                 if(line[0] == '>'){
@@ -239,14 +277,12 @@ int detect_alignment_format(char* infile,int* type)
                 if(strstr(line, "CLUSTAL W")){
                         hints[2]++; /* clustal format  */
                 }
-
                 if(strstr(line, "CLUSTAL O")){
                         hints[2]++; /* clustal format  */
                 }
                 if(strstr(line, "!!AA_MULTIPLE_ALIGNMENT")){
                         hints[1]++;
                 }
-
                 if(strstr(line, "!!NA_MULTIPLE_ALIGNMENT")){
                         hints[1]++;
                 }
@@ -259,7 +295,8 @@ int detect_alignment_format(char* infile,int* type)
                 }
         }
 
-        fclose(f_ptr);
+        //fclose(f_ptr);
+        //MFREE(line);
         set = 0;
 
         for(i = 0; i < 3;i++){
@@ -273,8 +310,6 @@ int detect_alignment_format(char* infile,int* type)
         if(set > 1){
                 ERROR_MSG("Input format could not be unambiguously detected");
         }
-
-
         if(hints[0]){
                 *type = FORMAT_FA;
         }
@@ -388,7 +423,17 @@ int detect_aligned(struct msa* msa)
         if(min_len == max_len){
                 msa->aligned = 1;
         }
-        //LOG_MSG("Aligned: %d",msa->aligned);
+        if(!gaps && min_len == max_len){
+                msa->aligned = ALN_STATUS_ALIGNED;
+        }else if(!gaps && min_len != max_len){
+                msa->aligned = ALN_STATUS_UNALIGNED;
+        }else{
+                msa->aligned = ALN_STATUS_UNKNOWN;
+        }
+
+
+
+        LOG_MSG("Aligned: %d gaps: %d",msa->aligned,gaps);
         return OK;
 }
 
@@ -934,39 +979,53 @@ ERROR:
         return FAIL;
 }
 
-struct msa* read_clu(char* infile, struct msa* msa)
+struct msa* read_clu(struct in_buffer* b , struct msa* msa)
 {
         //struct msa* msa = NULL;
         struct msa_seq* seq_ptr = NULL;
-        FILE* f_ptr = NULL;
-        char line[BUFFER_LEN];
-        int line_len;
+        //FILE* f_ptr = NULL;
+        char* line = NULL;
+        //size_t b_len = 0;
+        //ssize_t nread;
         int i,j;
         char* p;
         int active_seq = 0;
-
+        int line_len;
+        int nl,ni;
         /* sanity checks  */
-        if(!my_file_exists(infile)){
-                ERROR_MSG("File: %s does not exist.",infile);
-        }
+        //if(!my_file_exists(infile)){
+        //ERROR_MSG("File: %s does not exist.",infile);
+        //}
         if(msa == NULL){
                 msa = alloc_msa();
         }
 
-        RUNP(f_ptr = fopen(infile, "r"));
-        LOG_MSG("GAGA");
+        //RUNP(f_ptr = fopen(infile, "r"));
+        //LOG_MSG("GAGA");
         /* scan through first line header  */
-        while(fgets(line, BUFFER_LEN, f_ptr)){
-                fprintf(stdout,"LINE: %s", line);
-                line_len = strnlen(line, BUFFER_LEN);
-                line[line_len-1] = 0;
+        //while(fgets(line, BUFFER_LEN, f_ptr)){
+        //while ((nread = getline(&line, &b_len, f_ptr)) != -1){
+                //fprintf(stdout,"LINE: %s", line);
+                //line_len = strnlen(line, BUFFER_LEN);
+        ni =0;
+        for(nl = 0; nl < b->n_lines;nl++){
+                line = b->l[nl]->line;
+                line_len = b->l[nl]->len;
+                ni++;
+                //line_len = nread;
+                //line[line_len-1] = 0;
                 line_len--;
                 break;
         }
         active_seq =0;
-        while(fgets(line, BUFFER_LEN, f_ptr)){
-                line_len = strnlen(line, BUFFER_LEN);
-                line[line_len-1] = 0;
+        for(nl = ni; nl < b->n_lines;nl++){
+                line = b->l[nl]->line;
+                line_len = b->l[nl]->len;
+                //while ((nread = getline(&line, &b_len, f_ptr)) != -1){
+                //while(fgets(line, BUFFER_LEN, f_ptr)){
+                //line_len = strnlen(line, BUFFER_LEN);
+                //line_len = nread;
+                //line[line_len-1] = 0;
                 line_len--;     /* last character is newline  */
                 if(!line_len){
                         active_seq = 0;
@@ -979,6 +1038,7 @@ struct msa* read_clu(char* infile, struct msa* msa)
                                 //p = strstr(line,seq_ptr->name);
                                 //if(p){
                                 //LOG_MSG("Found bitsof seq %s", seq_ptr->name);
+
                                 p = line;
                                 j = 0;
                                 for(i = 0;i < line_len;i++){
@@ -1012,7 +1072,8 @@ struct msa* read_clu(char* infile, struct msa* msa)
         }
         RUN(null_terminate_sequences(msa));
 
-        fclose(f_ptr);
+        //fclose(f_ptr);
+        //MFREE(line);
         return msa;
 ERROR:
         free_msa(msa);
@@ -1021,31 +1082,22 @@ ERROR:
 
 
 
-struct msa* read_msf(char* infile,struct msa* msa)
+struct msa* read_msf(struct in_buffer* b,struct msa* msa)
 {
-        //struct msa* msa = NULL;
         struct msa_seq* seq_ptr = NULL;
-        FILE* f_ptr = NULL;
-        char line[BUFFER_LEN];
+        char* line = NULL;
         int line_len;
-        int i,j;
+        int i,j,nl,li;
         char* p;
         int active_seq = 0;
-
-        /* sanity checks  */
-        if(!my_file_exists(infile)){
-                ERROR_MSG("File: %s does not exist.",infile);
-        }
         if(msa == NULL){
                 msa = alloc_msa();
         }
-
-        RUNP(f_ptr = fopen(infile, "r"));
-
-
-        while(fgets(line, BUFFER_LEN, f_ptr)){
-                line_len = strnlen(line, BUFFER_LEN);
-                line[line_len-1] = 0;
+        li = 0;
+        for(nl = 0; nl < b->n_lines;nl++){
+                line = b->l[nl]->line;
+                line_len = b->l[nl]->len;
+                li++;
                 line_len--;     /* last character is newline  */
                 //fprintf(stdout,"%d \"%s\"\n",line_len,line);
                 if(strstr(line, "//")){
@@ -1079,9 +1131,9 @@ struct msa* read_msf(char* infile,struct msa* msa)
                 }
         }
         active_seq =0;
-        while(fgets(line, BUFFER_LEN, f_ptr)){
-                line_len = strnlen(line, BUFFER_LEN);
-                line[line_len-1] = 0;
+        for(nl = li; nl < b->n_lines;nl++){
+                line = b->l[nl]->line;
+                line_len = b->l[nl]->len;
                 line_len--;     /* last character is newline  */
                 if(!line_len){
                         active_seq = 0;
@@ -1117,35 +1169,47 @@ struct msa* read_msf(char* infile,struct msa* msa)
         }
         RUN(null_terminate_sequences(msa));
 
-        fclose(f_ptr);
+        //fclose(f_ptr);
+        //MFREE(line);
         return msa;
 ERROR:
         free_msa(msa);
         return NULL;
 }
 
-struct msa* read_fasta(char* infile,struct msa* msa)
+struct msa* read_fasta( struct in_buffer* b,struct msa* msa)
 {
         //struct msa* msa = NULL;
         struct msa_seq* seq_ptr = NULL;
-        FILE* f_ptr = NULL;
-        char line[BUFFER_LEN];
+        //FILE* f_ptr = NULL;
+        char* line = NULL;
+        //size_t b_len = 0;
+        //ssize_t nread;
+
+        //char line[BUFFER_LEN];
         int line_len;
         int i;
+        int nl;
 
         /* sanity checks  */
-        if(!my_file_exists(infile)){
-                ERROR_MSG("File: %s does not exist.",infile);
-        }
+        //if(!my_file_exists(infile)){
+        //ERROR_MSG("File: %s does not exist.",infile);
+        //}
         if(msa == NULL){
                 msa = alloc_msa();
         }
 
-        RUNP(f_ptr = fopen(infile, "r"));
 
+        for(nl = 0; nl < b->n_lines;nl++){
+                line = b->l[nl]->line;
+                line_len = b->l[nl]->len;
+                //RUNP(f_ptr = fopen(infile, "r"));
 
-        while(fgets(line, BUFFER_LEN, f_ptr)){
-                line_len = strnlen(line, BUFFER_LEN);
+                //while ((nread = getline(&line, &b_len, f_ptr)) != -1){
+                //while(fgets(line, BUFFER_LEN, f_ptr)){
+                //line_len = nread;
+
+                //fprintf(stdout,"%d %d %s",line_len,nread,line);
                 if(line[0] == '>'){
                         /* alloc seq if buffer is full */
                         if(msa->alloc_numseq == msa->numseq){
@@ -1156,20 +1220,19 @@ struct msa* read_fasta(char* infile,struct msa* msa)
                         for(i =0 ; i < line_len;i++){
                                 if(isspace(line[i])){
                                         line[i] = 0;
-
                                 }
-
                         }
                         seq_ptr = msa->sequences[msa->numseq];
                         snprintf(seq_ptr->name ,MSA_NAME_LEN ,"%s",line+1);
                         msa->numseq++;
 
                 }else{
-
                         for(i = 0;i < line_len;i++){
                                 msa->letter_freq[(int)line[i]]++;
                                 if(isalpha((int)line[i])){
-
+                                        if(!seq_ptr){
+                                                ERROR_MSG("Encountered a sequence before encountering it's name");
+                                        }
                                         if(seq_ptr->alloc_len == seq_ptr->len){
                                                 resize_msa_seq(seq_ptr);
                                         }
@@ -1184,13 +1247,56 @@ struct msa* read_fasta(char* infile,struct msa* msa)
                 }
         }
         RUN(null_terminate_sequences(msa));
-        fclose(f_ptr);
+        //fclose(f_ptr);
+        //MFREE(line);
         return msa;
 ERROR:
         free_msa(msa);
+        //if(line){
+        //MFREE(line);
+        //}
+        //if(f_ptr){
+        //fclose(f_ptr);
+        //}
         return NULL;
 }
 
+int merge_msa(struct msa** dest, struct msa* src)
+{
+        int i;
+        struct msa* d = NULL;
+        d = *dest;
+        if(d == NULL){
+                d = alloc_msa();
+        }
+
+        if(d->L != 0){
+                if(d->L != src->L){
+                        ERROR_MSG("Input alignments have different alphabets");
+                }
+        }
+        for(i = 0; i < 128;i++){
+                d->letter_freq[i] += src->letter_freq[i];
+        }
+
+        for(i = 0; i < src->numseq;i++){
+                free_msa_seq(d->sequences[d->numseq]);
+                d->sequences[d->numseq] = src->sequences[i];
+                src->sequences[i] = NULL;
+                d->numseq++;
+                if(d->alloc_numseq == d->numseq){
+                        RUN(resize_msa(d));
+                }
+        }
+        RUN(detect_alphabet(d));
+        RUN(detect_aligned(d));
+        RUN(set_sip_nsip(d));
+
+        *dest = d;
+        return OK;
+ERROR:
+        return FAIL;
+}
 
 int null_terminate_sequences(struct msa* msa)
 {
@@ -1241,11 +1347,13 @@ struct msa* alloc_msa(void)
         msa->sequences = NULL;
         msa->alloc_numseq = 512;
         msa->numseq = 0;
+        msa->num_profiles = 0;
         msa->L = 0;
         msa->aligned = 0;
         msa->plen = NULL;
         msa->sip = NULL;
         msa->nsip = NULL;
+
 
         MMALLOC(msa->sequences, sizeof(struct msa_seq*) * msa->alloc_numseq);
 
@@ -1294,9 +1402,15 @@ void free_msa(struct msa* msa)
                                 MFREE(msa->sip[i]);
                         }
                 }
-                MFREE(msa->plen);
-                MFREE(msa->sip);
-                MFREE(msa->nsip);
+                if(msa->plen){
+                        MFREE(msa->plen);
+                }
+                if(msa->sip){
+                        MFREE(msa->sip);
+                }
+                if(msa->nsip){
+                        MFREE(msa->nsip);
+                }
 
                 MFREE(msa->sequences);
                 MFREE(msa);
@@ -1478,4 +1592,118 @@ int GCGchecksum(char *seq, int len)
                 chk = (chk + (i % 57 + 1) * (toupper((int) seq[i]))) % 10000;
         }
         return chk;
+}
+
+
+
+
+
+
+int read_file_stdin(struct in_buffer** buffer,char* infile)
+{
+        struct in_buffer* b = NULL;
+        FILE* f_ptr = NULL;
+        char* line = NULL;
+        char* tmp = NULL;
+        size_t b_len = 0;
+        ssize_t nread;
+
+        //char line[BUFFER_LEN];
+        int line_len;
+
+        b = *buffer;
+
+        if(!b){
+                RUN(alloc_in_buffer(&b, 1024));
+        }
+        if(infile){
+                if(!my_file_exists(infile)){
+                        ERROR_MSG("File: %s does not exist.",infile);
+                }
+                RUNP(f_ptr = fopen(infile, "r"));
+        }else{
+                f_ptr = stdin;
+        }
+
+        b->n_lines = 0;
+
+        while ((nread = getline(&line, &b_len, f_ptr)) != -1){
+                //while(fgets(line, BUFFER_LEN, f_ptr)){
+                line_len = nread;
+                //tmp = b->l[b->n_lines]->line;
+                tmp= NULL;
+                MMALLOC(tmp, sizeof(char) * (line_len));
+                memcpy(tmp, line, line_len);
+                tmp[line_len-1] = 0;
+                b->l[b->n_lines]->line = tmp;
+                b->l[b->n_lines]->len = line_len;
+                b->n_lines++;
+                if(b->n_lines == b->alloc_lines){
+                        RUN(resize_in_buffer(b));
+                }
+
+        }
+        fclose(f_ptr);
+        MFREE(line);
+        *buffer = b;
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+int alloc_in_buffer(struct in_buffer** buffer, int n)
+{
+        struct in_buffer* b = NULL;
+        int i;
+
+        MMALLOC(b, sizeof(struct in_buffer));
+        b->alloc_lines = n;
+        b->l = NULL;
+        b->n_lines = 0;
+
+        MMALLOC(b->l, sizeof(struct in_line*) * b->alloc_lines);
+        for(i = 0; i < b->alloc_lines;i++){
+                b->l[i] = NULL;
+                MMALLOC(b->l[i], sizeof(struct in_line));
+                b->l[i]->line = NULL;
+                b->l[i]->len =0;
+        }
+
+        *buffer = b;
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+int resize_in_buffer(struct in_buffer* b)
+{
+        int i,o;
+        o = b->alloc_lines;
+        b->alloc_lines = b->alloc_lines + b->alloc_lines / 2;
+        MREALLOC(b->l, sizeof(struct in_line*) * b->alloc_lines);
+        for(i = o; i < b->alloc_lines;i++){
+                b->l[i] = NULL;
+                MMALLOC(b->l[i], sizeof(struct in_line));
+                b->l[i]->line = NULL;
+                b->l[i]->len =0;
+        }
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+void free_in_buffer(struct in_buffer* b)
+{
+        int i;
+        if(b){
+                for(i = 0; i < b->n_lines ;i++){
+                        MFREE(b->l[i]->line);
+
+                }
+                for(i = 0; i < b->alloc_lines;i++){
+                        MFREE(b->l[i]);
+                }
+                MFREE(b->l);
+                MFREE(b);
+        }
 }

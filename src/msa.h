@@ -51,9 +51,6 @@ struct msa{
         int aligned;
         int letter_freq[128];
         int L;
-
-
-
 };
 
 /* dealign */
@@ -67,5 +64,7 @@ int convert_msa_to_internal(struct msa* msa, int type);
 struct msa* read_input(char* infile,struct msa* msa);
 int write_msa(struct msa* msa, char* outfile, int type);
 void free_msa(struct msa* msa);
+
+extern int merge_msa(struct msa** dest, struct msa* src);
 
 #endif

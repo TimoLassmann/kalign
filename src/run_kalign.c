@@ -131,9 +131,13 @@ int main(int argc, char *argv[])
         int version = 0;
         int c;
         int showw = 0;
-        struct parameters* param = NULL;
 
+        struct parameters* param = NULL;
+        char* in = NULL;
         RUNP(param = init_param());
+
+        param->num_infiles = 0;
+
 
         while (1){
                 static struct option long_options[] ={
@@ -192,9 +196,10 @@ int main(int argc, char *argv[])
                         break;
 
                 case 'i':
-                        param->num_infiles =1;
-                        MMALLOC(param->infile, sizeof(char*));
-                        param->infile[0] = optarg;
+                        in = optarg;
+                                //param->num_infiles =1;
+                                //MMALLOC(param->infile, sizeof(char*));
+                                //param->infile[0] = optarg;
 
                         break;
                 case 'o':
@@ -231,15 +236,47 @@ int main(int argc, char *argv[])
                 return EXIT_SUCCESS;
         }
 
+        param->num_infiles = 0;
+
+        if (!isatty(fileno(stdin))){
+                param->num_infiles++;
+        }
+        if(in){
+                param->num_infiles++;
+        }
         if (optind < argc){
-                c = param->num_infiles;
                 param->num_infiles += argc-optind;
-                MREALLOC(param->infile, sizeof(char*) * param->num_infiles);
+        }
+        if(param->num_infiles ==0){
+                LOG_MSG("No infiles");
+                free_parameters(param);
+                return EXIT_SUCCESS;
+        }
+        //fprintf(stdout,"%d fgiles\n",param->num_infiles);
+        MMALLOC(param->infile, sizeof(char*) * param->num_infiles);
+        c = 0;
+        if (!isatty(fileno(stdin))){
+                param->infile[c] = NULL;
+                c++;
+        }
+        if(in){
+                param->infile[c] = in;
+                c++;
+        }
+        if (optind < argc){
                 while (optind < argc){
                         param->infile[c] =  argv[optind++];
                         c++;
                 }
         }
+        //for(c = 0; c < param->num_infiles;c++){
+                /*if(param->infile[c]){
+                        fprintf(stdout,"%s\n", param->infile[c]);
+                }else{
+                        fprintf(stdout,"STDIN\n");
+                        }*/
+        //}
+        //exit(0);
 
         if(!param->format){
                 param->out_format = FORMAT_FA;
@@ -258,17 +295,26 @@ int main(int argc, char *argv[])
         }
 
         if (param->num_infiles == 0){
-                LOG_MSG("No infiles");
-                return EXIT_SUCCESS;
+                if (!isatty(fileno(stdin))){
+                        LOG_MSG("Maybe stdin,,,");
+                        param->num_infiles =1;
+                        MMALLOC(param->infile, sizeof(char*));
+                        param->infile[0] = NULL;
+                }else{
+                        LOG_MSG("No infiles");
+                        free_parameters(param);
+                        return EXIT_SUCCESS;
+                }
         }
-        if (param->num_infiles >= 2){
+        /*if (param->num_infiles >= 2){
                 LOG_MSG("Too many input files:");
                 for(c = 0; c < param->num_infiles;c++){
                         LOG_MSG("  %s",param->infile[c]);
                 }
                 LOG_MSG("Version %s only accepts one input file!\n", PACKAGE_VERSION);
+                free_parameters(param);
                 return EXIT_SUCCESS;
-        }
+                }*/
 
 
         log_command_line(argc, argv);
@@ -285,19 +331,32 @@ ERROR:
 int run_kalign(struct parameters* param)
 {
         struct msa* msa = NULL;
+        struct msa* tmp_msa = NULL;
         struct aln_param* ap = NULL;
 
         int** map = NULL;       /* holds all alignment paths  */
         int i;
 
         DECLARE_TIMER(t1);
-        /* Step 1: read all input sequences & figure out output  */
-        for(i = 0; i < param->num_infiles;i++){
-                RUNP(msa = read_input(param->infile[i],msa));
+
+        if(param->num_infiles == 1){
+                RUNP(msa = read_input(param->infile[0],msa));
+        }else{
+                for(i = 0; i < param->num_infiles;i++){
+                        RUNP(tmp_msa = read_input(param->infile[i],tmp_msa));
+                        RUN(merge_msa(&msa, tmp_msa));
+                        free_msa(tmp_msa);
+                        tmp_msa = NULL;
+                }
         }
 
-        LOG_MSG("Detected: %d sequences.", msa->numseq);
+        /* Step 1: read all input sequences & figure out output  */
+        //for(i = 0; i < param->num_infiles;i++){
+        //RUNP(msa = read_input(param->infile[i],msa));
+        //}
 
+        LOG_MSG("Detected: %d sequences.", msa->numseq);
+        //exit(0);
         /* If we just want to reformat end here */
         if(param->reformat){
                 //LOG_MSG("%s reformat",param->reformat);
@@ -309,6 +368,14 @@ int run_kalign(struct parameters* param)
                                 snprintf(msa->sequences[i]->name, 128, "SEQ%d", i+1);
                         }
                 }
+                if(param->out_format == FORMAT_FA){
+                        RUN(dealign_msa(msa));
+                }
+
+                if(param->out_format != FORMAT_FA && msa->aligned != ALN_STATUS_ALIGNED){
+                        ERROR_MSG("Input sequences are not aligned - cannot write to MSA format: %s", param->format);
+                }
+
                 if (byg_start(param->format,"fastaFASTAfaFA") != -1){
                         RUN(dealign_msa(msa));
                 }
@@ -316,7 +383,7 @@ int run_kalign(struct parameters* param)
                 free_msa(msa);
                 return OK;
         }
-        if(msa->aligned){
+        if(msa->aligned != ALN_STATUS_UNALIGNED){
                 RUN(dealign_msa(msa));
         }
 
@@ -357,5 +424,7 @@ int run_kalign(struct parameters* param)
         free_ap(ap);
         return OK;
 ERROR:
+        free_msa(tmp_msa);
+        free_msa(msa);
         return FAIL;
 }

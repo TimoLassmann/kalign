@@ -29,7 +29,6 @@
 #define redPROTEIN 13
 #define defDNA 5
 
-
 struct alphabet{
         int8_t to_internal[128];
         int8_t to_external[32];

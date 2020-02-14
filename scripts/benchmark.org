@@ -112,6 +112,7 @@
 
     #+BEGIN_SRC bash -n :results none :exports none :var tbl=Benchprograms :colnames yes
       cd
+
       cd ~/kalignbenchmark/programs
       for idx in ${!tbl[*]}; do
           #echo  ${tbl[$idx]} 
