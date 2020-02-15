@@ -11,6 +11,7 @@ Download tarball from [releases](https://github.com/TimoLassmann/kalign/releases
 ``` bash
 tar -zxvf kalign-<version>.tar.gz
 cd kalign-<version>
+./autogen.sh
 ./configure
 make 
 make check 
