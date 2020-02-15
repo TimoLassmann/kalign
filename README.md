@@ -4,11 +4,14 @@ Kalign is a fast multiple sequence alignment program for biological sequences.
 
 # Install
 
-## Source
+## Release Tarball 
+
+Download tarball from [releases](https://github.com/TimoLassmann/kalign/releases). Then: 
+
 ``` bash
-git clone https://github.com/TimoLassmann/kalign.git 
-cd kalign
-./autogen.sh
+tar -zxvf kalign-<version>.tar.gz
+cd kalign-<version>
+./configure
 make 
 make check 
 make install 
@@ -17,6 +20,17 @@ make install
 ## Homebrew
 ``` bash
 brew install brewsci/bio/kalign
+```
+
+## Developer version
+``` bash
+git clone https://github.com/TimoLassmann/kalign.git 
+cd kalign
+./autogen.sh
+./configure 
+make 
+make check 
+make install 
 ```
 
 # Usage
@@ -34,7 +48,21 @@ Options:
 
 Kalign expects the input to be a set of unaligned sequences in fasta format or aligned sequences in aligned fasta, MSF or clustal format. Kalign automatically detects whether the input sequences are protein, RNA or DNA.
 
+Since version 3.2.0 kalign supports passing sequence in via stdin and support alignment of sequences from multiple files. 
+
 # Examples
+
+Passing sequences via stdin:
+
+```
+cat input.fa | kalign -f fasta > out.afa 
+```
+
+Combining multiple input files:
+
+```
+kalign seqsA.fa seqsB.fa seqsC.fa -f fasta > combined.afa 
+```
 
 Align sequences and output the alignment in MSF format:
 

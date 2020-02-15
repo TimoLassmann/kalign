@@ -1,6 +1,6 @@
 2020-02-15 Timo Lassmann
 
-	version 3.2.1
+	version 3.2.0
 
 	Added support for reading sequences from standard input:
 
@@ -17,4 +17,5 @@
 	Minor:
 	- added m4 macros to enable / disable compiler flags
 	- added m4 macro for valgrind. Now there is a make target
-	called check-valgrind that run all tests through valgrind. 
+	called check-valgrind that run all tests through valgrind.
+	

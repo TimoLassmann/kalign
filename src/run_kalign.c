@@ -1,7 +1,7 @@
 /*
     Kalign - a multiple sequence alignment program
 
-    Copyright 2006, 2019 Timo Lassmann
+    Copyright 2006, 2019, 2020 Timo Lassmann
 
     This file is part of kalign.
 
@@ -57,7 +57,13 @@ int print_kalign_help(char * argv[])
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--format","Output format." ,"[Fasta]"  );
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--reformat","Reformat existing alignment." ,"[NA]"  );
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--version (-V/-v)","Prints version." ,"[NA]"  );
-        fprintf(stdout,"\n");
+
+        fprintf(stdout,"\nExamples:\n\n");
+
+        fprintf(stdout,"Passing sequences via stdin:\n\n   cat input.fa | kalign -f fasta > out.afa\n\n");
+        fprintf(stdout,"Combining multiple input files:\n\n   kalign seqsA.fa seqsB.fa seqsC.fa -f fasta > combined.afa\n\n");
+
+
         return OK;
 }
 
@@ -84,7 +90,7 @@ int print_kalign_header(void)
         fprintf(stdout,"\n");
         fprintf(stdout,"Kalign (%s)\n", PACKAGE_VERSION);
         fprintf(stdout,"\n");
-        fprintf(stdout,"Copyright (C) 2006,2019 Timo Lassmann\n");
+        fprintf(stdout,"Copyright (C) 2006,2019,2020 Timo Lassmann\n");
         fprintf(stdout,"\n");
         fprintf(stdout,"This program comes with ABSOLUTELY NO WARRANTY; for details type:\n");
         fprintf(stdout,"`kalign -showw'.\n");
@@ -242,7 +248,8 @@ int main(int argc, char *argv[])
                 param->num_infiles += argc-optind;
         }
         if(param->num_infiles ==0){
-                LOG_MSG("No infiles");
+                RUN(print_kalign_help(argv));
+                LOG_MSG("No input files");
                 free_parameters(param);
                 return EXIT_SUCCESS;
         }
