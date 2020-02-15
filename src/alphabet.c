@@ -34,7 +34,7 @@ int merge_codes(struct alphabet*a,const int X, const int Y);
 int print_alphabet(struct alphabet* a);
 
 
-int main(int argc, char *argv[])
+int main(void)
 {
         struct alphabet* a = NULL;
 

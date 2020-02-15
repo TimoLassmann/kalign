@@ -9,13 +9,13 @@ data/afa.good.3 \
 data/clustal.good.1 \
 data/clustal.good.2
 
+@VALGRIND_CHECK_RULES@
 
 TESTS_ENVIRONMENT = \
       myprog_abspath='$(top_srcdir)'/src/; \
          export myprog_abspath;\
 	      testdatafiledir='$(top_srcdir)'/dev/data/; \
          export testdatafiledir;
-	$(VALGRIND)
 
 
 TESTS = run_io_test.sh

@@ -288,7 +288,7 @@ float dna_distance_calculation(struct bignode* hash[],const uint8_t * p,const in
                         node_p = hash[hv];
                         while(node_p){
                                 tmp = node_p->pos;
-                                for(j = 0;j < node_p->num;j++){
+                                for(j = 0;j < (int) node_p->num;j++){
                                         d[tmp[j]]++;
                                 }
                                 node_p = node_p->next;
@@ -301,7 +301,7 @@ float dna_distance_calculation(struct bignode* hash[],const uint8_t * p,const in
                         node_p = hash[hv];
                         while(node_p){
                                 tmp = node_p->pos;
-                                for(j = 0;j < node_p->num;j++){
+                                for(j = 0;j < (int)node_p->num;j++){
                                         d[tmp[j]]++;
                                 }
                                 node_p = node_p->next;
@@ -312,7 +312,7 @@ float dna_distance_calculation(struct bignode* hash[],const uint8_t * p,const in
                         node_p = hash[hv];
                         while(node_p){
                                 tmp = node_p->pos;
-                                for(j = 0;j < node_p->num;j++){
+                                for(j = 0;j < (int)node_p->num;j++){
                                         d[tmp[j]]++;
                                 }
                                 node_p = node_p->next;
@@ -323,7 +323,7 @@ float dna_distance_calculation(struct bignode* hash[],const uint8_t * p,const in
                         node_p = hash[hv];
                         while(node_p){
                                 tmp = node_p->pos;
-                                for(j = 0;j < node_p->num;j++){
+                                for(j = 0;j < (int)node_p->num;j++){
                                         d[tmp[j]]++;
                                 }
                                 node_p = node_p->next;
@@ -334,7 +334,7 @@ float dna_distance_calculation(struct bignode* hash[],const uint8_t * p,const in
                         node_p = hash[hv];
                         while(node_p){
                                 tmp = node_p->pos;
-                                for(j = 0;j < node_p->num;j++){
+                                for(j = 0;j < (int)node_p->num;j++){
                                         d[tmp[j]]++;
                                 }
                                 node_p = node_p->next;
@@ -400,7 +400,7 @@ void big_print_nodes(struct bignode *n)
 {
         int i;
         while(n){
-                for (i = 0; i < n->num;i++){
+                for (i = 0; i < (int)n->num;i++){
                         fprintf(stderr,"%d ",n->pos[i]);
                 }
                 n = n->next;

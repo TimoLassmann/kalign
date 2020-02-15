@@ -67,8 +67,12 @@ int set_gap_penalties(float* prof,int len,int nsip);
 
 /* Main dyn programming functions */
 
-int hirsch_ss_dyn_score(const struct aln_param* ap, const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm, int* hirsch_path,float* score);
-int hirsch_align_two_ss_vector_score(const struct aln_param* ap,const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm,int old_cor[],float* score);
+//int hirsch_ss_dyn_score(const struct aln_param* ap, const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm, int* hirsch_path,float* score);
+
+int hirsch_ss_dyn_score(const struct aln_param* ap, const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm, float* score);
+int hirsch_align_two_ss_vector_score(const struct aln_param* ap,struct hirsch_mem* hm,int old_cor[],float* score);
+
+//int hirsch_align_two_ss_vector_score(const struct aln_param* ap,const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm,int old_cor[],float* score);
 /* Align 2 sequences  */
 int hirsch_ss_dyn(const struct aln_param* ap, const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm, int* hirsch_path);
 int hirsch_align_two_ss_vector(const struct aln_param* ap,const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm,int* hirsch_path,float input_states[],int old_cor[]);
@@ -279,7 +283,7 @@ int hirsch_ss_dyn(const struct aln_param* ap, const uint8_t* seq1,const uint8_t*
         return  OK;
 }
 
-int hirsch_ss_dyn_score(const struct aln_param* ap, const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm, int* hirsch_path,float* score)
+int hirsch_ss_dyn_score(const struct aln_param* ap, const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm, float* score)
 {
         int mid = ((hm->enda - hm->starta) / 2)+ hm->starta;
         //float input_states[6] = {hm->f[0].a,hm->f[0].ga,hm->f[0].gb,hm->b[0].a,hm->b[0].ga,hm->b[0].gb};
@@ -303,14 +307,14 @@ int hirsch_ss_dyn_score(const struct aln_param* ap, const uint8_t* seq1,const ui
         //fprintf(stderr,"Backward:%d-%d	%d-%d\n",hm->starta,hm->enda,hm->startb,hm->endb);
         backward_hirsch_ss_dyn(ap,seq1,seq2,hm);
 
-        hirsch_align_two_ss_vector_score(ap,seq1,seq2,hm,old_cor,score);
+        hirsch_align_two_ss_vector_score(ap,hm,old_cor,score);
 
 
         return  OK;
 }
 
 
-int hirsch_align_two_ss_vector_score(const struct aln_param* ap,const uint8_t* seq1,const uint8_t* seq2,struct hirsch_mem* hm,int old_cor[],float* score)
+int hirsch_align_two_ss_vector_score(const struct aln_param* ap,struct hirsch_mem* hm,int old_cor[],float* score)
 {
         struct states* f = hm->f;
         struct states* b = hm->b;
@@ -756,6 +760,9 @@ int hirsch_align_two_ss_vector(const struct aln_param* ap,const uint8_t* seq1,co
                 //fprintf(stderr,"Following last: %d\n",c+1);
                 hirsch_ss_dyn(ap,seq1,seq2,hm,hirsch_path);
                 break;
+        default:
+                break;
+
         }
 
         return OK;//hirsch_path;
@@ -1351,6 +1358,9 @@ int hirsch_align_two_ps_vector(const struct aln_param* ap,const float* prof1,con
                 //fprintf(stderr,"Following last: %d\n",c+1);
                 hirsch_ps_dyn(ap,prof1,seq2,hm,hirsch_path,sip);
                 break;
+        default:
+                break;
+
         }
 
         return OK;
@@ -1945,6 +1955,9 @@ int hirsch_align_two_pp_vector(const float* prof1,const float* prof2,struct hirs
                 //fprintf(stderr,"Following last: %d\n",c+1);
                 hirsch_pp_dyn(prof1,prof2,hm,hirsch_path);
                 break;
+        default:
+                break;
+
         }
 
         return OK;

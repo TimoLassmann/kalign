@@ -25,7 +25,8 @@
 
 //struct alignment* make_seq(struct alignment* aln,int a,int b,int* path);
 int make_seq(struct msa* msa,int a,int b,int* path);
-int update_gaps(int old_len,int*gis,int new_len,int *newgaps);
+//int update_gaps(int old_len,int*gis,int new_len,int *newgaps);
+int update_gaps(int old_len,int*gis,int *newgaps);
 
 int weave(struct msa* msa, int** map, int* tree)
 {
@@ -112,11 +113,11 @@ int make_seq(struct msa* msa,int a,int b,int* path)
                 c++;
         }
         for (i = msa->nsip[a];i--;){
-                RUN(update_gaps(msa->sequences[msa->sip[a][i]]->len, msa->sequences[msa->sip[a][i]]->gaps ,path[0],gap_a));
+                RUN(update_gaps(msa->sequences[msa->sip[a][i]]->len, msa->sequences[msa->sip[a][i]]->gaps,gap_a));
                 //RUN(update_gaps(aln->sl[aln->sip[a][i]],aln->gaps[aln->sip[a][i]],path[0],gap_a));
         }
         for (i = msa->nsip[b];i--;){
-                RUN(update_gaps(msa->sequences[msa->sip[b][i]]->len,msa->sequences[msa->sip[b][i]]->gaps,path[0],gap_b));
+                RUN(update_gaps(msa->sequences[msa->sip[b][i]]->len,msa->sequences[msa->sip[b][i]]->gaps,gap_b));
                 //RUN(update_gaps(aln->sl[aln->sip[b][i]],aln->gaps[aln->sip[b][i]],path[0],gap_b));
         }
         MFREE(gap_a);
@@ -126,9 +127,9 @@ ERROR:
         return FAIL;
 }
 
-int update_gaps(int old_len,int*gis,int new_len,int *newgaps)
+int update_gaps(int old_len,int*gis,int *newgaps)
 {
-        unsigned int i,j;
+        int i,j;
         int add = 0;
         int rel_pos = 0;
         for (i = 0; i <= old_len;i++){

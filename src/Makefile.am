@@ -2,15 +2,14 @@
 
 ACLOCAL_AMFLAGS = -I m4
 
+@VALGRIND_CHECK_RULES@
+
 AM_CFLAGS =  @SIMD_FLAGS@ @OPENMP_CFLAGS@
 CLEANFILES = ihmm_seq_itest_read_test.fa test_model_file.txt test.lfa test_dna.lfa libhdf5gluetest_exp.h5 libhdf5gluetest.h5 model_at_*h5 test1.h5 test2.h5
 
 # top_builddir = @top_builddir@
 AM_LDFLAGS = @DEAD_STRIP@
 AM_LDFLAGS += -Wno-undef
-
-
-
 
 LIBS =  -lpthread -lm
 
@@ -19,8 +18,6 @@ LIBS =  -lpthread -lm
 #     AC_SUBST(HDF5_CPPFLAGS)
 #     AC_SUBST(HDF5_LDFLAGS)
 #     AC_SUBST(HDF5_LIBS)
-
-AM_CPPFLAGS=
 
 
 
@@ -65,7 +62,8 @@ bpm.c
 
 check_PROGRAMS = edist alphabet misc_test bpm_test rwaln rstdin_test
 TESTS = edist alphabet  misc_test bpm_test rstdin_test
-TESTS_ENVIRONMENT = $(VALGRIND)
+
+# TESTS_ENVIRONMENT = $(VALGRIND)
 
 rwaln_SOURCES = \
 tldevel.h \

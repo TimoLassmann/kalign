@@ -1,5 +1,5 @@
 
-AC_INIT(kalign, 3.1.1)
+AC_INIT(kalign, 3.2.1)
 
 #AC_CONFIG_AUX_DIR([.])
 
@@ -16,18 +16,14 @@ LT_INIT
 # AC_CONFIG_MACRO_DIRS([m4])
 AC_CONFIG_MACRO_DIR([m4])
 
-# M4 macros for checking of CPU features.
-m4_include([m4/ax_gcc_x86_avx_xgetbv.m4])
-m4_include([m4/ax_gcc_x86_cpuid.m4])
-m4_include([m4/ax_check_compile_flag.m4])
 m4_include([m4/ax_ext.m4])
-m4_include([m4/ax_openmp.m4])
+m4_include([m4/ax_valgrind_check.m4])
+m4_include([m4/ax_check_compile_flag.m4])
+m4_include([m4/ax_set_compile_flags.m4])
+
 AX_EXT
 
-
-
-
-
+AX_ENABLE_DEBUG
 
 
 AC_ARG_ENABLE(openmp, [AC_HELP_STRING([--enable-openmp],[use OpenMP directives for parallelism])], enable_openmp=$enableval, enable_openmp=no)
@@ -135,49 +131,9 @@ esac
 AC_SUBST(DEAD_STRIP)
 
 
-AC_ARG_ENABLE(debugging,[AS_HELP_STRING([--enable-debugging],[include debugging code])
-AS_HELP_STRING([--enable-debugging=x],[also set diagnostics verbosity level to <x> (1-3)])],
-enable_debugging=$enableval, enable_debugging="no")
+AX_VALGRIND_DFLT([memcheck], [on])
+AX_VALGRIND_CHECK
 
-case $enable_debugging in
-yes)  AC_DEFINE(DEBUGLEVEL, 0,[No debugging. ]);;
-1)  AC_DEFINE(DEBUGLEVEL, 1,[Defines debugging level 1.]);;
-2)  AC_DEFINE(DEBUGLEVEL, 2,[Defines debugging level 2.]);;
-3)  AC_DEFINE(DEBUGLEVEL, 3,[Defines debugging level 3.]);;
-no)  AC_DEFINE(DEBUGLEVEL, 0,[No debugging.]);;
-*)  AC_MSG_ERROR([Unknown argument to --enable-debugging: $enable_debugging]);;
-esac
-
-if test "$enable_debugging" != "no"; then
-AC_DEFINE(DEBUG,1,[Defines debugging .])
-CFLAGS="-ggdb -pedantic -Wall -std=gnu11 -fdata-sections -ffunction-sections"
-else
-CFLAGS="-O3 -pedantic -funroll-loops -Wall -std=gnu11 -fdata-sections -ffunction-sections"
-DEBUG=0
-fi
-
-ac_configure_args="$ac_configure_args PACKAGE_VERSION=$PACKAGE_VERSION   PACKAGE_NAME=$PACKAGE_NAME"
-
-AC_ARG_ENABLE(valgrind-tests,
-[--enable-valgrind-tests run self tests under valgrind],
-opt_valgrind_tests="$enableval", opt_valgrind_tests="no")
-
-
-OPTS="-q --trace-children=no --error-exitcode=1 --leak-check=yes"
-# Run self-tests under valgrind?
-if test "$opt_valgrind_tests" = "yes"; then
-AC_DEFINE(DEBUG,1,[Defines debugging .])
-CFLAGS="-ggdb -pedantic -Wall -m64 -std=gnu11"
-AC_CHECK_PROGS(VALGRIND, valgrind)
-
-VALGRIND="$VALGRIND $OPTS"
-else
-VALGRIND=
-fi
-AC_MSG_CHECKING([whether self tests are run under valgrind])
-AC_MSG_RESULT($opt_valgrind_tests)
-
-ac_configure_args="$ac_configure_args PACKAGE_VERSION=$PACKAGE_VERSION   PACKAGE_NAME=$PACKAGE_NAME"
 
 AC_CONFIG_FILES([Makefile
 src/Makefile dev/Makefile])

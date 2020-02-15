@@ -44,11 +44,11 @@
 int run_kalign(struct parameters* param);
 
 int print_kalign_header(void);
-int print_kalign_help(int argc, char * argv[]);
+int print_kalign_help(char * argv[]);
 int print_kalign_warranty(void);
 int print_AVX_warning(void);
 
-int print_kalign_help(int argc, char * argv[])
+int print_kalign_help(char * argv[])
 {
         const char usage[] = " -i <seq file> -o <out aln> ";
         fprintf(stdout,"\nUsage: %s %s\n\n",basename(argv[0]) ,usage);
@@ -194,13 +194,8 @@ int main(int argc, char *argv[])
                 case 'V':
                         version = 1;
                         break;
-
                 case 'i':
                         in = optarg;
-                                //param->num_infiles =1;
-                                //MMALLOC(param->infile, sizeof(char*));
-                                //param->infile[0] = optarg;
-
                         break;
                 case 'o':
                         param->outfile = optarg;
@@ -210,7 +205,6 @@ int main(int argc, char *argv[])
                         exit(1);
                         break;
                 default:
-
                         abort ();
                 }
         }
@@ -231,7 +225,7 @@ int main(int argc, char *argv[])
 
         }
         if(param->help_flag){
-                RUN(print_kalign_help(argc, argv));
+                RUN(print_kalign_help(argv));
                 free_parameters(param);
                 return EXIT_SUCCESS;
         }

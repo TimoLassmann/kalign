@@ -32,7 +32,7 @@ float hsum_ps_sse3(__m128 v);
 
 
 #ifdef ITEST_EDIST
-int main(int argc, char *argv[])
+int main(void)
 {
         struct rng_state* rng;
 
@@ -45,15 +45,15 @@ int main(int argc, char *argv[])
 //        mat = galloc(mat,1000,8,0.0);
 //void* _mm_malloc (size_t size, size_t align)
 
-        MMALLOC(mat, sizeof(float*)* 1000);
-        for(i = 0; i < 1000;i++){
+        MMALLOC(mat, sizeof(float*)* 100);
+        for(i = 0; i < 100;i++){
                 mat[i] = _mm_malloc(sizeof(float)*num_element, 32);
         }
 
         RUNP( rng =init_rng(0));
         //srand48_r(time(NULL), &randBuffer);
 
-        for(i =0; i < 1000;i++){
+        for(i =0; i < 100;i++){
                 for(j = 0; j <num_element;j++){
                         //drand48_r(&randBuffer,&r);
                         r = tl_random_double(rng);
@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
         }
         LOG_MSG("Check for correctness.");
 #ifdef HAVE_AVX2
-        for(i = 0; i < 1000;i++){
+        for(i = 0; i < 100;i++){
                 for(j = 0; j <= i;j++){
                         edist_serial(mat[i], mat[j], num_element, &d1);
                         edist_256(mat[i], mat[j], num_element, &d2);
@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
         LOG_MSG("Timing serial");
         START_TIMER(t);
         for(c = 0; c < max_iter;c++){
-        for(i = 0; i < 1000;i++){
+        for(i = 0; i < 100;i++){
                 for(j = 0; j <= i;j++){
                         edist_serial(mat[i], mat[j], num_element, &d1);
 
@@ -93,7 +93,7 @@ int main(int argc, char *argv[])
         LOG_MSG("Timing AVX");
         START_TIMER(t);
         for(c = 0; c < max_iter; c++){
-        for(i = 0; i < 1000;i++){
+        for(i = 0; i < 100;i++){
                 for(j = 0; j <= i;j++){
 
                         edist_256(mat[i], mat[j], num_element, &d2);
@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
         LOG_MSG("%f\tsec.",GET_TIMING(t));
 
 #endif
-        for(i = 0; i < 1000;i++){
+        for(i = 0; i < 100;i++){
                 _mm_free(mat[i]);
         }
         MFREE(mat);

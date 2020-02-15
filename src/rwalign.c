@@ -345,11 +345,11 @@ int detect_alphabet(struct msa* msa)
                 protein[i] = 0;
         }
 
-        for(i = 0 ; i < strlen(DNA_letters);i++){
+        for(i = 0 ; i < (int)strlen(DNA_letters);i++){
                 DNA[(int) DNA_letters[i]] = 1;
         }
 
-        for(i = 0 ; i < strlen(protein_letters);i++){
+        for(i = 0 ; i < (int)strlen(protein_letters);i++){
                 protein[(int) protein_letters[i]] = 1;
         }
 
@@ -431,9 +431,7 @@ int detect_aligned(struct msa* msa)
                 msa->aligned = ALN_STATUS_UNKNOWN;
         }
 
-
-
-        LOG_MSG("Aligned: %d gaps: %d",msa->aligned,gaps);
+        //LOG_MSG("Aligned: %d gaps: %d",msa->aligned,gaps);
         return OK;
 }
 
@@ -618,7 +616,7 @@ int write_msa_msf(struct msa* msa,char* outfile)
         }
 
         for(i = 0; i < msa->numseq;i++){
-                max_name_len = MACRO_MAX(max_name_len, strnlen( msa->sequences[i]->name,MSA_NAME_LEN));
+                max_name_len = MACRO_MAX(max_name_len, (int)strnlen( msa->sequences[i]->name,MSA_NAME_LEN));
         }
 
         aln_len = 0;
@@ -860,7 +858,7 @@ int write_msa_clustal(struct msa* msa,char* outfile)
         }
 
         for(i = 0; i < msa->numseq;i++){
-                max_name_len = MACRO_MAX(max_name_len, strnlen( msa->sequences[i]->name,MSA_NAME_LEN));
+                max_name_len = MACRO_MAX(max_name_len, (int)strnlen( msa->sequences[i]->name,MSA_NAME_LEN));
         }
 
         aln_len = 0;
@@ -1275,6 +1273,12 @@ int merge_msa(struct msa** dest, struct msa* src)
                         ERROR_MSG("Input alignments have different alphabets");
                 }
         }
+        if(d->aligned != 0 && d->aligned != ALN_STATUS_UNKNOWN){
+                if(d->aligned != src->aligned){
+                        d->aligned = ALN_STATUS_UNKNOWN;
+                }
+        }
+
         for(i = 0; i < 128;i++){
                 d->letter_freq[i] += src->letter_freq[i];
         }

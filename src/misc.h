@@ -35,7 +35,7 @@
 #include "rng.h"
 
 
-extern int byg_detect(uint8_t* text,int n);
+
 extern int byg_start(char* pattern,char*text);
 extern int byg_end(char* pattern,char*text);
 extern int byg_count(char* pattern,char*text);

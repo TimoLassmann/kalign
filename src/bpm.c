@@ -56,7 +56,7 @@ void print_256_all(__m256i X);
 /* The actual test.  */
 int bpm_test(void);
 
-int main(int argc, char *argv[])
+int main(void)
 {
 
         /* Important set_broadcast_mask has to be called before using bpm_256!!! */
@@ -209,7 +209,7 @@ int bpm_test(void)
                         b[j] = a[j];
                 }
         }
-
+        MFREE(alphabet);
         MFREE(a);
         MFREE(b);
         MFREE(rng);
@@ -403,7 +403,7 @@ uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m)
                 B[i] = 0;
         }
 
-        for(i = 0; i < m;i++){
+        for(i = 0; i < (uint64_t)m;i++){
                 B[p[i]] |= (1ul << i);
         }
 
@@ -415,7 +415,7 @@ uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m)
         MASK = 1ul << (m);
 
         //fprintf(stdout,"BEGINNING\t%lu %lu\n",VN,VP);
-        for(i = 0; i < n;i++){
+        for(i = 0; i < (uint64_t) n;i++){
                 //        fprintf(stdout,"%lu:\t",i);
                 X = (B[t[i]] | VN);
                 //fprintf(stdout,"%lu ", X);

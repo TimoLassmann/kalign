@@ -105,7 +105,7 @@ char* make_cmd_line(const int argc,char* const argv[])
 
         c = 0;
         for(i =0 ; i < argc;i++){
-                for(j = 0; j < strlen(argv[i]);j++){
+                for(j = 0; j < (int) strlen(argv[i]);j++){
                         if(c == 16384-1){
                                 break;
                         }
@@ -304,7 +304,7 @@ ERROR:
 struct checkpoint* init_checkpoint(char* base_name,char* target_dir)
 {
         struct checkpoint* chk = NULL;
-        size_t i = 0;
+        int i = 0;
         int j;
         MMALLOC(chk, sizeof(struct checkpoint));
 
@@ -312,7 +312,7 @@ struct checkpoint* init_checkpoint(char* base_name,char* target_dir)
         chk->base_dir = NULL;
         chk->base_name = NULL;
 
-        i = strlen(target_dir);
+        i = (int) strlen(target_dir);
         MMALLOC(chk->base_dir, sizeof(char) * (i+1));
 
         for(j = 0;j < i;j++){

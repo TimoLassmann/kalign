@@ -1,0 +1,20 @@
+2020-02-15 Timo Lassmann
+
+	version 3.2.1
+
+	Added support for reading sequences from standard input:
+
+	cat file.fasta | kalign -f fasta | ....
+
+	Added support for combining multiple input files into one alignment:
+
+	kalign sequencesA.fa sequencesB.fa > msa.fa
+
+	Also works in combination:
+
+	cat file.fasta | kalign sequencesA.fa sequencesB.fa > msa.fa
+
+	Minor:
+	- added m4 macros to enable / disable compiler flags
+	- added m4 macro for valgrind. Now there is a make target
+	called check-valgrind that run all tests through valgrind. 
