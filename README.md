@@ -1,3 +1,5 @@
+![C/C++ CI](https://github.com/TimoLassmann/kalign/workflows/C/C++%20CI/badge.svg)
+
 # Kalign
 
 Kalign is a fast multiple sequence alignment program for biological sequences.
