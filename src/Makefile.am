@@ -11,18 +11,6 @@ CLEANFILES = ihmm_seq_itest_read_test.fa test_model_file.txt test.lfa test_dna.l
 AM_LDFLAGS = @DEAD_STRIP@
 AM_LDFLAGS += -Wno-undef
 
-
-LIBS =  -lpthread -lm -lrt
-
-#     AC_SUBST(HDF5_CFLAGS)
-#     AC_SUBST(HDF5_CPPFLAGS)
-#     AC_SUBST(HDF5_LDFLAGS)
-#     AC_SUBST(HDF5_LIBS)
-
-
-
-#LOGO_SOURCES = motif_logo.c motif_logo.h
-
 bin_PROGRAMS = timescorealn kalign
 
 
@@ -131,4 +119,4 @@ edist_CPPFLAGS = $(AM_CPPFLAGS) -DITEST_EDIST
 rstdin_test_SOURCES = \
 read_from_stdin_test.c \
 tldevel.h \
-tldevel.c 
+tldevel.c

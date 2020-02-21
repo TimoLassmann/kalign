@@ -1,5 +1,5 @@
 
-AC_INIT(kalign, 3.2.0)
+AC_INIT(kalign, 3.2.1)
 
 #AC_CONFIG_AUX_DIR([.])
 
@@ -11,9 +11,9 @@ AC_PROG_RANLIB
 AC_PROG_INSTALL
 AM_SILENT_RULES([no])
 
+
 LT_INIT
 
-# AC_CONFIG_MACRO_DIRS([m4])
 AC_CONFIG_MACRO_DIR([m4])
 
 m4_include([m4/ax_ext.m4])
@@ -25,7 +25,6 @@ AX_EXT
 
 AX_ENABLE_DEBUG
 
-
 AC_ARG_ENABLE(openmp, [AC_HELP_STRING([--enable-openmp],[use OpenMP directives for parallelism])], enable_openmp=$enableval, enable_openmp=no)
 
 if test "$enable_openmp" = "yes"; then
@@ -34,11 +33,10 @@ if test "$enable_openmp" = "yes"; then
 fi
 AC_SUBST(SIMD_FLAGS)
 
-
 AC_ARG_WITH([openmp],
     AS_HELP_STRING([--without-openmp], [Do not use OpenMP]))
-AS_IF([test "x$with_openmp" = "xno"], 
-            [], 
+AS_IF([test "x$with_openmp" = "xno"],
+            [],
             [AX_OPENMP(
                 AC_DEFINE([HAVE_OPENMP],[1],[Defined if OpenMP should and can be used])
              )]
@@ -86,20 +84,19 @@ fi
 # Checks for programs.
 AC_PROG_AWK
 AC_PROG_CC
-# Check for C11 _Generic support 
+# Check for C11 _Generic support
 AC_C__GENERIC
 AC_PROG_INSTALL
 
 
 AC_CHECK_LIB([m], [sqrt])
 AC_CHECK_LIB([pthread], [main])
-
+AC_SEARCH_LIBS([clock_gettime],[rt])
 
 # Checks for header files.
 AC_CHECK_HEADERS([math.h float.h stdlib.h unistd.h])
 AC_CHECK_HEADERS([sys/time.h])
 AC_CHECK_HEADERS([limits.h])
-
 
 AC_C_INLINE
 AC_TYPE_INT32_T
@@ -154,4 +151,5 @@ AC_MSG_NOTICE([           Host system: $host_cpu-$host_vendor-$host_os])
 AC_MSG_NOTICE([     Uname information: $UNAME_INFO])
 AC_MSG_NOTICE([    Installation point: $prefix])
 AC_MSG_NOTICE([            SIMD flags: $SIMD_FLAGS])
+AC_MSG_NOTICE([            SIMD flags: $LIBRT])
 AC_MSG_NOTICE([---------------------------------------------------------])

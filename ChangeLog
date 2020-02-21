@@ -1,3 +1,10 @@
+2020-02-22 Timo lassmann
+
+	version 3.2.1
+
+	minor bug fix removed "-lrt" required for old glibc versions and replaced
+	with a search in configure.ac: AC_SEARCH_LIBS([clock_gettime],[rt])
+
 2020-02-15 Timo Lassmann
 
 	version 3.2.0
