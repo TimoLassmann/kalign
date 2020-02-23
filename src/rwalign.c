@@ -863,10 +863,10 @@ int write_msa_clustal(struct msa* msa,char* outfile)
 
         aln_len = 0;
         for (j = 0; j <= msa->sequences[0]->len;j++){
-                aln_len+=  msa->sequences[0]->gaps[j];
+                aln_len += msa->sequences[0]->gaps[j];
         }
         aln_len += msa->sequences[0]->len;
-        LOG_MSG("%d", aln_len);
+        //LOG_MSG("%d", aln_len);
         MMALLOC(linear_seq, sizeof(char)* (aln_len+1));
 
 
@@ -909,7 +909,7 @@ int write_msa_clustal(struct msa* msa,char* outfile)
                                 resize_line_buffer(lb);
                         }
                         ol = lb->lines[lb->num_line];
-                        c = strnlen(seq->name, MSA_NAME_LEN);
+                        c = (int) strnlen(seq->name, MSA_NAME_LEN);
 
 
                         for(j = 0;j < c;j++){
@@ -1528,20 +1528,15 @@ int resize_line_buffer(struct line_buffer* lb)
                 lb->lines[i]->seq_id =0;
                 lb->lines[i]->line = NULL;
                 MMALLOC(lb->lines[i]->line,sizeof(char) * lb->max_line_len);
-
         }
-
-
         return OK;
 ERROR:
         return FAIL;
 }
 
-
 void free_line_buffer(struct line_buffer* lb)
 {
         int i;
-
         if(lb){
                 for(i = 0; i < lb->alloc_num_lines;i++){
                         MFREE(lb->lines[i]->line);
@@ -1550,7 +1545,6 @@ void free_line_buffer(struct line_buffer* lb)
                 MFREE(lb->lines);
                 MFREE(lb);
         }
-
 }
 
 
@@ -1597,11 +1591,6 @@ int GCGchecksum(char *seq, int len)
         }
         return chk;
 }
-
-
-
-
-
 
 int read_file_stdin(struct in_buffer** buffer,char* infile)
 {
