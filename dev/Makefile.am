@@ -1,13 +1,21 @@
 AUTOMAKE_OPTIONS = serial-tests
 AM_COLOR_TESTS=always
-EXTRA_DIST = run_io_test.sh \
+EXTRA_DIST = \
+run_io_test.sh \
+run_aln_test.sh \
 data/a2m.good.1 \
 data/a2m.good.2 \
 data/afa.good.1 \
 data/afa.good.2 \
 data/afa.good.3 \
 data/clustal.good.1 \
-data/clustal.good.2
+data/clustal.good.2 \
+data/BB11001.msf \
+data/BB11001.tfa \
+data/BB12006.msf \
+data/BB12006.tfa \
+data/BB30014.msf \
+data/BB30014.tfa
 
 @VALGRIND_CHECK_RULES@
 
@@ -18,8 +26,8 @@ TESTS_ENVIRONMENT = \
          export testdatafiledir;
 
 
-TESTS = run_io_test.sh
+TESTS = run_io_test.sh run_aln_test.sh
 
 
 
-CLEANFILES =  rwtest.clu  rwtest.fasta  rwtest.msf
+CLEANFILES =  rwtest.clu  rwtest.fasta  rwtest.msf test.afa

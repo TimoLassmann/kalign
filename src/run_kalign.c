@@ -40,6 +40,7 @@
 #define OPT_RENAME 3
 #define OPT_REFORMAT 4
 #define OPT_SHOWW 5
+#define OPT_DEVTEST 6
 
 int run_kalign(struct parameters* param);
 
@@ -137,7 +138,7 @@ int main(int argc, char *argv[])
         int version = 0;
         int c;
         int showw = 0;
-
+        int devtest = 0;
         struct parameters* param = NULL;
         char* in = NULL;
         RUNP(param = init_param());
@@ -152,6 +153,7 @@ int main(int argc, char *argv[])
                         {"set", required_argument,0,OPT_SET},
                         {"format",  required_argument, 0, 'f'},
                         {"reformat",  required_argument, 0, OPT_REFORMAT},
+                        {"devtest",  no_argument, 0, OPT_DEVTEST},
                         {"changename",  0, 0, OPT_RENAME},
                         {"input",  required_argument, 0, 'i'},
                         {"infile",  required_argument, 0, 'i'},
@@ -193,6 +195,9 @@ int main(int argc, char *argv[])
                         param->format = optarg;
                         param->reformat = 1;
                         break;
+                case OPT_DEVTEST:
+                        devtest =1 ;
+                        break;
                 case 'h':
                         param->help_flag = 1;
                         break;
@@ -228,7 +233,6 @@ int main(int argc, char *argv[])
                 print_kalign_warranty();
                 free_parameters(param);
                 return EXIT_SUCCESS;
-
         }
         if(param->help_flag){
                 RUN(print_kalign_help(argv));
@@ -279,6 +283,23 @@ int main(int argc, char *argv[])
         //}
         //exit(0);
 
+        if(devtest){
+                char* datadir = NULL;
+                char* tmp = NULL;
+                LOG_MSG("Start aln tests.");
+                datadir = getenv("testdatafiledir");
+                for(c = 0; c < param->num_infiles;c++){
+                        tmp = NULL;
+                        MMALLOC(tmp, sizeof(char) * 1024);
+                        if(!datadir){
+                                snprintf(tmp,1024, "%s",param->infile[c]);
+                        }else{
+                                snprintf(tmp,1024, "%s/%s", datadir, param->infile[c]);
+                        }
+                        param->infile[c] = tmp;
+                }
+        }
+
         if(!param->format){
                 param->out_format = FORMAT_FA;
         }else{
@@ -321,6 +342,12 @@ int main(int argc, char *argv[])
         log_command_line(argc, argv);
 
         RUN(run_kalign(param));
+
+        if(devtest){
+                for(c = 0; c < param->num_infiles;c++){
+                        MFREE(param->infile[c]);
+                }
+        }
         free_parameters(param);
         return EXIT_SUCCESS;
 ERROR:
@@ -406,7 +433,7 @@ int run_kalign(struct parameters* param)
         LOG_MSG("Done in %f sec.", GET_TIMING(t1));
 
         /* set to aligned */
-        msa->aligned = 1;
+        msa->aligned = ALN_STATUS_ALIGNED;
 
         RUN(weave(msa , map, ap->tree));
 

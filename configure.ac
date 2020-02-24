@@ -1,5 +1,5 @@
 
-AC_INIT(kalign, 3.2.1)
+AC_INIT(kalign, 3.2.2)
 
 #AC_CONFIG_AUX_DIR([.])
 
@@ -151,5 +151,4 @@ AC_MSG_NOTICE([           Host system: $host_cpu-$host_vendor-$host_os])
 AC_MSG_NOTICE([     Uname information: $UNAME_INFO])
 AC_MSG_NOTICE([    Installation point: $prefix])
 AC_MSG_NOTICE([            SIMD flags: $SIMD_FLAGS])
-AC_MSG_NOTICE([            SIMD flags: $LIBRT])
 AC_MSG_NOTICE([---------------------------------------------------------])

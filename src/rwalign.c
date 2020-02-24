@@ -99,10 +99,11 @@ int main(int argc, char *argv[])
 {
         struct msa* msa = NULL;
         char buffer[BUFFER_LEN];
-        LOG_MSG("Start io tests.");
+
 
         char* datadir = NULL;
 
+        LOG_MSG("Start io tests.");
         datadir = getenv("testdatafiledir");
         if(!datadir){
                 snprintf(buffer,BUFFER_LEN, "%s",argv[1]);
@@ -112,21 +113,22 @@ int main(int argc, char *argv[])
         LOG_MSG("reading: %s", buffer);
 
         RUNP(msa = read_input(buffer,NULL));
-        if(msa->aligned == 0){
+        if(msa->aligned == ALN_STATUS_UNKNOWN){
                 RUN(dealign_msa(msa));
         }
         //LOG_MSG("ALIGNED???%d", msa->aligned);
-        if(msa->aligned){
+        if(msa->aligned == ALN_STATUS_ALIGNED){
                 LOG_MSG("Writing in Clustal format");
                 RUN(write_msa_clustal(msa,"rwtest.clu"));
                 LOG_MSG("Writing in aligned fasta format");
                 RUN(write_msa_fasta(msa, "rwtest.fasta"));
                 LOG_MSG("Writing in MSF format");
                 RUN(write_msa_msf(msa,"rwtest.msf"));
-        }else{
+        }else if(msa->aligned == ALN_STATUS_UNALIGNED){
                 LOG_MSG("Writing in aligned fasta format");
                 RUN(write_msa_fasta(msa, "rwtest.fasta"));
-
+        }else if(msa->aligned == ALN_STATUS_UNKNOWN){
+                LOG_MSG("Unknown alignment status");
         }
         free_msa(msa);
         return EXIT_SUCCESS;
@@ -448,6 +450,7 @@ int dealign_msa(struct msa* msa)
                         seq->gaps[j] = 0;
                 }
         }
+        msa->aligned = ALN_STATUS_UNALIGNED;
         return OK;
 }
 
@@ -866,7 +869,7 @@ int write_msa_clustal(struct msa* msa,char* outfile)
                 aln_len += msa->sequences[0]->gaps[j];
         }
         aln_len += msa->sequences[0]->len;
-        //LOG_MSG("%d", aln_len);
+        LOG_MSG("%d", aln_len);
         MMALLOC(linear_seq, sizeof(char)* (aln_len+1));
 
 
@@ -1329,15 +1332,17 @@ int make_linear_sequence(struct msa_seq* seq, char* linear_seq)
                         f++;
 
                 }
+                //LOG_MSG("%d %d %d",j,f,seq->gaps[j]);
                 linear_seq[f] = seq->seq[j];
                 f++;
         }
         for(c = 0;c < seq->gaps[ seq->len];c++){
+                //LOG_MSG("%d %d",j,seq->gaps[seq->len]);
                 linear_seq[f] = '-';
                 f++;
         }
         linear_seq[f] = 0;
-        //fprintf(stdout,"LINEAR:%s\n",linear_seq);
+        ///fprintf(stdout,"LINEAR:%s\n",linear_seq);
         return OK;
 }
 
