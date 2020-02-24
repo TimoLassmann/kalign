@@ -4,7 +4,7 @@
 
 Kalign is a fast multiple sequence alignment program for biological sequences.
 
-# Install
+# Installation 
 
 ## Release Tarball 
 
@@ -34,6 +34,20 @@ cd kalign
 make 
 make check 
 make install 
+```
+
+on macOS, install [brew](https://brew.sh/) then: 
+
+``` bash 
+brew install libtool
+brew install automake
+git clone https://github.com/TimoLassmann/kalign.git 
+cd kalign
+./autogen.sh
+./configure 
+make 
+make check 
+make install
 ```
 
 # Usage
