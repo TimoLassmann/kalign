@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-echo "Running kalign basic io test:";
+echo "Running kalign basic alignment tests:";
 
 
 testfiles=("BB11001.msf" "BB11001.tfa" "BB12006.msf" "BB12006.tfa" "BB30014.msf" "BB30014.tfa")

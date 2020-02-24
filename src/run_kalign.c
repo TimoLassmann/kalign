@@ -286,6 +286,15 @@ int main(int argc, char *argv[])
         if(devtest){
                 char* datadir = NULL;
                 char* tmp = NULL;
+                int f;
+                f = 0;
+                for(c = 0; c < param->num_infiles;c++){
+                        param->infile[f] = param->infile[c];
+                        if(param->infile[c] != NULL){
+                                f++;
+                        }
+                }
+                param->num_infiles = f;
                 LOG_MSG("Start aln tests.");
                 datadir = getenv("testdatafiledir");
                 for(c = 0; c < param->num_infiles;c++){
