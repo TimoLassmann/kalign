@@ -1,20 +1,21 @@
 2020-02-23  Timo Lassmann
 
 	* version 3.2.2
-	Fixed minor bug in rwaln test routine. It assumed that the input alignments
-	are in correctly formatted (which was not true for one test case). The
-	kalign executable was nover affected by this.
+	- Fixed minor bug in rwaln test routine. It assumed that input alignments
+	were correctly formatted (which was not true for one test case). The
+	kalign executable was never affected by this.
+	- Added a script to test a few alignments.
 
 2020-02-22 Timo lassmann
 
-	version 3.2.1
+	* version 3.2.1
 
 	minor bug fix removed "-lrt" required for old glibc versions and replaced
 	with a search in configure.ac: AC_SEARCH_LIBS([clock_gettime],[rt])
 
 2020-02-15 Timo Lassmann
 
-	version 3.2.0
+	* version 3.2.0
 
 	Added support for reading sequences from standard input:
 
