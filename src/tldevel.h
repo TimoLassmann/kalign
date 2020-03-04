@@ -518,8 +518,15 @@ ALLOC_2D_ARRAY_DEF(double);
 
 
 #define DECLARE_TIMER(n) struct timespec ts1_##n; struct timespec ts2_##n;
+
+#ifdef CLOCK_MONOTONIC_RAW
 #define START_TIMER(n) clock_gettime(CLOCK_MONOTONIC_RAW, &ts1_##n);
 #define STOP_TIMER(n) clock_gettime(CLOCK_MONOTONIC_RAW, &ts2_##n);
+#else
+#define START_TIMER(n) gettimeofday(&ts1_##n);
+#define STOP_TIMER(n) gettimeofday(&ts2_##n);
+#endif
+
 #define GET_TIMING(n) (double)(ts2_##n.tv_sec - ts1_##n.tv_sec) + ((double)  ts2_##n.tv_nsec - ts1_##n.tv_nsec) / 1000000000.0
 
 
