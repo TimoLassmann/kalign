@@ -23,6 +23,7 @@
 #include "global.h"
 #include "msa.h"
 #include "alphabet.h"
+#include "esl_stopwatch.h"
 
 struct in_line{
         char* line;
@@ -172,6 +173,7 @@ struct msa* read_input(char* infile,struct msa* msa)
                 }
         }
 
+
         DECLARE_TIMER(timer);
 
         START_TIMER(timer);
@@ -202,7 +204,9 @@ struct msa* read_input(char* infile,struct msa* msa)
         RUN(set_sip_nsip(msa));
         free_in_buffer(b);
         STOP_TIMER(timer);
-        LOG_MSG("Done reading input sequences in %f seconds.", GET_TIMING(timer));
+        GET_TIMING(timer);
+        DESTROY_TIMER(timer);
+        //LOG_MSG("Done reading input sequences in %f seconds.", GET_TIMING(timer));
         return msa;
 ERROR:
         free_msa(msa);

@@ -17,6 +17,8 @@ bin_PROGRAMS = timescorealn kalign
 kalign_SOURCES = run_kalign.c \
 tldevel.h \
 tldevel.c \
+esl_stopwatch.h \
+esl_stopwatch.c \
 rng.h \
 rng.c \
 global.h \
@@ -56,6 +58,8 @@ TESTS = edist alphabet  misc_test bpm_test rstdin_test
 rwaln_SOURCES = \
 tldevel.h \
 tldevel.c \
+esl_stopwatch.h \
+esl_stopwatch.c \
 rwalign.c \
 alphabet.h \
 alphabet.c \
@@ -65,6 +69,8 @@ rwaln_CPPFLAGS = $(AM_CPPFLAGS) -DRWALIGN_TEST
 timescorealn_SOURCES = \
 tldevel.h \
 tldevel.c \
+esl_stopwatch.h \
+esl_stopwatch.c \
 time_and_score_aln.c \
 msa.h \
 parameters.h \
@@ -79,6 +85,8 @@ misc.c
 bpm_test_SOURCES = \
 tldevel.h \
 tldevel.c \
+esl_stopwatch.h \
+esl_stopwatch.c \
 rng.h \
 rng.c \
 bpm.h \
@@ -109,6 +117,8 @@ alphabet_CPPFLAGS = $(AM_CPPFLAGS) -DITEST_ALPHABET
 edist_SOURCES = \
 tldevel.h \
 tldevel.c \
+esl_stopwatch.h \
+esl_stopwatch.c \
 rng.h \
 rng.c \
 euclidean_dist.h \

@@ -516,12 +516,12 @@ ALLOC_2D_ARRAY_DEF(double);
 #define LOGSUM_SIZE 1600000
 #define SCALE 100000.0
 
-
+/*
 #define DECLARE_TIMER(n) struct timespec ts1_##n; struct timespec ts2_##n;
 #define START_TIMER(n) clock_gettime(CLOCK_MONOTONIC_RAW, &ts1_##n);
 #define STOP_TIMER(n) clock_gettime(CLOCK_MONOTONIC_RAW, &ts2_##n);
 #define GET_TIMING(n) (double)(ts2_##n.tv_sec - ts1_##n.tv_sec) + ((double)  ts2_##n.tv_nsec - ts1_##n.tv_nsec) / 1000000000.0
-
+*/
 
 #define DECLARE_CHK(n,dir) struct checkpoint* chk_##n = NULL;  RUNP( chk_##n =  init_checkpoint(TOSTRING(n),dir));
 

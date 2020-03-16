@@ -25,6 +25,8 @@
 
 #include "rng.h"
 
+
+
 #ifdef HAVE_AVX2
 #include <immintrin.h>
 
@@ -40,7 +42,9 @@ __m256i bitShiftRight256ymm (__m256i *data, int count);
 /* Below are test functions  */
 #ifdef BPM_UTEST
 
+
 #include "alphabet.h"
+#include "esl_stopwatch.h"
 
 /* Functions needed for the unit test*/
 uint8_t dyn_256(const uint8_t* t,const uint8_t* p,int n,int m);
@@ -177,19 +181,25 @@ int bpm_test(void)
         double dyn_timing;
         double bpm_timing;
         int timing_iter = 100;
-        fprintf(stdout,"Dyn\tAVX\tDYN/AVX\n");
+        //fprintf(stdout,"Dyn\tAVX\tDYN/AVX\n");
         DECLARE_TIMER(t);
+
+        START_TIMER(t);
         for(i = 0; i < 100;i+=10){
                 RUN(mutate_seq(b,len,i,alphabet->L,rng));
-                START_TIMER(t);
+
                 for(j = 0; j < timing_iter;j++){
                         dyn_score = dyn_256(a,b,len,len);
                 }
-                STOP_TIMER(t);
-                dyn_timing = GET_TIMING(t);
+                //dyn_timing = GET_TIMING(t);
+        }
+        STOP_TIMER(t);
+        GET_TIMING(t);
 
+        START_TIMER(t);
+        for(i = 0; i < 100;i+=10){
+                RUN(mutate_seq(b,len,i,alphabet->L,rng));
 
-                START_TIMER(t);
 #ifdef HAVE_AVX2
                 for(j = 0; j < timing_iter;j++){
                         bpm_score = bpm_256(a,b,len,len);
@@ -197,18 +207,19 @@ int bpm_test(void)
 #else
                 bpm_score = dyn_score;
 #endif
-                STOP_TIMER(t);
 
-                bpm_timing = GET_TIMING(t);
 
-                ASSERT(dyn_score == bpm_score, "Scores differ: %d %d.",dyn_score, bpm_score);
-                fprintf(stdout,"%f\t%f\t%f\n",dyn_timing,bpm_timing,  dyn_timing / bpm_timing);
+                //ASSERT(dyn_score == bpm_score, "Scores differ: %d %d.",dyn_score, bpm_score);
+                //fprintf(stdout,"%f\t%f\t%f\n",dyn_timing,bpm_timing,  dyn_timing / bpm_timing);
 
                 /* restore seq */
                 for(j = 0;j < len;j++){
                         b[j] = a[j];
                 }
         }
+        STOP_TIMER(t);
+        GET_TIMING(t);
+        DESTROY_TIMER(t);
         MFREE(alphabet);
         MFREE(a);
         MFREE(b);

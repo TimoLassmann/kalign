@@ -25,6 +25,8 @@
 #include <xmmintrin.h>
 #include <immintrin.h>
 #include "float.h"
+
+#include "esl_stopwatch.h"
 /* These functions were taken from:  */
 /* https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-float-vector-sum-on-x86 */
 float hsum256_ps_avx(__m256 v);
@@ -87,7 +89,8 @@ int main(void)
         }
         }
         STOP_TIMER(t);
-        LOG_MSG("%f\tsec.",GET_TIMING(t));
+        GET_TIMING(t);
+        //LOG_MSG("%f\tsec.",GET_TIMING(t));
 
 #ifdef HAVE_AVX2
         LOG_MSG("Timing AVX");
@@ -102,7 +105,8 @@ int main(void)
         }
         }
         STOP_TIMER(t);
-        LOG_MSG("%f\tsec.",GET_TIMING(t));
+        GET_TIMING(t);
+        //LOG_MSG("%f\tsec.",GET_TIMING(t));
 
 #endif
         for(i = 0; i < 100;i++){
@@ -111,6 +115,7 @@ int main(void)
         MFREE(mat);
 
         MFREE(rng);
+        DESTROY_TIMER(t);
         return EXIT_SUCCESS;
 ERROR:
         return EXIT_FAILURE;

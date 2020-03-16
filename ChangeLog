@@ -1,3 +1,8 @@
+2020-03-16  Timo Lassmann 
+
+	* version 3.2.3
+	- replaced timing code with code from the easel lib.
+
 2020-02-23  Timo Lassmann
 
 	* version 3.2.2

@@ -30,7 +30,7 @@
 #include "alignment.h"
 #include "weave_alignment.h"
 
-
+#include "esl_stopwatch.h"
 #include "misc.h"
 #include <getopt.h>
 #include "alphabet.h"
@@ -439,7 +439,8 @@ int run_kalign(struct parameters* param)
         START_TIMER(t1);
         RUNP(map = hirschberg_alignment(msa, ap));
         STOP_TIMER(t1);
-        LOG_MSG("Done in %f sec.", GET_TIMING(t1));
+        GET_TIMING(t1);
+        //LOG_MSG("Done in %f sec.", GET_TIMING(t1));
 
         /* set to aligned */
         msa->aligned = ALN_STATUS_ALIGNED;
@@ -459,6 +460,7 @@ int run_kalign(struct parameters* param)
 
         free_msa(msa);
         free_ap(ap);
+        DESTROY_TIMER(t1);
         return OK;
 ERROR:
         free_msa(tmp_msa);

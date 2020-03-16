@@ -1,5 +1,5 @@
 
-AC_INIT(kalign, 3.2.2)
+AC_INIT(kalign, 3.2.3)
 
 #AC_CONFIG_AUX_DIR([.])
 
@@ -7,7 +7,7 @@ AC_USE_SYSTEM_EXTENSIONS
 AM_INIT_AUTOMAKE
 AC_PROG_CC
 AC_PROG_CXX
-AC_PROG_RANLIB
+#AC_PROG_RANLIB
 AC_PROG_INSTALL
 AM_SILENT_RULES([no])
 
@@ -91,30 +91,38 @@ AC_PROG_INSTALL
 
 AC_CHECK_LIB([m], [sqrt])
 AC_CHECK_LIB([pthread], [main])
-AC_SEARCH_LIBS([clock_gettime],[rt])
+AC_SEARCH_LIBS([clock_gettime],[rt posix])
 
 # Checks for header files.
 AC_CHECK_HEADERS([math.h float.h stdlib.h unistd.h])
 AC_CHECK_HEADERS([sys/time.h])
+
+AC_CHECK_HEADERS([mach/mach.h])
+
 AC_CHECK_HEADERS([limits.h])
 
+
 AC_C_INLINE
+AC_TYPE_SIZE_T
+AC_TYPE_SSIZE_T
+
+AC_TYPE_INT8_T
 AC_TYPE_INT32_T
 AC_TYPE_INT64_T
-AC_TYPE_INT8_T
-AC_TYPE_SIZE_T
+
+AC_TYPE_UINT8_T
 AC_TYPE_UINT16_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
-AC_TYPE_UINT8_T
 # Checks for library functions.
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_FUNC_STRNLEN
 AC_FUNC_ERROR_AT_LINE
 AC_CHECK_FUNCS([gettimeofday pow realpath sqrt strstr memset])
-
-
+AC_CHECK_FUNCS([clock_gettime])
+AC_CHECK_FUNCS([gethrtime])
+AC_CHECK_FUNCS([gettimeofday])
 
 AC_CANONICAL_HOST
 case $host_os in

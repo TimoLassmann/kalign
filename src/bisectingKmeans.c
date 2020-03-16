@@ -30,7 +30,7 @@
 
 #include "alignment.h"
 #include "pick_anchor.h"
-
+#include "esl_stopwatch.h"
 struct node{
         struct node* left;
         struct node* right;
@@ -90,8 +90,8 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap)
         RUNP(dm = d_estimation(msa, anchors, num_anchors,0));//les,int pair)
 
         STOP_TIMER(timer);
-
-        LOG_MSG("Done in %f sec.", GET_TIMING(timer));
+        GET_TIMING(timer);
+        //LOG_MSG("Done in %f sec.", GET_TIMING(timer));
 
         MFREE(anchors);
 
@@ -111,8 +111,8 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap)
 
         RUNP(root = bisecting_kmeans(msa,root, dm, samples, numseq, num_anchors, numseq, ap->rng));
         STOP_TIMER(timer);
-
-        LOG_MSG("Done in %f sec.", GET_TIMING(timer));
+        GET_TIMING(timer);
+        //LOG_MSG("Done in %f sec.", GET_TIMING(timer));
 
         label_internal(root, numseq);
 
@@ -126,7 +126,7 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap)
                 _mm_free(dm[i]);
         }
         MFREE(dm);
-
+        DESTROY_TIMER(timer);
         return OK;
 ERROR:
         return FAIL;
