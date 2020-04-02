@@ -42,7 +42,8 @@
 #define OPT_SHOWW 5
 #define OPT_DEVTEST 6
 
-int run_kalign(struct parameters* param);
+static int run_kalign(struct parameters* param);
+static int check_for_sequences(struct msa* msa);
 
 int print_kalign_header(void);
 int print_kalign_help(char * argv[]);
@@ -242,6 +243,10 @@ int main(int argc, char *argv[])
 
         param->num_infiles = 0;
 
+        /* Not sure if this is the best way to detect stdin input */
+        /* I fixed this by attempting to read and checking for valid
+           sequences */
+
         if (!isatty(fileno(stdin))){
                 param->num_infiles++;
         }
@@ -264,6 +269,7 @@ int main(int argc, char *argv[])
                 param->infile[c] = NULL;
                 c++;
         }
+
         if(in){
                 param->infile[c] = in;
                 c++;
@@ -274,15 +280,8 @@ int main(int argc, char *argv[])
                         c++;
                 }
         }
-        //for(c = 0; c < param->num_infiles;c++){
-                /*if(param->infile[c]){
-                        fprintf(stdout,"%s\n", param->infile[c]);
-                }else{
-                        fprintf(stdout,"STDIN\n");
-                        }*/
-        //}
-        //exit(0);
 
+        /* Just for internal development & testing */
         if(devtest){
                 char* datadir = NULL;
                 char* tmp = NULL;
@@ -327,7 +326,7 @@ int main(int argc, char *argv[])
 
         if (param->num_infiles == 0){
                 if (!isatty(fileno(stdin))){
-                        LOG_MSG("Maybe stdin,,,");
+                        LOG_MSG("Attempting stdin");
                         param->num_infiles =1;
                         MMALLOC(param->infile, sizeof(char*));
                         param->infile[0] = NULL;
@@ -337,16 +336,6 @@ int main(int argc, char *argv[])
                         return EXIT_SUCCESS;
                 }
         }
-        /*if (param->num_infiles >= 2){
-                LOG_MSG("Too many input files:");
-                for(c = 0; c < param->num_infiles;c++){
-                        LOG_MSG("  %s",param->infile[c]);
-                }
-                LOG_MSG("Version %s only accepts one input file!\n", PACKAGE_VERSION);
-                free_parameters(param);
-                return EXIT_SUCCESS;
-                }*/
-
 
         log_command_line(argc, argv);
 
@@ -374,26 +363,23 @@ int run_kalign(struct parameters* param)
         int** map = NULL;       /* holds all alignment paths  */
         int i;
 
-        DECLARE_TIMER(t1);
-
         if(param->num_infiles == 1){
-                RUNP(msa = read_input(param->infile[0],msa));
+                RUN(read_input(param->infile[0],&msa));
         }else{
                 for(i = 0; i < param->num_infiles;i++){
-                        RUNP(tmp_msa = read_input(param->infile[i],tmp_msa));
-                        RUN(merge_msa(&msa, tmp_msa));
-                        free_msa(tmp_msa);
-                        tmp_msa = NULL;
+                        RUN(read_input(param->infile[i],&tmp_msa));
+                        if(tmp_msa){
+                                RUN(merge_msa(&msa, tmp_msa));
+                                free_msa(tmp_msa);
+                                tmp_msa = NULL;
+                        }
                 }
         }
-
-        /* Step 1: read all input sequences & figure out output  */
-        //for(i = 0; i < param->num_infiles;i++){
-        //RUNP(msa = read_input(param->infile[i],msa));
-        //}
+        /* check if we have sequences  */
+        RUN(check_for_sequences(msa));
 
         LOG_MSG("Detected: %d sequences.", msa->numseq);
-        //exit(0);
+
         /* If we just want to reformat end here */
         if(param->reformat){
                 //LOG_MSG("%s reformat",param->reformat);
@@ -435,6 +421,7 @@ int run_kalign(struct parameters* param)
                 RUN(convert_msa_to_internal(msa, defPROTEIN));
         }
         /* Start alignment stuff */
+        DECLARE_TIMER(t1);
         LOG_MSG("Aligning");
         START_TIMER(t1);
         RUNP(map = hirschberg_alignment(msa, ap));
@@ -465,5 +452,23 @@ int run_kalign(struct parameters* param)
 ERROR:
         free_msa(tmp_msa);
         free_msa(msa);
+        return FAIL;
+}
+
+int check_for_sequences(struct msa* msa)
+
+{
+        if(!msa){
+                ERROR_MSG("No sequences were found in the input files or standard input.");
+        }
+        if(msa->numseq < 2){
+                if(msa->numseq == 0){
+                        ERROR_MSG("No sequences were found in the input files or standard input.");
+                }else if (msa->numseq == 1){
+                        ERROR_MSG("Only 1 sequence was found in the input files or standard input");
+                }
+        }
+        return OK;
+ERROR:
         return FAIL;
 }

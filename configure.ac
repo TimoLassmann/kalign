@@ -1,5 +1,5 @@
 
-AC_INIT(kalign, 3.2.3)
+AC_INIT(kalign, 3.2.4)
 
 #AC_CONFIG_AUX_DIR([.])
 

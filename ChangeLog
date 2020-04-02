@@ -1,3 +1,9 @@
+2020-04-01  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+
+	* version 3.2.4
+	- Fixed issue relating to stdin input on clusters.
+	- Added more sanity checks
+
 2020-03-16  Timo Lassmann 
 
 	* version 3.2.3

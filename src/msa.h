@@ -25,6 +25,7 @@
 
 
 #define MSA_NAME_LEN 128
+#define FORMAT_DETECT_FAIL -1
 #define FORMAT_FA 1
 #define FORMAT_MSF 2
 #define FORMAT_CLU 3
@@ -61,7 +62,7 @@ int dealign_msa(struct msa* msa);
 int convert_msa_to_internal(struct msa* msa, int type);
 /* rw functions */
 
-struct msa* read_input(char* infile,struct msa* msa);
+int read_input(char* infile,struct msa** msa);
 int write_msa(struct msa* msa, char* outfile, int type);
 void free_msa(struct msa* msa);
 

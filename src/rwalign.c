@@ -53,9 +53,9 @@ struct out_line{
 
 
 
-struct msa* read_fasta(struct in_buffer* b, struct msa* msa);
-struct msa* read_msf(struct in_buffer* b, struct msa* msa);
-struct msa* read_clu(struct in_buffer* b, struct msa* msa);
+int read_fasta(struct in_buffer* b, struct msa** msa);
+int read_msf(struct in_buffer* b, struct msa** msa);
+int read_clu(struct in_buffer* b, struct msa** msa);
 
 int write_msa_fasta(struct msa* msa,char* outfile);
 int write_msa_clustal(struct msa* msa,char* outfile);
@@ -160,11 +160,12 @@ int print_msa(struct msa* msa)
 }
 #endif
 
-struct msa* read_input(char* infile,struct msa* msa)
+int read_input(char* infile,struct msa** msa)
 {
         struct in_buffer* b = NULL;
+        struct msa* m = NULL;
         int type;
-
+        int i,j;
         //ASSERT(infile != NULL,"No input file");
         /* sanity checks  */
         if(infile){
@@ -180,8 +181,23 @@ struct msa* read_input(char* infile,struct msa* msa)
 
         /* read everything into a in_buffer  */
 
-
         RUN(read_file_stdin(&b,infile));
+
+        /* Check if any input was read */
+        /* Logic: sum length of lines 1.. up to 5 */
+        //LOG_MSG("%s lines: %d", infile, b->n_lines);
+        j = 0;
+        for(i = 0; i < MACRO_MIN(1, b->n_lines);i++){
+                j += b->l[i]->len -1; /* exclude '0' at the end of strings  */
+                //fprintf(stdout,"%d %s\n", i, b->l[i]->line);
+        }
+        //LOG_MSG("Len: %d",j);
+        if(j == 0){
+                DESTROY_TIMER(timer);
+                free_in_buffer(b);
+                *msa = NULL;
+                return OK;
+        }
         //exit(0);
 
         RUN(detect_alignment_format(b, &type));
@@ -191,26 +207,39 @@ struct msa* read_input(char* infile,struct msa* msa)
         if(type == FORMAT_FA){
                 //RUNP(msa = read_msf(infile,msa));
                 //RUNP(msa = read_clu(infile,msa));
-                RUNP(msa = read_fasta(b,msa));
+                RUN(read_fasta(b,&m));
         }else if(type == FORMAT_MSF){
-                RUNP(msa = read_msf(b,msa));
+                RUN(read_msf(b,&m));
         }else if(type == FORMAT_CLU){
-                RUNP(msa = read_clu(b,msa));
+                RUN(read_clu(b,&m));
+        }else if(type == FORMAT_DETECT_FAIL){
+                if(infile){
+                        WARNING_MSG("Could not detect input in file: %s", infile);
+                }else{
+                        WARNING_MSG("Could not detect input in standard input");
+                }
+                /* clean up allocated structures */
+                free_in_buffer(b);
+                DESTROY_TIMER(timer);
+                *msa = NULL;
+                return OK;
         }
 
-        RUN(detect_alphabet(msa));
-        RUN(detect_aligned(msa));
+        RUN(detect_alphabet(m));
+        RUN(detect_aligned(m));
 
-        RUN(set_sip_nsip(msa));
+        RUN(set_sip_nsip(m));
         free_in_buffer(b);
         STOP_TIMER(timer);
         GET_TIMING(timer);
         DESTROY_TIMER(timer);
         //LOG_MSG("Done reading input sequences in %f seconds.", GET_TIMING(timer));
-        return msa;
+        *msa = m;
+        return OK;
 ERROR:
-        free_msa(msa);
-        return NULL;
+
+        free_msa(m);
+        return FAIL;
 }
 
 int write_msa(struct msa* msa, char* outfile, int type)
@@ -227,7 +256,6 @@ int write_msa(struct msa* msa, char* outfile, int type)
         }else{
                 ERROR_MSG("Output format not recognized.");
         }
-
         return OK;
 ERROR:
         return FAIL;
@@ -311,10 +339,12 @@ int detect_alignment_format(struct in_buffer*b,int* type)
                 }
         }
         if(set == 0){
-                ERROR_MSG("Input alignment format could not be detected.");
+                *type = FORMAT_DETECT_FAIL;
+                //ERROR_MSG("Input alignment format could not be detected.");
         }
         if(set > 1){
-                ERROR_MSG("Input format could not be unambiguously detected");
+                *type = FORMAT_DETECT_FAIL;
+                //ERROR_MSG("Input format could not be unambiguously detected");
         }
         if(hints[0]){
                 *type = FORMAT_FA;
@@ -984,9 +1014,9 @@ ERROR:
         return FAIL;
 }
 
-struct msa* read_clu(struct in_buffer* b , struct msa* msa)
+int read_clu(struct in_buffer* b , struct msa** m)
 {
-        //struct msa* msa = NULL;
+        struct msa* msa = NULL;
         struct msa_seq* seq_ptr = NULL;
         //FILE* f_ptr = NULL;
         char* line = NULL;
@@ -1077,18 +1107,18 @@ struct msa* read_clu(struct in_buffer* b , struct msa* msa)
         }
         RUN(null_terminate_sequences(msa));
 
-        //fclose(f_ptr);
-        //MFREE(line);
-        return msa;
+        *m = msa;
+        return OK;
 ERROR:
         free_msa(msa);
-        return NULL;
+        return FAIL;
 }
 
 
 
-struct msa* read_msf(struct in_buffer* b,struct msa* msa)
+int read_msf(struct in_buffer* b,struct msa** m)
 {
+        struct msa* msa = NULL;
         struct msa_seq* seq_ptr = NULL;
         char* line = NULL;
         int line_len;
@@ -1174,17 +1204,18 @@ struct msa* read_msf(struct in_buffer* b,struct msa* msa)
         }
         RUN(null_terminate_sequences(msa));
 
+        *m = msa;
         //fclose(f_ptr);
         //MFREE(line);
-        return msa;
+        return OK;
 ERROR:
         free_msa(msa);
-        return NULL;
+        return FAIL;
 }
 
-struct msa* read_fasta( struct in_buffer* b,struct msa* msa)
+int read_fasta( struct in_buffer* b,struct msa** m)
 {
-        //struct msa* msa = NULL;
+        struct msa* msa = NULL;
         struct msa_seq* seq_ptr = NULL;
         //FILE* f_ptr = NULL;
         char* line = NULL;
@@ -1252,9 +1283,10 @@ struct msa* read_fasta( struct in_buffer* b,struct msa* msa)
                 }
         }
         RUN(null_terminate_sequences(msa));
+        *m = msa;
         //fclose(f_ptr);
         //MFREE(line);
-        return msa;
+        return OK;
 ERROR:
         free_msa(msa);
         //if(line){
@@ -1263,7 +1295,7 @@ ERROR:
         //if(f_ptr){
         //fclose(f_ptr);
         //}
-        return NULL;
+        return FAIL;
 }
 
 int merge_msa(struct msa** dest, struct msa* src)
@@ -1630,6 +1662,7 @@ int read_file_stdin(struct in_buffer** buffer,char* infile)
         b->n_lines = 0;
 
         while ((nread = getline(&line, &b_len, f_ptr)) != -1){
+                //LOG_MSG("Read %d ", nread);
                 //while(fgets(line, BUFFER_LEN, f_ptr)){
                 line_len = nread;
                 //tmp = b->l[b->n_lines]->line;
