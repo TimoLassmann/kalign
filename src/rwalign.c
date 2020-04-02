@@ -113,7 +113,7 @@ int main(int argc, char *argv[])
         }
         LOG_MSG("reading: %s", buffer);
 
-        RUNP(msa = read_input(buffer,NULL));
+        RUN(read_input(buffer,&msa));
         if(msa->aligned == ALN_STATUS_UNKNOWN){
                 RUN(dealign_msa(msa));
         }
