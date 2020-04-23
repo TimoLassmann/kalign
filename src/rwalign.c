@@ -641,6 +641,7 @@ int write_msa_msf(struct msa* msa,char* outfile)
         int max_name_len = 0;
         int line_length;
         int header_index;
+        int written;
 
         if(!msa->aligned){
                 ERROR_MSG("Sequences appear to be unaligned!");
@@ -671,8 +672,9 @@ int write_msa_msf(struct msa* msa,char* outfile)
            1 for newline character +
            6 for spaces every 10 letters
         */
+        /* BUG: the header lines might be longer!!  */
         line_length = max_name_len +5 + 60 + 2+6 ;
-
+        line_length = MACRO_MAX(256, line_length);
         RUNP(lb = alloc_line_buffer(line_length));
 
         /* print header line
@@ -701,6 +703,7 @@ int write_msa_msf(struct msa* msa,char* outfile)
         }else{
                 snprintf(ol->line, line_length,"!!NA_MULTIPLE_ALIGNMENT 1.0");
         }
+
         ol->block = -1;
         ol->seq_id = header_index;
         header_index++;
@@ -719,7 +722,15 @@ int write_msa_msf(struct msa* msa,char* outfile)
                 ERROR_MSG("time failed???");
         }
         ol = lb->lines[lb->num_line];
-        snprintf(ol->line, line_length," %s  MSF: %d  Type: %c  %s  Check: %d  ..", outfile == NULL ? "kalign" : outfile,aln_len, msa->L == defPROTEIN ? 'P' : 'N', date, GCGMultchecksum(msa));
+
+        written = snprintf(ol->line, line_length," %s  MSF: %d  Type: %c  %s  Check: %d  ..", outfile == NULL ? "stdout" : basename(outfile),aln_len, msa->L == defPROTEIN ? 'P' : 'N', date, GCGMultchecksum(msa));
+
+        if(written >= line_length){
+                MREALLOC(lb->lines[lb->num_line]->line,sizeof(char) * (written+1));
+                ol = lb->lines[lb->num_line];
+                written = snprintf(ol->line, written+1," %s  MSF: %d  Type: %c  %s  Check: %d  ..", outfile == NULL ? "stdout" : basename(outfile),aln_len, msa->L == defPROTEIN ? 'P' : 'N', date, GCGMultchecksum(msa));
+
+        }
 
         ol->block = -1;
         ol->seq_id = header_index;
@@ -742,12 +753,23 @@ int write_msa_msf(struct msa* msa,char* outfile)
 
                 ol = lb->lines[lb->num_line];
 
-                snprintf(ol->line, line_length," Name: %-*.*s  Len:  %5d  Check: %4d  Weight: %.2f",
-                         max_name_len,max_name_len,
-                         msa->sequences[i]->name ,
-                         aln_len,
-                         GCGchecksum(msa->sequences[i]->seq, msa->sequences[i]->len),
-                         1.0);
+                written = snprintf(ol->line, line_length," Name: %-*.*s  Len:  %5d  Check: %4d  Weight: %.2f",
+                                   max_name_len,max_name_len,
+                                   msa->sequences[i]->name ,
+                                   aln_len,
+                                   GCGchecksum(msa->sequences[i]->seq, msa->sequences[i]->len),
+                                   1.0);
+                if(written >= line_length){
+                        MREALLOC(lb->lines[lb->num_line]->line,sizeof(char) * (written+1));
+                        ol = lb->lines[lb->num_line];
+                        written = snprintf(ol->line, written+1," Name: %-*.*s  Len:  %5d  Check: %4d  Weight: %.2f",
+                                           max_name_len,max_name_len,
+                                           msa->sequences[i]->name ,
+                                           aln_len,
+                                           GCGchecksum(msa->sequences[i]->seq, msa->sequences[i]->len),
+                                           1.0);
+                }
+
 
                 ol->block = -1;
                 ol->seq_id = header_index;
@@ -847,8 +869,6 @@ int write_msa_msf(struct msa* msa,char* outfile)
                                 break;
                         }
                 }
-
-
         }
 
 
@@ -903,7 +923,9 @@ int write_msa_clustal(struct msa* msa,char* outfile)
                 aln_len += msa->sequences[0]->gaps[j];
         }
         aln_len += msa->sequences[0]->len;
-        LOG_MSG("%d", aln_len);
+        //LOG_MSG("%d", aln_len);
+
+
         MMALLOC(linear_seq, sizeof(char)* (aln_len+1));
 
 
@@ -913,7 +935,7 @@ int write_msa_clustal(struct msa* msa,char* outfile)
            1 for newline character
         */
         line_length = max_name_len +5 + 60 + 2;
-
+        line_length = MACRO_MAX(256, line_length );
         RUNP(lb = alloc_line_buffer(line_length));
 
         /* print header line
