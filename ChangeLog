@@ -1,3 +1,9 @@
+2020-04-22  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+
+	* version 3.2.5
+	- Bug fix: when given long output named the first lines in msf
+	output could be truncated.
+
 2020-04-01  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
 
 	* version 3.2.4
