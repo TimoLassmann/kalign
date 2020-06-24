@@ -19,11 +19,11 @@ if test "$enable_debugging" != "no"; then
 AC_DEFINE(DEBUG,1,[Defines debugging .])
 
 ADD_DEBUG_COMPILE_WARNINGS
-CFLAGS="-ggdb -std=gnu11"
+CFLAGS="-ggdb -std=gnu11 ${CFLAGS}"
 CFLAGS="${CFLAGS} ${TLDEVEL_CFLAGS}"
 else
 ADD_PRODUCTION_COMPILE_WARNINGS
-CFLAGS="-O3 -std=gnu11"
+CFLAGS="-O3 -std=gnu11 ${CFLAGS}"
 CFLAGS="${CFLAGS} ${TLDEVEL_CFLAGS}"
 DEBUG=0
 fi
