@@ -23,11 +23,15 @@
 #include <omp.h>
 #endif
 
-#ifdef HAVE_AVX2
-#include <xmmintrin.h>
+#define SIMDE_ENABLE_NATIVE_ALIASES
+#include <simde/x86/sse.h>
+#if !defined(_SSE_NATIVE)
+  #include <stdlib.h>
+  #define _mm_malloc(size, align) aligned_alloc(align, size)
+  #define _mm_free free
+#else
+  #include <mm_malloc.h>
 #endif
-
-#include <mm_malloc.h>
 
 #include "tlrng.h"
 #include "msa.h"
@@ -472,13 +476,8 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                         score = 0.0f;
                         for(i = 0; i < num_samples;i++){
                                 s = samples[i];
-#ifdef HAVE_AVX2
                                 edist_256(dm[s], cl, num_anchors, &dl);
                                 edist_256(dm[s], cr, num_anchors, &dr);
-#else
-                                edist_serial(dm[s], cl, num_anchors, &dl);
-                                edist_serial(dm[s], cr, num_anchors, &dr);
-#endif
                                 score += MACRO_MIN(dl,dr);
 
                                 if(dr < dl){

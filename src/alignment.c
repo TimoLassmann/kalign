@@ -20,7 +20,8 @@
 
 */
 
-#include <xmmintrin.h>
+#define SIMDE_ENABLE_NATIVE_ALIASES
+#include <simde/x86/sse.h>
 #include "alignment.h"
 
 

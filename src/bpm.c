@@ -25,10 +25,8 @@
 
 #include "tlrng.h"
 
-
-
-#ifdef HAVE_AVX2
-#include <immintrin.h>
+#define SIMDE_ENABLE_NATIVE_ALIASES
+#include <simde/x86/avx2.h>
 
 __m256i BROADCAST_MASK[16];
 
@@ -37,7 +35,6 @@ __m256i bitShiftRight256ymm (__m256i *data, int count);
 
 /* taken from Alexander Yee: http://www.numberworld.org/y-cruncher/internals/addition.html#ks_add */
  __m256i add256(uint32_t carry, __m256i A, __m256i B);
-#endif
 
 /* Below are test functions  */
 #ifdef BPM_UTEST
@@ -51,11 +48,9 @@ uint8_t dyn_256(const uint8_t* t,const uint8_t* p,int n,int m);
 uint8_t dyn_256_print(const uint8_t* t,const uint8_t* p,int n,int m);
 int  mutate_seq(uint8_t* s, int len,int k,int L, struct rng_state* rng);
 
-#ifdef HAVE_AVX2
 /* For debugging */
 void print_256(__m256i X);
 void print_256_all(__m256i X);
-#endif
 
 /* The actual test.  */
 int bpm_test(void);
@@ -64,9 +59,7 @@ int main(void)
 {
 
         /* Important set_broadcast_mask has to be called before using bpm_256!!! */
-#ifdef HAVE_AVX2
         set_broadcast_mask();
-#endif
         RUN(bpm_test());
         return EXIT_SUCCESS;
 ERROR:
@@ -149,11 +142,7 @@ int bpm_test(void)
                 for (j =0 ; j < test_iter; j++){
                         RUN(mutate_seq(b,len,i,alphabet->L,rng));
                         dyn_score = dyn_256(a,b,len,len);
-#ifdef HAVE_AVX2
                         bpm_score = bpm_256(a,b,len,len);
-#else
-                        bpm_score = dyn_score;
-#endif
                         if( abs( dyn_score - bpm_score) != 0){
                                 fprintf(stdout,"Scores differ: %d (dyn) %d (bpm) (%d out of %d)\n", dyn_score,bpm_score, calc_errors , total_calc);
                                 calc_errors++;
@@ -200,13 +189,9 @@ int bpm_test(void)
         for(i = 0; i < 100;i+=10){
                 RUN(mutate_seq(b,len,i,alphabet->L,rng));
 
-#ifdef HAVE_AVX2
                 for(j = 0; j < timing_iter;j++){
                         bpm_score = bpm_256(a,b,len,len);
                 }
-#else
-                bpm_score = dyn_score;
-#endif
 
 
                 //ASSERT(dyn_score == bpm_score, "Scores differ: %d %d.",dyn_score, bpm_score);
@@ -373,7 +358,6 @@ ERROR:
 
 }
 
-#ifdef HAVE_AVX2
 void print_256(__m256i X)
 {
         alignas(32) uint64_t debug[4];
@@ -393,7 +377,6 @@ void print_256_all(__m256i X)
         fprintf(stdout,"\n");
 }
 
-#endif
 #endif
 
 
@@ -462,7 +445,6 @@ uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m)
 }
 
 
-#ifdef HAVE_AVX2
 uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
 {
         __m256i VP,VN,D0,HN,HP,X,NOTONE;
@@ -658,4 +640,3 @@ __m256i bitShiftRight256ymm (__m256i *data, int count)
         carryOut   = _mm256_xor_si256 (innerCarry, rotate);                        //FIXME: not sure if this is correct!!!
         return carryOut;
 }
-#endif

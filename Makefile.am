@@ -1,4 +1,4 @@
-EXTRA_DIST = version.sh autogen.sh VERSION
+EXTRA_DIST = version.sh autogen.sh VERSION src/simde
 
 ACLOCAL_AMFLAGS = -I m4
 

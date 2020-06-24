@@ -22,22 +22,24 @@
 
 #include "euclidean_dist.h"
 #include "tlrng.h"
-#ifdef HAVE_AVX2
-#include <xmmintrin.h>
-#include <immintrin.h>
-#endif
+#define SIMDE_ENABLE_NATIVE_ALIASES
+#include <simde/x86/avx.h>
 
-#include <mm_malloc.h>
+#if !defined(_SSE_NATIVE)
+  #include <stdlib.h>
+  #define _mm_malloc(size, align) aligned_alloc(align, size)
+  #define _mm_free free
+#else
+  #include <mm_malloc.h>
+#endif
 
 #include "float.h"
 
 #include "esl_stopwatch.h"
 /* These functions were taken from:  */
 /* https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-float-vector-sum-on-x86 */
-#ifdef HAVE_AVX2
 float hsum256_ps_avx(__m256 v);
 float hsum_ps_sse3(__m128 v);
-#endif
 
 #ifdef ITEST_EDIST
 int main(void)
@@ -69,7 +71,6 @@ int main(void)
                 }
         }
         LOG_MSG("Check for correctness.");
-#ifdef HAVE_AVX2
         for(i = 0; i < 100;i++){
                 for(j = 0; j <= i;j++){
                         edist_serial(mat[i], mat[j], num_element, &d1);
@@ -80,7 +81,6 @@ int main(void)
                         }
                 }
         }
-#endif
         DECLARE_TIMER(t);
 
         LOG_MSG("Timing serial");
@@ -98,7 +98,6 @@ int main(void)
         GET_TIMING(t);
         //LOG_MSG("%f\tsec.",GET_TIMING(t));
 
-#ifdef HAVE_AVX2
         LOG_MSG("Timing AVX");
         START_TIMER(t);
         for(c = 0; c < max_iter; c++){
@@ -114,7 +113,6 @@ int main(void)
         GET_TIMING(t);
         //LOG_MSG("%f\tsec.",GET_TIMING(t));
 
-#endif
         for(i = 0; i < 100;i++){
                 _mm_free(mat[i]);
         }
@@ -162,7 +160,6 @@ int edist_serial_d(const double* a,const double* b,const int len, double* ret)
         return OK;
 }
 
-#ifdef HAVE_AVX2
 
 int edist_256(const float* a,const float* b, const int len, float* ret)
 {
@@ -211,4 +208,3 @@ float hsum_ps_sse3(__m128 v)
         return        _mm_cvtss_f32(sums);
 }
 
-#endif

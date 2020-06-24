@@ -23,14 +23,12 @@
 #include "tldevel.h"
 #include "tlrng.h"
 
-#ifdef HAVE_AVX2
-#include <immintrin.h>
-#endif
+#define SIMDE_ENABLE_NATIVE_ALIASES
+#include <simde/x86/avx.h>
 
 #include "misc.h"
 #include  <stdalign.h>
 #include <string.h>
-#include <immintrin.h>
 #ifdef ITEST_MISC
 
 
