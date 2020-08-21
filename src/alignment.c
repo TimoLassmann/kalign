@@ -2380,9 +2380,7 @@ float* make_profile(struct aln_param* ap,const uint8_t* seq,const int len)
         int i,j,c;
         float** subm = NULL;
         float* prof = NULL;
-
         float gpo,gpe,tgpe;
-
 
         gpo = ap->gpo;
         gpe = ap->gpe;
@@ -2398,7 +2396,6 @@ float* make_profile(struct aln_param* ap,const uint8_t* seq,const int len)
         prof[23+32] = -gpo;
         prof[24+32] = -gpe;
         prof[25+32] = -tgpe;
-
 
         i = len;
         while(i--){

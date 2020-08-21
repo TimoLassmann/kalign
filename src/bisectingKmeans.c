@@ -27,7 +27,6 @@
 #include "bisectingKmeans.h"
 
 
-
 #include "global.h"
 #include "msa.h"
 #include "sequence_distance.h"
@@ -36,6 +35,7 @@
 #include "alignment.h"
 #include "pick_anchor.h"
 #include "esl_stopwatch.h"
+
 struct node{
         struct node* left;
         struct node* right;
@@ -49,6 +49,7 @@ struct kmeans_result{
         int nr;
         float score;
 };
+
 
 static struct kmeans_result* alloc_kmeans_result(int num_samples);
 static void free_kmeans_results(struct kmeans_result* k);
@@ -185,11 +186,7 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
         RUNP(res_tmp = alloc_kmeans_result(num_samples));
 
         best->score = FLT_MAX;
-        /* int sel[100]; */
-        /* for(t_iter = 0;t_iter < tries;t_iter++){ */
-        /*         sel[t_iter] = tl_random_int(rng  , num_samples); */
-        /* } */
-        
+
         for(t_iter = 0;t_iter < tries;t_iter++){
                 res_tmp->score = FLT_MAX;
                 sl = res_tmp->sl;
@@ -330,6 +327,7 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
                 res_tmp->score = score;
 
                 if(res_tmp->score < best->score){
+                        //LOG_MSG("Better!!! %f %f", res_tmp->score,best->score);
                         res_ptr = res_tmp;
                         res_tmp = best;
                         best = res_ptr;
@@ -352,7 +350,7 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
         _mm_free(cl);
         MFREE(samples);
         n = alloc_node();
-
+        /* LOG_MSG("Done"); */
         RUNP(n->left = bisecting_kmeans(msa,n->left, dm, sl, numseq, num_anchors, num_l,rng));
 
         RUNP(n->right = bisecting_kmeans(msa,n->right, dm, sr, numseq, num_anchors, num_r,rng));
