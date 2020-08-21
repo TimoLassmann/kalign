@@ -21,7 +21,7 @@
 */
 
 #include "euclidean_dist.h"
-#include "rng.h"
+#include "tlrng.h"
 #include <xmmintrin.h>
 #include <immintrin.h>
 #include "float.h"

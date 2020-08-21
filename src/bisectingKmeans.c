@@ -21,7 +21,7 @@
 */
 
 #include <xmmintrin.h>
-
+#include "tlrng.h"
 #include "msa.h"
 
 #include "bisectingKmeans.h"

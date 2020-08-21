@@ -23,7 +23,7 @@
 #include "bpm.h"
 #include  <stdalign.h>
 
-#include "rng.h"
+#include "tlrng.h"
 
 
 
@@ -42,7 +42,7 @@ __m256i bitShiftRight256ymm (__m256i *data, int count);
 /* Below are test functions  */
 #ifdef BPM_UTEST
 
-
+#include <string.h>
 #include "alphabet.h"
 #include "esl_stopwatch.h"
 

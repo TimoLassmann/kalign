@@ -26,6 +26,8 @@
 #include "global.h"
 #include "parameters.h"
 #include "misc.h"
+struct rng_state;
+
 struct aln_param{
         struct rng_state* rng;
         //struct drand48_data randBuffer;

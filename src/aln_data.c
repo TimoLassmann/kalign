@@ -20,6 +20,7 @@
 
 */
 
+#include "global.h"
 #include "aln_data.h"
 
 

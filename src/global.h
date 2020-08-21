@@ -39,4 +39,5 @@
 #define ALN_STATUS_ALIGNED 2   /* sequences have equal lengths and may or may not contain gaps*/
 #define ALN_STATUS_UNKNOWN 3     /* sequences have un-equal length and contain gaps  */
 
+#define BUFFER_LEN 128
 #endif

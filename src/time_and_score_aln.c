@@ -21,13 +21,17 @@
 */
 
 #include "global.h"
+
+#include "tlmisc.h"
+
 #include "msa.h"
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <getopt.h>
 
 #include <limits.h>
 #include <stdlib.h>
-
+#include <string.h> 
 #include "align_io.h"
 #include "misc.h"
 
@@ -251,11 +255,11 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
 
                 snprintf(param->infile[0], BUFFER_LEN*2, "%s",ref);
                 LOG_MSG("read reference alignment");
-                RUNP(ref_aln = read_input(param->infile[0],ref_aln));//  detect_and_read_sequences(param));
+                RUN(read_input(param->infile[0],&ref_aln));//  detect_and_read_sequences(param));
 
                 snprintf(param->infile[0], BUFFER_LEN*2, "%s/test.msf",path);
                 LOG_MSG("read test alignment");
-                RUNP(test_aln = read_input(param->infile[0],test_aln));//  detect_and_read_sequences(param));
+                RUN(read_input(param->infile[0],&test_aln));//  detect_and_read_sequences(param));
 
                 /* find all reference sequences in the test alignment  */
                 /* delete all other sequences  */

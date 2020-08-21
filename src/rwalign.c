@@ -20,10 +20,16 @@
 
 */
 
+
+#include "tlmisc.h"
+
 #include "global.h"
 #include "msa.h"
 #include "alphabet.h"
 #include "esl_stopwatch.h"
+
+#include <string.h>
+#include <ctype.h>
 
 struct in_line{
         char* line;

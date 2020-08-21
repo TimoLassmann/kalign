@@ -20,13 +20,18 @@
 
 */
 
+#include "tldevel.h"
+#include "tlrng.h"
+
+
 #include <immintrin.h>
 
 #include "misc.h"
 #include  <stdalign.h>
-
-#include "rng.h"
+#include <string.h>
+#include <immintrin.h>
 #ifdef ITEST_MISC
+
 
 #include "alphabet.h"
 
@@ -253,3 +258,21 @@ int shuffle_arr_r(int* arr,int n, struct rng_state* rng)
         }
         return OK;
 }
+
+char* basename(const char* name)
+{
+        int i= 0;
+        int c = 0;
+
+        while(1){
+                if(name[i] == '/'){
+                        c = i+1;
+                }
+                if(!name[i]){
+                        break;
+                }
+                i++;
+        }
+        return (char*)(name +c);
+}
+

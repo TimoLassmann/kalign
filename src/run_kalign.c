@@ -33,6 +33,8 @@
 #include "esl_stopwatch.h"
 #include "misc.h"
 #include <getopt.h>
+#include <string.h>
+
 #include "alphabet.h"
 
 #define OPT_SET 1
@@ -337,7 +339,7 @@ int main(int argc, char *argv[])
                 }
         }
 
-        log_command_line(argc, argv);
+        //log_command_line(argc, argv);
 
         RUN(run_kalign(param));
 

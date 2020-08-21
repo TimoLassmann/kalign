@@ -31,10 +31,10 @@
 #include <stdio.h>
 
 
-#include "tldevel.h"
-#include "rng.h"
+#include <stdint.h>
 
 
+struct rng_state;
 
 extern int byg_start(char* pattern,char*text);
 extern int byg_end(char* pattern,char*text);
@@ -52,6 +52,6 @@ uint16_t circ_hash(const uint8_t* x, const uint8_t length);
 //unsigned circ_hash_next(const int * x, unsigned length, int x_first, short unsigned h);
 uint16_t circ_hash_next(const uint8_t * x,const uint8_t length,const uint8_t x_first, uint16_t h);
 
-
+extern char* basename(const char* name);
 
 #endif

@@ -23,6 +23,9 @@
 #include "alignment_parameters.h"
 
 #include "alphabet.h"
+
+#include "tlrng.h"
+
 int set_subm_gaps(struct aln_param* ap);
 int set_subm_gaps_DNA(struct aln_param* ap);
 int set_param_number(struct aln_param* ap,int L, int sel);

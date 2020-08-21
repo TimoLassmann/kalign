@@ -68,7 +68,7 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
 
         if(pair){
 
-                RUNP(dm = galloc(dm,num_samples,num_samples,0.0f));
+                RUN(galloc(&dm,num_samples,num_samples));
                 for(i = 0; i < num_samples;i++){
 
                         seq_a = msa->sequences[samples[i]]->s;// aln->s[samples[i]];
