@@ -23,11 +23,10 @@
 #ifndef BISECTINGKMEANS_H
 #define BISECTINGKMEANS_H
 
-#include "global.h"
-#include "msa.h"
-
 #include "alignment_parameters.h"
-#include "sequence_distance.h"
 
-extern int build_tree_kmeans(struct msa* msa, struct aln_param* ap);
+
+struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct rng_state* rng);
+
+//extern int build_tree_kmeans(struct msa* msa, struct aln_param* ap);
 #endif

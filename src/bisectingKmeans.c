@@ -26,6 +26,11 @@
 
 #include "bisectingKmeans.h"
 
+
+
+#include "global.h"
+#include "msa.h"
+#include "sequence_distance.h"
 #include "euclidean_dist.h"
 
 #include "alignment.h"
@@ -36,7 +41,6 @@ struct node{
         struct node* right;
         int id;
 };
-
 
 struct kmeans_result{
         int* sl;
@@ -55,7 +59,7 @@ struct node* alloc_node(void);
 int label_internal(struct node*n, int label);
 int* readbitree(struct node* p,int* tree);
 void printTree(struct node* curr,int depth);
-struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct rng_state* rng);
+//struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct rng_state* rng);
 
 
 int build_tree_kmeans(struct msa* msa, struct aln_param* ap)
@@ -105,9 +109,7 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap)
         //RUNP(root = alloc_node());
 
         START_TIMER(timer);
-
         LOG_MSG("Building guide tree.");
-
 
         RUNP(root = bisecting_kmeans(msa,root, dm, samples, numseq, num_anchors, numseq, ap->rng));
         STOP_TIMER(timer);
@@ -156,7 +158,6 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
         int num_var;
 
         int stop = 0;
-
         if(num_samples < 100){
                 float** dm = NULL;
                 RUNP(dm = d_estimation(msa, samples, num_samples,1));// anchors, num_anchors,1));
@@ -184,7 +185,11 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
         RUNP(res_tmp = alloc_kmeans_result(num_samples));
 
         best->score = FLT_MAX;
-
+        /* int sel[100]; */
+        /* for(t_iter = 0;t_iter < tries;t_iter++){ */
+        /*         sel[t_iter] = tl_random_int(rng  , num_samples); */
+        /* } */
+        
         for(t_iter = 0;t_iter < tries;t_iter++){
                 res_tmp->score = FLT_MAX;
                 sl = res_tmp->sl;
@@ -209,7 +214,7 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
                         w[j] /= num_samples;
                 }
                 r = tl_random_int(rng  , num_samples);
-
+                //r = sel[t_iter];
 
                 s = samples[r];
                 //LOG_MSG("Selected %d\n",s);
