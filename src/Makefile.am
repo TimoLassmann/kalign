@@ -4,7 +4,8 @@ ACLOCAL_AMFLAGS = -I m4
 
 @VALGRIND_CHECK_RULES@
 
-AM_CFLAGS =  @SIMD_FLAGS@ @OPENMP_CFLAGS@
+AM_CFLAGS =  @SIMD_FLAGS@ @OPENMP_CFLAGS@ @TLDEVEL_CFLAGS@
+
 CLEANFILES = ihmm_seq_itest_read_test.fa test_model_file.txt test.lfa test_dna.lfa libhdf5gluetest_exp.h5 libhdf5gluetest.h5 model_at_*h5 test1.h5 test2.h5
 
 # top_builddir = @top_builddir@
@@ -136,3 +137,4 @@ rstdin_test_SOURCES = \
 read_from_stdin_test.c \
 tldevel.h \
 tldevel.c
+

@@ -1,16 +1,12 @@
 
 AC_INIT(kalign, 3.2.6)
 
-#AC_CONFIG_AUX_DIR([.])
-
 AC_USE_SYSTEM_EXTENSIONS
 AM_INIT_AUTOMAKE
 AC_PROG_CC
-AC_PROG_CXX
-#AC_PROG_RANLIB
+
 AC_PROG_INSTALL
 AM_SILENT_RULES([no])
-
 
 LT_INIT
 
@@ -24,6 +20,7 @@ m4_include([m4/ax_set_compile_flags.m4])
 AX_EXT
 
 AX_ENABLE_DEBUG
+
 
 AC_ARG_ENABLE(openmp, [AC_HELP_STRING([--enable-openmp],[use OpenMP directives for parallelism])], enable_openmp=$enableval, enable_openmp=no)
 
@@ -83,7 +80,7 @@ fi
 
 # Checks for programs.
 AC_PROG_AWK
-AC_PROG_CC
+#AC_PROG_CC
 # Check for C11 _Generic support
 AC_C__GENERIC
 AC_PROG_INSTALL
@@ -141,6 +138,13 @@ AX_VALGRIND_DFLT([memcheck], [on])
 AX_VALGRIND_CHECK
 
 
+AC_CANONICAL_HOST
+
+AC_SUBST([COMPILER]) COMPILER=`$CC --version | head -n 1`
+AC_SUBST([DATE]) DATE="`date`"
+AC_SUBST([UNAME_INFO]) UNAME_INFO=`uname -n`
+
+
 AC_CONFIG_FILES([Makefile
 src/Makefile dev/Makefile])
 
@@ -157,7 +161,12 @@ AC_MSG_NOTICE([               Version: $VERSION])
 AC_MSG_NOTICE([         Configured on: $DATE])
 AC_MSG_NOTICE([         Configured by: $USER])
 AC_MSG_NOTICE([           Host system: $host_cpu-$host_vendor-$host_os])
+AC_MSG_NOTICE([              Compiler: $COMPILER])
 AC_MSG_NOTICE([     Uname information: $UNAME_INFO])
 AC_MSG_NOTICE([    Installation point: $prefix])
+AC_MSG_NOTICE([                CFLAGS: $CFLAGS])
+AC_MSG_NOTICE([     Additional CFLAGS: $TLDEVEL_CFLAGS])
+AC_MSG_NOTICE([                  LIBS: $LIBS])
+AC_MSG_NOTICE([               LDFLAGS: $LDFLAGS])
 AC_MSG_NOTICE([            SIMD flags: $SIMD_FLAGS])
 AC_MSG_NOTICE([---------------------------------------------------------])

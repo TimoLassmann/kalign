@@ -1,8 +1,11 @@
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
+#ifdef HAVE_CONFIG_H
+#include "config.h"
 
+#endif
+#include <unistd.h>
 #include "tldevel.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 int main(void)
 

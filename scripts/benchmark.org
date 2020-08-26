@@ -598,7 +598,6 @@ EOT
    #+END_SRC
 
    #+RESULTS:
-   [[file:Balibase_scores.jpeg]]
 
     
    
@@ -754,7 +753,6 @@ mat <- rbind(mat, readquanttestscores("scores_quantest2_kalign2.csv","kalign2"))
 #+END_SRC
 
 #+RESULTS:
-[[file:Homfam_scores.jpeg]]
 
 
 

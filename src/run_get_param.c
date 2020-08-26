@@ -59,6 +59,7 @@ int pair_fill(struct counts* ap, uint8_t*a,uint8_t*b,int len,double id_threshold
 int print_probabilies(struct counts*ap);
 
 
+
 int main(int argc, char *argv[])
 {
         //struct alignment* aln = NULL;
