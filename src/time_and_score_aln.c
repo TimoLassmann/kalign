@@ -31,7 +31,7 @@
 
 #include <limits.h>
 #include <stdlib.h>
-#include <string.h> 
+#include <string.h>
 #include "align_io.h"
 #include "misc.h"
 
@@ -231,7 +231,7 @@ int timescore(char* test,char* ref, char* program,char* scratch,char* out_file_n
         RUNP(pipe = popen(cmd,"r"));
         //if (system("which gnuplot"))
         while (fgets(ret, BUFFER_LEN, pipe)){
-                fprintf(stderr,"%s", ret);
+                //fprintf(stderr,"%s", ret);
         }
 
         rc = pclose(pipe);

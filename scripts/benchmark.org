@@ -390,17 +390,17 @@
      if [ $HAS_SLURM = 1 ]; then 
          echo "YES"
          sbatch <<EOT
-#!/usr/bin/env bash
+     #!/usr/bin/env bash
 
-#SBATCH --cpus-per-task=$CPU
-#SBATCH --mem=$SLURMMEM
-#SBATCH -t 10-12:30 # time (D-HH:MM)
-#SBATCH -o slurm.%N.%j.out # STDOUT
-#SBATCH -e slurm.%N.%j.err # STDERR
+     #SBATCH --cpus-per-task=$CPU
+     #SBATCH --mem=$SLURMMEM
+     #SBATCH -t 10-12:30 # time (D-HH:MM)
+     #SBATCH -o slurm.%N.%j.out # STDOUT
+     #SBATCH -e slurm.%N.%j.err # STDERR
 
-$CMD
-exit 0
-EOT
+     $CMD
+     exit 0
+     EOT
      else 
          $CMD 
      fi
@@ -432,96 +432,95 @@ EOT
 
 * Run alignment programs  
 
-    #+BEGIN_SRC bash -n :tangle gen_cmd.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
-      <<scratchdir>>
-    #+END_SRC
+  #+BEGIN_SRC bash -n :tangle gen_cmd.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
+    <<scratchdir>>
+  #+END_SRC
 
-    #+BEGIN_SRC bash -n :tangle gen_cmd.sh :noweb yes :exports code :results none :noweb yes 
+  #+BEGIN_SRC bash -n :tangle gen_cmd.sh :noweb yes :exports code :results none :noweb yes 
 
-      DIR=`pwd`
-      function usage()
-      {
-          printf "This script will generate scripts to run kalign, clustal omega and muscle on the balibase MSA benchmark data set.\n\n" ;
-          printf "usage: $0\n\n" ;
-          exit 1;
-      }
+    DIR=`pwd`
+    function usage()
+    {
+        printf "This script will generate scripts to run kalign, clustal omega and muscle on the balibase MSA benchmark data set.\n\n" ;
+        printf "usage: $0\n\n" ;
+        exit 1;
+    }
 
-      while getopts h  opt
-      do
-          case ${opt} in
-              h) usage;;
-              ,*) usage;;
-          esac
-      done
+    while getopts h  opt
+    do
+        case ${opt} in
+            h) usage;;
+            ,*) usage;;
+        esac
+    done
 
-      printf "Generating balibase run commands\n";
+    printf "Generating balibase run commands\n";
 
-      find ~/kalignbenchmark/data/bb3_release -name "*.tfa" |\
-          awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/);\
-                                          printf "run_aln.sh -p kalign -i %s -f msf -o %s/%s_%s_kalign.msf\n", $1,outdir,a[n-2],a[n-1];\
-                                          printf "run_aln.sh -p kalign2 -i %s -f msf -o %s/%s_%s_kalign2.msf\n", $1,outdir,a[n-2],a[n-1];\
-                                          printf "run_aln.sh -p muscle -i %s -f msf -o %s/%s_%s_muscle.msf\n", $1,outdir,a[n-2],a[n-1];\
-                                          printf "run_aln.sh -p clustal -i %s -f msf -o %s/%s_%s_clustal.msf\n", $1,outdir,a[n-2],a[n-1];\
-                               }' > run_benchmark.sh
+    find ~/kalignbenchmark/data/bb3_release -name "*.tfa" |\
+        awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/);\
+                                        printf "run_aln.sh -p kalign -i %s -f msf -o %s/%s_%s_kalign.msf\n", $1,outdir,a[n-2],a[n-1];\
+                                        printf "run_aln.sh -p kalign2 -i %s -f msf -o %s/%s_%s_kalign2.msf\n", $1,outdir,a[n-2],a[n-1];\
+                                        printf "run_aln.sh -p muscle -i %s -f msf -o %s/%s_%s_muscle.msf\n", $1,outdir,a[n-2],a[n-1];\
+                                        printf "run_aln.sh -p clustal -i %s -f msf -o %s/%s_%s_clustal.msf\n", $1,outdir,a[n-2],a[n-1];\
+                             }' > run_benchmark.sh
 
 
-      printf "Generating bralibase run commands\n";
+    printf "Generating bralibase run commands\n";
 
-      find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2  -name "*_test.fa" |\
-          grep unaligned |\
-          awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/);\
-                                        printf "run_aln.sh -p kalign -i %s -f msf -o %s/%s_%s_%s_kalign.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2];\
-                                        printf "run_aln.sh -p kalign2 -i %s -f msf -o %s/%s_%s_%s_kalign2.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2];\
-                                        printf "run_aln.sh -p muscle -i %s -f msf -o %s/%s_%s_%s_muscle.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2];\
-                                        printf "run_aln.sh -p clustal -i %s -f msf -o %s/%s_%s_%s_clustal.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2];\
-                 }' >> run_benchmark.sh
+    find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2  -name "*_test.fa" |\
+        grep unaligned |\
+        awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/);\
+                                      printf "run_aln.sh -p kalign -i %s -f msf -o %s/%s_%s_%s_kalign.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2];\
+                                      printf "run_aln.sh -p kalign2 -i %s -f msf -o %s/%s_%s_%s_kalign2.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2];\
+                                      printf "run_aln.sh -p muscle -i %s -f msf -o %s/%s_%s_%s_muscle.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2];\
+                                      printf "run_aln.sh -p clustal -i %s -f msf -o %s/%s_%s_%s_clustal.msf\n", $1,outdir,a[n-4],a[n-3],a[n-2];\
+               }' >> run_benchmark.sh
 
-      printf "Generating Quantest2 run commands\n";
+    printf "Generating Quantest2 run commands\n";
 
-      find ~/kalignbenchmark/data/QuanTest2/Test -name "*.vie" |\
-          awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/);\
-                    printf "run_aln.sh -p kalign -i %s -o %s/%s_kalign.afa\n", $1,outdir,a[n-1];\
-                    printf "run_aln.sh -p kalign2 -i %s -o %s/%s_kalign2.afa\n", $1,outdir,a[n-1];\
-                    printf "run_aln.sh -p muscle -i %s -o %s/%s_muscle.afa\n", $1,outdir,a[n-1];\
-                    printf "run_aln.sh -p clustal -i %s -o %s/%s_clustal.afa\n", $1,outdir,a[n-1];\
-      }' >>  run_benchmark.sh
+    find ~/kalignbenchmark/data/QuanTest2/Test -name "*.vie" |\
+        awk -v outdir="$SCRATCHDIR" '{n=split ($1,a,/[\/,.]/);\
+                  printf "run_aln.sh -p kalign -i %s -o %s/%s_kalign.afa\n", $1,outdir,a[n-1];\
+                  printf "run_aln.sh -p kalign2 -i %s -o %s/%s_kalign2.afa\n", $1,outdir,a[n-1];\
+                  printf "run_aln.sh -p muscle -i %s -o %s/%s_muscle.afa\n", $1,outdir,a[n-1];\
+                  printf "run_aln.sh -p clustal -i %s -o %s/%s_clustal.afa\n", $1,outdir,a[n-1];\
+    }' >>  run_benchmark.sh
 
-      chmod 755 run_benchmark.sh
-    #+END_SRC
+    chmod 755 run_benchmark.sh
+  #+END_SRC
 
-    Here is the script to run the homfam test: 
-    #+BEGIN_SRC bash -n :tangle gen_timecmd.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
-      <<scratchdir>>
-    #+END_SRC
+  Here is the script to run the homfam test: 
+  #+BEGIN_SRC bash -n :tangle gen_timecmd.sh :shebang #!/usr/bin/env bash :noweb yes :exports code :results none :noweb yes 
+    <<scratchdir>>
+  #+END_SRC
 
-    #+BEGIN_SRC bash -n :tangle gen_timecmd.sh :noweb yes :exports code :results none :noweb yes 
+  #+BEGIN_SRC bash -n :tangle gen_timecmd.sh :noweb yes :exports code :results none :noweb yes 
 
-      DIR=`pwd`
-      function usage()
-      {
-          printf "This script will generate scripts to run kalign, clustal omega and muscle on the balibase MSA benchmark data set.\n\n" ;
-          printf "usage: $0\n\n" ;
-          exit 1;
-      }
+    DIR=`pwd`
+    function usage()
+    {
+        printf "This script will generate scripts to run kalign, clustal omega and muscle on the balibase MSA benchmark data set.\n\n" ;
+        printf "usage: $0\n\n" ;
+        exit 1;
+    }
 
-      while getopts h  opt
-      do
-          case ${opt} in
-              h) usage;;
-              ,*) usage;;
-          esac
-      done
+    while getopts h  opt
+    do
+        case ${opt} in
+            h) usage;;
+            ,*) usage;;
+        esac
+    done
 
-      printf "export PATH=~/kalignbenchmark/programs:$PATH\n\n" > run_homfam.sh
-      find ~/kalignbenchmark/data/homfam  -name "*_testaln.fa" | awk -v outdir="$SCRATCHDIR" '{
-      ref_aln=$1;gsub("_testaln.fa", "_ref.msf",ref_aln);
-      printf "run_timealn.sh -p kalign -i %s -r %s\n", $1,ref_aln;
-      printf "run_timealn.sh -p kalign2 -i %s -r %s\n", $1,ref_aln;
-      printf "run_timealn.sh -p muscle -i %s -r %s\n", $1,ref_aln;
-      printf "run_timealn.sh -p clustal -i %s -r %s\n", $1,ref_aln;
-                   }' >> run_homfam.sh
+    printf "export PATH=~/kalignbenchmark/programs:$PATH\n\n" > run_homfam.sh
+    find ~/kalignbenchmark/data/homfam  -name "*_testaln.fa" | awk -v outdir="$SCRATCHDIR" '{
+    ref_aln=$1;gsub("_testaln.fa", "_ref.msf",ref_aln);
+    printf "run_timealn.sh -p kalign -i %s -r %s\n", $1,ref_aln;
+    printf "run_timealn.sh -p muscle -i %s -r %s\n", $1,ref_aln;
+    printf "run_timealn.sh -p clustal -i %s -r %s\n", $1,ref_aln;
+                 }' >> run_homfam.sh
 
-      #+END_SRC
+  #+END_SRC
 
 
 * Score alignments 
@@ -695,65 +694,61 @@ EOT
 
 *** Plot
 
-   #+BEGIN_SRC R :session one :results output graphics :file Quantest2_scores.jpeg :exports both :noweb yes 
-               <<Rlibraries>> 
-         readquanttestscores <-function(file,name){
-           mat  <- read.table(file);
-           colnames(mat) <- c("Name","Score")
-           mat$Type <- name
-           mat$Name <- sub(".*/" ,"", mat$Name)
-           mat$Name <- sub("[_]{1}[A-Z]*[.]{1}[A-Z]*$" ,"", mat$Name,ignore.case = TRUE)
-           mat <- as_tibble(mat)
-      
-           return(mat)
+    #+BEGIN_SRC R :session one :results output graphics :file Quantest2_scores.jpeg :exports both :noweb yes 
+      <<Rlibraries>> 
+      readquanttestscores <-function(file,name){
+        mat  <- read.table(file);
+        colnames(mat) <- c("Name","Score")
+        mat$Type <- name
+        mat$Name <- sub(".*/" ,"", mat$Name)
+        mat$Name <- sub("[_]{1}[A-Z]*[.]{1}[A-Z]*$" ,"", mat$Name,ignore.case = TRUE)
+        mat <- as_tibble(mat)
+  
+        return(mat)
 
-         }
-
-
-           library(ggplot2)
-         mat <- readquanttestscores("scores_quanttest_clustalo.csv","clustalo")
-         mat <- rbind(mat, readquanttestscores("scores_quanttest_kalign.csv","kalign3"));
-mat <- rbind(mat, readquanttestscores("scores_quantest2_kalign2.csv","kalign2"));
-  mat <- rbind(mat, readquanttestscores("scores_quanttest_muscle.csv","muscle"));
-     #mat <- mat  %>% mutate(Score = as.dbl(Score))      
-
-       
-            p4 <- ggplot(mat, aes(Type, Score))
-            p4 <- p4 + geom_boxplot(aes(colour = Type))
-     p4 <- p4 + ggtitle("Quantest2 benchmark")
-            
-            ggsave("Quantest2_scores.jpeg",p4,width = 16,  height = 12,  dpi = 300, units = c( "cm"))
+      }
 
 
-#+END_SRC
+      library(ggplot2)
+      mat <- readquanttestscores("scores_quanttest_clustalo.csv","clustalo")
+      mat <- rbind(mat, readquanttestscores("scores_quanttest_kalign.csv","kalign3"));
+      mat <- rbind(mat, readquanttestscores("scores_quantest2_kalign2.csv","kalign2"));
+      mat <- rbind(mat, readquanttestscores("scores_quanttest_muscle.csv","muscle"));
+                                              #mat <- mat  %>% mutate(Score = as.dbl(Score))      
 
-#+RESULTS:
-[[file:Quantest2_scores.jpeg]]
+
+      p4 <- ggplot(mat, aes(Type, Score))
+      p4 <- p4 + geom_boxplot(aes(colour = Type))
+      p4 <- p4 + ggtitle("Quantest2 benchmark")
+
+      ggsave("Quantest2_scores.jpeg",p4,width = 16,  height = 12,  dpi = 300, units = c( "cm"))
+
+
+    #+END_SRC
+
+    #+RESULTS:
+    [[file:Quantest2_scores.jpeg]]
 
 
 ** Homfam
 
 *** Plot: 
 
-   #+BEGIN_SRC R :session one :results output graphics :file Homfam_scores.jpeg :exports both :noweb yes 
+    #+BEGIN_SRC R :session one :results output graphics :file Homfam_scores.jpeg :exports both :noweb yes 
       <<Rplotheader>>
       library(ggplot2)
-     mat  <- read.csv("scores_homfam.csv");
-     p <- ggplot(mat, aes(NUMSEQ,Time))
-     p <- p + geom_point(aes(colour = Program,size = AVGLEN))
-     p <- p + scale_x_continuous(trans = 'log10', breaks=c(100,3000,10000,100000) ,labels = scales::comma)
-     p <- p + scale_y_continuous(trans = 'log10',breaks=c(0.01, 0.1, 1 , 10,100,1000,10000),labels=scales::comma )
+      mat  <- read.csv("scores_homfam.csv");
+      p <- ggplot(mat, aes(NUMSEQ,Time))
+      p <- p + geom_point(aes(colour = Program,size = AVGLEN))
+      p <- p + scale_x_continuous(trans = 'log10', breaks=c(100,3000,10000,100000) ,labels = scales::comma)
+      p <- p + scale_y_continuous(trans = 'log10',breaks=c(0.01, 0.1, 1 , 10,100,1000,10000),labels=scales::comma )
 
-     p <- p + xlab("Number of sequences") 
-     p <- p + ylab("Time (s)") 
-     p <- p + ggtitle("HomFam benchmark")
-     p     
-     ggsave("Homfam_scores.jpeg",p,width = 18,  height = 12,  dpi = 300, units = c( "cm")) 
-
-#+END_SRC
-
-#+RESULTS:
-
+      p <- p + xlab("Number of sequences") 
+      p <- p + ylab("Time (s)") 
+      p <- p + ggtitle("HomFam benchmark")
+      p     
+      ggsave("Homfam_scores.jpeg",p,width = 18,  height = 12,  dpi = 300, units = c( "cm")) 
+    #+END_SRC
 
 
 *** Run tests
