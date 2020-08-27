@@ -234,7 +234,6 @@
     #+END_SRC     
 
 
-
 ** Scripts to run programs 
    Alignment programs
    #+BEGIN_SRC sh :exports both :results none :noweb yes :tangle run_aln.sh :shebang #!/usr/bin/env bash
@@ -522,7 +521,6 @@
 
   #+END_SRC
 
-
 * Score alignments 
 
 ** Balibase    
@@ -755,7 +753,6 @@ p
 
 *** Run tests
 
-
 * Check for dependencies
 
 
@@ -806,3 +803,5 @@ p
     })
 
   #+END_SRC
+
+

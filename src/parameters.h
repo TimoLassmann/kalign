@@ -34,6 +34,9 @@ struct parameters{
         char *outfile;
         char* format;
         char* aln_param_file;
+        float gpo;
+        float gpe;
+        float tgpe;
         int out_format;
         int param_set;
         int dist_method;

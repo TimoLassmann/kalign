@@ -43,6 +43,11 @@ struct parameters*init_param(void)
         param->reformat = 0;
         param->rename = 0;
         param->help_flag = 0;
+
+        param->gpo = FLT_MAX;
+        param->gpe = FLT_MAX;
+        param->tgpe = FLT_MAX;
+        
         return param;
 ERROR:
         free_parameters(param);

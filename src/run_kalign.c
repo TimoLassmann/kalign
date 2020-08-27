@@ -23,7 +23,7 @@
 #include "global.h"
 #include "msa.h"
 #include "parameters.h"
-#include "align_io.h"
+//#include "align_io.h"
 #include "alignment_parameters.h"
 
 #include "bisectingKmeans.h"
@@ -42,7 +42,11 @@
 #define OPT_RENAME 3
 #define OPT_REFORMAT 4
 #define OPT_SHOWW 5
-#define OPT_DEVTEST 6
+#define OPT_GPO 6
+#define OPT_GPE 7
+#define OPT_TGPE 8
+
+#define OPT_DEVTEST 10
 
 static int run_kalign(struct parameters* param);
 static int check_for_sequences(struct msa* msa);
@@ -158,6 +162,9 @@ int main(int argc, char *argv[])
                         {"reformat",  required_argument, 0, OPT_REFORMAT},
                         {"devtest",  no_argument, 0, OPT_DEVTEST},
                         {"changename",  0, 0, OPT_RENAME},
+                        {"gpo",  required_argument, 0, OPT_GPO},
+                        {"gpe",  required_argument, 0, OPT_GPE},
+                        {"tgpe",  required_argument, 0, OPT_TGPE},
                         {"input",  required_argument, 0, 'i'},
                         {"infile",  required_argument, 0, 'i'},
                         {"in",  required_argument, 0, 'i'},
@@ -201,6 +208,16 @@ int main(int argc, char *argv[])
                 case OPT_DEVTEST:
                         devtest =1 ;
                         break;
+                case OPT_GPO:
+                        param->gpo = atof(optarg);
+                        break;
+                case OPT_GPE:
+                        param->gpe = atof(optarg);
+                        break;
+                case OPT_TGPE :
+                        param->tgpe = atof(optarg);
+                        break;
+
                 case 'h':
                         param->help_flag = 1;
                         break;
@@ -417,8 +434,6 @@ int run_kalign(struct parameters* param)
         RUN(init_ap(&ap,msa->numseq,msa->L ));
         /* Start bi-secting K-means sequence clustering */
         RUN(build_tree_kmeans(msa,ap));
-
-        
         /* by default all protein sequences are converted into a reduced alphabet
            when read from file. Here we turn them back into the default representation. */
         if(msa->L == redPROTEIN){
@@ -426,8 +441,16 @@ int run_kalign(struct parameters* param)
                 RUN(convert_msa_to_internal(msa, ambigiousPROTEIN));
         }
 
-        
         RUN(init_ap(&ap,msa->numseq,msa->L ));
+        if(param->gpo != FLT_MAX){
+                ap->gpo = param->gpo;
+        }
+        if(param->gpe != FLT_MAX){
+                ap->gpe = param->gpe;
+        }
+        if(param->tgpe != FLT_MAX){
+                ap->tgpe = param->tgpe;
+        }
 /* Start alignment stuff */
         DECLARE_TIMER(t1);
         LOG_MSG("Aligning");
