@@ -30,32 +30,39 @@ int set_subm_gaps(struct aln_param* ap);
 int set_subm_gaps_DNA(struct aln_param* ap);
 int set_param_number(struct aln_param* ap,int L, int sel);
 
-struct aln_param* init_ap(int numseq,int L)
+int new_aln_matrices(struct aln_param* ap);
+
+
+int init_ap(struct aln_param** aln_param, int numseq,int L)
 {
         struct aln_param* ap = NULL;
-        int i,j;
 
-        MMALLOC(ap, sizeof(struct aln_param));
 
-        ap->tree = NULL;
-        MMALLOC(ap->tree, sizeof(int) * (numseq*3+1));
+        if(*aln_param){
+                ap = *aln_param;
+        }else{
+                int i,j;
+                MMALLOC(ap, sizeof(struct aln_param));
 
-        for(i = 0;i < (numseq*3+1);i++){
-                ap->tree[i] = 0;
-        }
-        ap->subm = NULL;
+                ap->tree = NULL;
+                MMALLOC(ap->tree, sizeof(int) * (numseq*3+1));
 
-        RUNP(ap->rng = init_rng(42));
-        MMALLOC(ap->subm,sizeof (float*) * 21);
+                for(i = 0;i < (numseq*3+1);i++){
+                        ap->tree[i] = 0;
+                }
+                ap->subm = NULL;
 
-        for (i = 21;i--;){
-                ap->subm[i] = NULL;
-                MMALLOC(ap->subm[i],sizeof(float) * 21);
-                for (j = 21;j--;){
-                        ap->subm[i][j] = 0.0f;
+                RUNP(ap->rng = init_rng(42));
+                MMALLOC(ap->subm,sizeof (float*) * 23);
+
+                for (i = 23;i--;){
+                        ap->subm[i] = NULL;
+                        MMALLOC(ap->subm[i],sizeof(float) * 23);
+                        for (j = 23;j--;){
+                                ap->subm[i][j] = 0.0f;
+                        }
                 }
         }
-
         if(L == defDNA){
                 RUN(set_subm_gaps_DNA(ap));
         }else if(L == defPROTEIN){
@@ -63,11 +70,15 @@ struct aln_param* init_ap(int numseq,int L)
                 RUN(set_subm_gaps(ap));
         }else if(L == redPROTEIN){
                 RUN(set_subm_gaps(ap));
+        }else if(L == ambigiousPROTEIN){
+                RUN(new_aln_matrices(ap));
         }
-        return ap;
+
+        *aln_param = ap;
+        return OK;
 ERROR:
         free_ap(ap);
-        return NULL;
+        return FAIL;
 }
 
 
@@ -179,3 +190,52 @@ int set_subm_gaps(struct aln_param* ap)
 
         return OK;
 }
+
+
+
+int new_aln_matrices(struct aln_param* ap)
+{
+        int i,j;
+        //char aacode[20] = "ACDEFGHIKLMNPQRSTVWY";
+        //char aa_order[23] = "ARNDCQEGHILKMFPSTWYVBZX";
+        //int num_aa = 23;
+
+        int CorBLOSUM66_13plus[23][23] = {
+                /*A  R  N  D  C  Q  E  G  H  I  L  K  M  F  P  S  T  W  Y  V  B  Z  X*/
+                {5,-1,-1,-2,-2,-1,-1,0,-2,-1,-1,-1,0,-2,-1,1,0,-2,-2,0,-2,-1,0},
+                {-1,6,0,-1,-3,1,1,-2,0,-2,-2,3,-1,-3,-1,-1,-1,-1,-1,-2,0,1,-1},
+                {-1,0,6,2,-3,1,0,0,0,-3,-3,0,-2,-2,-1,1,0,-2,-1,-2,4,0,-1},
+                {-2,-1,2,7,-3,1,2,-1,-1,-3,-3,0,-3,-3,-1,0,-1,-3,-2,-3,5,2,-1},
+                {-2,-3,-3,-3,12,-3,-4,-3,-2,-2,-3,-3,-2,-1,-3,-2,-2,-3,-2,-2,-3,-3,-2},
+                {-1,1,1,1,-3,5,2,-2,0,-2,-2,1,0,-2,-1,0,0,-1,-1,-2,1,3,0},
+                {-1,1,0,2,-4,2,6,-2,-1,-3,-3,1,-2,-3,0,0,-1,-2,-2,-2,1,4,-1},
+                {0,-2,0,-1,-3,-2,-2,7,-2,-4,-4,-2,-3,-3,-2,0,-2,-3,-3,-3,-1,-2,-1},
+                {-2,0,0,-1,-2,0,-1,-2,10,-3,-3,0,-2,-2,-2,-1,-1,-2,1,-3,0,0,-1},
+                {-1,-2,-3,-3,-2,-2,-3,-4,-3,5,2,-2,2,0,-3,-2,-1,-1,-1,3,-3,-2,-1},
+                {-1,-2,-3,-3,-3,-2,-3,-4,-3,2,5,-2,3,1,-3,-3,-2,0,-1,1,-3,-2,-1},
+                {-1,3,0,0,-3,1,1,-2,0,-2,-2,5,-1,-3,-1,0,0,-2,-2,-2,0,1,-1},
+                {0,-1,-2,-3,-2,0,-2,-3,-2,2,3,-1,6,1,-2,-1,-1,0,-1,1,-2,-1,0},
+                {-2,-3,-2,-3,-1,-2,-3,-3,-2,0,1,-3,1,7,-3,-2,-2,2,3,0,-3,-3,-1},
+                {-1,-1,-1,-1,-3,-1,0,-2,-2,-3,-3,-1,-2,-3,9,0,-1,-2,-2,-2,-1,-1,-1},
+                {1,-1,1,0,-2,0,0,0,-1,-2,-3,0,-1,-2,0,4,2,-2,-2,-1,0,0,0},
+                {0,-1,0,-1,-2,0,-1,-2,-1,-1,-2,0,-1,-2,-1,2,5,-1,-1,0,0,0,0},
+                {-2,-1,-2,-3,-3,-1,-2,-3,-2,-1,0,-2,0,2,-2,-2,-1,13,3,-2,-2,-2,-1},
+                {-2,-1,-1,-2,-2,-1,-2,-3,1,-1,-1,-2,-1,3,-2,-2,-1,3,9,-1,-2,-2,-1},
+                {0,-2,-2,-3,-2,-2,-2,-3,-3,3,1,-2,1,0,-2,-1,0,-2,-1,4,-3,-2,-1},
+                {-2,0,4,5,-3,1,1,-1,0,-3,-3,0,-2,-3,-1,0,0,-2,-2,-3,4,1,-1},
+                {-1,1,0,2,-3,3,4,-2,0,-2,-2,1,-1,-3,-1,0,0,-2,-2,-2,1,4,-1},
+                {0,-1,-1,-1,-2,0,-1,-1,-1,-1,-1,-1,0,-1,-1,0,0,-1,-1,-1,-1,-1,-1},
+        };
+        int x,y;
+        for(i = 0; i < 23;i++){
+                for(j = 0; j < 23;j++){
+                        ap->subm[i][j] = (float)(CorBLOSUM66_13plus[i][j]);
+                }
+        }
+        ap->gpo = 5.5;
+        ap->gpe = 2.0;
+        ap->tgpe = 1.0;
+        return OK;
+}
+
+

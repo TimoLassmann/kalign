@@ -414,33 +414,39 @@ int run_kalign(struct parameters* param)
 
 
         /* allocate aln parameters  */
-        RUNP(ap = init_ap(msa->numseq,msa->L ));
+        RUN(init_ap(&ap,msa->numseq,msa->L ));
         /* Start bi-secting K-means sequence clustering */
         RUN(build_tree_kmeans(msa,ap));
+
+        
         /* by default all protein sequences are converted into a reduced alphabet
            when read from file. Here we turn them back into the default representation. */
         if(msa->L == redPROTEIN){
-                RUN(convert_msa_to_internal(msa, defPROTEIN));
+                //RUN(convert_msa_to_internal(msa, defPROTEIN));
+                RUN(convert_msa_to_internal(msa, ambigiousPROTEIN));
         }
-        /* Start alignment stuff */
+
+        
+        RUN(init_ap(&ap,msa->numseq,msa->L ));
+/* Start alignment stuff */
         DECLARE_TIMER(t1);
         LOG_MSG("Aligning");
         START_TIMER(t1);
         RUNP(map = hirschberg_alignment(msa, ap));
         STOP_TIMER(t1);
         GET_TIMING(t1);
-        //LOG_MSG("Done in %f sec.", GET_TIMING(t1));
+//LOG_MSG("Done in %f sec.", GET_TIMING(t1));
 
-        /* set to aligned */
+/* set to aligned */
         msa->aligned = ALN_STATUS_ALIGNED;
 
         RUN(weave(msa , map, ap->tree));
 
-        /* clean up map */
+/* clean up map */
         for(i = 0; i < msa->num_profiles ;i++){
-               if(map[i]){
-                       MFREE(map[i]);
-               }
+                if(map[i]){
+                        MFREE(map[i]);
+                }
         }
         MFREE(map);
         map = NULL;

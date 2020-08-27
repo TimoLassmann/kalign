@@ -23,6 +23,7 @@
 #include "alphabet.h"
 
 int create_default_protein(struct alphabet* a);
+int create_protein_BZX(struct alphabet* a);
 int create_default_DNA(struct alphabet* a);
 int create_reduced_protein(struct alphabet* a);
 
@@ -91,15 +92,19 @@ struct alphabet* create_alphabet(int type)
                 create_default_protein(a);
                 break;
         }
+        case ambigiousPROTEIN :{
+                create_protein_BZX(a);
+                break;
+        }
         case defDNA : {
                 create_default_DNA(a);
                 break;
         }
-        case redPROTEIN : {
-                create_reduced_protein(a);
-                break;
-        }
-        default:
+                        case redPROTEIN : {
+                                create_reduced_protein(a);
+                                break;
+                        }
+                                default:
                 break;
         }
 
@@ -176,6 +181,33 @@ int create_default_protein(struct alphabet* a)
         code++;
         return OK;
 }
+
+int create_protein_BZX(struct alphabet* a)
+{
+        char aacode[23] = "ARNDCQEGHILKMFPSTWYVBZX";
+
+        int code;
+        int i;
+        code = 0;
+        for(i = 0; i < 23;i++){
+                //fprintf(stdout,"%c %d CODE: %d\n", aacode[i], (int) aacode[i], code);
+                a->to_internal[(int) aacode[i]] = code;
+
+                code++;
+        }
+        /* ambiguity codes  */
+        /* Some protein sequences contain 'U' - a non-IUPAC code
+           I will treat these as an ambiguous aa
+           e.g:
+           >Q74EN2_GEOSL/108-206
+           TRELEALVAKGTEEGGYLLIDSRPAGKYNEAHIPTAVSIPFAELEKNPALLTASKDRLLVFYCGGVTUVLSPKSAGLAKKSGYEKVRVYLDGEPEWKKA
+
+        */
+        a->to_internal[(int) 'U'] = code-1;
+        //code++;
+        return OK;
+}
+
 
 int create_default_DNA(struct alphabet* a)
 {

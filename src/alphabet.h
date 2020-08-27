@@ -26,6 +26,7 @@
 #include "global.h"
 
 #define defPROTEIN 21
+#define ambigiousPROTEIN 23
 #define redPROTEIN 13
 #define defDNA 5
 
@@ -35,6 +36,7 @@ struct alphabet{
         int type;
         int L;
 };
+
 
 extern struct alphabet* create_alphabet(int type);
 extern int switch_alphabet(struct alphabet* a, int type);

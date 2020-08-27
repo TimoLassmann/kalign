@@ -33,7 +33,6 @@
 
 #define NODESIZE 16
 
-
 /* small hash implementation */
 struct bignode{
         struct bignode *next;
@@ -44,7 +43,6 @@ struct bignode{
 struct bignode* big_insert_hash(struct bignode *n,const unsigned int pos);
 void big_remove_nodes(struct bignode *n);
 void big_print_nodes(struct bignode *n);
-
 
 float calc_distance(uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b, int L);
 float dna_distance_calculation(struct bignode* hash[],const uint8_t * p,const int seqlen,int diagonals,float mode);
