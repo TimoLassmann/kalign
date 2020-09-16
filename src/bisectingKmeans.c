@@ -1,25 +1,27 @@
 /*
-    Kalign - a multiple sequence alignment program
+  Kalign - a multiple sequence alignment program
 
-    Copyright 2006, 2019 Timo Lassmann
+  Copyright 2006, 2019 Timo Lassmann
 
-    This file is part of kalign.
+  This file is part of kalign.
 
-    Kalign is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+  Kalign is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+  You should have received a copy of the GNU General Public License
+  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 */
-
+#ifdef HAVE_OPENMP
+#include <omp.h>
+#endif
 #include <xmmintrin.h>
 #include "tlrng.h"
 #include "msa.h"
@@ -112,8 +114,18 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap)
 
         START_TIMER(timer);
         LOG_MSG("Building guide tree.");
+/* #ifdef HAVE_OPENMP */
+/*         omp_set_num_threads(4); */
+/* #pragma omp parallel */
+/*         // Only the first thread will spawn other threads */
+/* #pragma omp single nowait */
+/*         { */
+/* #endif */
+                root = bisecting_kmeans(msa,root, dm, samples, numseq, num_anchors, numseq, ap->rng,0);
 
-        RUNP(root = bisecting_kmeans(msa,root, dm, samples, numseq, num_anchors, numseq, ap->rng,0));
+/* #ifdef HAVE_OPENMP */
+/*         } */
+/* #endif */
         STOP_TIMER(timer);
         GET_TIMING(timer);
         //LOG_MSG("Done in %f sec.", GET_TIMING(timer));
@@ -160,7 +172,6 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
         int num_var;
 
         int stop = 0;
-
         if(num_samples < 100){
                 float** dm = NULL;
                 RUNP(dm = d_estimation(msa, samples, num_samples,1));// anchors, num_anchors,1));
@@ -310,8 +321,8 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
 
                                         }
                                 }
-                                if(s){
 
+                                if(s){
                                         w = cl;
                                         cl = wl;
                                         wl = w;
@@ -337,116 +348,125 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
         }
         free_kmeans_results(res_tmp);
 
-                                      sl = best->sl;
-                                      sr = best->sr;
+        sl = best->sl;
+        sr = best->sr;
 
-                                      num_l = best->nl;
+        num_l = best->nl;
 
-                                      num_r = best->nr;
+        num_r = best->nr;
 
-                                      MFREE(best);
+        MFREE(best);
 
-                                      _mm_free(wr);
-                                      _mm_free(wl);
-                                      _mm_free(cr);
-                                      _mm_free(cl);
-                                      MFREE(samples);
-                                      n = alloc_node();
-                                      /* LOG_MSG("Done"); */
-                                      RUNP(n->left = bisecting_kmeans(msa,n->left, dm, sl, numseq, num_anchors, num_l,rng,d));
-
-                                      RUNP(n->right = bisecting_kmeans(msa,n->right, dm, sr, numseq, num_anchors, num_r,rng,d));
-
-                                      return n;
-                              ERROR:
-                                      return NULL;
-                              }
-
-                              struct node* upgma(float **dm,int* samples, int numseq)
-                              {
-                                      struct node** tree = NULL;
-                                      struct node* tmp = NULL;
-
-                                      int i,j;
-                                      int *as = NULL;
-                                      float max;
-                                      int node_a = 0;
-                                      int node_b = 0;
-                                      int cnode = numseq;
-                                      int numprofiles;
+        _mm_free(wr);
+        _mm_free(wl);
+        _mm_free(cr);
+        _mm_free(cl);
+        MFREE(samples);
+        n = alloc_node();
 
 
-                                      numprofiles = (numseq << 1) - 1;
+        //LOG_MSG("Done");
+/* #ifdef HAVE_OPENMP */
+/* #pragma omp task */
+/* #endif */
+        n->left = bisecting_kmeans(msa,n->left, dm, sl, numseq, num_anchors, num_l,rng,d);
+/* #ifdef HAVE_OPENMP */
+/* #pragma omp task */
+/* #endif */
+        n->right = bisecting_kmeans(msa,n->right, dm, sr, numseq, num_anchors, num_r,rng,d);
+/* #ifdef HAVE_OPENMP */
+/* #pragma omp taskwait */
+/* #endif */
+        return n;
+ERROR:
+        return NULL;
+}
 
-                                      MMALLOC(as,sizeof(int)*numseq);
-                                      for (i = numseq; i--;){
-                                              as[i] = i+1;
-                                      }
+struct node* upgma(float **dm,int* samples, int numseq)
+{
+        struct node** tree = NULL;
+        struct node* tmp = NULL;
 
-                                      MMALLOC(tree,sizeof(struct node*)*numseq);
-                                      for (i = 0;i < numseq;i++){
-                                              tree[i] = NULL;
-                                              tree[i] = alloc_node();
-                                              tree[i]->id = samples[i];
-                                      }
-
-                                      while (cnode != numprofiles){
-                                              max = FLT_MAX;
-                                              for (i = 0;i < numseq-1; i++){
-                                                      if (as[i]){
-                                                              for ( j = i + 1;j < numseq;j++){
-                                                                      if (as[j]){
-                                                                              if (dm[i][j] < max){
-                                                                                      max = dm[i][j];
-                                                                                      node_a = i;
-                                                                                      node_b = j;
-                                                                              }
-                                                                      }
-                                                              }
-                                                      }
-                                              }
-                                              tmp = NULL;
-                                              tmp = alloc_node();
-                                              tmp->left = tree[node_a];
-                                              tmp->right = tree[node_b];
+        int i,j;
+        int *as = NULL;
+        float max;
+        int node_a = 0;
+        int node_b = 0;
+        int cnode = numseq;
+        int numprofiles;
 
 
-                                              tree[node_a] = tmp;
-                                              tree[node_b] = NULL;
+        numprofiles = (numseq << 1) - 1;
 
-                                              /*deactivate  sequences to be joined*/
-                                              as[node_a] = cnode+1;
-                                              as[node_b] = 0;
-                                              cnode++;
+        MMALLOC(as,sizeof(int)*numseq);
+        for (i = numseq; i--;){
+                as[i] = i+1;
+        }
 
-                                              /*calculate new distances*/
-                                              for (j = numseq;j--;){
-                                                      if (j != node_b){
-                                                              dm[node_a][j] = (dm[node_a][j] + dm[node_b][j])*0.5f;
+        MMALLOC(tree,sizeof(struct node*)*numseq);
+        for (i = 0;i < numseq;i++){
+                tree[i] = NULL;
+                tree[i] = alloc_node();
+                tree[i]->id = samples[i];
+        }
 
-                                                      }
-                                              }
-                                              dm[node_a][node_a] = 0.0f;
-                                              for (j = numseq;j--;){
-                                                      dm[j][node_a] = dm[node_a][j];
-                                              }
-                                      }
-                                      tmp = tree[node_a];
-                                      MFREE(tree);
-                                      MFREE(as);
-                                      return tmp;
-                              ERROR:
-                                      return NULL;
-                              }
+        while (cnode != numprofiles){
+                max = FLT_MAX;
+                for (i = 0;i < numseq-1; i++){
+                        if (as[i]){
+                                for ( j = i + 1;j < numseq;j++){
+                                        if (as[j]){
+                                                if (dm[i][j] < max){
+                                                        max = dm[i][j];
+                                                        node_a = i;
+                                                        node_b = j;
+                                                }
+                                        }
+                                }
+                        }
+                }
+                tmp = NULL;
+                tmp = alloc_node();
+                tmp->left = tree[node_a];
+                tmp->right = tree[node_b];
 
-                              struct node* alloc_node(void)
-                              {
-                                      struct node* n = NULL;
-                                      MMALLOC(n, sizeof(struct node));
-                                      n->left = NULL;
-                                      n->right = NULL;
-                                      n->id = -1;
-return n;
+
+                tree[node_a] = tmp;
+                tree[node_b] = NULL;
+
+                /*deactivate  sequences to be joined*/
+                as[node_a] = cnode+1;
+                as[node_b] = 0;
+                cnode++;
+
+                /*calculate new distances*/
+                for (j = numseq;j--;){
+                        if (j != node_b){
+                                dm[node_a][j] = (dm[node_a][j] + dm[node_b][j])*0.5f;
+
+                        }
+                }
+                dm[node_a][node_a] = 0.0f;
+                for (j = numseq;j--;){
+                        dm[j][node_a] = dm[node_a][j];
+                }
+        }
+        tmp = tree[node_a];
+        MFREE(tree);
+        MFREE(as);
+        return tmp;
+ERROR:
+        return NULL;
+}
+
+struct node* alloc_node(void)
+{
+        struct node* n = NULL;
+        MMALLOC(n, sizeof(struct node));
+        n->left = NULL;
+        n->right = NULL;
+        n->id = -1;
+        return n;
 ERROR:
         return NULL;
 }

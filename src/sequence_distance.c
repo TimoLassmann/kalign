@@ -20,7 +20,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 */
-
+#include <omp.h>
 #include <xmmintrin.h>
 #include "sequence_distance.h"
 
@@ -105,19 +105,30 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                 dm[i][j] = 0.0f;
                         }
                 }
-
-
+                LOG_MSG("Got here");
+                omp_set_num_threads(4);
+#pragma omp parallel for shared(dm, msa) private(i, j) collapse(2) schedule(dynamic)
                 for(i = 0; i < numseq;i++){
-                        seq_a = msa->sequences[i]->s;// aln->s[i];
-                        len_a = msa->sequences[i]->len;//  aln->sl[i];
                         for(j = 0;j < num_samples;j++){
-                                seq_b = msa->sequences[samples[j]]->s;// aln->s[ seeds[j]];
-                                len_b = msa->sequences[samples[j]]->len;// aln->sl[seeds[j]];
-
-                                dist = calc_distance(seq_a, seq_b, len_a, len_b,msa->L);
-                                dm[i][j] = dist;
+                                dm[i][j] = calc_distance(msa->sequences[i]->s,
+                                                         msa->sequences[samples[j]]->s,
+                                                         msa->sequences[i]->len,
+                                                         msa->sequences[samples[j]]->len,
+                                                         msa->L);
+                                //dm[i][j] = dist;
                         }
                 }
+                /* for(i = 0; i < numseq;i++){ */
+                /*         seq_a = msa->sequences[i]->s;// aln->s[i]; */
+                /*         len_a = msa->sequences[i]->len;//  aln->sl[i]; */
+                /*         for(j = 0;j < num_samples;j++){ */
+                /*                 seq_b = msa->sequences[samples[j]]->s;// aln->s[ seeds[j]]; */
+                /*                 len_b = msa->sequences[samples[j]]->len;// aln->sl[seeds[j]]; */
+
+                /*                 dist = calc_distance(seq_a, seq_b, len_a, len_b,msa->L); */
+                /*                 dm[i][j] = dist; */
+                /*         } */
+                /* } */
         }
         return dm;
 ERROR:

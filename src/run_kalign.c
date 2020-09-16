@@ -462,9 +462,12 @@ int run_kalign(struct parameters* param)
 
 /* set to aligned */
         msa->aligned = ALN_STATUS_ALIGNED;
+        LOG_MSG("Weaving");
+        START_TIMER(t1);
 
         RUN(weave(msa , map, ap->tree));
-
+        STOP_TIMER(t1);
+        GET_TIMING(t1);
 /* clean up map */
         for(i = 0; i < msa->num_profiles ;i++){
                 if(map[i]){
