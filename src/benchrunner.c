@@ -1,4 +1,3 @@
-
 #include "global.h"
 
 #include "tldevel.h"
@@ -35,6 +34,7 @@ struct parameters_br{
         float gpo;
         float gpe;
         float tgpe;
+        int uniq;
 };
 
 
@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
         param->gpo = FLT_MAX;
         param->gpe = FLT_MAX;
         param->tgpe = FLT_MAX;
-        
+        param->uniq = 0;
         int help = 0;
         int c;
 
@@ -71,6 +71,7 @@ int main(int argc, char *argv[])
                         {"gpo",  required_argument, 0, OPT_GPO},
                         {"gpe",  required_argument, 0, OPT_GPE},
                         {"tgpe",  required_argument, 0, OPT_TGPE},
+                        {"uniq",  required_argument, 0, 'u'},
                         {"help",   no_argument,0,'h'},
                         {"quiet",  0, 0, 'q'},
                         {0, 0, 0, 0}
@@ -109,6 +110,9 @@ int main(int argc, char *argv[])
                         break;
                 case OPT_TGPE :
                         param->tgpe = atof(optarg);
+                        break;
+                case 'u':
+                        param->uniq = atoi(optarg);
                         break;
                 case 'h':
                         help = 1;
@@ -209,7 +213,7 @@ int run_and_score(struct parameters_br* param)
         path = realpath(param->scratch, NULL);
         if (path) {
                 LOG_MSG("scratch is: %s", path);
-        }else{
+        } else{
                 MMALLOC(path, sizeof(char) * 10);
                 rc = snprintf(path, 10, "%s",".");
         }
@@ -222,13 +226,13 @@ int run_and_score(struct parameters_br* param)
                 }
 
                 if(param->gpo != FLT_MAX && param->gpe != FLT_MAX && param->tgpe != FLT_MAX){
-                        rc = snprintf(cmd, BUFFER_LEN*2, "kalign -gpo %f -gpe %f -tgpe %f %s -f msf -o %s/test.msf",param->gpo,param->gpe, param->tgpe, param->testseq,path);
+                        rc = snprintf(cmd, BUFFER_LEN*2, "valgrind kalign -gpo %f -gpe %f -tgpe %f %s -f msf -o %s/test_%d.msf",param->gpo,param->gpe, param->tgpe, param->testseq,path,param->uniq);
                 }else{
-                rc = snprintf(cmd, BUFFER_LEN*2, "kalign %s -f msf -o %s/test.msf", param->testseq,path);
+                        rc = snprintf(cmd, BUFFER_LEN*2, "valgrind kalign %s -f msf -o %s/test_%d.msf", param->testseq,path,param->uniq);
                 }
         }else if(!strcmp(param->program,"kalign2")){
                 if (system("which kalign2")){
-                            ERROR_MSG("kalign2 is not found in your path:\n%s\n",envpaths);
+                        ERROR_MSG("kalign2 is not found in your path:\n%s\n",envpaths);
                 }
 
                 rc = snprintf(cmd, BUFFER_LEN*2, "kalign2 -i  %s -f msf -o %s/test.msf",param->testseq,path);
@@ -256,7 +260,7 @@ int run_and_score(struct parameters_br* param)
         RUNP(pipe = popen(cmd,"r"));
         //if (system("which gnuplot"))
         while (fgets(ret, BUFFER_LEN, pipe)){
-                //fprintf(stderr,"%s", ret);
+                fprintf(stderr,"%s", ret);
         }
 
         rc = pclose(pipe);
@@ -268,16 +272,17 @@ int run_and_score(struct parameters_br* param)
                 time = (double) (tv2.tv_usec - tv1.tv_usec) / (double) CLOCKS_PER_SEC  + (double) (tv2.tv_sec - tv1.tv_sec);
 
                 printf ("Total time = %f seconds\n",time);
-                // extract all sequences from the test alignment that are found in the reference...  
+                // extract all sequences from the test alignment that are found in the reference...
                 LOG_MSG("read reference alignment");
 
                 RUN(read_input( param->refseq , &ref_aln));
                 //RUN(read_input(param->infile[0],&ref_aln));//  detect_and_read_sequences(param));
 
-                snprintf( ret, BUFFER_LEN*2, "%s/test.msf",path);
+                snprintf( ret, BUFFER_LEN*2, "%s/test_%d.msf",path,param->uniq);
                 LOG_MSG("read test alignment");
                 RUN(read_input(ret,&test_aln));//  detect_and_read_sequences(param));
-
+                snprintf(ret, BUFFER_LEN, "%s/evalaln_%d.msf",path,param->uniq);
+                write_msa(test_aln, ret, FORMAT_MSF);
 
                 average_seq_len = 0.0;
                 for(j = 0; j < test_aln->numseq;j++){
@@ -311,19 +316,19 @@ int run_and_score(struct parameters_br* param)
                 org_len = test_aln->numseq;
                 test_aln->numseq = pos_test;
 
-                
 
-                snprintf(ret, BUFFER_LEN, "%s/evalaln.msf",path);
+
+                snprintf(ret, BUFFER_LEN, "%s/evalaln_%d.msf",path,param->uniq);
                 write_msa(test_aln, ret, FORMAT_MSF);
 
-                
+
                 //output(test_aln,param);
 
                 test_aln->numseq = org_len;
 
 
 
-                snprintf(cmd, BUFFER_LEN, "bali_score %s %s",  param->refseq, ret);
+                snprintf(cmd, BUFFER_LEN*2, "bali_score %s %s",  param->refseq, ret);
                 // Execute a process listing
 
 
@@ -341,41 +346,69 @@ int run_and_score(struct parameters_br* param)
 
 
                 sscanf(ret, "%*s %*s %lf %lf", &SP,&TC);
-                pclose(pipe);
-                if(!strcmp(param->output, "stdout")){
-                        out_ptr = stdout;
-                }else if(!my_file_exists(param->output)){
-                        RUNP(out_ptr = fopen(param->output ,"w"));
-                        fprintf(out_ptr,"Program,Alignment,AVGLEN,NUMSEQ,SP,TC,Time\n");
+                rc = pclose(pipe);
+                if(rc == EXIT_SUCCESS){
+                        if(!strcmp(param->output, "server")){
+
+                                fprintf(stdout,"%f\n",SP);
+
+
+                        }else  if(!strcmp(param->output, "stdout")){
+                                out_ptr = stdout;
+                                fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f\n",param->program,basename(param->refseq), average_seq_len,test_aln->numseq,SP,TC,time);
+                                fclose(out_ptr);
+
+                        }else if(!my_file_exists(param->output)){
+                                RUNP(out_ptr = fopen(param->output ,"w"));
+                                fprintf(out_ptr,"Program,Alignment,AVGLEN,NUMSEQ,SP,TC,Time\n");
+                                fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f\n",param->program,basename(param->refseq), average_seq_len,test_aln->numseq,SP,TC,time);
+                                fclose(out_ptr);
+
+                        }else{
+                                RUNP(out_ptr = fopen(param->output,"a"));
+                                fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f\n",param->program,basename(param->refseq), average_seq_len,test_aln->numseq,SP,TC,time);
+                                fclose(out_ptr);
+
+                        }
+
                 }else{
-                        RUNP(out_ptr = fopen(param->output,"a"));
+                        ERROR_MSG("Running %s failed", cmd);
                 }
 
-                fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f\n",param->program,basename(param->refseq), average_seq_len,test_aln->numseq,SP,TC,time);
-                fclose(out_ptr);
 
-                LOG_MSG("SP:%f TC:%f", SP,TC);
-                free_msa(ref_aln);
-                free_msa(test_aln );
+                //LOG_MSG("SP:%f TC:%f", SP,TC);
+
                 //free_aln(test_aln);
                 //MFREE(param->outfile);
                 //MFREE(param->infile[0]);
                 //free_parameters(param);
-
+                free_msa(ref_aln);
+                free_msa(test_aln );
 
         } else {  // EXIT_FAILURE is not used by all programs, maybe needs some adaptation.
-                WARNING_MSG("Running:\n%s failed.", cmd);
-                WARNING_MSG("Error code was: %d", rc);
+                ERROR_MSG("Running:\n%s failed.", cmd);
+                /* WARNING_MSG("Error code was: %d", rc); */
         }
 
 
 
+        if(path){
+                MFREE(path);
+        }
 
-
-        MFREE(path);
+        //MFREE(path);
 
         return OK;
 ERROR:
+        if(ref_aln){
+                free_msa(ref_aln);
+        }
+        if(test_aln){
+                free_msa(test_aln);
+        }
+        if(path){
+                MFREE(path);
+        }
         return FAIL;
 }
 

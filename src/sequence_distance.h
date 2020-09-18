@@ -29,5 +29,5 @@
 #include "alignment_parameters.h"
 
 extern float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair);
-
+extern float calc_distance(uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b, int L);
 #endif

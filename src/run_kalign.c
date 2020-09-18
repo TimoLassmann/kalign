@@ -34,7 +34,7 @@
 #include "misc.h"
 #include <getopt.h>
 #include <string.h>
-
+#include "idata.h"
 #include "alphabet.h"
 
 #define OPT_SET 1
@@ -47,6 +47,8 @@
 #define OPT_TGPE 8
 
 #define OPT_DEVTEST 10
+
+#define OPT_DUMP_INTERNAL 11
 
 static int run_kalign(struct parameters* param);
 static int check_for_sequences(struct msa* msa);
@@ -161,6 +163,7 @@ int main(int argc, char *argv[])
                         {"format",  required_argument, 0, 'f'},
                         {"reformat",  required_argument, 0, OPT_REFORMAT},
                         {"devtest",  no_argument, 0, OPT_DEVTEST},
+                        {"dumpinternal",no_argument, 0, OPT_DUMP_INTERNAL},
                         {"changename",  0, 0, OPT_RENAME},
                         {"gpo",  required_argument, 0, OPT_GPO},
                         {"gpe",  required_argument, 0, OPT_GPE},
@@ -186,6 +189,9 @@ int main(int argc, char *argv[])
                         break;
                 }
                 switch(c) {
+                case OPT_DUMP_INTERNAL:
+                        param->dump_internal = 1;
+                        break;
                 case OPT_SHOWW:
                         showw = 1;
                         break;
@@ -244,7 +250,9 @@ int main(int argc, char *argv[])
                 free_parameters(param);
                 return EXIT_SUCCESS;
         }
+        if(!param->dump_internal){
         print_kalign_header();
+        }
 #ifndef HAVE_AVX2
         RUN(print_AVX_warning());
 #endif
@@ -432,6 +440,21 @@ int run_kalign(struct parameters* param)
 
         /* allocate aln parameters  */
         RUN(init_ap(&ap,msa->numseq,msa->L ));
+
+        if(param->dump_internal){
+                double* s;
+                int s_len;
+                RUN(get_internal_data(msa,ap,&s, &s_len));
+                for(i = 0; i < s_len;i++){
+                        fprintf(stdout,"%0.2f ", s[i]);
+
+                }
+                fprintf(stdout,"\n");
+                MFREE(s);
+                //exit(0);
+                free_msa(msa);
+                return OK;
+        }
         /* Start bi-secting K-means sequence clustering */
         RUN(build_tree_kmeans(msa,ap));
         /* by default all protein sequences are converted into a reduced alphabet

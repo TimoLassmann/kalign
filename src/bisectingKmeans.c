@@ -121,7 +121,7 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap)
 /* #pragma omp single nowait */
 /*         { */
 /* #endif */
-                root = bisecting_kmeans(msa,root, dm, samples, numseq, num_anchors, numseq, ap->rng,0);
+        root = bisecting_kmeans(msa,root, dm, samples, numseq, num_anchors, numseq, ap->rng,0);
 
 /* #ifdef HAVE_OPENMP */
 /*         } */
@@ -147,6 +147,7 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap)
 ERROR:
         return FAIL;
 }
+
 
 struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct rng_state* rng, int d)
 {

@@ -24,9 +24,11 @@ rwalign.c \
 esl_stopwatch.h \
 esl_stopwatch.c \
 alphabet.h \
-alphabet.c 
+alphabet.c
 
 kalign_SOURCES = run_kalign.c \
+idata.h \
+idata.c \
 tldevel.h \
 tldevel.c \
 tlmisc.h \
@@ -148,4 +150,3 @@ rstdin_test_SOURCES = \
 read_from_stdin_test.c \
 tldevel.h \
 tldevel.c
-

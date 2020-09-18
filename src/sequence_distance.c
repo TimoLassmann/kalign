@@ -44,7 +44,7 @@ struct bignode* big_insert_hash(struct bignode *n,const unsigned int pos);
 void big_remove_nodes(struct bignode *n);
 void big_print_nodes(struct bignode *n);
 
-float calc_distance(uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b, int L);
+
 float dna_distance_calculation(struct bignode* hash[],const uint8_t * p,const int seqlen,int diagonals,float mode);
 float protein_wu_distance_calculation(struct bignode* hash[],const uint8_t* seq,const int seqlen,const int diagonals,const float mode);
 
@@ -105,9 +105,9 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                 dm[i][j] = 0.0f;
                         }
                 }
-                LOG_MSG("Got here");
-                omp_set_num_threads(4);
-#pragma omp parallel for shared(dm, msa) private(i, j) collapse(2) schedule(dynamic)
+
+ /*                omp_set_num_threads(4); */
+/* #pragma omp parallel for shared(dm, msa) private(i, j) collapse(2) schedule(dynamic) */
                 for(i = 0; i < numseq;i++){
                         for(j = 0;j < num_samples;j++){
                                 dm[i][j] = calc_distance(msa->sequences[i]->s,
@@ -129,6 +129,7 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                 /*                 dm[i][j] = dist; */
                 /*         } */
                 /* } */
+
         }
         return dm;
 ERROR:

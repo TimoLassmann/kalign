@@ -209,7 +209,7 @@ int read_input(char* infile,struct msa** msa)
         RUN(detect_alignment_format(b, &type));
         //exit(0);
 
-
+        //LOG_MSG("FORMAT: %d", type);
         if(type == FORMAT_FA){
                 //RUNP(msa = read_msf(infile,msa));
                 //RUNP(msa = read_clu(infile,msa));
@@ -435,44 +435,48 @@ ERROR:
 
 int detect_aligned(struct msa* msa)
 {
-        /* Here I look for gap character in the character frequency vector
-           if they are there we know the input sequences were aligned. This is not strictly
-           necessary for .clu and .msf infiles - but better safe than sorry. */
         int min_len;
         int max_len;
+        int l;
         int i;
+        int j;
+        int n;
         int gaps = 0;
         /* assume that sequences are not aligned */
         msa->aligned = 0;
 
-        gaps += msa->letter_freq[ (int) '-'];
-        gaps += msa->letter_freq[ (int) '.'];
-        gaps += msa->letter_freq[ (int) '_'];
-        gaps += msa->letter_freq[ (int) '~'];
 
-
-
-        /* if all sequences are the same length they could be considered
-           aligned (at least for the purpose of writing out a .msf / .clu
-           file) */
+        /* Improved logic:
+           Lets sum up the number of gaps plus sequence length of the first
+           X sequences. if min == max it is aligned.
+        */
         min_len = INT32_MAX;
-        max_len = INT32_MIN;
-        for(i = 0; i < msa->numseq;i++){
-                min_len = MACRO_MIN(min_len, msa->sequences[i]->len);
-                max_len = MACRO_MAX(max_len, msa->sequences[i]->len);
+        max_len = 0;
+        gaps = 0;
+        n = MACRO_MIN(50, msa->numseq);
+        for(i = 0; i < n;i++){
+                l = 0;
+                for (j = 0; j <= msa->sequences[i]->len;j++){
+                        l += msa->sequences[i]->gaps[j];
+                }
+                gaps += l;
+                l += msa->sequences[i]->len;
+                min_len = MACRO_MIN(min_len, l);
+                max_len = MACRO_MAX(max_len, l);
         }
-        //LOG_MSG("%d %d",min_len,max_len);
-        if(min_len == max_len){
-                msa->aligned = 1;
-        }
-        if(!gaps && min_len == max_len){
-                msa->aligned = ALN_STATUS_ALIGNED;
-        }else if(!gaps && min_len != max_len){
-                msa->aligned = ALN_STATUS_UNALIGNED;
+        if(gaps){
+                if(min_len == max_len){ /* sequences have gaps and total length is identical - clearly aligned  */
+                        msa->aligned = ALN_STATUS_ALIGNED;
+                }else{          /* odd there are gaps but total length differs - unknown status  */
+                        msa->aligned = ALN_STATUS_UNKNOWN;
+                }
         }else{
-                msa->aligned = ALN_STATUS_UNKNOWN;
+                if(min_len == max_len){ /* no gaps and sequences have same length. Can' tell if they are aligned  */
+                        msa->aligned = ALN_STATUS_UNKNOWN;
+                }else{          /* No gaps and sequences have different lengths - unaligned */
+                        msa->aligned = ALN_STATUS_UNALIGNED;
+                }
         }
-
         //LOG_MSG("Aligned: %d gaps: %d",msa->aligned,gaps);
         return OK;
 }
@@ -924,12 +928,12 @@ int write_msa_clustal(struct msa* msa,char* outfile)
                 max_name_len = MACRO_MAX(max_name_len, (int)strnlen( msa->sequences[i]->name,MSA_NAME_LEN));
         }
 
+
         aln_len = 0;
         for (j = 0; j <= msa->sequences[0]->len;j++){
                 aln_len += msa->sequences[0]->gaps[j];
         }
         aln_len += msa->sequences[0]->len;
-        //LOG_MSG("%d", aln_len);
 
 
         MMALLOC(linear_seq, sizeof(char)* (aln_len+1));
@@ -1115,11 +1119,11 @@ int read_clu(struct in_buffer* b , struct msa** m)
                                 for(i = j;i < line_len;i++){
                                         msa->letter_freq[(int)p[i]]++;
                                         if(isalpha((int)p[i])){
+                                                seq_ptr->seq[seq_ptr->len] = p[i];
+                                                seq_ptr->len++;
                                                 if(seq_ptr->alloc_len == seq_ptr->len){
                                                         resize_msa_seq(seq_ptr);
                                                 }
-                                                seq_ptr->seq[seq_ptr->len] = p[i];
-                                                seq_ptr->len++;
                                         }
                                         if(ispunct((int)p[i])){
                                                 seq_ptr->gaps[seq_ptr->len]++;
@@ -1212,11 +1216,12 @@ int read_msf(struct in_buffer* b,struct msa** m)
                                 for(i = 0;i < line_len-j;i++){
                                         msa->letter_freq[(int)p[i]]++;
                                         if(isalpha((int)p[i])){
+
+                                                seq_ptr->seq[seq_ptr->len] = p[i];
+                                                seq_ptr->len++;
                                                 if(seq_ptr->alloc_len == seq_ptr->len){
                                                         resize_msa_seq(seq_ptr);
                                                 }
-                                                seq_ptr->seq[seq_ptr->len] = p[i];
-                                                seq_ptr->len++;
                                         }
                                         if(ispunct((int)p[i])){
                                                 seq_ptr->gaps[seq_ptr->len]++;

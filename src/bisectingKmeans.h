@@ -27,6 +27,5 @@
 
 int build_tree_kmeans(struct msa* msa, struct aln_param* ap);
 
-
 //extern int build_tree_kmeans(struct msa* msa, struct aln_param* ap);
 #endif

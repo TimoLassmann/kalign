@@ -88,7 +88,7 @@ void free_ap(struct aln_param* ap)
         int i;
         if(ap){
                 if(ap->subm){
-                        for (i = 21;i--;){
+                        for (i = 23;i--;){
                                 MFREE(ap->subm[i]);
                         }
                         MFREE(ap->subm);
@@ -140,7 +140,7 @@ int set_subm_gaps_DNA(struct aln_param* ap)
         ap->gpe = 39.4;
         ap->tgpe =  292.6;
         //param->secret = 28.3;
- 			  //		     A    C    G    T    .    N
+        //         A    C    G    T    .    N
 
         return OK;
 }
@@ -237,5 +237,3 @@ int new_aln_matrices(struct aln_param* ap)
         ap->tgpe = 1.0;
         return OK;
 }
-
-
