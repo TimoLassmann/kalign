@@ -16,9 +16,6 @@ m4_include([m4/ax_valgrind_check.m4])
 m4_include([m4/ax_check_compile_flag.m4])
 m4_include([m4/ax_set_compile_flags.m4])
 
-AX_EXT
-
-AX_ENABLE_DEBUG
 
 AN_IDENTIFIER([_Generic], [AC_C__GENERIC])
 AC_DEFUN([AC_C__GENERIC],
@@ -55,6 +52,9 @@ fi
 # Check for C11 _Generic support
 AC_C__GENERIC
 
+AX_EXT
+
+AX_ENABLE_DEBUG
 
 AC_ARG_ENABLE(openmp, [AC_HELP_STRING([--enable-openmp],[use OpenMP directives for parallelism])], enable_openmp=$enableval, enable_openmp=no)
 
