@@ -226,9 +226,9 @@ int run_and_score(struct parameters_br* param)
                 }
 
                 if(param->gpo != FLT_MAX && param->gpe != FLT_MAX && param->tgpe != FLT_MAX){
-                        rc = snprintf(cmd, BUFFER_LEN*2, "valgrind kalign -gpo %f -gpe %f -tgpe %f %s -f msf -o %s/test_%d.msf",param->gpo,param->gpe, param->tgpe, param->testseq,path,param->uniq);
+                        rc = snprintf(cmd, BUFFER_LEN*2, "kalign -gpo %f -gpe %f -tgpe %f %s -f msf -o %s/test_%d.msf",param->gpo,param->gpe, param->tgpe, param->testseq,path,param->uniq);
                 }else{
-                        rc = snprintf(cmd, BUFFER_LEN*2, "valgrind kalign %s -f msf -o %s/test_%d.msf", param->testseq,path,param->uniq);
+                        rc = snprintf(cmd, BUFFER_LEN*2, "kalign %s -f msf -o %s/test_%d.msf", param->testseq,path,param->uniq);
                 }
         }else if(!strcmp(param->program,"kalign2")){
                 if (system("which kalign2")){
@@ -252,7 +252,7 @@ int run_and_score(struct parameters_br* param)
                 ERROR_MSG("Program %s not recognize\n", param->program);
         }
 
-        LOG_MSG("Running: %s", cmd);
+        //LOG_MSG("Running: %s", cmd);
 
         gettimeofday(&tv1, NULL);
 
@@ -260,7 +260,7 @@ int run_and_score(struct parameters_br* param)
         RUNP(pipe = popen(cmd,"r"));
         //if (system("which gnuplot"))
         while (fgets(ret, BUFFER_LEN, pipe)){
-                fprintf(stderr,"%s", ret);
+                //fprintf(stderr,"%s", ret);
         }
 
         rc = pclose(pipe);
