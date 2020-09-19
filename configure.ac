@@ -1,6 +1,6 @@
 AC_INIT(kalign, 3.2.6)
 
-AC_USE_SYSTEM_EXTENSIONS
+
 AM_INIT_AUTOMAKE
 AC_PROG_CC
 
@@ -52,7 +52,7 @@ fi
 # Check for C11 _Generic support
 AC_C__GENERIC
 
-AX_EXT
+
 
 AX_ENABLE_DEBUG
 
@@ -115,7 +115,7 @@ AC_TYPE_UINT64_T
 # Checks for library functions.
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
-AC_FUNC_STRNLEN
+
 AC_FUNC_ERROR_AT_LINE
 AC_CHECK_FUNCS([gettimeofday pow realpath sqrt strstr memset])
 AC_CHECK_FUNCS([clock_gettime])

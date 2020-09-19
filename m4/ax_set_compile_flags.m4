@@ -1,4 +1,3 @@
-
 AC_DEFUN([AX_ENABLE_DEBUG],
 [AC_ARG_ENABLE(debugging,
 [AS_HELP_STRING([--enable-debugging],[include debugging code])
@@ -23,11 +22,11 @@ changequote([,])
 if test "$enable_debugging" != "no"; then
 AC_DEFINE(DEBUG,1,[Defines debugging .])
 ADD_DEBUG_COMPILE_WARNINGS
-CFLAGS="-ggdb -std=iso9899:2017 ${CFLAGS}"
+CFLAGS="-ggdb -std=gnu11 ${CFLAGS}"
 CFLAGS="${CFLAGS}"
 else
 ADD_PRODUCTION_COMPILE_WARNINGS
-CFLAGS="-O3 -std=iso9899:2017 ${CFLAGS}"
+CFLAGS="-O3 -std=gnu11 ${CFLAGS}"
 CFLAGS="${CFLAGS}"
 DEBUG=0
 fi
@@ -35,7 +34,7 @@ fi
 ])
 
 AC_DEFUN([ADD_DEBUG_COMPILE_WARNINGS],
-  [TLDEVEL_CFLAGS=""  
+  [TLDEVEL_CFLAGS=""
   AX_CHECK_COMPILE_FLAG([-pedantic],[TLDEVEL_CFLAGS="${TLDEVEL_CFLAGS} -pedantic"],,)
   AX_CHECK_COMPILE_FLAG([-fstack-protector],[TLDEVEL_CFLAGS="${TLDEVEL_CFLAGS} -fstack-protector"],,)
   dnl AX_CHECK_COMPILE_FLAG([-fsanitize=safe-stack],[TLDEVEL_CFLAGS="${TLDEVEL_CFLAGS} -fsanitize=safe-stack"],,)
