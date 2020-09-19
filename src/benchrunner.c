@@ -281,8 +281,8 @@ int run_and_score(struct parameters_br* param)
                 snprintf( ret, BUFFER_LEN*2, "%s/test_%d.msf",path,param->uniq);
                 LOG_MSG("read test alignment");
                 RUN(read_input(ret,&test_aln));//  detect_and_read_sequences(param));
-                snprintf(ret, BUFFER_LEN, "%s/evalaln_%d.msf",path,param->uniq);
-                write_msa(test_aln, ret, FORMAT_MSF);
+
+
 
                 average_seq_len = 0.0;
                 for(j = 0; j < test_aln->numseq;j++){
@@ -360,13 +360,13 @@ int run_and_score(struct parameters_br* param)
 
                         }else if(!my_file_exists(param->output)){
                                 RUNP(out_ptr = fopen(param->output ,"w"));
-                                fprintf(out_ptr,"Program,Alignment,AVGLEN,NUMSEQ,SP,TC,Time\n");
-                                fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f\n",param->program,basename(param->refseq), average_seq_len,test_aln->numseq,SP,TC,time);
+                                fprintf(out_ptr,"Program,Alignment,AVGLEN,NUMSEQ,GPO,GPE,TGPE,SP,TC,Time\n");
+                                fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f,%f,%f,%f\n",param->program,basename(param->refseq), average_seq_len,test_aln->numseq,param->gpo,param->gpe,param->tgpe,SP,TC,time);
                                 fclose(out_ptr);
 
                         }else{
                                 RUNP(out_ptr = fopen(param->output,"a"));
-                                fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f\n",param->program,basename(param->refseq), average_seq_len,test_aln->numseq,SP,TC,time);
+                                fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f,%f,%f,%f\n",param->program,basename(param->refseq), average_seq_len,test_aln->numseq,param->gpo,param->gpe,param->tgpe,SP,TC,time);
                                 fclose(out_ptr);
 
                         }
@@ -390,7 +390,15 @@ int run_and_score(struct parameters_br* param)
                 /* WARNING_MSG("Error code was: %d", rc); */
         }
 
+        snprintf(ret, BUFFER_LEN, "%s/evalaln_%d.msf",path,param->uniq);
+        if(my_file_exists(ret)){
+                remove(ret);
+        }
 
+        snprintf( ret, BUFFER_LEN*2, "%s/test_%d.msf",path,param->uniq);
+        if(my_file_exists(ret)){
+                remove(ret);
+        }
 
         if(path){
                 MFREE(path);
@@ -400,6 +408,16 @@ int run_and_score(struct parameters_br* param)
 
         return OK;
 ERROR:
+        snprintf(ret, BUFFER_LEN, "%s/evalaln_%d.msf",path,param->uniq);
+        if(my_file_exists(ret)){
+                remove(ret);
+        }
+
+        snprintf( ret, BUFFER_LEN*2, "%s/test_%d.msf",path,param->uniq);
+        if(my_file_exists(ret)){
+                remove(ret);
+        }
+
         if(ref_aln){
                 free_msa(ref_aln);
         }

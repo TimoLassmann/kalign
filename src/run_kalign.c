@@ -465,6 +465,7 @@ int run_kalign(struct parameters* param)
         }
 
         RUN(init_ap(&ap,msa->numseq,msa->L ));
+
         if(param->gpo != FLT_MAX){
                 ap->gpo = param->gpo;
         }
