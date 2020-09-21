@@ -18,16 +18,16 @@ int main(int argc, char *argv[])
         int rc;
 
         float gpo_start = 5.0F;
-        float gpo_step = 0.25F;
+        float gpo_step = 0.1F;
 
         float gpe_start = 1.5F;
-        float gpe_step = 0.25F;
+        float gpe_step = 0.1F;
 
         float tgpe_start = 0.5F;
-        float tgpe_step = 0.25F;
+        float tgpe_step = 0.1F;
 
         float matadd_start = 0.0F;
-        float matadd_step = 0.25F;
+        float matadd_step = 0.1F;
 
         float gpo;
         float gpe;
@@ -44,13 +44,13 @@ int main(int argc, char *argv[])
                 ret[strcspn(ret, "\r\n")] = 0;
 
                 gpo = gpo_start;
-                for(i = 0;i < 5;i++){
+                for(i = 0;i < 15;i++){
                         gpe = gpe_start;
-                        for(j = 0;j < 5;j++){
+                        for(j = 0;j < 15;j++){
                                 tgpe = tgpe_start;
-                                for(c = 0;c <5;c++){
+                                for(c = 0;c <15;c++){
                                         matadd = matadd_start;
-                                        for(f = 0; f < 5; f++){
+                                        for(f = 0; f < 15; f++){
                                                 rc = snprintf(out, BUFSIZ, "benchrunner --scratch ~/tmp --gpo %f -gpe %f -tgpe %f -matadd %f -program kalign -test %s -ref %s -o big_run_out.csv -u %d \n", gpo,gpe,tgpe,matadd, ret,ret,  i << 12| j << 8 | c << 4 | f);
                                                 fprintf(stdout,"%s",out);
                                                 matadd += matadd_step;
