@@ -39,7 +39,6 @@ struct aln_param{
         int* tree;
 };
 
-
-extern int init_ap(struct aln_param** aln_param, int numseq,int L);
+extern int init_ap(struct aln_param** aln_param, struct parameters* param, int numseq,int L);
 extern void free_ap(struct aln_param* ap);
 #endif

@@ -45,6 +45,7 @@
 #define OPT_GPO 6
 #define OPT_GPE 7
 #define OPT_TGPE 8
+#define OPT_MATADD 9
 
 #define OPT_DEVTEST 10
 
@@ -168,6 +169,7 @@ int main(int argc, char *argv[])
                         {"gpo",  required_argument, 0, OPT_GPO},
                         {"gpe",  required_argument, 0, OPT_GPE},
                         {"tgpe",  required_argument, 0, OPT_TGPE},
+                        {"matadd",  required_argument, 0, OPT_MATADD},
                         {"input",  required_argument, 0, 'i'},
                         {"infile",  required_argument, 0, 'i'},
                         {"in",  required_argument, 0, 'i'},
@@ -223,7 +225,9 @@ int main(int argc, char *argv[])
                 case OPT_TGPE :
                         param->tgpe = atof(optarg);
                         break;
-
+                case OPT_MATADD :
+                        param->matadd = atof(optarg);
+                        break;
                 case 'h':
                         param->help_flag = 1;
                         break;
@@ -437,9 +441,9 @@ int run_kalign(struct parameters* param)
                 RUN(dealign_msa(msa));
         }
 
-
         /* allocate aln parameters  */
-        RUN(init_ap(&ap,msa->numseq,msa->L ));
+        RUN(init_ap(&ap,param,msa->numseq,msa->L ));
+
 
         if(param->dump_internal){
                 double* s;
@@ -463,18 +467,10 @@ int run_kalign(struct parameters* param)
                 //RUN(convert_msa_to_internal(msa, defPROTEIN));
                 RUN(convert_msa_to_internal(msa, ambigiousPROTEIN));
         }
+        /* allocate aln parameters  */
+        RUN(init_ap(&ap,param,msa->numseq,msa->L ));
 
-        RUN(init_ap(&ap,msa->numseq,msa->L ));
 
-        if(param->gpo != FLT_MAX){
-                ap->gpo = param->gpo;
-        }
-        if(param->gpe != FLT_MAX){
-                ap->gpe = param->gpe;
-        }
-        if(param->tgpe != FLT_MAX){
-                ap->tgpe = param->tgpe;
-        }
 /* Start alignment stuff */
         DECLARE_TIMER(t1);
         LOG_MSG("Aligning");

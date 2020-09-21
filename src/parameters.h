@@ -37,6 +37,7 @@ struct parameters{
         float gpo;
         float gpe;
         float tgpe;
+        float matadd;
         int out_format;
         int param_set;
         int dist_method;

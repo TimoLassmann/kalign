@@ -21,6 +21,7 @@
 #define OPT_GPO 6
 #define OPT_GPE 7
 #define OPT_TGPE 8
+#define OPT_MATADD 9
 
 //#define BUFFER_LEN 512
 
@@ -34,6 +35,7 @@ struct parameters_br{
         float gpo;
         float gpe;
         float tgpe;
+        float matadd;
         int uniq;
 };
 
@@ -57,6 +59,7 @@ int main(int argc, char *argv[])
         param->gpo = FLT_MAX;
         param->gpe = FLT_MAX;
         param->tgpe = FLT_MAX;
+        param->matadd = 0.0F;
         param->uniq = 0;
         int help = 0;
         int c;
@@ -71,6 +74,7 @@ int main(int argc, char *argv[])
                         {"gpo",  required_argument, 0, OPT_GPO},
                         {"gpe",  required_argument, 0, OPT_GPE},
                         {"tgpe",  required_argument, 0, OPT_TGPE},
+                        {"matadd",  required_argument, 0, OPT_MATADD},
                         {"uniq",  required_argument, 0, 'u'},
                         {"help",   no_argument,0,'h'},
                         {"quiet",  0, 0, 'q'},
@@ -111,6 +115,9 @@ int main(int argc, char *argv[])
                 case OPT_TGPE :
                         param->tgpe = atof(optarg);
                         break;
+                case OPT_MATADD :
+                        param->matadd = atof(optarg);
+                        break;
                 case 'u':
                         param->uniq = atoi(optarg);
                         break;
@@ -119,10 +126,8 @@ int main(int argc, char *argv[])
                         break;
                 case '?':
                         help = 1;
-
                         break;
                 default:
-
                         abort ();
                 }
         }
@@ -225,8 +230,8 @@ int run_and_score(struct parameters_br* param)
                         ERROR_MSG("kalign is not found in your path:\n%s\n",envpaths);
                 }
 
-                if(param->gpo != FLT_MAX && param->gpe != FLT_MAX && param->tgpe != FLT_MAX){
-                        rc = snprintf(cmd, BUFFER_LEN*2, "kalign -gpo %f -gpe %f -tgpe %f %s -f msf -o %s/test_%d.msf",param->gpo,param->gpe, param->tgpe, param->testseq,path,param->uniq);
+                if(param->gpo != FLT_MAX && param->gpe != FLT_MAX && param->tgpe != FLT_MAX && param->matadd != 0.0F ){
+                        rc = snprintf(cmd, BUFFER_LEN*2, "kalign -gpo %f -gpe %f -tgpe %f -matadd %f %s -f msf -o %s/test_%d.msf",param->gpo,param->gpe, param->tgpe,param->matadd, param->testseq,path,param->uniq);
                 }else{
                         rc = snprintf(cmd, BUFFER_LEN*2, "kalign %s -f msf -o %s/test_%d.msf", param->testseq,path,param->uniq);
                 }
@@ -360,13 +365,14 @@ int run_and_score(struct parameters_br* param)
 
                         }else if(!my_file_exists(param->output)){
                                 RUNP(out_ptr = fopen(param->output ,"w"));
-                                fprintf(out_ptr,"Program,Alignment,AVGLEN,NUMSEQ,GPO,GPE,TGPE,SP,TC,Time\n");
-                                fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f,%f,%f,%f\n",param->program,basename(param->refseq), average_seq_len,test_aln->numseq,param->gpo,param->gpe,param->tgpe,SP,TC,time);
+                                fprintf(out_ptr,"Program,Alignment,AVGLEN,NUMSEQ,GPO,GPE,TGPE,MATADD,SP,TC,Time\n");
+                                fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",param->program,basename(param->refseq), average_seq_len,test_aln->numseq,param->gpo,param->gpe,param->tgpe,param->matadd,SP,TC,time);
                                 fclose(out_ptr);
 
                         }else{
                                 RUNP(out_ptr = fopen(param->output,"a"));
-                                fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f,%f,%f,%f\n",param->program,basename(param->refseq), average_seq_len,test_aln->numseq,param->gpo,param->gpe,param->tgpe,SP,TC,time);
+                                fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",param->program,basename(param->refseq), average_seq_len,test_aln->numseq,param->gpo,param->gpe,param->tgpe,param->matadd,SP,TC,time);
+
                                 fclose(out_ptr);
 
                         }

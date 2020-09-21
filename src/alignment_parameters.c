@@ -33,15 +33,15 @@ int set_param_number(struct aln_param* ap,int L, int sel);
 int new_aln_matrices(struct aln_param* ap);
 
 
-int init_ap(struct aln_param** aln_param, int numseq,int L)
+int init_ap(struct aln_param** aln_param, struct parameters* param, int numseq,int L)
 {
         struct aln_param* ap = NULL;
-
+        int i,j;
 
         if(*aln_param){
                 ap = *aln_param;
         }else{
-                int i,j;
+
                 MMALLOC(ap, sizeof(struct aln_param));
 
                 ap->tree = NULL;
@@ -72,6 +72,24 @@ int init_ap(struct aln_param** aln_param, int numseq,int L)
                 RUN(set_subm_gaps(ap));
         }else if(L == ambigiousPROTEIN){
                 RUN(new_aln_matrices(ap));
+        }
+
+        if(param->gpo != FLT_MAX){
+                ap->gpo = param->gpo;
+        }
+        if(param->gpe != FLT_MAX){
+                ap->gpe = param->gpe;
+        }
+        if(param->tgpe != FLT_MAX){
+                ap->tgpe = param->tgpe;
+        }
+        if(param->matadd!= 0.0F){
+                for(i = 0; i < 23;i++){
+                        for(j = 0; j < 23;j++){
+                                ap->subm[i][j] += param->matadd;
+                        }
+                }
+
         }
 
         *aln_param = ap;

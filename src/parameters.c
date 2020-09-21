@@ -48,6 +48,7 @@ struct parameters*init_param(void)
         param->gpo = FLT_MAX;
         param->gpe = FLT_MAX;
         param->tgpe = FLT_MAX;
+        param->matadd = 0.0F;
 
         return param;
 ERROR:
