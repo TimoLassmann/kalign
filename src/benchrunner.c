@@ -23,6 +23,8 @@
 #define OPT_TGPE 8
 #define OPT_MATADD 9
 
+#define OPT_RUNNAME 10
+
 //#define BUFFER_LEN 512
 
 struct parameters_br{
@@ -31,7 +33,7 @@ struct parameters_br{
         char* program;
         char* scratch;
         char* output;
-
+        char* run_name;
         float gpo;
         float gpe;
         float tgpe;
@@ -55,6 +57,7 @@ int main(int argc, char *argv[])
         param->program = NULL;
         param->scratch = NULL;
         param->output = NULL;
+        param->run_name = NULL;
 
         param->gpo = FLT_MAX;
         param->gpe = FLT_MAX;
@@ -70,6 +73,7 @@ int main(int argc, char *argv[])
                         {"ref", required_argument,0,OPT_REFALN},
                         {"program",  required_argument, 0, OPT_PROGRAM},
                         {"scratch",  required_argument, 0, OPT_TMPDIR},
+                        {"runname",  required_argument, 0, OPT_RUNNAME },
                         {"output",  required_argument, 0, OPT_OUTPUT},
                         {"gpo",  required_argument, 0, OPT_GPO},
                         {"gpe",  required_argument, 0, OPT_GPE},
@@ -105,6 +109,9 @@ int main(int argc, char *argv[])
                         break;
                 case OPT_OUTPUT:
                         param->output  = optarg;
+                        break;
+                case OPT_RUNNAME:
+                        param->run_name  = optarg;
                         break;
                 case OPT_GPO:
                         param->gpo = atof(optarg);
@@ -245,7 +252,7 @@ int run_and_score(struct parameters_br* param)
                 if (system("which muscle3.8.31_i86linux32")){
                         ERROR_MSG("muscle3.8.31_i86linux32 is not found in your path:\n%s\n",envpaths);
                 }
-                rc = snprintf(cmd, BUFFER_LEN*2, "muscle3.8.31_i86linux32  -maxiters 2 -msf -in %s -out %s/test.msf",param->testseq,path);
+                rc = snprintf(cmd, BUFFER_LEN*2, "muscle3.8.31_i86linux32  -maxiters 2 -msf -in %s -out %s/test_%d.msf",param->testseq,path,param->uniq);
         }else if(!strcmp(param->program,"clustal")){
                 if (system("which clustalo-1.2.4-Ubuntu-x86_64")){
                         ERROR_MSG("clustalo-1.2.4-Ubuntu-x86_64 is not found in your path:\n%s\n",envpaths);
@@ -358,23 +365,69 @@ int run_and_score(struct parameters_br* param)
                                 fprintf(stdout,"%f\n",SP);
 
 
-                        }else  if(!strcmp(param->output, "stdout")){
-                                out_ptr = stdout;
-                                fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f\n",param->program,basename(param->refseq), average_seq_len,test_aln->numseq,SP,TC,time);
-                                fclose(out_ptr);
-
                         }else if(!my_file_exists(param->output)){
                                 RUNP(out_ptr = fopen(param->output ,"w"));
-                                fprintf(out_ptr,"Program,Alignment,AVGLEN,NUMSEQ,GPO,GPE,TGPE,MATADD,SP,TC,Time\n");
-                                fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",param->program,basename(param->refseq), average_seq_len,test_aln->numseq,param->gpo,param->gpe,param->tgpe,param->matadd,SP,TC,time);
+
+                                fprintf(out_ptr,"Name,Alignment,AVGLEN,NUMSEQ,GPO,GPE,TGPE,MATADD,SP,TC,Time\n");
+                                if(param->run_name){
+                                        fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",
+                                                param->run_name,
+                                                basename(param->refseq),
+                                                average_seq_len,
+                                                test_aln->numseq,
+                                                param->gpo,
+                                                param->gpe,
+                                                param->tgpe,
+                                                param->matadd,
+                                                SP,
+                                                TC,
+                                                time);
+                                }else{
+                                        fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",
+                                                param->program,
+                                                basename(param->refseq),
+                                                average_seq_len,
+                                                test_aln->numseq,
+                                                param->gpo,
+                                                param->gpe,
+                                                param->tgpe,
+                                                param->matadd,
+                                                SP,
+                                                TC,
+                                                time);
+                                }
                                 fclose(out_ptr);
 
                         }else{
                                 RUNP(out_ptr = fopen(param->output,"a"));
-                                fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",param->program,basename(param->refseq), average_seq_len,test_aln->numseq,param->gpo,param->gpe,param->tgpe,param->matadd,SP,TC,time);
-
+                                if(param->run_name){
+                                        fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",
+                                                param->run_name,
+                                                basename(param->refseq),
+                                                average_seq_len,
+                                                test_aln->numseq,
+                                                param->gpo,
+                                                param->gpe,
+                                                param->tgpe,
+                                                param->matadd,
+                                                SP,
+                                                TC,
+                                                time);
+                                }else{
+                                        fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",
+                                                param->program,
+                                                basename(param->refseq),
+                                                average_seq_len,
+                                                test_aln->numseq,
+                                                param->gpo,
+                                                param->gpe,
+                                                param->tgpe,
+                                                param->matadd,
+                                                SP,
+                                                TC,
+                                                time);
+                                }
                                 fclose(out_ptr);
-
                         }
 
                 }else{
@@ -445,10 +498,14 @@ int print_help_score_and_align(char **argv)
         fprintf(stdout,"NOTE: the program appends results to the output file.\n\n");
         fprintf(stdout,"Options:\n\n");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--scratch","Scratch directory." ,"[NA]"  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--runname","Name of run." ,"[NA]"  );
+
 
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpo","Gap open ." ,"[NA]"  );
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpe","Gap extend." ,"[NA]"  );
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--tgpe","Gap extend terminal." ,"[NA]"  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--matadd","Addition to sub matrix." ,"[NA]"  );
+
 
         return OK;
 }

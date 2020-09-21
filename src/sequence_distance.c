@@ -129,8 +129,9 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                 /*                 dm[i][j] = dist; */
                 /*         } */
                 /* } */
-
         }
+
+
         return dm;
 ERROR:
         return NULL;

@@ -136,7 +136,7 @@ int** hirschberg_alignment(struct msa* msa, struct aln_param* ap)
                 b = tree[i*3+1];
                 c = tree[i*3+2];
                 //fprintf(stderr,"\r%8.0f percent done",(float)(i) /(float)numseq * 100);
-                //fprintf(stderr,"Aligning:%d %d->%d	done:%f\n",a,b,c,((float)(i+1)/(float)numseq)*100);
+                //fprintf(stdout,"Aligning:%d %d->%d	done:%f\n",a,b,c,((float)(i+1)/(float)numseq)*100);
                 if(a < numseq){
                         len_a = msa->sequences[a]->len;//  aln->sl[a];
                 }else{
@@ -280,6 +280,7 @@ int hirsch_ss_dyn(const struct aln_param* ap, const uint8_t* seq1,const uint8_t*
 
 
         hirsch_align_two_ss_vector(ap,seq1,seq2,hm,hirsch_path,input_states,old_cor);
+
         return  OK;
 }
 
@@ -546,7 +547,7 @@ int hirsch_align_two_ss_vector(const struct aln_param* ap,const uint8_t* seq1,co
 
 
         //fprintf(stderr,"Transition:%d	at:%d\n",transition,c);
-
+        //LOG_MSG("MAX: %f",max);
         //j = hirsch_path[0];
         switch(transition){
         case 1: //a -> a = 1
