@@ -23,7 +23,7 @@
 #include <xmmintrin.h>
 #include "alignment.h"
 
-#include "pick_anchor.h"
+
 #define MAX(a, b) (a > b ? a : b)
 #define MAX3(a,b,c) MAX(MAX(a,b),c)
 
@@ -2746,7 +2746,6 @@ ERROR:
 
 int hirsch_mem_realloc(struct hirsch_mem* hm,int x)
 {
-
         if((x+1) > hm->size){
                 hm->size = x+1;
 

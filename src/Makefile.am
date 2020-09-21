@@ -47,8 +47,6 @@ global.h \
 msa.h \
 parameters.h \
 parameters.c \
-aln_data.h \
-aln_data.c \
 alphabet.h \
 alphabet.c \
 alignment_parameters.h \
@@ -69,7 +67,10 @@ rwalign.c \
 misc.h \
 misc.c \
 bpm.h \
-bpm.c
+bpm.c \
+aln_struct.h \
+aln_mem.h \
+aln_mem.c
 
 
 check_PROGRAMS = edist alphabet misc_test bpm_test rwaln rstdin_test
