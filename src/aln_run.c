@@ -71,7 +71,6 @@ int** create_chaos_msa(struct msa* msa, struct aln_param* ap)
                                 best_b = b;
                                 max_score = ap->score;
                         }
-
                 }
                 a = best_a;
                 b = best_b;
