@@ -7,6 +7,7 @@
 #define EXTERN extern
 #endif
 EXTERN int** create_msa(struct msa* msa, struct aln_param* ap);
+EXTERN int** create_chaos_msa(struct msa* msa, struct aln_param* ap);
 #undef ALN_RUN_IMPORT
 #undef EXTERN
 #endif

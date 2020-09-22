@@ -2,12 +2,31 @@
 
 #include <stdint.h>
 
+#include "aln_struct.h"
 #include "alignment_parameters.h"
 
 
 #define ALN_SETUP_IMPORT
 #include "aln_setup.h"
 
+
+int init_alnmem(struct aln_mem* m, int len_a, int len_b)
+{
+        m->starta = 0;
+        m->startb = 0;
+        m->enda = len_a;
+        m->endb = len_b;
+        m->len_a = len_a;
+        m->len_b = len_b;
+
+        m->f[0].a  = 0.0F;
+        m->f[0].ga = -FLT_MAX;
+        m->f[0].gb = -FLT_MAX;
+        m->b[0].a  = 0.0F;
+        m->b[0].ga = -FLT_MAX;
+        m->b[0].gb = -FLT_MAX;
+        return OK;
+}
 
 int make_profile_n(struct aln_param* ap,const uint8_t* seq,const int len, float** p)
 {

@@ -7,7 +7,7 @@
 #define EXTERN extern
 #endif
 
-
+EXTERN int init_alnmem(struct aln_mem* m, int len_a, int len_b);
 EXTERN int make_profile_n(struct aln_param* ap,const uint8_t* seq,const int len, float** p);
 EXTERN int set_gap_penalties_n(float* prof,int len,int nsip);
 EXTERN int add_gap_info_to_path_n(int** p_path,int len_a,int len_b);

@@ -86,7 +86,6 @@ aln_profileprofile.c
 
 
 
-
 check_PROGRAMS = edist alphabet misc_test bpm_test rwaln rstdin_test
 TESTS = edist alphabet  misc_test bpm_test rstdin_test
 
