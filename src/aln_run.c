@@ -117,8 +117,8 @@ int** create_msa(struct msa* msa, struct aln_param* ap)
                                 m->len_a = len_b;
                                 m->len_b = len_a;
 
-                                ap->seq1 = msa->sequences[a]->s;
-                                ap->seq2 = NULL;
+                                ap->seq1 = NULL;
+                                ap->seq2 = msa->sequences[a]->s;
                                 ap->prof1 = profile[b];
                                 ap->prof2 = NULL;
                                 ap->sip = msa->nsip[b];
@@ -131,8 +131,8 @@ int** create_msa(struct msa* msa, struct aln_param* ap)
                         }
                 }else{
                         if(b < numseq){
-                                ap->seq1 = msa->sequences[b]->s;
-                                ap->seq2 = NULL;
+                                ap->seq1 = NULL;
+                                ap->seq2 = msa->sequences[b]->s;
                                 ap->prof1 = profile[a];
                                 ap->prof2 = NULL;
                                 ap->sip = msa->nsip[a];
