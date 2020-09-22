@@ -37,6 +37,8 @@
 #include "idata.h"
 #include "alphabet.h"
 
+#include "aln_run.h"
+
 #define OPT_SET 1
 #define OPT_ALNPARAM 2
 #define OPT_RENAME 3
@@ -475,7 +477,8 @@ int run_kalign(struct parameters* param)
         DECLARE_TIMER(t1);
         LOG_MSG("Aligning");
         START_TIMER(t1);
-        RUNP(map = hirschberg_alignment(msa, ap));
+        RUNP(map = create_msa(msa,ap));
+        //RUNP(map = hirschberg_alignment(msa, ap));
         STOP_TIMER(t1);
         GET_TIMING(t1);
 //LOG_MSG("Done in %f sec.", GET_TIMING(t1));

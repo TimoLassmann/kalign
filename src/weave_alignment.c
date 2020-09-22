@@ -87,7 +87,6 @@ int make_seq(struct msa* msa,int a,int b,int* path)
         int posa = 0;
         int posb = 0;
 
-
         MMALLOC(gap_a,(path[0]+1)*sizeof(int));
         MMALLOC(gap_b,(path[0]+1)*sizeof(int));
 
@@ -112,7 +111,9 @@ int make_seq(struct msa* msa,int a,int b,int* path)
                 }
                 c++;
         }
+
         for (i = msa->nsip[a];i--;){
+
                 RUN(update_gaps(msa->sequences[msa->sip[a][i]]->len, msa->sequences[msa->sip[a][i]]->gaps,gap_a));
                 //RUN(update_gaps(aln->sl[aln->sip[a][i]],aln->gaps[aln->sip[a][i]],path[0],gap_a));
         }
@@ -144,5 +145,3 @@ int update_gaps(int old_len,int*gis,int *newgaps)
         }
         return OK;
 }
-
-

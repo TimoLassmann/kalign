@@ -233,7 +233,7 @@ int aln_seqprofile_backward(struct aln_mem* m,const struct aln_param* ap)
         return OK;
 }
 
-int aln_seqprofile_meetup(struct aln_mem* m,struct aln_param* ap,int* meet,int* t,float* score)
+int aln_seqprofile_meetup(struct aln_mem* m,struct aln_param* ap,int old_cor[],int* meet,int* t,float* score)
 {
         struct states* f = m->f;
         struct states* b = m->b;
@@ -258,17 +258,17 @@ int aln_seqprofile_meetup(struct aln_mem* m,struct aln_param* ap,int* meet,int* 
         //int max = -FLT_MAX;
         float max = -FLT_MAX;
         //float middle =  (m->endb - m->startb)/2 + m->startb;
-        float middle = (float)(ap->old_cor[3] - ap->old_cor[2])/2.0F + (float)ap->old_cor[2];
+        float middle = (float)(old_cor[3] - old_cor[2])/2.0F + (float)old_cor[2];
         float sub = 0.0F;
 
 
-        prof1+= ((ap->old_cor[4]+1)<<6);
+        prof1+= ((old_cor[4]+1)<<6);
 
         //i = m->startb;
 
         c = -1;
         //for(i = m->startb; i < m->endb;i++){
-        for(i = ap->old_cor[2]; i < ap->old_cor[3];i++){
+        for(i = old_cor[2]; i < old_cor[3];i++){
                 sub = fabsf(middle -i);
                 sub /= 1000;
                 if(f[i].a+b[i].a-sub> max){
@@ -320,7 +320,7 @@ int aln_seqprofile_meetup(struct aln_mem* m,struct aln_param* ap,int* meet,int* 
                 }
         }
         //i = m->endb;
-        i = ap->old_cor[3];
+        i = old_cor[3];
 
         sub = fabsf(middle -i);
         sub /= 1000;

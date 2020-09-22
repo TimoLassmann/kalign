@@ -26,6 +26,8 @@ int** create_msa(struct msa* msa, struct aln_param* ap)
         int* tree = NULL;
         int numseq;
 
+        ap->mode = ALN_MODE_FULL;
+
         g = msa->num_profiles;
         numseq = msa->numseq;
 
@@ -44,7 +46,7 @@ int** create_msa(struct msa* msa, struct aln_param* ap)
                 b = tree[i*3+1];
                 c = tree[i*3+2];
                 //fprintf(stderr,"\r%8.0f percent done",(float)(i) /(float)numseq * 100);
-                //fprintf(stdout,"Aligning:%d %d->%d	done:%f\n",a,b,c,((float)(i+1)/(float)numseq)*100);
+                fprintf(stdout,"Aligning:%d %d->%d	done:%f\n",a,b,c,((float)(i+1)/(float)numseq)*100);
                 if(a < numseq){
                         len_a = msa->sequences[a]->len;//  aln->sl[a];
                 }else{

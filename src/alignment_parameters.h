@@ -39,8 +39,6 @@ struct aln_param{
         const float* prof2;
         const uint8_t* seq1;
         const uint8_t* seq2;
-        float input_states[6];
-        int old_cor[5];
         int sip;
         int mode;
         /* actual parameters  */
