@@ -477,6 +477,7 @@ int run_kalign(struct parameters* param)
         DECLARE_TIMER(t1);
         LOG_MSG("Aligning");
         START_TIMER(t1);
+        //RUNP(map = create_chaos_msa(msa, ap));
         RUNP(map = create_msa(msa,ap));
         //RUNP(map = hirschberg_alignment(msa, ap));
         STOP_TIMER(t1);

@@ -12,13 +12,15 @@
 #define ALN_RUN_IMPORT
 #include "aln_run.h"
 
-
+static int score_aln(struct aln_mem* m,struct aln_param* ap,float** profile, struct msa* msa, int a,int b,int numseq,float* score);
 static int SampleWithoutReplacement(struct rng_state* rng, int N, int n,int* samples);
 static int int_cmp(const void *a, const void *b);
+
 int** create_chaos_msa(struct msa* msa, struct aln_param* ap)
 {
         struct aln_mem* m = NULL;
-        int i,j,g,a,b,c;
+        int i,j,g,a,b,c,l;
+        int best_a, best_b;
         int len_a;
         int len_b;
         float** profile = NULL;
@@ -27,6 +29,8 @@ int** create_chaos_msa(struct msa* msa, struct aln_param* ap)
         int* tree = NULL;
 
         int* active = NULL;
+        float max_score;
+        float score;
         int numseq;
 
         ap->mode = ALN_MODE_FULL;
@@ -50,15 +54,28 @@ int** create_chaos_msa(struct msa* msa, struct aln_param* ap)
 
         for(i = 0; i < numseq-1;i++){
                 /* pick one sequence / profile  */
+                max_score = -FLT_MAX;
+                l = 25;
 
-                a = tl_random_int(ap->rng, numseq-i);
-
-                b = tl_random_int(ap->rng, numseq-i);
-                while(b == a){
+                //LOG_MSG("L:%d", l);
+                for(g = 0; g < l;g++){
+                        a = tl_random_int(ap->rng, numseq-i);
                         b = tl_random_int(ap->rng, numseq-i);
-                }
+                        while(b == a){
+                                b = tl_random_int(ap->rng, numseq-i);
+                        }
+                        score_aln(m, ap, profile, msa, active[a], active[b], numseq, &score);
+                        //LOG_MSG("TEsting %d %d : %f", a,b, ap->score);
+                        if(ap->score > max_score){
+                                best_a = a;
+                                best_b = b;
+                                max_score = ap->score;
+                        }
 
-                LOG_MSG("samples: %d %d", active[a],active[b]);
+                }
+                a = best_a;
+                b = best_b;
+                //LOG_MSG("samples: %d %d", active[a],active[b]);
 
                 ap->tree[i*3] = active[a];
                 ap->tree[i*3+1] = active[b];
@@ -71,7 +88,9 @@ int** create_chaos_msa(struct msa* msa, struct aln_param* ap)
                 a = ap->tree[i*3];
                 b = ap->tree[i*3+1];
                 c = ap->tree[i*3+2];
-                fprintf(stdout,"Aligning:%d %d->%d	done:%f\n",a,b,c,((float)(i+1)/(float)numseq)*100);
+
+                //score_aln(m, ap, profile, msa, a, b, numseq, &score);
+                //fprintf(stdout,"Aligning:%d %d->%d	done:%f score:%f\n",a,b,c,((float)(i+1)/(float)numseq)*100,score);
                 if(a < numseq){
                         len_a = msa->sequences[a]->len;//  aln->sl[a];
                 }else{
@@ -470,4 +489,112 @@ int SampleWithoutReplacement(struct rng_state* rng, int N, int n,int* samples)
                 }
         }
         return OK;
+}
+
+
+int score_aln(struct aln_mem* m,struct aln_param* ap,float** profile, struct msa* msa, int a,int b,int numseq,float* score)
+{
+        int i,j,g;
+        int len_a;
+        int len_b;
+        if(a < numseq){
+                len_a = msa->sequences[a]->len;//  aln->sl[a];
+        }else{
+                len_a = msa->plen[a];
+        }
+        if(b < numseq){
+
+                len_b = msa->sequences[b]->len;// aln->sl[b];
+        }else{
+                len_b = msa->plen[b];
+        }
+        ap->mode = ALN_MODE_SCORE_ONLY;
+
+        g = (len_a > len_b)? len_a:len_b;
+
+        RUN(resize_aln_mem(m, g));
+
+
+        if (a < numseq){
+                RUN(make_profile_n(ap, msa->sequences[a]->s,len_a,&profile[a]));
+                //RUNP(profile[a] = make_profile(ap,msa->sequences[a]->s,len_a));
+        }else{
+                RUN(set_gap_penalties_n(profile[a],len_a,msa->nsip[b]));
+                //RUN(set_gap_penalties(profile[a],len_a,msa->nsip[b]));
+                //smooth_gaps(profile[a],len_a,window,strength);
+
+                //increase_gaps(profile[a],len_a,window,strength);
+        }
+        if (b < numseq){
+                RUN(make_profile_n(ap, msa->sequences[b]->s,len_b,&profile[b]));
+                //RUNP(profile[b] = make_profile(ap,msa->sequences[b]->s,len_b));
+        }else{
+                RUN(set_gap_penalties_n(profile[b],len_b,msa->nsip[a]));
+                //smooth_gaps(profile[b],len_b,window,strength);
+                //increase_gaps(profile[b],len_b,window,strength);
+        }
+
+        init_alnmem(m, len_a, len_b);
+        //fprintf(stderr,"LENA:%d	LENB:%d	numseq:%d\n",len_a,len_b,numseq);
+        if(a < numseq){
+                if(b < numseq){
+                        ap->seq1 = msa->sequences[a]->s;
+                        ap->seq2 = msa->sequences[b]->s;
+                        ap->prof1 = NULL;
+                        ap->prof2 = NULL;
+
+                        aln_runner(m, ap, NULL);
+                }else{
+                        m->enda = len_b;
+                        m->endb = len_a;
+                        m->len_a = len_b;
+                        m->len_b = len_a;
+
+                        ap->seq1 = NULL;
+                        ap->seq2 = msa->sequences[a]->s;
+                        ap->prof1 = profile[b];
+                        ap->prof2 = NULL;
+                        ap->sip = msa->nsip[b];
+
+                        aln_runner(m, ap, NULL);
+                        ap->score = ap->score / msa->nsip[b];
+
+                }
+        }else{
+                if(b < numseq){
+                        ap->seq1 = NULL;
+                        ap->seq2 = msa->sequences[b]->s;
+                        ap->prof1 = profile[a];
+                        ap->prof2 = NULL;
+                        ap->sip = msa->nsip[a];
+                        aln_runner(m, ap, NULL);
+                        ap->score = ap->score / msa->nsip[a];
+                }else{
+                        if(len_a < len_b){
+                                ap->seq1 = NULL;
+                                ap->seq2 = NULL;
+                                ap->prof1 = profile[a];
+                                ap->prof2 = profile[b];
+                                aln_runner(m, ap, NULL);
+
+                        }else{
+                                m->enda = len_b;
+                                m->endb = len_a;
+                                m->len_a = len_b;
+                                m->len_b = len_a;
+
+                                ap->seq1 = NULL;
+                                ap->seq2 = NULL;
+                                ap->prof1 = profile[b];
+                                ap->prof2 = profile[a];
+                                aln_runner(m, ap, NULL);
+
+                        }
+                        ap->score = ap->score / (msa->nsip[a] * msa->nsip[b]);
+                }
+        }
+        *score = ap->score;
+        return OK;
+ERROR:
+        return FAIL;
 }
