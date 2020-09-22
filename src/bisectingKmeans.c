@@ -208,11 +208,11 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
 
                 w = _mm_malloc(sizeof(float) * num_var,32);
                 for(i = 0; i < num_var;i++){
-                        w[i] = 0.0f;
-                        wr[i] = 0.0f;
-                        wl[i] = 0.0f;
-                        cr[i] = 0.0f;
-                        cl[i] = 0.0f;
+                        w[i] = 0.0F;
+                        wr[i] = 0.0F;
+                        wl[i] = 0.0F;
+                        cr[i] = 0.0F;
+                        cl[i] = 0.0F;
                 }
                 for(i = 0; i < num_samples;i++){
                         s = samples[i];
@@ -222,7 +222,7 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
                 }
 
                 for(j = 0; j < num_anchors;j++){
-                        w[j] /= num_samples;
+                        w[j] /= (float)num_samples;
                 }
                 r = tl_random_int(rng  , num_samples);
                 //r = sel[t_iter];
@@ -251,7 +251,7 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
                 }
 
                 if(!s){
-                        score = 0;
+                        score = 0.0F;
                         num_l = 0;
                         num_r = 0;
                         sl[num_l] = samples[0];
@@ -292,10 +292,20 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
                                                 w = wr;
                                                 sr[num_r] = s;
                                                 num_r++;
-                                        }else{
+                                        }else if (dr > dl){
                                                 w = wl;
                                                 sl[num_l] = s;
                                                 num_l++;
+                                        }else{
+                                                if(i & 1){
+                                                        w = wr;
+                                                        sr[num_r] = s;
+                                                        num_r++;
+                                                }else{
+                                                        w = wl;
+                                                        sl[num_l] = s;
+                                                        num_l++;
+                                                }
                                         }
 
                                         for(j = 0; j < num_anchors;j++){
@@ -305,8 +315,8 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
                                 }
 
                                 for(j = 0; j < num_anchors;j++){
-                                        wl[j] /= num_l;
-                                        wr[j] /= num_r;
+                                        wl[j] /= (float)num_l;
+                                        wr[j] /= (float)num_r;
                                 }
 
                                 s = 0;

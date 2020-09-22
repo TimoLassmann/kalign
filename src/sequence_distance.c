@@ -81,7 +81,7 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                   bpm_256(seq_b, seq_a, len_b, len_a)
                                   );*/
                                 dist = calc_distance(seq_a, seq_b, len_a, len_b,msa->L);
-
+                                dist = dist / (float) MACRO_MIN(len_a, len_b);
                                 dm[i][j] = dist;//*dist;
                                 dm[j][i] = dm[i][j];
                         }
@@ -108,13 +108,23 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
 
  /*                omp_set_num_threads(4); */
 /* #pragma omp parallel for shared(dm, msa) private(i, j) collapse(2) schedule(dynamic) */
+                uint8_t* s1;
+                uint8_t* s2;
+                int l1;
+                int l2;
                 for(i = 0; i < numseq;i++){
+                        s1 = msa->sequences[i]->s;
+                        l1 = msa->sequences[i]->len;
                         for(j = 0;j < num_samples;j++){
-                                dm[i][j] = calc_distance(msa->sequences[i]->s,
-                                                         msa->sequences[samples[j]]->s,
-                                                         msa->sequences[i]->len,
-                                                         msa->sequences[samples[j]]->len,
+                                s2 = msa->sequences[samples[j]]->s;
+                                l2 = msa->sequences[samples[j]]->len;
+                                dm[i][j] = calc_distance(s1,
+                                                         s2,
+                                                         l1,
+                                                         l2,
                                                          msa->L);
+
+
                                 //dm[i][j] = dist;
                         }
                 }
