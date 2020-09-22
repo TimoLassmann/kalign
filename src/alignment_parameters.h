@@ -23,20 +23,34 @@
 #ifndef ALIGNMENT_PARAMETERS_H
 #define ALIGNMENT_PARAMETERS_H
 
-#include "global.h"
+//#include "global.h"
 #include "parameters.h"
-#include "misc.h"
+//#include "misc.h"
+#include <stdint.h>
 struct rng_state;
+
+#define ALN_MODE_SCORE_ONLY 2
+#define ALN_MODE_FULL 1
 
 struct aln_param{
         struct rng_state* rng;
-        //struct drand48_data randBuffer;
+        /* run specific settings */
+        const float* prof1;
+        const float* prof2;
+        const uint8_t* seq1;
+        const uint8_t* seq2;
+        float input_states[6];
+        int old_cor[5];
+        int sip;
+        int mode;
+        /* actual parameters  */
         float** subm;
+        int* tree;
         float gpo;
         float gpe;
         float tgpe;
+        float score;
 
-        int* tree;
 };
 
 extern int init_ap(struct aln_param** aln_param, struct parameters* param, int numseq,int L);

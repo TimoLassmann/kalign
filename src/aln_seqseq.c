@@ -8,54 +8,15 @@
 #define ALN_SEQSEQ
 #include "aln_seqseq.h"
 
-static int aln_seqseq_foward(const struct aln_param* ap,const uint8_t* seq1,const uint8_t* seq2,struct aln_mem* m);
-static int aln_seqseq_backward(const struct aln_param* ap,const uint8_t* seq1,const uint8_t* seq2,struct aln_mem* m);
-
-static int aln_seqseq_join(const struct aln_param* ap,const uint8_t* seq1,const uint8_t* seq2,struct aln_mem* m,int* path,float input_states[],int old_cor[]);
-
-int aln_seqseq_runner(const struct aln_param* ap, const uint8_t* seq1,const uint8_t* seq2,struct aln_mem* m, int* path)
-{
-        int mid = ((m->enda - m->starta) / 2)+ m->starta;
-        float input_states[6] = {
-                m->f[0].a,
-                m->f[0].ga,
-                m->f[0].gb,
-                m->b[0].a,
-                m->b[0].ga,
-                m->b[0].gb};
-        int old_cor[5] = {
-                m->starta,
-                m->enda,
-                m->startb,
-                m->endb,
-                mid};
-
-        if(m->starta >= m->enda){
-                return OK;//hirsch_path;
-        }
-        if(m->startb >= m->endb){
-                return OK;///hirsch_path;
-        }
+#define MAX(a, b) (a > b ? a : b)
+#define MAX3(a,b,c) MAX(MAX(a,b),c)
 
 
-        m->enda = mid;
-
-        //fprintf(stderr,"Forward:%d-%d	%d-%d\n",m->starta,m->enda,m->startb,m->endb);
-        aln_seqseq_foward(ap,seq1,seq2,m);
-
-        m->starta = mid;
-        m->enda = old_cor[1];
-        //fprintf(stderr,"Backward:%d-%d	%d-%d\n",m->starta,m->enda,m->startb,m->endb);
-        aln_seqseq_backward(ap,seq1,seq2,m);
-
-
-        aln_seqseq_join(ap,seq1,seq2,m,path,input_states,old_cor);
-        return  OK;
-}
-
-int aln_seqseq_foward(const struct aln_param* ap,const uint8_t* seq1,const uint8_t* seq2,struct aln_mem* m)
+int aln_seqseq_foward(struct aln_mem* m,struct aln_param* ap)
 {
         struct states* s = m->f;
+        const uint8_t* seq1 = ap->seq1;
+        const uint8_t* seq2 = ap->seq2;
         float *subp = 0;
         const int starta = m->starta;
         const int enda = m->enda;
@@ -70,13 +31,10 @@ int aln_seqseq_foward(const struct aln_param* ap,const uint8_t* seq1,const uint8
         register int i = 0;
         register int j = 0;
 
-        float gpo,gpe,tgpe;
-        float** subm = NULL;
-        gpo = ap->gpo;
-        gpe = ap->gpe;
-        tgpe = ap->tgpe;
-        subm = ap->subm;
-
+        const float gpo = ap->gpo;
+        const float gpe = ap->gpe;
+        const float tgpe = ap->tgpe;
+        float** subm = ap->subm;
 
         s[startb].a = s[0].a;
         s[startb].ga = s[0].ga;
@@ -153,11 +111,12 @@ int aln_seqseq_foward(const struct aln_param* ap,const uint8_t* seq1,const uint8
         return OK;
 }
 
-int aln_seqseq_backward(const struct aln_param* ap,const uint8_t* seq1,const uint8_t* seq2,struct aln_mem* m)
+int aln_seqseq_backward(struct aln_mem* m,struct aln_param* ap)
 {
 
         struct states* s = m->b;
-        float** subm = NULL;
+        const uint8_t* seq1 = ap->seq1;
+        const uint8_t* seq2 = ap->seq2;
         float *subp = NULL;
         const int starta = m->starta;
         const int enda = m->enda;
@@ -174,12 +133,12 @@ int aln_seqseq_backward(const struct aln_param* ap,const uint8_t* seq1,const uin
 
         register int i = 0;
         register int j = 0;
-        float gpo,gpe,tgpe;
 
-        gpo = ap->gpo;
-        gpe = ap->gpe;
-        tgpe = ap->tgpe;
-        subm = ap->subm;
+        const float gpo = ap->gpo;
+        const float gpe = ap->gpe;
+        const float tgpe = ap->tgpe;
+        float** subm = ap->subm;
+
 
         s[endb].a = s[0].a ;
         s[endb].ga = s[0].ga;
@@ -270,21 +229,18 @@ int aln_seqseq_backward(const struct aln_param* ap,const uint8_t* seq1,const uin
 }
 
 
-
-
-int aln_seqseq_join(const struct aln_param* ap,const uint8_t* seq1,const uint8_t* seq2,struct aln_mem* m,int* path,float input_states[],int old_cor[])
+int aln_seqseq_meetup(struct aln_mem* m,struct aln_param* ap,int* meet,int* t,float* score)
 {
         struct states* f = m->f;
         struct states* b = m->b;
-        int i,c;
+
+
+        const float gpo = ap->gpo;
+        const float gpe = ap->gpe;
+        const float tgpe = ap->tgpe;
+        int i;
+        int c;
         int transition = -1;
-
-        float gpo,gpe,tgpe;
-
-        gpo = ap->gpo;
-        gpe = ap->gpe;
-        tgpe = ap->tgpe;
-
 
         //code:
         // a -> a = 1
@@ -298,16 +254,16 @@ int aln_seqseq_join(const struct aln_param* ap,const uint8_t* seq1,const uint8_t
         //int max = -FLT_MAX;
         float max = -FLT_MAX;
         //float middle =  (hm->endb - hm->startb)/2 + hm->startb;
-        float middle =  (old_cor[3] - old_cor[2])/2 + old_cor[2];
-        float sub = 0.0;
+        float middle =  (float)(ap->old_cor[3] - ap->old_cor[2])/2.0F + (float)ap->old_cor[2];
+        float sub = 0.0F;
 
         //i = hm->startb;
-        i = old_cor[2];
+
         c = -1;
         //for(i = hm->startb; i < hm->endb;i++){
-        for(i = old_cor[2]; i < old_cor[3];i++){
+        for(i = ap->old_cor[2]; i < ap->old_cor[3];i++){
 
-                sub = fabsf(middle - i);
+                sub = fabsf(middle - (float)i);
                 sub /= 1000;
                 //	fprintf(stderr,"%d-%d	%f\n",hm->startb,hm->endb,sub);
                 if(f[i].a+b[i].a-sub > max){
@@ -359,8 +315,8 @@ int aln_seqseq_join(const struct aln_param* ap,const uint8_t* seq1,const uint8_t
                 }
         }
         //i = hm->endb;
-        i = old_cor[3];
-        sub = fabsf(middle -i);
+        i = ap->old_cor[3];
+        sub = fabsf(middle - (float)i);
         sub /= 1000;
 
         if(f[i].a+b[i].gb-gpo-sub > max){
@@ -384,223 +340,8 @@ int aln_seqseq_join(const struct aln_param* ap,const uint8_t* seq1,const uint8_t
                         c = i;
                 }
         }
-
-
-        //fprintf(stderr,"Transition:%d	at:%d\n",transition,c);
-        //LOG_MSG("MAX: %f",max);
-        //j = hirsch_path[0];
-        switch(transition){
-        case 1: //a -> a = 1
-
-                path[old_cor[4]] = c;
-                path[old_cor[4]+1] = c+1;
-
-                //		fprintf(stderr,"Aligning:%d-%d\n",old_cor[4],c);
-                //		fprintf(stderr,"Aligning:%d-%d\n",old_cor[4]+1,c+1);
-                //foward:
-                m->f[0].a = input_states[0];
-                m->f[0].ga = input_states[1];
-                m->f[0].gb = input_states[2];
-                m->b[0].a = 0.0;
-                m->b[0].ga = -FLT_MAX;
-                m->b[0].gb = -FLT_MAX;
-                //		fprintf(stderr,"Using this for start:%d	%d	%d\n",m->f[0].a,m->f[0].ga,m->f[0].gb);
-
-                m->starta = old_cor[0];
-                m->enda = old_cor[4]-1;
-
-                m->startb = old_cor[2];
-                m->endb = c-1;
-                //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,m->starta,m->enda,m->startb,m->endb);
-                aln_seqseq_runner(ap,seq1,seq2,m,path);
-                //backward:
-                m->starta = old_cor[4]+1;
-                m->enda = old_cor[1];
-                m->startb = c+1;
-                m->endb = old_cor[3];
-                m->f[0].a = 0.0;
-                m->f[0].ga = -FLT_MAX;
-                m->f[0].gb = -FLT_MAX;
-                m->b[0].a = input_states[3];
-                m->b[0].ga = input_states[4];
-                m->b[0].gb = input_states[5];
-
-                //fprintf(stderr,"Following last: %d  what:%d-%d	%d-%d\n",c+1,m->starta,m->enda,m->startb,m->endb);
-                aln_seqseq_runner(ap,seq1,seq2,m,path);
-                break;
-        case 2:// a -> ga = 2
-                path[old_cor[4]] = c;
-                //		fprintf(stderr,"Aligning:%d-%d\n",old_cor[4],c);
-                //foward:
-                m->f[0].a = input_states[0];
-                m->f[0].ga = input_states[1];
-                m->f[0].gb = input_states[2];
-                m->b[0].a = 0.0;
-                m->b[0].ga = -FLT_MAX;
-                m->b[0].gb = -FLT_MAX;
-
-
-                m->starta = old_cor[0];
-                m->enda = old_cor[4]-1;
-
-                m->startb = old_cor[2];
-                m->endb = c-1;
-                //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,m->starta,m->enda,m->startb,m->endb);
-                aln_seqseq_runner(ap,seq1,seq2,m,path);
-
-                //backward:
-                m->starta = old_cor[4];
-                m->enda = old_cor[1];
-                m->startb = c+1;
-                m->endb = old_cor[3];
-                m->f[0].a = -FLT_MAX;
-                m->f[0].ga = 0.0;
-                m->f[0].gb = -FLT_MAX;
-                m->b[0].a = input_states[3];
-                m->b[0].ga = input_states[4];
-                m->b[0].gb = input_states[5];
-
-                //fprintf(stderr,"Following last: %d  what:%d-%d	%d-%d\n",c+1,m->starta,m->enda,m->startb,m->endb);
-                aln_seqseq_runner(ap,seq1,seq2,m,path);
-                break;
-        case 3:// a -> gb = 3
-                path[old_cor[4]] = c;
-                //		fprintf(stderr,"Aligning:%d-%d\n",old_cor[4],c);
-                //foward:
-                m->f[0].a = input_states[0];
-                m->f[0].ga = input_states[1];
-                m->f[0].gb = input_states[2];
-                m->b[0].a = 0.0;
-                m->b[0].ga = -FLT_MAX;
-                m->b[0].gb = -FLT_MAX;
-
-                m->starta = old_cor[0];
-                m->enda = old_cor[4]-1;
-
-                m->startb = old_cor[2];
-                m->endb = c-1;
-                //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,m->starta,m->enda,m->startb,m->endb);
-                aln_seqseq_runner(ap,seq1,seq2,m,path);
-                //backward:
-                m->starta = old_cor[4]+1;
-                m->enda = old_cor[1];
-                m->startb = c;
-                m->endb = old_cor[3];
-                m->f[0].a = -FLT_MAX;
-                m->f[0].ga = -FLT_MAX;
-                m->f[0].gb = 0.0;
-                m->b[0].a = input_states[3];
-                m->b[0].ga = input_states[4];
-                m->b[0].gb = input_states[5];
-
-                //fprintf(stderr,"Following last: %d\n",c+1);
-                aln_seqseq_runner(ap,seq1,seq2,m,path);
-
-
-                break;
-        case 5://ga -> a = 5
-                path[old_cor[4]+1] = c+1;
-                //		fprintf(stderr,"Aligning:%d-%d\n",old_cor[4]+1,c+1);
-
-                //foward:
-                m->f[0].a = input_states[0];
-                m->f[0].ga = input_states[1];
-                m->f[0].gb = input_states[2];
-                m->b[0].a = -FLT_MAX;
-                m->b[0].ga = 0.0;
-                m->b[0].gb = -FLT_MAX;
-
-                m->starta = old_cor[0];
-                m->enda = old_cor[4];
-
-                m->startb = old_cor[2];
-                m->endb = c-1;
-                //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,m->starta,m->enda,m->startb,m->endb);
-                aln_seqseq_runner(ap,seq1,seq2,m,path);
-                //backward:
-                m->starta = old_cor[4]+1;
-                m->enda = old_cor[1];
-                m->startb = c+1;
-                m->endb = old_cor[3];
-                m->f[0].a = 0.0;
-                m->f[0].ga = -FLT_MAX;
-                m->f[0].gb = -FLT_MAX;
-                m->b[0].a = input_states[3];
-                m->b[0].ga = input_states[4];
-                m->b[0].gb = input_states[5];
-
-                //fprintf(stderr,"Following last: %d\n",c+1);
-                aln_seqseq_runner(ap,seq1,seq2,m,path);
-                break;
-        case 6://gb->gb = 6;
-
-                //foward:
-                m->f[0].a = input_states[0];
-                m->f[0].ga = input_states[1];
-                m->f[0].gb = input_states[2];
-                m->b[0].a = -FLT_MAX;
-                m->b[0].ga = -FLT_MAX;
-                m->b[0].gb = 0.0;
-
-                m->starta = old_cor[0];
-                m->enda = old_cor[4]-1;
-                m->startb = old_cor[2];
-                m->endb = c;
-                //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,m->starta,m->enda,m->startb,m->endb);
-
-                aln_seqseq_runner(ap,seq1,seq2,m,path);
-                //backward:
-                m->starta = old_cor[4]+1;
-                m->enda = old_cor[1];
-                m->startb = c;
-                m->endb = old_cor[3];
-                m->f[0].a = -FLT_MAX;
-                m->f[0].ga = -FLT_MAX;
-                m->f[0].gb = 0.0;
-                m->b[0].a = input_states[3];
-                m->b[0].ga = input_states[4];
-                m->b[0].gb = input_states[5];
-
-                //fprintf(stderr,"Following last: %d\n",c+
-                aln_seqseq_runner(ap,seq1,seq2,m,path);
-                break;
-        case 7://gb->a = 7;
-
-                path[old_cor[4]+1] = c+1;
-                //		fprintf(stderr,"Aligning:%d-%d\n",old_cor[4]+1,c+1);
-                //foward:
-                m->f[0].a = input_states[0];
-                m->f[0].ga = input_states[1];
-                m->f[0].gb = input_states[2];
-                m->b[0].a = -FLT_MAX;
-                m->b[0].ga = -FLT_MAX;
-                m->b[0].gb = 0.0;
-
-                m->starta = old_cor[0];
-                m->enda = old_cor[4]-1;
-                m->startb = old_cor[2];
-                m->endb = c;
-                //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,m->starta,m->enda,m->startb,m->endb);
-
-                aln_seqseq_runner(ap,seq1,seq2,m,path);
-                //backward:
-                m->starta = old_cor[4]+1;
-                m->enda = old_cor[1];
-                m->startb = c+1;
-                m->endb = old_cor[3];
-                m->f[0].a = 0.0;
-                m->f[0].ga = -FLT_MAX;
-                m->f[0].gb = -FLT_MAX;
-                m->b[0].a = input_states[3];
-                m->b[0].ga = input_states[4];
-                m->b[0].gb = input_states[5];
-
-                //fprintf(stderr,"Following last: %d\n",c+1);
-                aln_seqseq_runner(ap,seq1,seq2,m,path);
-                break;
-        default:
-                break;
-
-        }
+        *meet = c;
+        *t = transition;
+        *score = max;
         return OK;
 }

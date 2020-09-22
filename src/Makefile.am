@@ -70,7 +70,21 @@ bpm.h \
 bpm.c \
 aln_struct.h \
 aln_mem.h \
-aln_mem.c
+aln_mem.c \
+aln_setup.h \
+aln_setup.c \
+aln_run.h \
+aln_run.c \
+aln_controller.h \
+aln_controller.c \
+aln_seqseq.h \
+aln_seqseq.c \
+aln_seqprofile.h \
+aln_seqprofile.c \
+aln_profileprofile.h \
+aln_profileprofile.c
+
+
 
 
 check_PROGRAMS = edist alphabet misc_test bpm_test rwaln rstdin_test

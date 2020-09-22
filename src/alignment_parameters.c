@@ -213,7 +213,8 @@ int set_subm_gaps(struct aln_param* ap)
 
 int new_aln_matrices(struct aln_param* ap)
 {
-        int i,j;
+        int i;
+        int j;
         //char aacode[20] = "ACDEFGHIKLMNPQRSTVWY";
         //char aa_order[23] = "ARNDCQEGHILKMFPSTWYVBZX";
         //int num_aa = 23;
@@ -244,14 +245,14 @@ int new_aln_matrices(struct aln_param* ap)
                 {-1,1,0,2,-3,3,4,-2,0,-2,-2,1,-1,-3,-1,0,0,-2,-2,-2,1,4,-1},
                 {0,-1,-1,-1,-2,0,-1,-1,-1,-1,-1,-1,0,-1,-1,0,0,-1,-1,-1,-1,-1,-1},
         };
-        int x,y;
+
         for(i = 0; i < 23;i++){
                 for(j = 0; j < 23;j++){
                         ap->subm[i][j] = (float)(CorBLOSUM66_13plus[i][j]);
                 }
         }
-        ap->gpo = 5.5;
-        ap->gpe = 2.0;
-        ap->tgpe = 1.0;
+        ap->gpo = 5.5F;
+        ap->gpe = 2.0F;
+        ap->tgpe = 1.0F;
         return OK;
 }
