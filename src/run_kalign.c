@@ -50,8 +50,8 @@
 #define OPT_MATADD 9
 
 #define OPT_DEVTEST 10
-
-#define OPT_DUMP_INTERNAL 11
+#define OPT_CHAOS 11
+#define OPT_DUMP_INTERNAL 12
 
 static int run_kalign(struct parameters* param);
 static int check_for_sequences(struct msa* msa);
@@ -172,6 +172,7 @@ int main(int argc, char *argv[])
                         {"gpe",  required_argument, 0, OPT_GPE},
                         {"tgpe",  required_argument, 0, OPT_TGPE},
                         {"matadd",  required_argument, 0, OPT_MATADD},
+                        {"chaos",   required_argument, 0, OPT_CHAOS},
                         {"input",  required_argument, 0, 'i'},
                         {"infile",  required_argument, 0, 'i'},
                         {"in",  required_argument, 0, 'i'},
@@ -193,6 +194,9 @@ int main(int argc, char *argv[])
                         break;
                 }
                 switch(c) {
+                case OPT_CHAOS:
+                        param->chaos = atoi(optarg);
+                        break;
                 case OPT_DUMP_INTERNAL:
                         param->dump_internal = 1;
                         break;
@@ -369,7 +373,14 @@ int main(int argc, char *argv[])
                         return EXIT_SUCCESS;
                 }
         }
-
+        if(param->chaos){
+                if(param->chaos == 1){
+                        ERROR_MSG("Param chaos need to be bigger than 1 (currently %d)", param->chaos);
+                }
+                if(param->chaos > 10){
+                        ERROR_MSG("Param chaos bigger than 10 (currently %d)",param->chaos);
+                }
+        }
         //log_command_line(argc, argv);
 
         RUN(run_kalign(param));
@@ -385,7 +396,6 @@ ERROR:
         free_parameters(param);
         return EXIT_FAILURE;
 }
-
 
 int run_kalign(struct parameters* param)
 {
@@ -462,7 +472,9 @@ int run_kalign(struct parameters* param)
                 return OK;
         }
         /* Start bi-secting K-means sequence clustering */
-        //RUN(build_tree_kmeans(msa,ap));
+        if(!param->chaos){
+                RUN(build_tree_kmeans(msa,ap));
+        }
         /* by default all protein sequences are converted into a reduced alphabet
            when read from file. Here we turn them back into the default representation. */
         if(msa->L == redPROTEIN){
@@ -477,8 +489,11 @@ int run_kalign(struct parameters* param)
         DECLARE_TIMER(t1);
         LOG_MSG("Aligning");
         START_TIMER(t1);
-        RUNP(map = create_chaos_msa(msa, ap));
-        //RUNP(map = create_msa(msa,ap));
+        if(param->chaos){
+                RUNP(map = create_chaos_msa(msa, ap));
+        }else{
+                RUNP(map = create_msa(msa,ap));
+        }
         //RUNP(map = hirschberg_alignment(msa, ap));
         STOP_TIMER(t1);
         GET_TIMING(t1);

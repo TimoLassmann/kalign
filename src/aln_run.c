@@ -45,7 +45,7 @@ int** create_chaos_msa(struct msa* msa, struct aln_param* ap)
         }
 
         RUN(alloc_aln_mem(&m, 2048));
-        MMALLOC(samples,sizeof(int) * 6);
+        MMALLOC(samples,sizeof(int) * ap->chaos);
         MMALLOC(active, sizeof(int) * numseq);
         for(i = 0; i < numseq;i++){
                 active[i] = i;
@@ -55,7 +55,7 @@ int** create_chaos_msa(struct msa* msa, struct aln_param* ap)
         for(i = 0; i < numseq-1;i++){
                 /* pick one sequence / profile  */
                 max_score = -FLT_MAX;
-                l = MACRO_MIN(6, numseq-i);
+                l = MACRO_MIN(ap->chaos, numseq-i);
                 SampleWithoutReplacement(ap->rng, numseq-i, l, samples);
 
                 for(g = 0;g < l-1;g++){

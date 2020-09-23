@@ -49,7 +49,7 @@ struct parameters*init_param(void)
         param->gpe = FLT_MAX;
         param->tgpe = FLT_MAX;
         param->matadd = 0.0F;
-
+        param->chaos = 0;
         return param;
 ERROR:
         free_parameters(param);

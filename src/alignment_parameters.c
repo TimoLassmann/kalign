@@ -51,7 +51,7 @@ int init_ap(struct aln_param** aln_param, struct parameters* param, int numseq,i
                         ap->tree[i] = 0;
                 }
                 ap->subm = NULL;
-
+                ap->chaos = param->chaos;
                 RUNP(ap->rng = init_rng(42));
                 MMALLOC(ap->subm,sizeof (float*) * 23);
 

@@ -38,6 +38,7 @@ struct parameters{
         float gpe;
         float tgpe;
         float matadd;
+        int chaos;
         int out_format;
         int param_set;
         int dist_method;

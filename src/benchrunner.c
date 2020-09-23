@@ -34,11 +34,9 @@ struct parameters_br{
         char* scratch;
         char* output;
         char* run_name;
-        float gpo;
-        float gpe;
-        float tgpe;
-        float matadd;
+        char** options;
         int uniq;
+        int n_options;
 };
 
 
@@ -58,12 +56,9 @@ int main(int argc, char *argv[])
         param->scratch = NULL;
         param->output = NULL;
         param->run_name = NULL;
-
-        param->gpo = FLT_MAX;
-        param->gpe = FLT_MAX;
-        param->tgpe = FLT_MAX;
-        param->matadd = 0.0F;
+        param->options = NULL;
         param->uniq = 0;
+        param->n_options = 0;
         int help = 0;
         int c;
 
@@ -75,10 +70,6 @@ int main(int argc, char *argv[])
                         {"scratch",  required_argument, 0, OPT_TMPDIR},
                         {"runname",  required_argument, 0, OPT_RUNNAME },
                         {"output",  required_argument, 0, OPT_OUTPUT},
-                        {"gpo",  required_argument, 0, OPT_GPO},
-                        {"gpe",  required_argument, 0, OPT_GPE},
-                        {"tgpe",  required_argument, 0, OPT_TGPE},
-                        {"matadd",  required_argument, 0, OPT_MATADD},
                         {"uniq",  required_argument, 0, 'u'},
                         {"help",   no_argument,0,'h'},
                         {"quiet",  0, 0, 'q'},
@@ -113,18 +104,6 @@ int main(int argc, char *argv[])
                 case OPT_RUNNAME:
                         param->run_name  = optarg;
                         break;
-                case OPT_GPO:
-                        param->gpo = atof(optarg);
-                        break;
-                case OPT_GPE:
-                        param->gpe = atof(optarg);
-                        break;
-                case OPT_TGPE :
-                        param->tgpe = atof(optarg);
-                        break;
-                case OPT_MATADD :
-                        param->matadd = atof(optarg);
-                        break;
                 case 'u':
                         param->uniq = atoi(optarg);
                         break;
@@ -132,11 +111,26 @@ int main(int argc, char *argv[])
                         help = 1;
                         break;
                 case '?':
+                        LOG_MSG("Print %c", optopt);
                         help = 1;
                         break;
                 default:
                         abort ();
                 }
+        }
+
+        if (optind < argc){
+                param->n_options = argc-optind;
+                if(param->n_options != 1){
+                        ERROR_MSG("benrunner can only accept one additional argument");
+                }
+                MMALLOC(param->options, sizeof(char*) * param->n_options);
+                c = 0;
+                while (optind < argc){
+                        param->options[c] =  argv[optind++];
+                        c++;
+                }
+                param->n_options = c;
         }
 
         if(help){
@@ -188,12 +182,18 @@ int main(int argc, char *argv[])
 
 
         RUN(run_and_score(param));
+        if(param->options){
+                MFREE(param->options);
+        }
         MFREE(param);
         //RUN(timescore(testseq, refseq, program, scratch,output));
         return EXIT_SUCCESS;
 ERROR:
-        WARNING_MSG("Something went wrong. Use this program like this:\n\n");
-        RUN(print_help_score_and_align(argv));
+        if(param->options){
+                MFREE(param->options);
+        }
+        MFREE(param);
+        /* RUN(print_help_score_and_align(argv)); */
         return EXIT_FAILURE;
 }
 
@@ -208,8 +208,10 @@ int run_and_score(struct parameters_br* param)
         //struct parameters* param = NULL;
         auto int rc;
         //char path_buffer[BUFFER_LEN];
-        char cmd[BUFFER_LEN*2];
-        char ret[BUFFER_LEN*2];
+        char cmd[BUFSIZ*2];
+        char ret[BUFSIZ];
+        char progline[BUFSIZ];
+        char* options = NULL;
         char* path = NULL;
         FILE* pipe = NULL;
         double time;
@@ -218,7 +220,7 @@ int run_and_score(struct parameters_br* param)
 
         struct timeval  tv1, tv2;
         int pos_test;
-        int i,j;
+        int i,j,l;
 
         char *envpaths = getenv("PATH");
 
@@ -230,6 +232,27 @@ int run_and_score(struct parameters_br* param)
                 rc = snprintf(path, 10, "%s",".");
         }
 
+        if(param->n_options){
+
+                l = strlen(param->options[0]);
+                MMALLOC(options, sizeof(char) * ( l+1));
+
+                for(i = 0; i < l;i++){
+                        if(param->options[0][i] == '@' || param->options[0][i] == ':'){
+                                options[i] = ' ';
+                        }else{
+                                options[i] = param->options[0][i];
+                        }
+                }
+                options[l] = 0;
+
+        }else{
+                MMALLOC(options, sizeof(char) * 1);
+
+                options[0] = 0;
+
+        }
+
 
 
         if(!strcmp(param->program , "kalign")){
@@ -237,11 +260,8 @@ int run_and_score(struct parameters_br* param)
                         ERROR_MSG("kalign is not found in your path:\n%s\n",envpaths);
                 }
 
-                if(param->gpo != FLT_MAX && param->gpe != FLT_MAX && param->tgpe != FLT_MAX && param->matadd != 0.0F ){
-                        rc = snprintf(cmd, BUFFER_LEN*2, "kalign -gpo %f -gpe %f -tgpe %f -matadd %f %s -f msf -o %s/test_%d.msf",param->gpo,param->gpe, param->tgpe,param->matadd, param->testseq,path,param->uniq);
-                }else{
-                        rc = snprintf(cmd, BUFFER_LEN*2, "kalign %s -f msf -o %s/test_%d.msf", param->testseq,path,param->uniq);
-                }
+                rc = snprintf(cmd, BUFSIZ, "kalign %s %s -f msf -o %s/test_%d.msf",options, param->testseq,path,param->uniq);
+
         }else if(!strcmp(param->program,"kalign2")){
                 if (system("which kalign2")){
                         ERROR_MSG("kalign2 is not found in your path:\n%s\n",envpaths);
@@ -330,7 +350,7 @@ int run_and_score(struct parameters_br* param)
 
 
 
-                snprintf(ret, BUFFER_LEN, "%s/evalaln_%d.msf",path,param->uniq);
+                snprintf(ret, BUFSIZ, "%s/evalaln_%d.msf",path,param->uniq);
                 write_msa(test_aln, ret, FORMAT_MSF);
 
 
@@ -340,7 +360,7 @@ int run_and_score(struct parameters_br* param)
 
 
 
-                snprintf(cmd, BUFFER_LEN*2, "bali_score %s %s",  param->refseq, ret);
+                snprintf(cmd,BUFSIZ*2 , "bali_score %s %s",  param->refseq, ret);
                 // Execute a process listing
 
 
@@ -352,7 +372,7 @@ int run_and_score(struct parameters_br* param)
                 // Grab data from process execution
 
 
-                while (fgets(ret, BUFFER_LEN, pipe)){
+                while (fgets(ret, BUFSIZ, pipe)){
                         //fprintf(stdout,"%s", ret);
                 }
 
@@ -360,6 +380,24 @@ int run_and_score(struct parameters_br* param)
                 sscanf(ret, "%*s %*s %lf %lf", &SP,&TC);
                 rc = pclose(pipe);
                 if(rc == EXIT_SUCCESS){
+                        /* construct program name  */
+                        l = strlen(options);
+
+                        if(l > 1){
+                                for(i = 0; i < l;i++){
+                                        if(options[i] == ' '){
+                                                options[i] = '_';
+                                        }
+
+                                }
+
+                                snprintf(progline, BUFSIZ, "%s%s", param->program,options);
+                        }else{
+                                snprintf(progline, BUFSIZ, "%s", param->program);
+                        }
+
+
+
                         if(!strcmp(param->output, "server")){
 
                                 fprintf(stdout,"%f\n",SP);
@@ -368,32 +406,24 @@ int run_and_score(struct parameters_br* param)
                         }else if(!my_file_exists(param->output)){
                                 RUNP(out_ptr = fopen(param->output ,"w"));
 
-                                fprintf(out_ptr,"Runname,Program,Alignment,AVGLEN,NUMSEQ,GPO,GPE,TGPE,MATADD,SP,TC,Time\n");
+                                fprintf(out_ptr,"Runname,Program,Alignment,AVGLEN,NUMSEQ,SP,TC,Time\n");
                                 if(param->run_name){
-                                        fprintf(out_ptr,"%s,%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",
+                                        fprintf(out_ptr,"%s,%s,%s,%f,%d,%f,%f,%f\n",
                                                 param->run_name,
-                                                param->program,
+                                                progline,
                                                 basename(param->refseq),
                                                 average_seq_len,
                                                 test_aln->numseq,
-                                                param->gpo,
-                                                param->gpe,
-                                                param->tgpe,
-                                                param->matadd,
                                                 SP,
                                                 TC,
                                                 time);
                                 }else{
-                                        fprintf(out_ptr,"%s,%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",
+                                        fprintf(out_ptr,"%s,%s,%s,%f,%d,%f,%f,%f\n",
                                                 param->program,
-                                                param->program,
+                                                progline,
                                                 basename(param->refseq),
                                                 average_seq_len,
                                                 test_aln->numseq,
-                                                param->gpo,
-                                                param->gpe,
-                                                param->tgpe,
-                                                param->matadd,
                                                 SP,
                                                 TC,
                                                 time);
@@ -403,30 +433,22 @@ int run_and_score(struct parameters_br* param)
                         }else{
                                 RUNP(out_ptr = fopen(param->output,"a"));
                                 if(param->run_name){
-                                        fprintf(out_ptr,"%s,%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",
+                                        fprintf(out_ptr,"%s,%s,%s,%f,%d,%f,%f,%f\n",
                                                 param->run_name,
-                                                param->program,
+                                                progline,
                                                 basename(param->refseq),
                                                 average_seq_len,
                                                 test_aln->numseq,
-                                                param->gpo,
-                                                param->gpe,
-                                                param->tgpe,
-                                                param->matadd,
                                                 SP,
                                                 TC,
                                                 time);
                                 }else{
-                                        fprintf(out_ptr,"%s,%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",
+                                        fprintf(out_ptr,"%s,%s,%s,%f,%d,%f,%f,%f\n",
                                                 param->program,
-                                                param->program,
+                                                progline,
                                                 basename(param->refseq),
                                                 average_seq_len,
                                                 test_aln->numseq,
-                                                param->gpo,
-                                                param->gpe,
-                                                param->tgpe,
-                                                param->matadd,
                                                 SP,
                                                 TC,
                                                 time);
@@ -466,7 +488,7 @@ int run_and_score(struct parameters_br* param)
         if(path){
                 MFREE(path);
         }
-
+        MFREE(options);
         //MFREE(path);
 
         return OK;
@@ -480,7 +502,9 @@ ERROR:
         if(my_file_exists(ret)){
                 remove(ret);
         }
-
+        if(options){
+                MFREE(options);
+        }
         if(ref_aln){
                 free_msa(ref_aln);
         }
