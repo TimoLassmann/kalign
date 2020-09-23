@@ -52,7 +52,7 @@ int init_ap(struct aln_param** aln_param, struct parameters* param, int numseq,i
                 }
                 ap->subm = NULL;
 
-                RUNP(ap->rng = init_rng(0));
+                RUNP(ap->rng = init_rng(42));
                 MMALLOC(ap->subm,sizeof (float*) * 23);
 
                 for (i = 23;i--;){

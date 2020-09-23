@@ -166,8 +166,8 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
         float* wr = NULL;
         float* cl = NULL;
         float* cr = NULL;
-        float dl = 0.0f;
-        float dr = 0.0f;
+        float dl = 0.0F;
+        float dr = 0.0F;
         float score;
         int i,j,s;
         int num_var;
@@ -272,9 +272,8 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
                                 num_r = 0;
 
                                 for(i = 0; i < num_anchors;i++){
-
-                                        wr[i] = 0.0f;
-                                        wl[i] = 0.0f;
+                                        wr[i] = 0.0F;
+                                        wl[i] = 0.0F;
                                 }
                                 score = 0.0f;
                                 for(i = 0; i < num_samples;i++){
@@ -453,11 +452,11 @@ struct node* upgma(float **dm,int* samples, int numseq)
                 /*calculate new distances*/
                 for (j = numseq;j--;){
                         if (j != node_b){
-                                dm[node_a][j] = (dm[node_a][j] + dm[node_b][j])*0.5f;
+                                dm[node_a][j] = (dm[node_a][j] + dm[node_b][j])*0.5F;
 
                         }
                 }
-                dm[node_a][node_a] = 0.0f;
+                dm[node_a][node_a] = 0.0F;
                 for (j = numseq;j--;){
                         dm[j][node_a] = dm[node_a][j];
                 }

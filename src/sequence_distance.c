@@ -81,7 +81,7 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                   bpm_256(seq_b, seq_a, len_b, len_a)
                                   );*/
                                 dist = calc_distance(seq_a, seq_b, len_a, len_b,msa->L);
-                                dist = dist / (float) MACRO_MIN(len_a, len_b);
+                                //dist = dist / (float) MACRO_MIN(len_a, len_b);
                                 dm[i][j] = dist;//*dist;
                                 dm[j][i] = dm[i][j];
                         }
@@ -102,7 +102,7 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                         dm[i] = NULL;
                         dm[i] = _mm_malloc(sizeof(float) * a,32);
                         for(j = 0; j < a;j++){
-                                dm[i][j] = 0.0f;
+                                dm[i][j] = 0.0F;
                         }
                 }
 
@@ -123,8 +123,7 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                                          l1,
                                                          l2,
                                                          msa->L);
-
-
+                                //dm[i][j] = dm[i][j] / (float) MACRO_MIN(l1, l2);
                                 //dm[i][j] = dist;
                         }
                 }
