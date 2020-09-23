@@ -59,8 +59,6 @@ sequence_distance.h \
 sequence_distance.c \
 euclidean_dist.h \
 euclidean_dist.c \
-alignment.h \
-alignment.c \
 weave_alignment.h \
 weave_alignment.c \
 rwalign.c \
