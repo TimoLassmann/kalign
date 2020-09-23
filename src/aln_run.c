@@ -336,7 +336,6 @@ int** create_msa(struct msa* msa, struct aln_param* ap)
                         RUN(set_gap_penalties_n(profile[a],len_a,msa->nsip[b]));
                         //RUN(set_gap_penalties(profile[a],len_a,msa->nsip[b]));
                         //smooth_gaps(profile[a],len_a,window,strength);
-
                         //increase_gaps(profile[a],len_a,window,strength);
                 }
                 if (b < numseq){
