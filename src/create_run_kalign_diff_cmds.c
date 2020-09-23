@@ -76,6 +76,10 @@ int main(int argc, char *argv[])
                 fprintf(stdout,"%s",out);
                 c++;
 
+                rc = snprintf(out, BUFSIZ, "benchrunner --scratch ~/tmp --runname %s -program kalign @-chaos:10@ -test %s -ref %s -o kalign_diff_out.csv -u %d \n",runname, filename,ret,c);
+                fprintf(stdout,"%s",out);
+                c++;
+
         }
 
         rc = pclose(pipe);
