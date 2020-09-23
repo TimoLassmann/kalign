@@ -261,9 +261,9 @@ int** create_chaos_msa(struct msa* msa, struct aln_param* ap)
 
         }
         MFREE(profile);
-
+        MFREE(active);
         MFREE(samples);
-
+        free_aln_mem(m);
         return map;
 ERROR:
         if(m){
@@ -528,23 +528,11 @@ int score_aln(struct aln_mem* m,struct aln_param* ap,float** profile, struct msa
         RUN(resize_aln_mem(m, g));
 
 
-        if (a < numseq){
-                RUN(make_profile_n(ap, msa->sequences[a]->s,len_a,&profile[a]));
-                //RUNP(profile[a] = make_profile(ap,msa->sequences[a]->s,len_a));
-        }else{
+        if (a > numseq){
                 RUN(set_gap_penalties_n(profile[a],len_a,msa->nsip[b]));
-                //RUN(set_gap_penalties(profile[a],len_a,msa->nsip[b]));
-                //smooth_gaps(profile[a],len_a,window,strength);
-
-                //increase_gaps(profile[a],len_a,window,strength);
         }
-        if (b < numseq){
-                RUN(make_profile_n(ap, msa->sequences[b]->s,len_b,&profile[b]));
-                //RUNP(profile[b] = make_profile(ap,msa->sequences[b]->s,len_b));
-        }else{
+        if (b > numseq){
                 RUN(set_gap_penalties_n(profile[b],len_b,msa->nsip[a]));
-                //smooth_gaps(profile[b],len_b,window,strength);
-                //increase_gaps(profile[b],len_b,window,strength);
         }
 
         init_alnmem(m, len_a, len_b);
