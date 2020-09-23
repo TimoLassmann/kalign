@@ -317,7 +317,7 @@ int aln_seqseq_meetup(struct aln_mem* m,struct aln_param* ap,int old_cor[],int* 
         //i = hm->endb;
         i = old_cor[3];
         sub = fabsf(middle - (float)i);
-        sub /= 1000;
+        sub /= 1000.0F;
 
         if(f[i].a+b[i].gb-gpo-sub > max){
                 max = f[i].a+b[i].gb - gpo-sub;
