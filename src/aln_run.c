@@ -19,7 +19,7 @@ static int int_cmp(const void *a, const void *b);
 int** create_chaos_msa(struct msa* msa, struct aln_param* ap)
 {
         struct aln_mem* m = NULL;
-        int i,j,g,a,b,c,l;
+        int i,j,g,f,a,b,c,l;
         int best_a, best_b;
         int len_a;
         int len_b;
@@ -45,7 +45,7 @@ int** create_chaos_msa(struct msa* msa, struct aln_param* ap)
         }
 
         RUN(alloc_aln_mem(&m, 2048));
-
+        MMALLOC(samples,sizeof(int) * 6);
         MMALLOC(active, sizeof(int) * numseq);
         for(i = 0; i < numseq;i++){
                 active[i] = i;
@@ -55,23 +55,38 @@ int** create_chaos_msa(struct msa* msa, struct aln_param* ap)
         for(i = 0; i < numseq-1;i++){
                 /* pick one sequence / profile  */
                 max_score = -FLT_MAX;
-                l = 25;
+                l = MACRO_MIN(6, numseq-1);
+                SampleWithoutReplacement(ap->rng, numseq-i, l, samples);
 
-                //LOG_MSG("L:%d", l);
-                for(g = 0; g < l;g++){
-                        a = tl_random_int(ap->rng, numseq-i);
-                        b = tl_random_int(ap->rng, numseq-i);
-                        while(b == a){
-                                b = tl_random_int(ap->rng, numseq-i);
-                        }
-                        score_aln(m, ap, profile, msa, active[a], active[b], numseq, &score);
-                        //LOG_MSG("TEsting %d %d : %f", a,b, ap->score);
-                        if(ap->score > max_score){
-                                best_a = a;
-                                best_b = b;
-                                max_score = ap->score;
+                for(g = 0;g < l-1;g++){
+                        a = samples[g];
+                        for(f = g + 1; f < l;f++){
+                                b = samples[f];
+                                score_aln(m, ap, profile, msa, active[a], active[b], numseq, &score);
+                                //LOG_MSG("TEsting %d %d : %f", a,b, ap->score);
+                                if(ap->score > max_score){
+                                        best_a = a;
+                                        best_b = b;
+                                        max_score = ap->score;
+                                }
                         }
                 }
+                /* //LOG_MSG("L:%d", l); */
+                /* for(g = 0; g < l;g++){ */
+                /*         a = tl_random_int(ap->rng, numseq-i); */
+                /*         b = tl_random_int(ap->rng, numseq-i); */
+                /*         while(b == a){ */
+                /*                 b = tl_random_int(ap->rng, numseq-i); */
+                /*         } */
+                /*         score_aln(m, ap, profile, msa, active[a], active[b], numseq, &score); */
+                /*         //LOG_MSG("TEsting %d %d : %f", a,b, ap->score); */
+                /*         if(ap->score > max_score){ */
+                /*                 best_a = a; */
+                /*                 best_b = b; */
+                /*                 max_score = ap->score; */
+                /*         } */
+                /* } */
+
                 a = best_a;
                 b = best_b;
                 //LOG_MSG("samples: %d %d", active[a],active[b]);

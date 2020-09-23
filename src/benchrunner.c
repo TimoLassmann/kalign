@@ -368,10 +368,11 @@ int run_and_score(struct parameters_br* param)
                         }else if(!my_file_exists(param->output)){
                                 RUNP(out_ptr = fopen(param->output ,"w"));
 
-                                fprintf(out_ptr,"Name,Alignment,AVGLEN,NUMSEQ,GPO,GPE,TGPE,MATADD,SP,TC,Time\n");
+                                fprintf(out_ptr,"Runname,Program,Alignment,AVGLEN,NUMSEQ,GPO,GPE,TGPE,MATADD,SP,TC,Time\n");
                                 if(param->run_name){
-                                        fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",
+                                        fprintf(out_ptr,"%s,%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",
                                                 param->run_name,
+                                                param->program,
                                                 basename(param->refseq),
                                                 average_seq_len,
                                                 test_aln->numseq,
@@ -383,7 +384,8 @@ int run_and_score(struct parameters_br* param)
                                                 TC,
                                                 time);
                                 }else{
-                                        fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",
+                                        fprintf(out_ptr,"%s,%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",
+                                                param->program,
                                                 param->program,
                                                 basename(param->refseq),
                                                 average_seq_len,
@@ -401,8 +403,9 @@ int run_and_score(struct parameters_br* param)
                         }else{
                                 RUNP(out_ptr = fopen(param->output,"a"));
                                 if(param->run_name){
-                                        fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",
+                                        fprintf(out_ptr,"%s,%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",
                                                 param->run_name,
+                                                param->program,
                                                 basename(param->refseq),
                                                 average_seq_len,
                                                 test_aln->numseq,
@@ -414,7 +417,8 @@ int run_and_score(struct parameters_br* param)
                                                 TC,
                                                 time);
                                 }else{
-                                        fprintf(out_ptr,"%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",
+                                        fprintf(out_ptr,"%s,%s,%s,%f,%d,%f,%f,%f,%f,%f,%f,%f\n",
+                                                param->program,
                                                 param->program,
                                                 basename(param->refseq),
                                                 average_seq_len,

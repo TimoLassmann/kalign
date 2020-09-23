@@ -15,6 +15,8 @@ int main(int argc, char *argv[])
         char ret[BUFSIZ];
         char out[BUFSIZ];
         char filename[512];
+        char runname[512];
+        char* hit;
         int rc;
 
         float gpo;
@@ -23,7 +25,7 @@ int main(int argc, char *argv[])
         float matadd;
         int l;
         int c;
-
+        int i,j;
         snprintf(cmd, BUFSIZ, "find ~/kalignbenchmark/data/bb3_release -name \"*.msf\"");
         RUNP(pipe = popen(cmd,"r"));
         //if (system("which gnuplot"))
@@ -32,6 +34,21 @@ int main(int argc, char *argv[])
                 //fprintf(stderr,"%s", ret);
                 ret[strcspn(ret, "\r\n")] = 0;
 
+                hit = strstr(ret, "bb3_release/RV");
+                if(hit){
+                        hit += 12;
+                        l = strlen(hit);
+                        for(i = 0; i < l;i++){
+                                if(hit[i] == '/'){
+                                        runname[i] = 0;
+                                        break;
+                                }
+                                runname[i] = hit[i];
+
+                        }
+                }else{
+                        snprintf(runname, 512, "%s", "default");
+                }
                 snprintf(filename, 512, "%s", ret);
                 l = strlen(filename);
                 filename[l-4] = '.';
@@ -39,22 +56,11 @@ int main(int argc, char *argv[])
                 filename[l-2] = 'f';
                 filename[l-1] = 'a';
                 //fprintf(stderr,"%s\n", filename);
-                rc = snprintf(out, BUFSIZ, "benchrunner --scratch ~/tmp --runname muscle -program muscle -test %s -ref %s -o kalign_diff_out.csv -u %d \n", filename,ret,c);
+                rc = snprintf(out, BUFSIZ, "benchrunner --scratch ~/tmp --runname %s -program muscle -test %s -ref %s -o kalign_diff_out.csv -u %d \n", runname,filename,ret,c);
                 fprintf(stdout,"%s",out);
                 c++;
 
-                rc = snprintf(out, BUFSIZ, "benchrunner --scratch ~/tmp --runname defaultset -program kalign -test %s -ref %s -o kalign_diff_out.csv -u %d --gpo 5.5 -gpe 2.0 -tgpe 1.0 -matadd 0.0 \n", ret,ret,c);
-                fprintf(stdout,"%s",out);
-                c++;
-
-                rc = snprintf(out, BUFSIZ, "benchrunner --scratch ~/tmp --runname default -program kalign -test %s -ref %s -o kalign_diff_out.csv -u %d \n", ret,ret,c);
-                fprintf(stdout,"%s",out);
-                c++;
-
-                rc = snprintf(out, BUFSIZ, "benchrunner --scratch ~/tmp --runname coarse --gpo 5.545 -gpe 2.013  -tgpe 1.001 -matadd 0.5196 -program kalign -test %s -ref %s -o kalign_diff_out.csv -u %d \n", ret,ret,c);
-                fprintf(stdout,"%s",out);
-                c++;
-                rc = snprintf(out, BUFSIZ, "benchrunner --scratch ~/tmp --runname coarse_round --gpo 5.5 -gpe 2.013  -tgpe 1.0 -matadd 0.5 -program kalign -test %s -ref %s -o kalign_diff_out.csv -u %d \n", ret,ret,c);
+                rc = snprintf(out, BUFSIZ, "benchrunner --scratch ~/tmp --runname %s -program kalign -test %s -ref %s -o kalign_diff_out.csv -u %d \n",runname, ret,ret,c);
                 fprintf(stdout,"%s",out);
                 c++;
 
