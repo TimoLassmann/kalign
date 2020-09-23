@@ -55,7 +55,7 @@ int** create_chaos_msa(struct msa* msa, struct aln_param* ap)
         for(i = 0; i < numseq-1;i++){
                 /* pick one sequence / profile  */
                 max_score = -FLT_MAX;
-                l = MACRO_MIN(6, numseq-1);
+                l = MACRO_MIN(6, numseq-i);
                 SampleWithoutReplacement(ap->rng, numseq-i, l, samples);
 
                 for(g = 0;g < l-1;g++){
@@ -86,7 +86,7 @@ int** create_chaos_msa(struct msa* msa, struct aln_param* ap)
                 /*                 max_score = ap->score; */
                 /*         } */
                 /* } */
-
+                //exit(0);
                 a = best_a;
                 b = best_b;
                 //LOG_MSG("samples: %d %d", active[a],active[b]);
@@ -262,7 +262,7 @@ int** create_chaos_msa(struct msa* msa, struct aln_param* ap)
         }
         MFREE(profile);
 
-
+        MFREE(samples);
 
         return map;
 ERROR:

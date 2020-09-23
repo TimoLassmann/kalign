@@ -462,7 +462,7 @@ int run_kalign(struct parameters* param)
                 return OK;
         }
         /* Start bi-secting K-means sequence clustering */
-        RUN(build_tree_kmeans(msa,ap));
+        //RUN(build_tree_kmeans(msa,ap));
         /* by default all protein sequences are converted into a reduced alphabet
            when read from file. Here we turn them back into the default representation. */
         if(msa->L == redPROTEIN){
@@ -477,8 +477,8 @@ int run_kalign(struct parameters* param)
         DECLARE_TIMER(t1);
         LOG_MSG("Aligning");
         START_TIMER(t1);
-        //RUNP(map = create_chaos_msa(msa, ap));
-        RUNP(map = create_msa(msa,ap));
+        RUNP(map = create_chaos_msa(msa, ap));
+        //RUNP(map = create_msa(msa,ap));
         //RUNP(map = hirschberg_alignment(msa, ap));
         STOP_TIMER(t1);
         GET_TIMING(t1);
