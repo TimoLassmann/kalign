@@ -1,3 +1,17 @@
+2020-09-24  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+
+	* version 3.2.7 - Development version
+	- dynamic programming in now more modular.
+	- fixed rare bug in alignment input / output
+	- added gap parameters (--gpo, --gpe, --tgpe)
+	- for protein alignment I now use the CorBLOSUM66_13plus matrix from:
+
+	Hess M, Keul F, Goesele M, Hamacher K.
+	Addressing inaccuracies in BLOSUM computation improves homology search performance.
+	BMC bioinformatics. 2016 Dec 1;17(1):189.
+
+	with the empirically derived gap penalties.
+
 2020-04-22  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
 
 	* version 3.2.5
@@ -10,7 +24,7 @@
 	- Fixed issue relating to stdin input on clusters.
 	- Added more sanity checks
 
-2020-03-16  Timo Lassmann 
+2020-03-16  Timo Lassmann
 
 	* version 3.2.3
 	- replaced timing code with code from the easel lib.
@@ -50,4 +64,3 @@
 	- added m4 macros to enable / disable compiler flags
 	- added m4 macro for valgrind. Now there is a make target
 	called check-valgrind that run all tests through valgrind.
-
