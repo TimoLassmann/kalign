@@ -144,7 +144,6 @@ int print_AVX_warning(void)
         fprintf(stdout,"WARNING: AVX2 instruction set not found!\n");
         fprintf(stdout,"         Kalign will not run optimally.\n");
         fprintf(stdout,"\n");
-
         return OK;
 }
 
@@ -160,7 +159,6 @@ int main(int argc, char *argv[])
         RUNP(param = init_param());
 
         param->num_infiles = 0;
-
 
         while (1){
                 static struct option long_options[] ={
