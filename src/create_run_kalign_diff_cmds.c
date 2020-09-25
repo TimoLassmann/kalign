@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
         int c;
         int i,j;
         snprintf(cmd, BUFSIZ, "find ~/kalignbenchmark/data/bb3_release -name \"*.msf\"");
-        snprintf(cmd, BUFSIZ, "find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name \"*.msf\" | grep structural");
+        //snprintf(cmd, BUFSIZ, "find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name \"*.msf\" | grep structural");
         RUNP(pipe = popen(cmd,"r"));
         //if (system("which gnuplot"))
         c = 1;
