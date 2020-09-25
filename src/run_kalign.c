@@ -27,7 +27,7 @@
 #include "alignment_parameters.h"
 
 #include "bisectingKmeans.h"
-#include "alignment.h"
+/* #include "alignment.h" */
 #include "weave_alignment.h"
 
 #include "esl_stopwatch.h"

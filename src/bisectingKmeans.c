@@ -34,7 +34,7 @@
 #include "sequence_distance.h"
 #include "euclidean_dist.h"
 
-#include "alignment.h"
+/* #include "alignment.h" */
 #include "pick_anchor.h"
 #include "esl_stopwatch.h"
 

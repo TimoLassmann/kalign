@@ -25,7 +25,7 @@
 #include "sequence_distance.h"
 
 #include "alphabet.h"
-#include "alignment.h"
+/* #include "alignment.h" */
 #include "align_io.h"
 
 #include "misc.h"
