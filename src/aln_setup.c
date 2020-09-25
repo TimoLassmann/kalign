@@ -67,7 +67,7 @@ int make_profile_n(struct aln_param* ap,const uint8_t* seq,const int len, float*
 
                 prof += 32;
 
-                for(j = 21;j--;){
+                for(j = 23;j--;){
                         prof[j] = subm[c][j];
                 }
                 prof[23] = -gpo;
