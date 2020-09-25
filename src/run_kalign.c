@@ -263,7 +263,7 @@ int main(int argc, char *argv[])
                 return EXIT_SUCCESS;
         }
         if(!param->dump_internal){
-        print_kalign_header();
+                print_kalign_header();
         }
 #ifndef HAVE_AVX2
         RUN(print_AVX_warning());

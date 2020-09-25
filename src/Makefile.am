@@ -20,6 +20,10 @@ genruncmds_SOURCES = \
 create_run_cmds.c
 
 genkaligndiffcmds_SOURCES = \
+tldevel.h \
+tldevel.c \
+tlmisc.h \
+tlmisc.c \
 create_run_kalign_diff_cmds.c
 
 benchrunner_SOURCES = benchrunner.c \

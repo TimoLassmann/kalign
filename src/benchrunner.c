@@ -360,7 +360,8 @@ int run_and_score(struct parameters_br* param)
 
 
 
-                snprintf(cmd,BUFSIZ*2 , "bali_score %s %s",  param->refseq, ret);
+                /* snprintf(cmd,BUFSIZ*2 , "bali_score %s %s",  param->refseq, ret); */
+                snprintf(cmd,BUFSIZ*2 , "mumsa %s %s",  param->refseq, ret);
                 // Execute a process listing
 
 
@@ -376,8 +377,8 @@ int run_and_score(struct parameters_br* param)
                         //fprintf(stdout,"%s", ret);
                 }
 
-
-                sscanf(ret, "%*s %*s %lf %lf", &SP,&TC);
+                TC = 0.0;
+                sscanf(ret, "%*s %*s %lf", &SP);
                 rc = pclose(pipe);
                 if(rc == EXIT_SUCCESS){
                         /* construct program name  */
