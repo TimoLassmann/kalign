@@ -20,7 +20,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 */
-#include <omp.h>
+
 #include <xmmintrin.h>
 #include "sequence_distance.h"
 
@@ -106,18 +106,21 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                         }
                 }
 
- /*                omp_set_num_threads(4); */
-/* #pragma omp parallel for shared(dm, msa) private(i, j) collapse(2) schedule(dynamic) */
-                uint8_t* s1;
-                uint8_t* s2;
-                int l1;
-                int l2;
+
+                struct msa_seq** s = msa->sequences;
+#ifdef HAVE_OPENMP
+#pragma omp parallel for shared(dm, s) private(i, j) collapse(2) schedule(static)
+#endif
                 for(i = 0; i < numseq;i++){
-                        s1 = msa->sequences[i]->s;
-                        l1 = msa->sequences[i]->len;
                         for(j = 0;j < num_samples;j++){
-                                s2 = msa->sequences[samples[j]]->s;
-                                l2 = msa->sequences[samples[j]]->len;
+                                uint8_t* s1;
+                                uint8_t* s2;
+                                int l1;
+                                int l2;
+                                s1 = s[i]->s;
+                                l1 = s[i]->len;
+                                s2 = s[samples[j]]->s;
+                                l2 = s[samples[j]]->len;
                                 dm[i][j] = calc_distance(s1,
                                                          s2,
                                                          l1,

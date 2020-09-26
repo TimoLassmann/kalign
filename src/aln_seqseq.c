@@ -118,8 +118,8 @@ int aln_seqseq_backward(struct aln_mem* m,struct aln_param* ap)
         const uint8_t* seq1 = ap->seq1;
         const uint8_t* seq2 = ap->seq2;
         float *subp = NULL;
-        const int starta = m->starta;
-        const int enda = m->enda;
+        const int starta = m->starta_2;
+        const int enda = m->enda_2;
         const int startb =m->startb;
         const int endb = m->endb;
 

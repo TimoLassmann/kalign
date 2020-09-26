@@ -20,6 +20,10 @@
 
 */
 
+#ifdef HAVE_OPENMP
+#include <omp.h>
+#endif
+
 #include "global.h"
 #include "msa.h"
 #include "parameters.h"
@@ -52,6 +56,7 @@
 #define OPT_DEVTEST 10
 #define OPT_CHAOS 11
 #define OPT_DUMP_INTERNAL 12
+#define OPT_NTHREADS 14
 
 static int run_kalign(struct parameters* param);
 static int check_for_sequences(struct msa* msa);
@@ -175,6 +180,7 @@ int main(int argc, char *argv[])
                         {"tgpe",  required_argument, 0, OPT_TGPE},
                         {"matadd",  required_argument, 0, OPT_MATADD},
                         {"chaos",   required_argument, 0, OPT_CHAOS},
+                        {"nthreads",  required_argument, 0, 'n'},
                         {"input",  required_argument, 0, 'i'},
                         {"infile",  required_argument, 0, 'i'},
                         {"in",  required_argument, 0, 'i'},
@@ -189,7 +195,7 @@ int main(int argc, char *argv[])
 
                 int option_index = 0;
 
-                c = getopt_long_only (argc, argv,"i:o:f:hqvV",long_options, &option_index);
+                c = getopt_long_only (argc, argv,"i:o:f:n:hqvV",long_options, &option_index);
 
                 /* Detect the end of the options. */
                 if (c == -1){
@@ -216,6 +222,9 @@ int main(int argc, char *argv[])
                         break;
                 case 'f':
                         param->format = optarg;
+                        break;
+                case 'n':
+                        param->nthreads = atoi(optarg);
                         break;
                 case OPT_REFORMAT:
                         param->format = optarg;
@@ -279,6 +288,15 @@ int main(int argc, char *argv[])
                 free_parameters(param);
                 return EXIT_SUCCESS;
         }
+
+        if(param->nthreads < 1){
+                RUN(print_kalign_help(argv));
+                LOG_MSG("Number of threads has to be >= 1.");
+                free_parameters(param);
+                return EXIT_FAILURE;
+        }
+
+
 
         param->num_infiles = 0;
 
@@ -407,7 +425,9 @@ int run_kalign(struct parameters* param)
 
         int** map = NULL;       /* holds all alignment paths  */
         int i;
-
+#ifdef HAVE_OPENMP
+        omp_set_num_threads(param->nthreads);
+#endif
         if(param->num_infiles == 1){
                 RUN(read_input(param->infile[0],&msa));
         }else{

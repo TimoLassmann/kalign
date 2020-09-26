@@ -29,6 +29,11 @@
 #include "config.h"
 #endif
 
+#ifdef HAVE_OPENMP
+#include <omp.h>
+#endif
+
+
 #include <stdlib.h>
 #include <stdio.h>
 

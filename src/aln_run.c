@@ -96,8 +96,20 @@ int** create_msa(struct msa* msa, struct aln_param* ap)
                                 /* aln_runner(m, ap, map[c]); */
                                 /* LOG_MSG("SCORE: %f", ap->score); */
                                 ap->mode = ALN_MODE_FULL;
-                                aln_runner(m, ap, map[c]);
-                                //hirsch_ss_dyn(ap,msa->sequences[a]->s, msa->sequences[b]->s,hm,map[c]);
+#ifdef HAVE_OPENMP
+                                /* omp_set_num_threads(4); */
+#pragma omp parallel
+                                // Only the first thread will spawn other threads
+#pragma omp single nowait
+                                {
+#endif
+
+                                        aln_runner(m, ap, map[c]);
+                                        //hirsch_ss_dyn(ap,msa->sequences[a]->s, msa->sequences[b]->s,hm,map[c]);
+#ifdef HAVE_OPENMP
+                                }
+#endif
+
                         }else{
                                 m->enda = len_b;
                                 m->endb = len_a;
@@ -114,7 +126,18 @@ int** create_msa(struct msa* msa, struct aln_param* ap)
                                 /* aln_runner(m, ap, map[c]); */
                                 /* LOG_MSG("SCORE: %f", ap->score); */
                                 ap->mode = ALN_MODE_FULL;
-                                aln_runner(m, ap, map[c]);
+#ifdef HAVE_OPENMP
+                                /* omp_set_num_threads(4); */
+#pragma omp parallel
+                                // Only the first thread will spawn other threads
+#pragma omp single nowait
+                                {
+#endif
+
+                                        aln_runner(m, ap, map[c]);
+#ifdef HAVE_OPENMP
+                                }
+#endif
 
                                 //hirsch_ps_dyn(ap,profile[b], msa->sequences[a]->s,hm,map[c],msa->nsip[b]);
                                 RUN(mirror_path_n(&map[c],len_a,len_b));
@@ -131,7 +154,18 @@ int** create_msa(struct msa* msa, struct aln_param* ap)
                                 /* aln_runner(m, ap, map[c]); */
                                 /* LOG_MSG("SCORE: %f", ap->score); */
                                 ap->mode = ALN_MODE_FULL;
-                                aln_runner(m, ap, map[c]);
+#ifdef HAVE_OPENMP
+                                /* omp_set_num_threads(4); */
+#pragma omp parallel
+                                // Only the first thread will spawn other threads
+#pragma omp single nowait
+                                {
+#endif
+
+                                        aln_runner(m, ap, map[c]);
+#ifdef HAVE_OPENMP
+                                }
+#endif
 
                                 //hirsch_ps_dyn(ap,profile[a],msa->sequences[b]->s ,hm,map[c],msa->nsip[a]);
                         }else{
@@ -160,7 +194,19 @@ int** create_msa(struct msa* msa, struct aln_param* ap)
                                         /* aln_runner(m, ap, map[c]); */
                                         /* LOG_MSG("SCORE: %f", ap->score); */
                                         ap->mode = ALN_MODE_FULL;
-                                        aln_runner(m, ap, map[c]);
+#ifdef HAVE_OPENMP
+                                        /* omp_set_num_threads(4); */
+#pragma omp parallel
+                                        // Only the first thread will spawn other threads
+#pragma omp single nowait
+                                        {
+#endif
+
+                                                aln_runner(m, ap, map[c]);
+#ifdef HAVE_OPENMP
+                                        }
+#endif
+
                                         //hirsch_pp_dyn(profile[b],profile[a],hm,map[c]);
                                         RUN(mirror_path_n(&map[c],len_a,len_b));
                                         //RUNP(map[c] = mirror_hirsch_path(map[c],len_a,len_b));

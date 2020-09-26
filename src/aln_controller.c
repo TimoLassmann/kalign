@@ -52,29 +52,60 @@ int aln_runner(struct aln_mem* m,struct aln_param* ap, int* path)
         //fprintf(stderr,"Forward:%d-%d	%d-%d\n",m->starta,m->enda,m->startb,m->endb);
 
         m->enda = mid;
+        m->starta_2 = mid;
+        m->enda_2 = old_cor[1];
 
         //fprintf(stderr,"Forward:%d-%d	%d-%d\n",m->starta,m->enda,m->startb,m->endb);
         if(ap->seq1){
+#ifdef HAVE_OPENMP
+#pragma omp task shared(m,ap) if(m->enda - m->starta > 1000)
+#endif
                 aln_seqseq_foward(m,ap);
         }else if(ap->prof2){
+#ifdef HAVE_OPENMP
+#pragma omp task shared(m,ap)if(m->enda - m->starta > 1000)
+#endif
                 aln_profileprofile_foward(m,ap);
         }else{
+#ifdef HAVE_OPENMP
+#pragma omp task shared(m,ap)if(m->enda - m->starta > 1000)
+#endif
                 aln_seqprofile_foward(m,ap);
         }
+        /* CRITICAL  */
+        //m->starta = mid;
+        //m->enda = old_cor[1];
 
-        m->starta = mid;
-        m->enda = old_cor[1];
-        //fprintf(stderr,"Backward:%d-%d	%d-%d\n",m->starta,m->enda,m->startb,m->endb);
+//fprintf(stderr,"Backward:%d-%d	%d-%d\n",m->starta,m->enda,m->startb,m->endb);
 
 
         if(ap->seq1){
+#ifdef HAVE_OPENMP
+#pragma omp task shared(m,ap) if(m->enda_2 - m->starta_2 > 1000)
+#endif
                 aln_seqseq_backward(m,ap);
+#ifdef HAVE_OPENMP
+#pragma omp taskwait
+#endif
+
                 aln_seqseq_meetup(m,ap,old_cor,&meet,&transition,&score);
         }else if(ap->prof2){
+#ifdef HAVE_OPENMP
+#pragma omp task shared(m,ap)if(m->enda_2 - m->starta_2 > 1000)
+#endif
                 aln_profileprofile_backward(m,ap);
+#ifdef HAVE_OPENMP
+#pragma omp taskwait
+#endif
                 aln_profileprofile_meetup(m,ap,old_cor,&meet,&transition,&score);
         }else{
+#ifdef HAVE_OPENMP
+#pragma omp task shared(m,ap)if(m->enda_2 - m->starta_2 > 1000)
+#endif
                 aln_seqprofile_backward(m,ap);
+#ifdef HAVE_OPENMP
+#pragma omp taskwait
+#endif
                 aln_seqprofile_meetup(m,ap,old_cor,&meet,&transition,&score);
         }
 

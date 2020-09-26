@@ -50,6 +50,7 @@ struct parameters*init_param(void)
         param->tgpe = FLT_MAX;
         param->matadd = 0.0F;
         param->chaos = 0;
+        param->nthreads = 4;
         return param;
 ERROR:
         free_parameters(param);

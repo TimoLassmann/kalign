@@ -169,7 +169,7 @@ int aln_profileprofile_backward(struct aln_mem* m,struct aln_param* ap)
         register int c = 0;
 
         register int f = 0;
-        prof1 += (m->enda+1) << 6;
+        prof1 += (m->enda_2 +1) << 6;
         prof2 += (m->endb+1) << 6;
         s[m->endb].a = s[0].a;
         s[m->endb].ga = s[0].ga;
@@ -196,7 +196,7 @@ int aln_profileprofile_backward(struct aln_mem* m,struct aln_param* ap)
         s[m->startb].ga = -FLT_MAX;
         s[m->startb].gb = -FLT_MAX;
 
-        i = m->enda-m->starta;
+        i = m->enda_2-m->starta_2;
         while(i--){
                 prof1 -= 64;
 

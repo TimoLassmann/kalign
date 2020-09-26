@@ -41,7 +41,7 @@ int aln_seqprofile_foward(struct aln_mem* m,const struct aln_param* ap)
         s[m->startb].ga = s[0].ga;
         s[m->startb].gb = s[0].gb;
         if(m->startb){
-                for (j = m->startb+1; j < m->endb;j++){
+                for (j = m->startb +1; j < m->endb;j++){
                         s[j].a = -FLT_MAX;
                         s[j].ga = MAX(s[j-1].ga-ext,s[j-1].a-open);
                         s[j].gb = -FLT_MAX;
@@ -148,14 +148,14 @@ int aln_seqprofile_backward(struct aln_mem* m,const struct aln_param* ap)
         const float text = ap->tgpe * (float)sip;
 
 
-        prof1 += (m->enda+1) << 6;
+        prof1 += (m->enda_2 +1) << 6;
 
         s[m->endb].a = s[0].a;
         s[m->endb].ga = s[0].ga;
         s[m->endb].gb = s[0].gb;
 
         if(m->endb != m->len_b){
-                for(j = m->endb-1;j > m->startb;j--){
+                for(j = m->endb-1;j > m->startb ;j--){
                         s[j].a = -FLT_MAX;
                         s[j].ga = MAX(s[j+1].ga-ext,s[j+1].a-open);
                         s[j].gb = -FLT_MAX;
@@ -172,7 +172,7 @@ int aln_seqprofile_backward(struct aln_mem* m,const struct aln_param* ap)
         s[m->startb].ga = -FLT_MAX;
         s[m->startb].gb = -FLT_MAX;
 
-        i = m->enda-m->starta;
+        i = m->enda_2 -m->starta_2;
         while(i--){
                 prof1 -= 64;
                 pa = s[m->endb].a;

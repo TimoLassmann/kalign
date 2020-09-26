@@ -114,18 +114,19 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap)
 
         START_TIMER(timer);
         LOG_MSG("Building guide tree.");
-/* #ifdef HAVE_OPENMP */
-/*         omp_set_num_threads(4); */
-/* #pragma omp parallel */
-/*         // Only the first thread will spawn other threads */
-/* #pragma omp single nowait */
-/*         { */
-/* #endif */
+
+#ifdef HAVE_OPENMP
+        /* omp_set_num_threads(4); */
+#pragma omp parallel
+        // Only the first thread will spawn other threads
+#pragma omp single nowait
+        {
+#endif
         root = bisecting_kmeans(msa,root, dm, samples, numseq, num_anchors, numseq, ap->rng,0);
 
-/* #ifdef HAVE_OPENMP */
-/*         } */
-/* #endif */
+#ifdef HAVE_OPENMP
+        }
+#endif
         STOP_TIMER(timer);
         GET_TIMING(timer);
         //LOG_MSG("Done in %f sec.", GET_TIMING(timer));
@@ -200,7 +201,7 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
         RUNP(res_tmp = alloc_kmeans_result(num_samples));
 
         best->score = FLT_MAX;
-
+        tries = MACRO_MIN(tries, num_samples);
         for(t_iter = 0;t_iter < tries;t_iter++){
                 res_tmp->score = FLT_MAX;
                 sl = res_tmp->sl;
@@ -224,9 +225,9 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
                 for(j = 0; j < num_anchors;j++){
                         w[j] /= (float)num_samples;
                 }
-                r = tl_random_int(rng  , num_samples);
+                //r = tl_random_int(rng  , num_samples);
                 //r = sel[t_iter];
-
+                r = t_iter;
                 s = samples[r];
                 //LOG_MSG("Selected %d\n",s);
                 for(j = 0; j < num_anchors;j++){
@@ -376,17 +377,19 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
 
 
         //LOG_MSG("Done");
-/* #ifdef HAVE_OPENMP */
-/* #pragma omp task */
-/* #endif */
+#ifdef HAVE_OPENMP
+#pragma omp task shared(n) if(numseq > 2000)
+#endif
         n->left = bisecting_kmeans(msa,n->left, dm, sl, numseq, num_anchors, num_l,rng,d);
-/* #ifdef HAVE_OPENMP */
-/* #pragma omp task */
-/* #endif */
+
+
+#ifdef HAVE_OPENMP
+#pragma omp task shared(n) if(numseq > 2000)
+#endif
         n->right = bisecting_kmeans(msa,n->right, dm, sr, numseq, num_anchors, num_r,rng,d);
-/* #ifdef HAVE_OPENMP */
-/* #pragma omp taskwait */
-/* #endif */
+#ifdef HAVE_OPENMP
+#pragma omp taskwait
+#endif
         return n;
 ERROR:
         return NULL;
