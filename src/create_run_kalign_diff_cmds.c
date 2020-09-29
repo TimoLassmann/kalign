@@ -194,11 +194,13 @@ int main(int argc, char *argv[])
                         fprintf(stdout,"%s",out);
                         c++;
 
+                        rc = snprintf(out, BUFSIZ, "benchrunner --scratch %s @-n:1@ --runname %s -program kalign -test %s -ref %s -o %s -u %d \n", param->scratchdir, runname,ret, filename,param->outfile, c);
+                        fprintf(stdout,"%s",out);
+                        c++;
 
-
-
-
-
+                        rc = snprintf(out, BUFSIZ, "benchrunner --scratch %s  @-n:4@  --runname %s -program kalign -test %s -ref %s -o %s -u %d \n", param->scratchdir, runname,ret, filename,param->outfile, c);
+                        fprintf(stdout,"%s",out);
+                        c++;
 
                         /* rc = snprintf(out, BUFSIZ, "benchrunner --scratch ~/tmp --runname %s -program kalign @--tgpe:0.5@ -test %s -ref %s -o kalign_diff_out.csv -u %d \n",runname, filename,ret,c); */
                         /* fprintf(stdout,"%s",out); */
@@ -240,17 +242,23 @@ int main(int argc, char *argv[])
         if (rc == EXIT_SUCCESS) { // == 0
         }
 
-        /* dat = read.csv("results.csv",header = T) */
-        /* l = str_split(dat$Alignment, "_")
- */
 
 
 
-        /* c = data.frame(matrix(unlist(l), nrow=length(l), byrow=T)) */
-        /* colnames(c) = c("Case","Aln"); */
-        /* dat = cbind(dat,c) */
-        /* ggplot(dat, aes(Case, SP))  +  geom_boxplot(aes(colour = Program)) + scale_color_discrete(name = "Program")  */
+        snprintf(cmd, BUFSIZ, "%s_plotting.R", param->outfile);
 
+        RUNP(pipe = fopen(cmd, "w"));
+        fprintf(pipe,"library(tidyverse)\n");
+        fprintf(pipe,"dat = read.csv(\"%s\",header = T)\n",param->outfile);
+        fprintf(pipe,"l = str_split(dat$Alignment, \"_\")\n");
+        fprintf(pipe,"c = data.frame(matrix(unlist(l), nrow=length(l), byrow=T))\n");
+        fprintf(pipe,"colnames(c) = c(\"Case\",\"Aln\");\n");
+        fprintf(pipe,"dat = cbind(dat,c)\n");
+        fprintf(pipe,"ggplot(dat, aes(Case, SP))  +  geom_boxplot(aes(colour = Program)) + scale_color_discrete(name = \"Program\")\n");
+        snprintf(cmd, BUFSIZ, "%s.pdf", param->outfile);
+        fprintf(pipe,"ggsave(\"%s\",p)\n", cmd);
+
+        fclose(pipe);
 
         if(param){
                 MFREE(param);

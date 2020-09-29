@@ -82,9 +82,10 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                   );*/
                                 dist = calc_distance(seq_a, seq_b, len_a, len_b,msa->L);
                                 //dist = dist / (float) MACRO_MIN(len_a, len_b);
-                                dm[i][j] = dist;//*dist;
+                                dm[i][j] = dist;//  + (float)MACRO_MIN(len_a, len_b) / (float)MACRO_MAX(len_a, len_b);
                                 dm[j][i] = dm[i][j];
                         }
+
                         //fprintf(stdout,"\n");
                 }
         }else{
@@ -126,6 +127,8 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                                          l1,
                                                          l2,
                                                          msa->L);
+
+                                //dm[i][j] += (float)MACRO_MIN(l1, l2) / (float)MACRO_MAX(l1, l2);
                                 //dm[i][j] = dm[i][j] / (float) MACRO_MIN(l1, l2);
                                 //dm[i][j] = dist;
                         }

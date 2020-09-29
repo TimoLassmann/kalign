@@ -422,6 +422,7 @@ int run_kalign(struct parameters* param)
         struct msa* msa = NULL;
         struct msa* tmp_msa = NULL;
         struct aln_param* ap = NULL;
+        struct aln_task_list* task_list = NULL;
 
         int** map = NULL;       /* holds all alignment paths  */
         int i;
@@ -485,7 +486,6 @@ int run_kalign(struct parameters* param)
                 RUN(get_internal_data(msa,ap,&s, &s_len));
                 for(i = 0; i < s_len;i++){
                         fprintf(stdout,"%0.2f ", s[i]);
-
                 }
                 fprintf(stdout,"\n");
                 MFREE(s);
@@ -495,7 +495,7 @@ int run_kalign(struct parameters* param)
         }
         /* Start bi-secting K-means sequence clustering */
         if(!param->chaos){
-                RUN(build_tree_kmeans(msa,ap));
+                RUN(build_tree_kmeans(msa,ap,&task_list));
         }
         /* by default all protein sequences are converted into a reduced alphabet
            when read from file. Here we turn them back into the default representation. */
@@ -514,7 +514,7 @@ int run_kalign(struct parameters* param)
         if(param->chaos){
                 RUNP(map = create_chaos_msa(msa, ap));
         }else{
-                RUNP(map = create_msa(msa,ap));
+                RUNP(map = create_msa(msa,ap, task_list));
         }
         //RUNP(map = hirschberg_alignment(msa, ap));
         STOP_TIMER(t1);
@@ -526,7 +526,7 @@ int run_kalign(struct parameters* param)
         LOG_MSG("Weaving");
         START_TIMER(t1);
 
-        RUN(weave(msa , map, ap->tree));
+        RUN(weave(msa , map, ap->tree,task_list));
         STOP_TIMER(t1);
         GET_TIMING(t1);
 /* clean up map */

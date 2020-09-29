@@ -3,6 +3,7 @@
 
 #include "msa.h"
 #include "alignment_parameters.h"
+#include "bisectingKmeans.h"
 
 #include "aln_struct.h"
 #include "aln_mem.h"
@@ -15,11 +16,215 @@
 static int score_aln(struct aln_mem* m,struct aln_param* ap,float** profile, struct msa* msa, int a,int b,int numseq,float* score);
 static int SampleWithoutReplacement(struct rng_state* rng, int N, int n,int* samples);
 static int int_cmp(const void *a, const void *b);
+//static int do_align(struct msa* msa, struct aln_param* ap,struct aln_mem* m, int a,int b, int c);
+static int do_align(struct msa* msa,int** map,float** profile, struct aln_param* ap,struct aln_mem* m, int a,int b, int c);
 
-int** create_msa(struct msa* msa, struct aln_param* ap)
+int do_align(struct msa* msa,int** map,float** profile, struct aln_param* ap,struct aln_mem* m, int a,int b, int c)
+{
+        int len_a;
+        int len_b;
+        int j,g;
+        int numseq;
+
+        numseq = msa->numseq;
+
+        if(a < numseq){
+                len_a = msa->sequences[a]->len;//  aln->sl[a];
+        }else{
+                len_a = msa->plen[a];
+        }
+        if(b < numseq){
+
+                len_b = msa->sequences[b]->len;// aln->sl[b];
+        }else{
+                len_b = msa->plen[b];
+        }
+
+        g = (len_a > len_b)? len_a:len_b;
+        MMALLOC(map[c],sizeof(int) * (g+2));
+
+        RUN(resize_aln_mem(m, g));
+
+        for (j = 0; j < (g+2);j++){
+                map[c][j] = -1;
+        }
+
+        if (a < numseq){
+                RUN(make_profile_n(ap, msa->sequences[a]->s,len_a,&profile[a]));
+        }else{
+                RUN(set_gap_penalties_n(profile[a],len_a,msa->nsip[b]));
+        }
+
+        if (b < numseq){
+                RUN(make_profile_n(ap, msa->sequences[b]->s,len_b,&profile[b]));
+        }else{
+                RUN(set_gap_penalties_n(profile[b],len_b,msa->nsip[a]));
+        }
+
+        init_alnmem(m, len_a, len_b);
+        //fprintf(stderr,"LENA:%d	LENB:%d	numseq:%d\n",len_a,len_b,numseq);
+        if(a < numseq){
+                if(b < numseq){
+                        ap->seq1 = msa->sequences[a]->s;
+                        ap->seq2 = msa->sequences[b]->s;
+                        ap->prof1 = NULL;
+                        ap->prof2 = NULL;
+
+                        /* ap->mode = ALN_MODE_SCORE_ONLY; */
+                        /* aln_runner(m, ap, map[c]); */
+                        /* LOG_MSG("SCORE: %f", ap->score); */
+                        ap->mode = ALN_MODE_FULL;
+#ifdef HAVE_OPENMP
+                        /* omp_set_num_threads(4); */
+#pragma omp parallel
+                        // Only the first thread will spawn other threads
+#pragma omp single nowait
+                        {
+#endif
+                                aln_runner(m, ap, map[c]);
+                                //hirsch_ss_dyn(ap,msa->sequences[a]->s, msa->sequences[b]->s,hm,map[c]);
+#ifdef HAVE_OPENMP
+                        }
+#endif
+
+                }else{
+                        m->enda = len_b;
+                        m->endb = len_a;
+                        m->len_a = len_b;
+                        m->len_b = len_a;
+
+                        ap->seq1 = NULL;
+                        ap->seq2 = msa->sequences[a]->s;
+                        ap->prof1 = profile[b];
+                        ap->prof2 = NULL;
+                        ap->sip = msa->nsip[b];
+
+                        /* ap->mode = ALN_MODE_SCORE_ONLY; */
+                        /* aln_runner(m, ap, map[c]); */
+                        /* LOG_MSG("SCORE: %f", ap->score); */
+                        ap->mode = ALN_MODE_FULL;
+#ifdef HAVE_OPENMP
+                        /* omp_set_num_threads(4); */
+#pragma omp parallel
+                        // Only the first thread will spawn other threads
+#pragma omp single nowait
+                        {
+#endif
+
+                                aln_runner(m, ap, map[c]);
+#ifdef HAVE_OPENMP
+                        }
+#endif
+
+                        //hirsch_ps_dyn(ap,profile[b], msa->sequences[a]->s,hm,map[c],msa->nsip[b]);
+                        RUN(mirror_path_n(&map[c],len_a,len_b));
+                        //RUNP(map[c] = mirror_hirsch_path(map[c],len_a,len_b));
+                }
+        }else{
+                if(b < numseq){
+                        ap->seq1 = NULL;
+                        ap->seq2 = msa->sequences[b]->s;
+                        ap->prof1 = profile[a];
+                        ap->prof2 = NULL;
+                        ap->sip = msa->nsip[a];
+                        /* ap->mode = ALN_MODE_SCORE_ONLY; */
+                        /* aln_runner(m, ap, map[c]); */
+                        /* LOG_MSG("SCORE: %f", ap->score); */
+                        ap->mode = ALN_MODE_FULL;
+#ifdef HAVE_OPENMP
+                        /* omp_set_num_threads(4); */
+#pragma omp parallel
+                        // Only the first thread will spawn other threads
+#pragma omp single nowait
+                        {
+#endif
+
+                                aln_runner(m, ap, map[c]);
+#ifdef HAVE_OPENMP
+                        }
+#endif
+
+                        //hirsch_ps_dyn(ap,profile[a],msa->sequences[b]->s ,hm,map[c],msa->nsip[a]);
+                }else{
+                        if(len_a < len_b){
+                                ap->seq1 = NULL;
+                                ap->seq2 = NULL;
+                                ap->prof1 = profile[a];
+                                ap->prof2 = profile[b];
+                                /* ap->mode = ALN_MODE_SCORE_ONLY; */
+                                /* aln_runner(m, ap, map[c]); */
+                                /* LOG_MSG("SCORE: %f", ap->score); */
+                                ap->mode = ALN_MODE_FULL;
+                                aln_runner(m, ap, map[c]);
+                                //hirsch_pp_dyn(profile[a],profile[b],hm,map[c]);
+                        }else{
+                                m->enda = len_b;
+                                m->endb = len_a;
+                                m->len_a = len_b;
+                                m->len_b = len_a;
+
+                                ap->seq1 = NULL;
+                                ap->seq2 = NULL;
+                                ap->prof1 = profile[b];
+                                ap->prof2 = profile[a];
+                                /* ap->mode = ALN_MODE_SCORE_ONLY; */
+                                /* aln_runner(m, ap, map[c]); */
+                                /* LOG_MSG("SCORE: %f", ap->score); */
+                                ap->mode = ALN_MODE_FULL;
+#ifdef HAVE_OPENMP
+                                /* omp_set_num_threads(4); */
+#pragma omp parallel
+                                // Only the first thread will spawn other threads
+#pragma omp single nowait
+                                {
+#endif
+
+                                        aln_runner(m, ap, map[c]);
+#ifdef HAVE_OPENMP
+                                }
+#endif
+
+                                //hirsch_pp_dyn(profile[b],profile[a],hm,map[c]);
+                                RUN(mirror_path_n(&map[c],len_a,len_b));
+                                //RUNP(map[c] = mirror_hirsch_path(map[c],len_a,len_b));
+                        }
+                }
+        }
+
+        RUN(add_gap_info_to_path_n(&map[c], len_a, len_b));
+        //map[c] = add_gap_info_to_hirsch_path(map[c],len_a,len_b);
+
+        //if(i != numseq-2){
+                //MREALLOC(profile_ptr, sizeof(float)*64*(map[c][0]+2));
+                MMALLOC(profile[c],sizeof(float)*64*(map[c][0]+2));
+                //update(profile[a],profile[b],profile[c],map[c]);
+                update_n(profile[a],profile[b],profile[c],ap,map[c],msa->nsip[a],msa->nsip[b]);
+                //}
+
+        msa->plen[c] = map[c][0];
+
+        msa->nsip[c] = msa->nsip[a] + msa->nsip[b];
+        MMALLOC(msa->sip[c],sizeof(int)*(msa->nsip[a] + msa->nsip[b]));
+        g =0;
+        for (j = msa->nsip[a];j--;){
+                msa->sip[c][g] = msa->sip[a][j];
+                g++;
+        }
+        for (j = msa->nsip[b];j--;){
+                msa->sip[c][g] = msa->sip[b][j];
+                g++;
+        }
+        MFREE(profile[a]);
+        MFREE(profile[b]);
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+int** create_msa(struct msa* msa, struct aln_param* ap,struct aln_task_list* t)
 {
         struct aln_mem* m = NULL;
-        int i,j,g,a,b,c;
+        int i,j,g,s,a,b,c;
         int len_a;
         int len_b;
         float** profile = NULL;
@@ -42,6 +247,31 @@ int** create_msa(struct msa* msa, struct aln_param* ap)
         }
 
         RUN(alloc_aln_mem(&m, 2048));
+        s = 0;
+        g = t->list[0]->p;
+        for(i = 0; i < t->n_tasks;i++){
+                if(t->list[i]->p != g){
+                        for(j = s; j < i;j++){
+                                fprintf(stdout,"%3d %3d -> %3d (p: %d)\n", t->list[j]->a, t->list[j]->b, t->list[j]->c, t->list[j]->p);
+
+                                do_align(msa,map,profile, ap, m,t->list[j]->a, t->list[j]->b, t->list[j]->c);
+                        }
+                        fprintf(stdout,"\n");
+                        g =t->list[i]->p;
+                        s = i;
+                }
+        }
+        for(j = s; j < i;j++){
+                fprintf(stdout,"%3d %3d -> %3d (p: %d)\n", t->list[j]->a, t->list[j]->b, t->list[j]->c, t->list[j]->p);
+
+                do_align(msa,map,profile, ap, m,t->list[j]->a, t->list[j]->b, t->list[j]->c);
+        }
+
+        MFREE(profile);
+
+        free_aln_mem(m);
+        return map;
+        exit(0);
 
         for (i = 0; i < (numseq-1);i++){
                 a = tree[i*3];

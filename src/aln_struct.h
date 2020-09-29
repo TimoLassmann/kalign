@@ -13,9 +13,7 @@ struct aln_mem{
         struct states* f;
         struct states* b;
         int starta;
-
         int starta_2;
-
         int startb;
         int enda;
         int enda_2;
@@ -23,6 +21,7 @@ struct aln_mem{
         int size;
         int len_a;
         int len_b;
+        int sip;
 };
 
 #endif

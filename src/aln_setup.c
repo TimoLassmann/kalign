@@ -94,17 +94,16 @@ int set_gap_penalties_n(float* prof,int len,int nsip)
         int i;
         prof +=  (64 *(len+1));
 
-        prof[27] = prof[55]*(float)nsip;//gap open or close  23
-        prof[28] = prof[56]*(float)nsip;//gap extention 24
-        prof[29] = prof[57]*(float)nsip;//gap open or close 25
+        prof[27] = prof[55] * (float)nsip;//gap open or close  23
+        prof[28] = prof[56] * (float)nsip;//gap extention 24
+        prof[29] = prof[57] * (float)nsip;//gap open or close 25
 
         i = len+1;
         while(i--){
                 prof -= 64;
-                prof[27] = prof[55]*(float)nsip;//gap open or close
-                prof[28] = prof[56]*(float)nsip;//gap extention
-
-                prof[29] = prof[57]*(float)nsip;//gap open or close
+                prof[27] = prof[55] * (float)nsip;//gap open or close
+                prof[28] = prof[56] * (float)nsip;//gap extention
+                prof[29] = prof[57] * (float)nsip;//gap open or close
         }
         return OK;
 }

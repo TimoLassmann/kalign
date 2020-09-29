@@ -122,6 +122,9 @@ int main(int argc, char *argv[])
         if (optind < argc){
                 param->n_options = argc-optind;
                 if(param->n_options != 1){
+                        while (optind < argc){
+                                fprintf(stdout,"%s",argv[optind++]);
+                        }
                         ERROR_MSG("benrunner can only accept one additional argument");
                 }
                 MMALLOC(param->options, sizeof(char*) * param->n_options);

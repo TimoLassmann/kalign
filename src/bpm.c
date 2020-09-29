@@ -469,13 +469,13 @@ uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
 
         int i,j, k,diff;
 
-        alignas(32)  uint32_t f[21][8];
+        alignas(32)  uint32_t f[23][8];
         //int ALIGNED_(64) f[8];
         if(m > 255){
                 m = 255;
         }
 
-        for(i = 0; i < 21;i++){
+        for(i = 0; i < 23;i++){
                 for(j = 0;j < 8;j++){
                         f[i][j] =0u;
                 }

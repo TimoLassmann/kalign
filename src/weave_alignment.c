@@ -22,24 +22,32 @@
 
 #include "weave_alignment.h"
 
+#include "bisectingKmeans.h"
 
 //struct alignment* make_seq(struct alignment* aln,int a,int b,int* path);
 int make_seq(struct msa* msa,int a,int b,int* path);
 //int update_gaps(int old_len,int*gis,int new_len,int *newgaps);
 int update_gaps(int old_len,int*gis,int *newgaps);
 
-int weave(struct msa* msa, int** map, int* tree)
+int weave(struct msa* msa, int** map, int* tree, struct aln_task_list*t)
 {
         int i;
-        int a,b;
+        int a,b,c;
 
-        //RUN(clean_aln(aln));
+        //RUN(clean_aln(aln)
+        for(i = 0; i < t->n_tasks;i++){
+                a = t->list[i]->a;
+                b = t->list[i]->b;
+                c = t->list[i]->c;
+                fprintf(stdout,"%3d %3d -> %3d (p: %d)\n", t->list[i]->a, t->list[i]->b, t->list[i]->c, t->list[i]->p);
+                RUN(make_seq(msa,a,b,map[c]));
+        }
 
-        for (i = 0; i < (msa->numseq-1)*3;i +=3){
+        /*for (i = 0; i < (msa->numseq-1)*3;i +=3){
                 a = tree[i];
                 b = tree[i+1];
                 RUN(make_seq(msa,a,b,map[tree[i+2]]));
-        }
+                }*/
 
         return OK;
 ERROR:

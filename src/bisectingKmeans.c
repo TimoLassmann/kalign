@@ -38,10 +38,12 @@
 #include "pick_anchor.h"
 #include "esl_stopwatch.h"
 
+
 struct node{
         struct node* left;
         struct node* right;
         int id;
+        int d;
 };
 
 struct kmeans_result{
@@ -60,13 +62,16 @@ struct node* upgma(float **dm,int* samples, int numseq);
 struct node* alloc_node(void);
 
 int label_internal(struct node*n, int label);
+//int label_internal(struct node*n, int label);
 int* readbitree(struct node* p,int* tree);
-void printTree(struct node* curr,int depth);
+void print_tree(struct node*n, struct aln_task_list*t);
+static int sort_tasks_by_priority(const void *a, const void *b);
+/* void printTree(struct node* curr,int depth); */
 //struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct rng_state* rng);
 
 static struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct rng_state* rng, int d);
 
-int build_tree_kmeans(struct msa* msa, struct aln_param* ap)
+int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_task_list** task_list)
 {
         //struct drand48_data randBuffer;
         struct node* root = NULL;
@@ -132,12 +137,36 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap)
         //LOG_MSG("Done in %f sec.", GET_TIMING(timer));
 
         label_internal(root, numseq);
+        struct aln_task_list* t = NULL;
+        MMALLOC(t, sizeof(struct aln_task_list));
 
+        t->n_tasks = 0;
+        t->n_alloc_tasks = numseq-1;
+        t->list = NULL;
+        MMALLOC(t->list, sizeof(struct task*) * t->n_alloc_tasks);
+        for(i = 0; i < t->n_alloc_tasks;i++){
+                t->list[i] = NULL;
+                MMALLOC(t->list[i], sizeof(struct task));
+        }
+
+        print_tree(root,t);
+
+
+        qsort(t->list, t->n_tasks, sizeof(struct task*), sort_tasks_by_priority);
+
+        for(i = 0; i < t->n_tasks;i++){
+                fprintf(stdout,"%3d %3d -> %3d (p: %d)\n", t->list[i]->a, t->list[i]->b, t->list[i]->c, t->list[i]->p);
+        }
+
+
+        *task_list = t;
+
+        /*exit(0);
         ap->tree[0] = 1;
         ap->tree = readbitree(root, ap->tree);
         for (i = 0; i < (numseq*3);i++){
                 tree[i] = tree[i+1];
-        }
+                }*/
         MFREE(root);
         for(i =0 ; i < msa->numseq;i++){
                 _mm_free(dm[i]);
@@ -174,7 +203,7 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
         int num_var;
 
         int stop = 0;
-        if(num_samples < 100){
+        if(num_samples < 200){
                 float** dm = NULL;
                 RUNP(dm = d_estimation(msa, samples, num_samples,1));// anchors, num_anchors,1));
                 n = upgma(dm,samples, num_samples);
@@ -248,7 +277,6 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
                                 s = 1;
                                 break;
                         }
-
                 }
 
                 if(!s){
@@ -479,6 +507,7 @@ struct node* alloc_node(void)
         n->left = NULL;
         n->right = NULL;
         n->id = -1;
+        n->d = 0;
         return n;
 ERROR:
         return NULL;
@@ -486,13 +515,16 @@ ERROR:
 
 int label_internal(struct node*n, int label)
 {
+        //n->d = d;
         if(n->left){
                 label = label_internal(n->left, label);
         }
         if(n->right){
                 label = label_internal(n->right, label);
         }
-
+        if(n->left && n->right){
+                n->d = MACRO_MAX(n->left->d,n->right->d) + 1;
+        }
         if(n->id == -1){
                 n->id = label;
                 label++;
@@ -500,6 +532,35 @@ int label_internal(struct node*n, int label)
         return label;
 
 }
+
+void print_tree(struct node*n, struct aln_task_list*t)
+{
+        int i;
+        for(i = 0; i < n->d;i++){
+                //fprintf(stdout," ");
+        }
+        if(n->left && n->right){
+                struct task*task;
+                task = t->list[t->n_tasks];
+                task->a = n->left->id;
+                task->b = n->right->id;
+                task->c = n->id;
+                task->p = n->d;
+        fprintf(stdout,"Node %d  %d  depends on %d %d \n", n->id, n->d  , n->left->id, n->right->id);
+
+                t->n_tasks++;
+        }else{
+                //        fprintf(stdout,"Node %d  %d \n", n->id, n->d );
+
+        }
+        if(n->left){
+                print_tree(n->left,t);
+        }
+        if(n->right){
+                print_tree(n->right,t);
+        }
+}
+
 
 int* readbitree(struct node* p,int* tree)
 {
@@ -554,5 +615,19 @@ void free_kmeans_results(struct kmeans_result* k)
                         MFREE(k->sr);
                 }
                 MFREE(k);
+        }
+}
+
+
+
+int sort_tasks_by_priority(const void *a, const void *b)
+{
+        struct task* const *one = a;
+        struct task* const *two = b;
+
+        if((*one)->p >= (*two)->p){
+                return 1;
+        }else{
+                return -1;
         }
 }

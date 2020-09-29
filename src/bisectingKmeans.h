@@ -25,7 +25,10 @@
 
 #include "alignment_parameters.h"
 
-int build_tree_kmeans(struct msa* msa, struct aln_param* ap);
+
+int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_task_list** task_list);
+
+//int build_tree_kmeans(struct msa* msa, struct aln_param* ap);
 
 //extern int build_tree_kmeans(struct msa* msa, struct aln_param* ap);
 #endif
