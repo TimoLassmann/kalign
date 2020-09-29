@@ -29,7 +29,7 @@ int make_seq(struct msa* msa,int a,int b,int* path);
 //int update_gaps(int old_len,int*gis,int new_len,int *newgaps);
 int update_gaps(int old_len,int*gis,int *newgaps);
 
-int weave(struct msa* msa, int** map, int* tree, struct aln_task_list*t)
+int weave(struct msa* msa, int** map, int* tree, struct aln_tasks*t)
 {
         int i;
         int a,b,c;

@@ -1,6 +1,11 @@
 #ifndef ALN_STRUCT_H
 #define ALN_STRUCT_H
 
+#include "stdint.h"
+
+#define ALN_MODE_SCORE_ONLY 2
+#define ALN_MODE_FULL 1
+
 
 struct states{
         float a;
@@ -10,6 +15,11 @@ struct states{
 };
 
 struct aln_mem{
+        const float* prof1;
+        const float* prof2;
+        const uint8_t* seq1;
+        const uint8_t* seq2;
+
         struct states* f;
         struct states* b;
         int starta;
@@ -21,7 +31,10 @@ struct aln_mem{
         int size;
         int len_a;
         int len_b;
+
+
         int sip;
+        int mode;
 };
 
 #endif

@@ -8,7 +8,7 @@ struct task{
         int p;                  /* priority */
 };
 
-struct aln_task_list{
+struct aln_tasks{
         struct task** list;     /* list of pairwise alignments and their priority */
         float** profile;        /* buffer to hold output profiles */
         int** map;              /* traceback paths */
@@ -22,8 +22,8 @@ struct aln_task_list{
 #define EXTERN extern
 #endif
 
-EXTERN int alloc_task_list(struct aln_task_list** tasks,int numseq);
-EXTERN void free_task_list(stuct aln_task_list* tasks);
+EXTERN int alloc_tasks(struct aln_tasks** tasks,int numseq);
+EXTERN void free_tasks(struct aln_tasks* tasks);
 
 #undef ALN_TASK_IMPORT
 #undef EXTERN

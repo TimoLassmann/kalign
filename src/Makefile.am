@@ -73,6 +73,8 @@ misc.c \
 bpm.h \
 bpm.c \
 aln_struct.h \
+aln_task.h \
+aln_task.c \
 aln_mem.h \
 aln_mem.c \
 aln_setup.h \

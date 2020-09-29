@@ -5,10 +5,12 @@
 #include "alignment_parameters.h"
 #include "bisectingKmeans.h"
 
+#include "aln_task.h"
 #include "aln_struct.h"
 #include "aln_mem.h"
 #include "aln_setup.h"
 #include "aln_controller.h"
+
 
 #define ALN_RUN_IMPORT
 #include "aln_run.h"
@@ -33,8 +35,8 @@ int do_align(struct msa* msa,int** map,float** profile, struct aln_param* ap,str
         }else{
                 len_a = msa->plen[a];
         }
-        if(b < numseq){
 
+        if(b < numseq){
                 len_b = msa->sequences[b]->len;// aln->sl[b];
         }else{
                 len_b = msa->plen[b];
@@ -69,7 +71,6 @@ int do_align(struct msa* msa,int** map,float** profile, struct aln_param* ap,str
                         ap->seq2 = msa->sequences[b]->s;
                         ap->prof1 = NULL;
                         ap->prof2 = NULL;
-
                         /* ap->mode = ALN_MODE_SCORE_ONLY; */
                         /* aln_runner(m, ap, map[c]); */
                         /* LOG_MSG("SCORE: %f", ap->score); */
@@ -86,7 +87,6 @@ int do_align(struct msa* msa,int** map,float** profile, struct aln_param* ap,str
 #ifdef HAVE_OPENMP
                         }
 #endif
-
                 }else{
                         m->enda = len_b;
                         m->endb = len_a;
@@ -110,12 +110,10 @@ int do_align(struct msa* msa,int** map,float** profile, struct aln_param* ap,str
 #pragma omp single nowait
                         {
 #endif
-
                                 aln_runner(m, ap, map[c]);
 #ifdef HAVE_OPENMP
                         }
 #endif
-
                         //hirsch_ps_dyn(ap,profile[b], msa->sequences[a]->s,hm,map[c],msa->nsip[b]);
                         RUN(mirror_path_n(&map[c],len_a,len_b));
                         //RUNP(map[c] = mirror_hirsch_path(map[c],len_a,len_b));
@@ -221,7 +219,7 @@ ERROR:
         return FAIL;
 }
 
-int** create_msa(struct msa* msa, struct aln_param* ap,struct aln_task_list* t)
+int** create_msa(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
 {
         struct aln_mem* m = NULL;
         int i,j,g,s,a,b,c;
@@ -248,6 +246,7 @@ int** create_msa(struct msa* msa, struct aln_param* ap,struct aln_task_list* t)
 
         RUN(alloc_aln_mem(&m, 2048));
         s = 0;
+
         g = t->list[0]->p;
         for(i = 0; i < t->n_tasks;i++){
                 if(t->list[i]->p != g){
@@ -296,7 +295,6 @@ int** create_msa(struct msa* msa, struct aln_param* ap,struct aln_task_list* t)
                 MMALLOC(map[c],sizeof(int) * (g+2));
 
                 RUN(resize_aln_mem(m, g));
-
 
                 for (j = 0; j < (g+2);j++){
                         map[c][j] = -1;

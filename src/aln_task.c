@@ -4,13 +4,23 @@
 #include "aln_task.h"
 
 
-int alloc_task_list(struct aln_task_list** tasks,int numseq)
+int alloc_tasks(struct aln_tasks** tasks,int numseq)
 {
-        struct aln_task_list* t = NULL;
+        struct aln_tasks* t = NULL;
+        int np;
+        int i;
+
+        MMALLOC(t, sizeof(struct aln_tasks));
 
         t->n_tasks = 0;
         t->n_alloc_tasks = numseq-1;
         t->list = NULL;
+        t->profile = NULL;
+        t->map = NULL;
+
+        np =  (numseq << 1) - 1;
+        MMALLOC(t->profile,sizeof(float*)*np);
+        MMALLOC(t->map,sizeof(int*)*np);
         MMALLOC(t->list, sizeof(struct task*) * t->n_alloc_tasks);
         for(i = 0; i < t->n_alloc_tasks;i++){
                 t->list[i] = NULL;
@@ -21,14 +31,22 @@ int alloc_task_list(struct aln_task_list** tasks,int numseq)
 
         return OK;
 ERROR:
+        free_tasks(t);
         return FAIL;
 }
 
-void free_task_list(struct aln_task_list* tasks)
+void free_tasks(struct aln_tasks* t)
 {
-        if(tasks){
+        if(t){
+                int i;
+                for(i = 0; i < t->n_alloc_tasks;i++){
 
-                MFREE(tasks);
+                        MFREE(t->list[i]);
+                }
+                MFREE(t->list);
+                MFREE(t->map);
+                MFREE(t->profile);
+                MFREE(t);
         }
 
 }

@@ -39,9 +39,12 @@ struct aln_param{
         const float* prof2;
         const uint8_t* seq1;
         const uint8_t* seq2;
-        int chaos;
+
         int sip;
         int mode;
+
+
+         int chaos;
         /* actual parameters  */
         float** subm;
         int* tree;

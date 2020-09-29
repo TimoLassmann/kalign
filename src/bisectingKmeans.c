@@ -31,6 +31,7 @@
 
 #include "global.h"
 #include "msa.h"
+#include "aln_task.h"
 #include "sequence_distance.h"
 #include "euclidean_dist.h"
 
@@ -64,16 +65,17 @@ struct node* alloc_node(void);
 int label_internal(struct node*n, int label);
 //int label_internal(struct node*n, int label);
 int* readbitree(struct node* p,int* tree);
-void print_tree(struct node*n, struct aln_task_list*t);
+void print_tree(struct node*n, struct aln_tasks  *t) ;
 static int sort_tasks_by_priority(const void *a, const void *b);
 /* void printTree(struct node* curr,int depth); */
 //struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct rng_state* rng);
 
 static struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct rng_state* rng, int d);
 
-int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_task_list** task_list)
+int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_tasks** tasks)
 {
         //struct drand48_data randBuffer;
+        struct aln_tasks* t = NULL;
         struct node* root = NULL;
         float** dm = NULL;
         int* tree = NULL;
@@ -91,6 +93,7 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_task_list
 
         tree = ap->tree;
 
+        t = *tasks;
 
         numseq = msa->numseq;
 
@@ -127,6 +130,7 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_task_list
 #pragma omp single nowait
         {
 #endif
+
         root = bisecting_kmeans(msa,root, dm, samples, numseq, num_anchors, numseq, ap->rng,0);
 
 #ifdef HAVE_OPENMP
@@ -137,17 +141,7 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_task_list
         //LOG_MSG("Done in %f sec.", GET_TIMING(timer));
 
         label_internal(root, numseq);
-        struct aln_task_list* t = NULL;
-        MMALLOC(t, sizeof(struct aln_task_list));
 
-        t->n_tasks = 0;
-        t->n_alloc_tasks = numseq-1;
-        t->list = NULL;
-        MMALLOC(t->list, sizeof(struct task*) * t->n_alloc_tasks);
-        for(i = 0; i < t->n_alloc_tasks;i++){
-                t->list[i] = NULL;
-                MMALLOC(t->list[i], sizeof(struct task));
-        }
 
         print_tree(root,t);
 
@@ -159,7 +153,7 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_task_list
         }
 
 
-        *task_list = t;
+        //*task_list = t;
 
         /*exit(0);
         ap->tree[0] = 1;
@@ -533,7 +527,7 @@ int label_internal(struct node*n, int label)
 
 }
 
-void print_tree(struct node*n, struct aln_task_list*t)
+void print_tree(struct node*n, struct aln_tasks* t)
 {
         int i;
         for(i = 0; i < n->d;i++){
@@ -541,6 +535,7 @@ void print_tree(struct node*n, struct aln_task_list*t)
         }
         if(n->left && n->right){
                 struct task*task;
+
                 task = t->list[t->n_tasks];
                 task->a = n->left->id;
                 task->b = n->right->id;
