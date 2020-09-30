@@ -4,11 +4,12 @@ AC_INIT(kalign, 3.2.7)
 
 AC_USE_SYSTEM_EXTENSIONS
 AM_INIT_AUTOMAKE
+# Checks for programs.
+AC_PROG_AWK
 AC_PROG_CC
 AC_PROG_CXX
-AC_PROG_RANLIB
-#AC_PROG_RANLIB
 AC_PROG_INSTALL
+AC_PROG_RANLIB
 AM_SILENT_RULES([no])
 
 
@@ -80,12 +81,9 @@ fi
 ])# AC_C__GENERIC
 
 
-# Checks for programs.
-AC_PROG_AWK
-AC_PROG_CC
 # Check for C11 _Generic support
 AC_C__GENERIC
-AC_PROG_INSTALL
+
 
 
 AC_CHECK_LIB([m], [sqrt])
@@ -160,5 +158,8 @@ AC_MSG_NOTICE([         Configured by: $USER])
 AC_MSG_NOTICE([           Host system: $host_cpu-$host_vendor-$host_os])
 AC_MSG_NOTICE([     Uname information: $UNAME_INFO])
 AC_MSG_NOTICE([    Installation point: $prefix])
+AC_MSG_NOTICE([                CFLAGS: $CFLAGS])
+AC_MSG_NOTICE([               CPFLAGS: $CPPFLAGS   $TLDEVEL_CPPFLAGS])
+AC_MSG_NOTICE([               LDFLAGS: $LDFLAGS])
 AC_MSG_NOTICE([            SIMD flags: $SIMD_FLAGS])
 AC_MSG_NOTICE([---------------------------------------------------------])
