@@ -6,10 +6,10 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v1
-      
+
     - name: autogen
       run: ./autogen.sh
     - name: configure
@@ -20,3 +20,5 @@ jobs:
       run: make check
     - name: make distcheck
       run: make distcheck
+    - name: kalign version
+      run: kalign -v
