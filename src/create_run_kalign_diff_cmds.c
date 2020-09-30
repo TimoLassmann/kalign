@@ -250,10 +250,10 @@ int main(int argc, char *argv[])
         RUNP(pipe = fopen(cmd, "w"));
         fprintf(pipe,"library(tidyverse)\n");
         fprintf(pipe,"dat = read.csv(\"%s\",header = T)\n",param->outfile);
-        fprintf(pipe,"l = str_split(dat$Alignment, \"_\")\n");
+        fprintf(pipe,"l =  str_split_fixed(dat$Alignment, \"_\",2)\n");
         fprintf(pipe,"c = data.frame(matrix(unlist(l), nrow=length(l), byrow=T))\n");
-        fprintf(pipe,"colnames(c) = c(\"Case\",\"Aln\");\n");
-        fprintf(pipe,"dat = cbind(dat,c)\n");
+        fprintf(pipe,"colnames(l) = c(\"Case\",\"Aln\");\n");
+        fprintf(pipe,"dat = cbind(dat,l)\n");
         fprintf(pipe,"ggplot(dat, aes(Case, SP))  +  geom_boxplot(aes(colour = Program)) + scale_color_discrete(name = \"Program\")\n");
         snprintf(cmd, BUFSIZ, "%s.pdf", param->outfile);
         fprintf(pipe,"ggsave(\"%s\",p)\n", cmd);

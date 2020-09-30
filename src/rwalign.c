@@ -640,6 +640,7 @@ int write_msa_msf(struct msa* msa,char* outfile)
         struct out_line* ol= NULL;
         struct msa_seq* seq = NULL;
         time_t now;			/* current time as a time_t */
+        struct tm local_time;
         char   date[64];		/* today's date in GCG's format "October 3, 1996 15:57" */
         char* linear_seq = NULL;
         char* ptr;
@@ -728,7 +729,12 @@ int write_msa_msf(struct msa* msa,char* outfile)
 
         /* The msf line*/
         now = time(NULL);
-        if (strftime(date, 64, "%B %d, %Y %H:%M", localtime(&now)) == 0){
+
+        if((localtime_r(&now,&local_time)) == NULL){
+                ERROR_MSG("could not get local time");
+        }
+
+        if (strftime(date, 64, "%B %d, %Y %H:%M", &local_time) == 0){
                 ERROR_MSG("time failed???");
         }
         ol = lb->lines[lb->num_line];
@@ -895,6 +901,9 @@ int write_msa_msf(struct msa* msa,char* outfile)
         MFREE(linear_seq);
         return OK;
 ERROR:
+        if(linear_seq){
+                MFREE(linear_seq);
+        }
         return FAIL;
 }
 
