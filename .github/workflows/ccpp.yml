@@ -22,3 +22,25 @@ jobs:
       run: make distcheck
     - name: kalign version
       run: kalign -v
+
+
+
+build-mac:
+
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: autogen
+      run: ./autogen.sh
+    - name: configure
+      run: ./configure
+    - name: make
+      run: make
+    - name: make check
+      run: make check
+    - name: make distcheck
+      run: make distcheck
+    - name: kalign version
+      run: kalign -v
