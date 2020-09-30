@@ -425,7 +425,6 @@ int run_kalign(struct parameters* param)
         struct aln_param* ap = NULL;
         struct aln_tasks* tasks = NULL;
 
-        int** map = NULL;       /* holds all alignment paths  */
         int i;
 #ifdef HAVE_OPENMP
         omp_set_num_threads(param->nthreads);
@@ -473,6 +472,7 @@ int run_kalign(struct parameters* param)
                 free_msa(msa);
                 return OK;
         }
+
         if(msa->aligned != ALN_STATUS_UNALIGNED){
                 RUN(dealign_msa(msa));
         }
@@ -517,9 +517,13 @@ int run_kalign(struct parameters* param)
         LOG_MSG("Aligning");
         START_TIMER(t1);
         if(param->chaos){
-                RUNP(map = create_chaos_msa(msa, ap));
+                RUN(create_chaos_msa(msa, ap,tasks));
         }else{
-                RUNP(map = create_msa(msa,ap, tasks));
+                #ifdef HAVE_OPENMP
+                RUN(create_msa_openMP(msa,ap, tasks));
+                #else
+                RUN(create_msa_serial(msa,ap, tasks));
+                #endif
         }
         //RUNP(map = hirschberg_alignment(msa, ap));
         STOP_TIMER(t1);
@@ -531,17 +535,13 @@ int run_kalign(struct parameters* param)
         LOG_MSG("Weaving");
         START_TIMER(t1);
 
-        RUN(weave(msa , map, ap->tree,tasks));
+        RUN(weave(msa,tasks));
         STOP_TIMER(t1);
         GET_TIMING(t1);
 /* clean up map */
-        for(i = 0; i < msa->num_profiles ;i++){
-                if(map[i]){
-                        MFREE(map[i]);
-                }
-        }
-        MFREE(map);
-        map = NULL;
+
+        free_tasks(tasks);
+
         /* We are done. */
         RUN(write_msa(msa, param->outfile, param->out_format));
 

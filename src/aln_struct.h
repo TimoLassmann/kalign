@@ -19,9 +19,12 @@ struct aln_mem{
         const float* prof2;
         const uint8_t* seq1;
         const uint8_t* seq2;
-
+        struct aln_param* ap;
         struct states* f;
         struct states* b;
+
+        float score;
+
         int starta;
         int starta_2;
         int startb;

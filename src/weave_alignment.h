@@ -26,10 +26,11 @@
 #include "global.h"
 #include "aln_task.h"
 #include "msa.h"
-#include "bisectingKmeans.h"
+
 //extern int weave(struct msa* msa, int** map, int* tree);
 
-extern int weave(struct msa* msa, int** map, int* tree, struct aln_tasks* t);
+extern int weave(struct msa* msa,struct aln_tasks*t);
+
 extern int clean_aln(struct msa* msa);
 
 #endif

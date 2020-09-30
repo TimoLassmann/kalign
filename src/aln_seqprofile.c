@@ -13,12 +13,12 @@
 #define MAX3(a,b,c) MAX(MAX(a,b),c)
 
 
-int aln_seqprofile_foward(struct aln_mem* m,const struct aln_param* ap)
+int aln_seqprofile_foward(struct aln_mem* m)
 {
         struct states* s = m->f;
-        const float* prof1 = ap->prof1;
-        const uint8_t* seq2 = ap->seq2;
-        const int sip = ap->sip;
+        const float* prof1 = m->prof1;
+        const uint8_t* seq2 = m->seq2;
+        const int sip = m->sip;
 
         register float pa = 0;
         register float pga = 0;
@@ -31,9 +31,9 @@ int aln_seqprofile_foward(struct aln_mem* m,const struct aln_param* ap)
         register int i = 0;
         register int j = 0;
 
-        const float open = ap->gpo  * (float)sip;
-        const float ext  = ap->gpe  * (float)sip;
-        const float text = ap->tgpe * (float)sip;
+        const float open = m->ap->gpo  * (float)sip;
+        const float ext  = m->ap->gpe  * (float)sip;
+        const float text = m->ap->tgpe * (float)sip;
 
 
         prof1 += (m->starta)<< 6;
@@ -126,12 +126,12 @@ int aln_seqprofile_foward(struct aln_mem* m,const struct aln_param* ap)
         return OK;
 }
 
-int aln_seqprofile_backward(struct aln_mem* m,const struct aln_param* ap)
+int aln_seqprofile_backward(struct aln_mem* m)
 {
         struct states* s = m->b;
-        const float* prof1 = ap->prof1;
-        const uint8_t* seq2 = ap->seq2;
-        const int sip = ap->sip;
+        const float* prof1 = m->prof1;
+        const uint8_t* seq2 = m->seq2;
+        const int sip = m->sip;
         register float pa = 0;
         register float pga = 0;
         register float pgb = 0;
@@ -143,9 +143,9 @@ int aln_seqprofile_backward(struct aln_mem* m,const struct aln_param* ap)
         register int i = 0;
         register int j = 0;
 
-        const float open = ap->gpo  * (float)sip;
-        const float ext  = ap->gpe  * (float)sip;
-        const float text = ap->tgpe * (float)sip;
+        const float open = m->ap->gpo  * (float)sip;
+        const float ext  = m->ap->gpe  * (float)sip;
+        const float text = m->ap->tgpe * (float)sip;
 
 
         prof1 += (m->enda_2 +1) << 6;
@@ -233,17 +233,17 @@ int aln_seqprofile_backward(struct aln_mem* m,const struct aln_param* ap)
         return OK;
 }
 
-int aln_seqprofile_meetup(struct aln_mem* m,struct aln_param* ap,int old_cor[],int* meet,int* t,float* score)
+int aln_seqprofile_meetup(struct aln_mem* m,int old_cor[],int* meet,int* t,float* score)
 {
         struct states* f = m->f;
         struct states* b = m->b;
-        const float* prof1 = ap->prof1;
-        int sip = ap->sip;
+        const float* prof1 = m->prof1;
+        int sip = m->sip;
         int i;
         int c;
         int transition = -1;
 
-        const float open = ap->gpo * (float)sip;
+        const float open = m->ap->gpo * (float)sip;
 
 
         //code:

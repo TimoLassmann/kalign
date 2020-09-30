@@ -28,7 +28,6 @@
 
 #include "bisectingKmeans.h"
 
-
 #include "global.h"
 #include "msa.h"
 #include "aln_task.h"
@@ -65,7 +64,8 @@ struct node* alloc_node(void);
 int label_internal(struct node*n, int label);
 //int label_internal(struct node*n, int label);
 int* readbitree(struct node* p,int* tree);
-void print_tree(struct node*n, struct aln_tasks  *t) ;
+/* void print_tree(struct node*n, struct aln_tasks  *t) ; */
+static void create_tasks(struct node*n, struct aln_tasks* t);
 static int sort_tasks_by_priority(const void *a, const void *b);
 /* void printTree(struct node* curr,int depth); */
 //struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct rng_state* rng);
@@ -78,7 +78,6 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_tasks** t
         struct aln_tasks* t = NULL;
         struct node* root = NULL;
         float** dm = NULL;
-        int* tree = NULL;
         int* samples = NULL;
         int* anchors = NULL;
         int num_anchors;
@@ -89,9 +88,6 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_tasks** t
         ASSERT(msa != NULL, "No alignment.");
         //ASSERT(param != NULL, "No input parameters.");
         ASSERT(ap != NULL, "No alignment parameters.");
-
-
-        tree = ap->tree;
 
         t = *tasks;
 
@@ -142,15 +138,14 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_tasks** t
 
         label_internal(root, numseq);
 
-
-        print_tree(root,t);
+        create_tasks(root, t);
 
 
         qsort(t->list, t->n_tasks, sizeof(struct task*), sort_tasks_by_priority);
 
-        for(i = 0; i < t->n_tasks;i++){
-                fprintf(stdout,"%3d %3d -> %3d (p: %d)\n", t->list[i]->a, t->list[i]->b, t->list[i]->c, t->list[i]->p);
-        }
+        /* for(i = 0; i < t->n_tasks;i++){ */
+        /*         fprintf(stdout,"%3d %3d -> %3d (p: %d)\n", t->list[i]->a, t->list[i]->b, t->list[i]->c, t->list[i]->p); */
+        /* } */
 
 
         //*task_list = t;
@@ -197,7 +192,7 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
         int num_var;
 
         int stop = 0;
-        if(num_samples < 200){
+        if(num_samples < 100){
                 float** dm = NULL;
                 RUNP(dm = d_estimation(msa, samples, num_samples,1));// anchors, num_anchors,1));
                 n = upgma(dm,samples, num_samples);
@@ -424,6 +419,7 @@ struct node* upgma(float **dm,int* samples, int numseq)
 
         int i,j;
         int *as = NULL;
+
         float max;
         int node_a = 0;
         int node_b = 0;
@@ -437,6 +433,7 @@ struct node* upgma(float **dm,int* samples, int numseq)
         for (i = numseq; i--;){
                 as[i] = i+1;
         }
+
 
         MMALLOC(tree,sizeof(struct node*)*numseq);
         for (i = 0;i < numseq;i++){
@@ -472,14 +469,17 @@ struct node* upgma(float **dm,int* samples, int numseq)
                 /*deactivate  sequences to be joined*/
                 as[node_a] = cnode+1;
                 as[node_b] = 0;
+
+
                 cnode++;
 
                 /*calculate new distances*/
                 for (j = numseq;j--;){
                         if (j != node_b){
-                                dm[node_a][j] = (dm[node_a][j] + dm[node_b][j])*0.5F;
+                                dm[node_a][j] = (dm[node_a][j] + dm[node_b][j])*0.5F + 0.001F;
 
                         }
+                        //fprintf(stdout,"\n");
                 }
                 dm[node_a][node_a] = 0.0F;
                 for (j = numseq;j--;){
@@ -527,7 +527,7 @@ int label_internal(struct node*n, int label)
 
 }
 
-void print_tree(struct node*n, struct aln_tasks* t)
+void create_tasks(struct node*n, struct aln_tasks* t)
 {
         int i;
         for(i = 0; i < n->d;i++){
@@ -541,18 +541,21 @@ void print_tree(struct node*n, struct aln_tasks* t)
                 task->b = n->right->id;
                 task->c = n->id;
                 task->p = n->d;
-        fprintf(stdout,"Node %d  %d  depends on %d %d \n", n->id, n->d  , n->left->id, n->right->id);
+                //fprintf(stdout,"Node %d  %d  depends on %d %d \n", n->id, n->d  , n->left->id, n->right->id);
 
                 t->n_tasks++;
-        }else{
-                //        fprintf(stdout,"Node %d  %d \n", n->id, n->d );
-
         }
         if(n->left){
-                print_tree(n->left,t);
+                create_tasks(n->left,t);
         }
         if(n->right){
-                print_tree(n->right,t);
+                create_tasks(n->right,t);
+        }
+        if(n->left){
+                if(n->right){
+                        MFREE(n->left);
+                        MFREE(n->right);
+                }
         }
 }
 

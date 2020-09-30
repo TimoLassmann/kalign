@@ -160,6 +160,19 @@ int set_subm_gaps_DNA(struct aln_param* ap)
         //param->secret = 28.3;
         //         A    C    G    T    .    N
 
+        /*for(i = 0; i < 5; i++){
+                for(j =0; j < 5;j++){
+                        if(i == j){
+                                ap->subm[i][j] = 5;
+                        }else{
+                                ap->subm[i][j] = -4;
+                        }
+                }
+        }
+
+        ap->gpo = 7;
+        ap->gpe = 4;
+        ap->tgpe = 3;*/
         return OK;
 }
 

@@ -22,6 +22,8 @@ int alloc_aln_mem(struct aln_mem** mem, int x)
         m->sip = 0;
         m->mode = ALN_MODE_FULL;
 
+        m->ap = NULL;
+
         m->starta = 0;
         m->startb = 0;
         m->enda = 0;

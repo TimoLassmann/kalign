@@ -12,11 +12,11 @@
 #define MAX3(a,b,c) MAX(MAX(a,b),c)
 
 
-int aln_profileprofile_foward(struct aln_mem* m,struct aln_param* ap)
+int aln_profileprofile_foward(struct aln_mem* m)
 {
         unsigned int freq[23];
-        const float* prof1 = ap->prof1;
-        const float* prof2 = ap->prof2;
+        const float* prof1 = m->prof1;
+        const float* prof2 = m->prof2;
         struct states* s = m->f;
         register float pa = 0;
         register float pga = 0;
@@ -149,12 +149,12 @@ int aln_profileprofile_foward(struct aln_mem* m,struct aln_param* ap)
         return OK;
 }
 
-int aln_profileprofile_backward(struct aln_mem* m,struct aln_param* ap)
+int aln_profileprofile_backward(struct aln_mem* m)
 {
         unsigned int freq[23];
         struct states* s = m->b;
-        const float* prof1 = ap->prof1;
-        const float* prof2 = ap->prof2;
+        const float* prof1 = m->prof1;
+        const float* prof2 = m->prof2;
 
         register float pa = 0;
         register float pga = 0;
@@ -284,7 +284,7 @@ int aln_profileprofile_backward(struct aln_mem* m,struct aln_param* ap)
 }
 
 
-int aln_profileprofile_meetup(struct aln_mem* m,struct aln_param* ap,int old_cor[], int* meet,int* t,float* score)
+int aln_profileprofile_meetup(struct aln_mem* m,int old_cor[], int* meet,int* t,float* score)
 {
         struct states* f = m->f;
         struct states* b = m->b;
@@ -292,8 +292,8 @@ int aln_profileprofile_meetup(struct aln_mem* m,struct aln_param* ap,int old_cor
         int c;
         int transition = -1;
 
-        const float* prof1 = ap->prof1;
-        const float* prof2 = ap->prof2;
+        const float* prof1 = m->prof1;
+        const float* prof2 = m->prof2;
         //code:
         // a -> a = 1
         // a -> ga = 2

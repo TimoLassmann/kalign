@@ -9,8 +9,8 @@
 #define EXTERN extern
 #endif
 
-EXTERN int aln_runner(struct aln_mem* m,struct aln_param* ap,int* path);
-
+/* EXTERN int aln_runner(struct aln_mem* m,struct aln_param* ap,int* path); */
+EXTERN int aln_runner(struct aln_mem* m, int* path);
 #undef ALN_CONTROLLER_IMPORT
 #undef EXTERN
 #endif

@@ -12,11 +12,11 @@
 #define MAX3(a,b,c) MAX(MAX(a,b),c)
 
 
-int aln_seqseq_foward(struct aln_mem* m,struct aln_param* ap)
+int aln_seqseq_foward(struct aln_mem* m)
 {
         struct states* s = m->f;
-        const uint8_t* seq1 = ap->seq1;
-        const uint8_t* seq2 = ap->seq2;
+        const uint8_t* seq1 = m->seq1;
+        const uint8_t* seq2 = m->seq2;
         float *subp = 0;
         const int starta = m->starta;
         const int enda = m->enda;
@@ -31,10 +31,10 @@ int aln_seqseq_foward(struct aln_mem* m,struct aln_param* ap)
         register int i = 0;
         register int j = 0;
 
-        const float gpo = ap->gpo;
-        const float gpe = ap->gpe;
-        const float tgpe = ap->tgpe;
-        float** subm = ap->subm;
+        const float gpo = m->ap->gpo;
+        const float gpe = m->ap->gpe;
+        const float tgpe = m->ap->tgpe;
+        float** subm = m->ap->subm;
 
         s[startb].a = s[0].a;
         s[startb].ga = s[0].ga;
@@ -111,12 +111,12 @@ int aln_seqseq_foward(struct aln_mem* m,struct aln_param* ap)
         return OK;
 }
 
-int aln_seqseq_backward(struct aln_mem* m,struct aln_param* ap)
+int aln_seqseq_backward(struct aln_mem* m)
 {
 
         struct states* s = m->b;
-        const uint8_t* seq1 = ap->seq1;
-        const uint8_t* seq2 = ap->seq2;
+        const uint8_t* seq1 = m->seq1;
+        const uint8_t* seq2 = m->seq2;
         float *subp = NULL;
         const int starta = m->starta_2;
         const int enda = m->enda_2;
@@ -134,10 +134,10 @@ int aln_seqseq_backward(struct aln_mem* m,struct aln_param* ap)
         register int i = 0;
         register int j = 0;
 
-        const float gpo = ap->gpo;
-        const float gpe = ap->gpe;
-        const float tgpe = ap->tgpe;
-        float** subm = ap->subm;
+        const float gpo = m->ap->gpo;
+        const float gpe = m->ap->gpe;
+        const float tgpe = m->ap->tgpe;
+        float** subm = m->ap->subm;
 
 
         s[endb].a = s[0].a ;
@@ -229,15 +229,15 @@ int aln_seqseq_backward(struct aln_mem* m,struct aln_param* ap)
 }
 
 
-int aln_seqseq_meetup(struct aln_mem* m,struct aln_param* ap,int old_cor[],int* meet,int* t,float* score)
+int aln_seqseq_meetup(struct aln_mem* m,int old_cor[],int* meet,int* t,float* score)
 {
         struct states* f = m->f;
         struct states* b = m->b;
 
 
-        const float gpo = ap->gpo;
-        const float gpe = ap->gpe;
-        const float tgpe = ap->tgpe;
+        const float gpo = m->ap->gpo;
+        const float gpe = m->ap->gpe;
+        const float tgpe = m->ap->tgpe;
         int i;
         int c;
         int transition = -1;

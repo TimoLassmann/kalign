@@ -35,13 +35,13 @@ struct rng_state;
 struct aln_param{
         struct rng_state* rng;
         /* run specific settings */
-        const float* prof1;
-        const float* prof2;
-        const uint8_t* seq1;
-        const uint8_t* seq2;
+        /* const float* prof1; */
+        /* const float* prof2; */
+        /* const uint8_t* seq1; */
+        /* const uint8_t* seq2; */
 
-        int sip;
-        int mode;
+        /* int sip; */
+        /* int mode; */
 
 
          int chaos;
