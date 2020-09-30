@@ -644,6 +644,7 @@ int write_msa_msf(struct msa* msa,char* outfile)
         char   date[64];		/* today's date in GCG's format "October 3, 1996 15:57" */
         char* linear_seq = NULL;
         char* ptr;
+        char* basename = NULL;
         FILE* f_ptr = NULL;
 
         int aln_len;
@@ -738,14 +739,21 @@ int write_msa_msf(struct msa* msa,char* outfile)
                 ERROR_MSG("time failed???");
         }
         ol = lb->lines[lb->num_line];
+        if(outfile){
+                RUN(tlfilename(outfile, &basename));
+        }
 
-        written = snprintf(ol->line, line_length," %s  MSF: %d  Type: %c  %s  Check: %d  ..", outfile == NULL ? "stdout" : basename(outfile),aln_len, msa->L == defPROTEIN ? 'P' : 'N', date, GCGMultchecksum(msa));
+        written = snprintf(ol->line, line_length," %s  MSF: %d  Type: %c  %s  Check: %d  ..", outfile == NULL ? "stdout" :   basename,aln_len, msa->L == defPROTEIN ? 'P' : 'N', date, GCGMultchecksum(msa));
 
         if(written >= line_length){
                 MREALLOC(lb->lines[lb->num_line]->line,sizeof(char) * (written+1));
                 ol = lb->lines[lb->num_line];
-                written = snprintf(ol->line, written+1," %s  MSF: %d  Type: %c  %s  Check: %d  ..", outfile == NULL ? "stdout" : basename(outfile),aln_len, msa->L == defPROTEIN ? 'P' : 'N', date, GCGMultchecksum(msa));
+                written = snprintf(ol->line, written+1," %s  MSF: %d  Type: %c  %s  Check: %d  ..", outfile == NULL ? "stdout" : basename,aln_len, msa->L == defPROTEIN ? 'P' : 'N', date, GCGMultchecksum(msa));
 
+        }
+
+        if(basename){
+                MFREE(basename);
         }
 
         ol->block = -1;
@@ -903,6 +911,9 @@ int write_msa_msf(struct msa* msa,char* outfile)
 ERROR:
         if(linear_seq){
                 MFREE(linear_seq);
+        }
+        if(basename){
+                MFREE(basename);
         }
         return FAIL;
 }

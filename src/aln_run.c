@@ -259,7 +259,7 @@ int create_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
 #pragma omp parallel for shared(msa,t,m,s,i) private(j)
                         for(j = s; j < i;j++){
                                 int tid = omp_get_thread_num();
-                                fprintf(stdout,"%3d %3d -> %3d (p: %d) running on %d\n", t->list[j]->a, t->list[j]->b, t->list[j]->c, t->list[j]->p,tid);
+                                //fprintf(stdout,"%3d %3d -> %3d (p: %d) running on %d\n", t->list[j]->a, t->list[j]->b, t->list[j]->c, t->list[j]->p,tid);
 
                                 do_align(msa,t,m[tid],j);
                         }
@@ -270,7 +270,7 @@ int create_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
                 }
         }
         for(j = s; j < i;j++){
-                fprintf(stdout,"%3d %3d -> %3d (p: %d)\n", t->list[j]->a, t->list[j]->b, t->list[j]->c, t->list[j]->p);
+                //fprintf(stdout,"%3d %3d -> %3d (p: %d)\n", t->list[j]->a, t->list[j]->b, t->list[j]->c, t->list[j]->p);
                 do_align(msa,t,m[0],j);
         }
 
