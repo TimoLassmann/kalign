@@ -535,7 +535,12 @@ ERROR:
 int print_help_score_and_align(char **argv)
 {
         const char usage[] = "  -test <test sequences> -ref <reference alignment> -program <kalign|clustalo|muscle> -o <outfile>";
-        fprintf(stdout,"\nUsage: %s [-options] %s\n\n",basename(argv[0]) ,usage);
+
+        char* basename = NULL;
+
+
+        RUN(tlfilename(argv[0], &basename));
+        fprintf(stdout,"\nUsage: %s [-options] %s\n\n",basename ,usage);
         fprintf(stdout,"NOTE: the program appends results to the output file.\n\n");
         fprintf(stdout,"Options:\n\n");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--scratch","Scratch directory." ,"[NA]"  );
@@ -547,6 +552,14 @@ int print_help_score_and_align(char **argv)
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--tgpe","Gap extend terminal." ,"[NA]"  );
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--matadd","Addition to sub matrix." ,"[NA]"  );
 
+        if(basename){
+                MFREE(basename);
+        }
 
         return OK;
+ERROR:
+        if(basename){
+                MFREE(basename);
+        }
+        return FAIL;
 }

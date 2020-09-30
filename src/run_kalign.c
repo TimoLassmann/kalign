@@ -25,6 +25,9 @@
 #endif
 
 #include "global.h"
+
+#include "tlmisc.h"
+
 #include "msa.h"
 #include "parameters.h"
 //#include "align_io.h"
@@ -70,7 +73,12 @@ int print_AVX_warning(void);
 int print_kalign_help(char * argv[])
 {
         const char usage[] = " -i <seq file> -o <out aln> ";
-        fprintf(stdout,"\nUsage: %s %s\n\n",basename(argv[0]) ,usage);
+        char* basename = NULL;
+
+
+        RUN(tlfilename(argv[0], &basename));
+
+        fprintf(stdout,"\nUsage: %s %s\n\n",basename ,usage);
         fprintf(stdout,"Options:\n\n");
 
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--format","Output format." ,"[Fasta]"  );
@@ -87,7 +95,15 @@ int print_kalign_help(char * argv[])
         fprintf(stdout,"Combining multiple input files:\n\n   kalign seqsA.fa seqsB.fa seqsC.fa -f fasta > combined.afa\n\n");
 
 
+        if(basename){
+                MFREE(basename);
+        }
         return OK;
+ERROR:
+        if(basename){
+                MFREE(basename);
+        }
+        return FAIL;
 }
 
 int print_kalign_warranty(void)
