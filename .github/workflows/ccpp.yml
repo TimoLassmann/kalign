@@ -30,7 +30,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-
+    - name: install build tools
+      run: brew install automake
     - name: autogen
       run: ./autogen.sh
     - name: configure
