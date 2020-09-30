@@ -22,7 +22,13 @@
 #ifdef HAVE_OPENMP
 #include <omp.h>
 #endif
+
+#ifdef HAVE_AVX2
 #include <xmmintrin.h>
+#endif
+
+#include <mm_malloc.h>
+
 #include "tlrng.h"
 #include "msa.h"
 

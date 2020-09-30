@@ -239,7 +239,8 @@ int main(int argc, char *argv[])
 
         rc = pclose(pipe);
 
-        if (rc == EXIT_SUCCESS) { // == 0
+        if (rc != EXIT_SUCCESS) { // == 0
+                ERROR_MSG("COMMAND FAILED: %s" , cmd);
         }
 
 

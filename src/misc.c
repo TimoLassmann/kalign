@@ -23,8 +23,9 @@
 #include "tldevel.h"
 #include "tlrng.h"
 
-
+#ifdef HAVE_AVX2
 #include <immintrin.h>
+#endif
 
 #include "misc.h"
 #include  <stdalign.h>
@@ -275,4 +276,3 @@ char* basename(const char* name)
         }
         return (char*)(name +c);
 }
-

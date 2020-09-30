@@ -22,8 +22,12 @@
 
 #include "euclidean_dist.h"
 #include "tlrng.h"
+#ifdef HAVE_AVX2
 #include <xmmintrin.h>
 #include <immintrin.h>
+#endif
+
+
 #include "float.h"
 
 #include "esl_stopwatch.h"
