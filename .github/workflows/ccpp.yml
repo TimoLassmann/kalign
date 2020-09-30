@@ -13,7 +13,7 @@ jobs:
     - name: autogen
       run: ./autogen.sh
     - name: configure
-      run: ./configure
+      run: ./configure --prefix $HOME
     - name: make
       run: make
     - name: make check
@@ -23,7 +23,7 @@ jobs:
     - name: make install
       run: make install
     - name: kalign version
-      run: kalign -v
+      run: ~/bin/kalign -v
 
   build-mac:
     runs-on: macos-latest
