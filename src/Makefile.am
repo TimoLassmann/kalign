@@ -17,6 +17,8 @@ bin_PROGRAMS = kalign
 noinst_PROGRAMS = timescorealn benchrunner genruncmds genkaligndiffcmds
 
 genruncmds_SOURCES = \
+tldevel.h \
+tldevel.c \
 create_run_cmds.c
 
 genkaligndiffcmds_SOURCES = \
