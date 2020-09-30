@@ -373,6 +373,7 @@ ERROR:
 
 }
 
+#ifdef HAVE_AVX2
 void print_256(__m256i X)
 {
         alignas(32) uint64_t debug[4];
@@ -391,6 +392,8 @@ void print_256_all(__m256i X)
         }
         fprintf(stdout,"\n");
 }
+
+#endif
 #endif
 
 
