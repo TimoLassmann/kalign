@@ -20,6 +20,8 @@ jobs:
       run: make check
     - name: make distcheck
       run: make distcheck
+    - name: make install
+      run: make install
     - name: kalign version
       run: kalign -v
 
