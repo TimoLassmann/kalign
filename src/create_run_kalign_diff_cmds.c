@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
                 ERROR_MSG("No output file! use -o <> ");
         }else{
                 if(my_file_exists(param->outfile)){
-                        WARNING_MSG("output file %s exists - will append results!");
+                        WARNING_MSG("output file %s exists - will append results!", param->outfile);
                 }
         }
 
