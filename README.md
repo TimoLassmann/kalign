@@ -1,23 +1,24 @@
 ![C/C++ CI](https://github.com/TimoLassmann/kalign/workflows/C/C++%20CI/badge.svg)
+![CodeQL](https://github.com/TimoLassmann/kalign/workflows/CodeQL/badge.svg)
 
 # Kalign
 
 Kalign is a fast multiple sequence alignment program for biological sequences.
 
-# Installation 
+# Installation
 
-## Release Tarball 
+## Release Tarball
 
-Download tarball from [releases](https://github.com/TimoLassmann/kalign/releases). Then: 
+Download tarball from [releases](https://github.com/TimoLassmann/kalign/releases). Then:
 
 ``` bash
 tar -zxvf kalign-<version>.tar.gz
 cd kalign-<version>
 ./autogen.sh
 ./configure
-make 
-make check 
-make install 
+make
+make check
+make install
 ```
 
 ## Homebrew
@@ -27,26 +28,26 @@ brew install brewsci/bio/kalign
 
 ## Developer version
 ``` bash
-git clone https://github.com/TimoLassmann/kalign.git 
+git clone https://github.com/TimoLassmann/kalign.git
 cd kalign
 ./autogen.sh
-./configure 
-make 
-make check 
-make install 
+./configure
+make
+make check
+make install
 ```
 
-on macOS, install [brew](https://brew.sh/) then: 
+on macOS, install [brew](https://brew.sh/) then:
 
-``` bash 
+``` bash
 brew install libtool
 brew install automake
-git clone https://github.com/TimoLassmann/kalign.git 
+git clone https://github.com/TimoLassmann/kalign.git
 cd kalign
 ./autogen.sh
-./configure 
-make 
-make check 
+./configure
+make
+make check
 make install
 ```
 
@@ -54,7 +55,7 @@ make install
 
 
 ``` bash
-Usage: kalign  -i <seq file> -o <out aln> 
+Usage: kalign  -i <seq file> -o <out aln>
 
 Options:
 
@@ -65,20 +66,20 @@ Options:
 
 Kalign expects the input to be a set of unaligned sequences in fasta format or aligned sequences in aligned fasta, MSF or clustal format. Kalign automatically detects whether the input sequences are protein, RNA or DNA.
 
-Since version 3.2.0 kalign supports passing sequence in via stdin and support alignment of sequences from multiple files. 
+Since version 3.2.0 kalign supports passing sequence in via stdin and support alignment of sequences from multiple files.
 
 # Examples
 
 Passing sequences via stdin:
 
 ```
-cat input.fa | kalign -f fasta > out.afa 
+cat input.fa | kalign -f fasta > out.afa
 ```
 
 Combining multiple input files:
 
 ```
-kalign seqsA.fa seqsB.fa seqsC.fa -f fasta > combined.afa 
+kalign seqsA.fa seqsB.fa seqsC.fa -f fasta > combined.afa
 ```
 
 Align sequences and output the alignment in MSF format:
@@ -99,15 +100,15 @@ Re-align sequences in an existing alignment:
 kalign -i BB11001.msf  -o out.afa
 ```
 
-Reformat existing alignment: 
+Reformat existing alignment:
 
 ```
 kalign -i BB11001.msf -r afa -o out.afa
 ```
 
-# Benchmark results 
+# Benchmark results
 
-Here are some benchmark results. The code to reproduce these figures can be found at [here](scripts/benchmark.org). 
+Here are some benchmark results. The code to reproduce these figures can be found at [here](scripts/benchmark.org).
 
 ## Balibase
 
@@ -128,7 +129,6 @@ Here are some benchmark results. The code to reproduce these figures can be foun
 # Please cite:
 1. Lassmann, Timo. _Kalign 3: multiple sequence alignment of large data sets._ **Bioinformatics** (2019). [pdf](https://academic.oup.com/bioinformatics/advance-article-pdf/doi/10.1093/bioinformatics/btz795/30314127/btz795.pdf)
 
-# Other papers: 
-1. Lassmann, Timo, Oliver Frings, and Erik LL Sonnhammer. _Kalign2: high-performance multiple alignment of protein and nucleotide sequences allowing external features._ **Nucleic acids research** 37.3 (2008): 858-865. [Pubmed](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2647288/)      
+# Other papers:
+1. Lassmann, Timo, Oliver Frings, and Erik LL Sonnhammer. _Kalign2: high-performance multiple alignment of protein and nucleotide sequences allowing external features._ **Nucleic acids research** 37.3 (2008): 858-865. [Pubmed](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2647288/)
 2. Lassmann, Timo, and Erik LL Sonnhammer. _Kalign: an accurate and fast multiple sequence alignment algorithm._ **BMC bioinformatics** 6.1 (2005): 298. [Pubmed](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1325270/)
-
