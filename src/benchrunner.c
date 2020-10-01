@@ -39,7 +39,8 @@ struct parameters_br{
         int n_options;
 };
 
-
+static int read_clean_alignments(char* ref_filename, char* test_filename, struct msa** ref, struct msa** test);
+static int sort_msa_by_name(const void *a, const void *b);
 
 int print_help_score_and_align(char **argv);
 
@@ -207,7 +208,7 @@ int run_and_score(struct parameters_br* param)
         struct msa* ref_aln = NULL;
         struct msa* test_aln = NULL;
 
-        struct msa_seq* seq_ptr = NULL;
+
         char* basename = NULL;
         //struct parameters* param = NULL;
         auto int rc;
@@ -223,7 +224,7 @@ int run_and_score(struct parameters_br* param)
         double average_seq_len = 0.0;
 
         struct timeval  tv1, tv2;
-        int pos_test;
+
         int i,j,l;
 
         char *envpaths = getenv("PATH");
@@ -310,14 +311,8 @@ int run_and_score(struct parameters_br* param)
                 printf ("Total time = %f seconds\n",time);
                 // extract all sequences from the test alignment that are found in the reference...
                 LOG_MSG("read reference alignment");
-
-                RUN(read_input( param->refseq , &ref_aln));
-                //RUN(read_input(param->infile[0],&ref_aln));//  detect_and_read_sequences(param));
-
                 snprintf( ret, BUFFER_LEN*2, "%s/test_%d.msf",path,param->uniq);
-                LOG_MSG("read test alignment");
-                RUN(read_input(ret,&test_aln));//  detect_and_read_sequences(param));
-
+                RUN(read_clean_alignments(param->refseq, ret,  &ref_aln,&test_aln));
 
 
                 average_seq_len = 0.0;
@@ -326,57 +321,21 @@ int run_and_score(struct parameters_br* param)
                 }
 
                 average_seq_len = average_seq_len / (double) test_aln->numseq;
-                pos_test = 0;
-                LOG_MSG("Search for matching sequences ");
-                for(i = 0; i < ref_aln->numseq;i++){
-                        //LOG_MSG("Searching for: %s", ref_aln->sequences[i]->name);// sn[i]);
-                        for(j = 0; j < test_aln->numseq;j++){
-                                if(strnlen(ref_aln->sequences[i]->name, MSA_NAME_LEN) == strnlen(test_aln->sequences[j]->name, MSA_NAME_LEN)){
-                                        //if(  ref_aln->lsn[i] == test_aln->lsn[j]){
-                                        if(!strcmp( ref_aln->sequences[i]->name, test_aln->sequences[j]->name)){
-
-                                                //LOG_MSG("Found: %s",ref_aln->sequences[i]->name);
-                                                seq_ptr = test_aln->sequences[pos_test];
-                                                test_aln->sequences[pos_test] = test_aln->sequences[j];
-                                                test_aln->sequences[j] = seq_ptr;
-                                                pos_test++;
-                                        }
-                                }
-
-                        }
-                }
-
-                int org_len;
 
 
-                org_len = test_aln->numseq;
-                test_aln->numseq = pos_test;
-
-
+                snprintf(ret, BUFSIZ, "%s/refaln_%d.msf",path,param->uniq);
+                write_msa(ref_aln, ret, FORMAT_MSF);
 
                 snprintf(ret, BUFSIZ, "%s/evalaln_%d.msf",path,param->uniq);
                 write_msa(test_aln, ret, FORMAT_MSF);
 
-
-                //output(test_aln,param);
-
-                test_aln->numseq = org_len;
-
-
-
                 /* snprintf(cmd,BUFSIZ*2 , "bali_score %s %s",  param->refseq, ret); */
-                snprintf(cmd,BUFSIZ*2 , "mumsa %s %s",  param->refseq, ret);
-                // Execute a process listing
-
-
+                snprintf(cmd,BUFSIZ*2 , "mumsa %s/refaln_%d.msf %s/evalaln_%d.msf",path,param->uniq,path,param->uniq);
 
                 // Setup our pipe for reading and execute our command.
                 RUNP(pipe = popen(cmd,"r"));
 
-
                 // Grab data from process execution
-
-
                 while (fgets(ret, BUFSIZ, pipe)){
                         //fprintf(stdout,"%s", ret);
                 }
@@ -400,7 +359,6 @@ int run_and_score(struct parameters_br* param)
                         }else{
                                 snprintf(progline, BUFSIZ, "%s", param->program);
                         }
-
 
 
                         if(!strcmp(param->output, "server")){
@@ -488,6 +446,10 @@ int run_and_score(struct parameters_br* param)
                 /* WARNING_MSG("Error code was: %d", rc); */
         }
 
+        snprintf(ret, BUFFER_LEN, "%s/refaln_%d.msf",path,param->uniq);
+        if(my_file_exists(ret)){
+                remove(ret);
+        }
         snprintf(ret, BUFFER_LEN, "%s/evalaln_%d.msf",path,param->uniq);
         if(my_file_exists(ret)){
                 remove(ret);
@@ -509,6 +471,10 @@ ERROR:
         WARNING_MSG("Failed");
         WARNING_MSG("ref: %s", param->refseq);
 
+        snprintf(ret, BUFFER_LEN, "%s/refaln_%d.msf",path,param->uniq);
+        if(my_file_exists(ret)){
+                remove(ret);
+        }
         snprintf(ret, BUFFER_LEN, "%s/evalaln_%d.msf",path,param->uniq);
         if(my_file_exists(ret)){
                 /* remove(ret); */
@@ -565,4 +531,98 @@ ERROR:
                 MFREE(basename);
         }
         return FAIL;
+}
+
+int read_clean_alignments(char* ref_filename, char* test_filename, struct msa** ref, struct msa** test)
+{
+        struct msa* ref_aln;
+        struct msa* tmp_aln;
+        struct msa* test_aln;
+
+        int i,j,c,n;
+
+        RUN(read_input( ref_filename, &ref_aln));
+        RUN(read_input(test_filename, &test_aln));//  detect_and_read_sequences(param));
+
+        /* sort test and ref alignment  */
+        qsort(test_aln->sequences , test_aln->numseq, sizeof(struct msa_seq *), sort_msa_by_name);
+        qsort(ref_aln->sequences , ref_aln->numseq, sizeof(struct msa_seq *), sort_msa_by_name);
+
+        /* if test contains more sequences than ref
+           copy ref; free sequences; copy sequences from test over
+        */
+        /* Case one -> all good */
+        if(ref_aln->numseq == test_aln->numseq){
+                *ref = ref_aln;
+                *test = test_aln;
+
+        }else if(ref_aln->numseq < test_aln->numseq){ /* Case 2 more test then ref  */
+
+                /* read ref in again */
+                RUN(read_input( ref_filename, &tmp_aln));
+
+                /* free sequences  */
+                for(i = 0; i < tmp_aln->numseq;i++){
+                        struct msa_seq* seq;
+                        seq = tmp_aln->sequences[i];
+                        MFREE(seq->name);
+                        MFREE(seq->seq);
+                        MFREE(seq->s);
+                        MFREE(seq->gaps);
+                        MFREE(seq);
+                }
+                /* copy test sequences matching ref names over. */
+                for(i = 0; i < ref_aln->numseq;i++){
+                        c = -1;
+                        n = 0;
+                        for(j = 0; j < test_aln->numseq;j++){
+                                //if(  ref_aln->lsn[i] == test_aln->lsn[j]){
+                                if(!strncmp( ref_aln->sequences[i]->name, test_aln->sequences[j]->name, MSA_NAME_LEN)){
+                                        n++;
+                                        c = j;
+
+                                }
+
+                        }
+                        if(c == -1){
+                                ERROR_MSG("Sequence %s not found in test alignment!", ref_aln->sequences[i]->name);
+                        }else if( n > 1){
+                                ERROR_MSG("Multiple sequences with name %s found",ref_aln->sequences[i]->name);
+                        }else{
+                                tmp_aln->sequences[i] = test_aln->sequences[c];
+                                test_aln->sequences[c] = NULL;
+                        }
+                }
+                free_msa(test_aln);
+                *ref = ref_aln;
+                *test = tmp_aln;
+        }else{                  /* case 3: more ref than test??? should never happen */
+                ERROR_MSG("Reference contains more sequences than test aln");
+        }
+        return OK;
+ERROR:
+        if(tmp_aln){
+                free_msa(tmp_aln);
+        }
+        if(test_aln){
+                free_msa(test_aln);
+        }
+        if(ref_aln){
+                free_msa(ref_aln);
+        }
+        return FAIL;
+}
+
+int sort_msa_by_name(const void *a, const void *b)
+{
+        struct msa_seq* const *one = a;
+
+        struct msa_seq* const *two = b;
+
+
+        if(strncmp((*one)->name, (*two)->name, MSA_NAME_LEN) < 0){
+                return -1;
+        }else{
+                return 1;
+        }
 }
