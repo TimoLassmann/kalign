@@ -379,7 +379,6 @@ int create_chaos_msa(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
                         }
                 }
 
-
                 /* //LOG_MSG("L:%d", l); */
                 /* for(g = 0; g < l;g++){ */
                 /*         a = tl_random_int(ap->rng, numseq-i); */

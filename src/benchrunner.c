@@ -354,12 +354,10 @@ int run_and_score(struct parameters_br* param)
                                         }
 
                                 }
-
                                 snprintf(progline, BUFSIZ, "%s%s", param->program,options);
                         }else{
                                 snprintf(progline, BUFSIZ, "%s", param->program);
                         }
-
 
                         if(!strcmp(param->output, "server")){
 
