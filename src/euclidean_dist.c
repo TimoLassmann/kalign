@@ -33,9 +33,10 @@
 #include "esl_stopwatch.h"
 /* These functions were taken from:  */
 /* https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-float-vector-sum-on-x86 */
+#ifdef HAVE_AVX2
 float hsum256_ps_avx(__m256 v);
 float hsum_ps_sse3(__m128 v);
-
+#endif
 
 #ifdef ITEST_EDIST
 int main(void)

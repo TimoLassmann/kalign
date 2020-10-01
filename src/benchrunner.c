@@ -508,12 +508,12 @@ int run_and_score(struct parameters_br* param)
 ERROR:
         snprintf(ret, BUFFER_LEN, "%s/evalaln_%d.msf",path,param->uniq);
         if(my_file_exists(ret)){
-                remove(ret);
+                /* remove(ret); */
         }
 
         snprintf( ret, BUFFER_LEN*2, "%s/test_%d.msf",path,param->uniq);
         if(my_file_exists(ret)){
-                remove(ret);
+                /* remove(ret); */
         }
         if(options){
                 MFREE(options);

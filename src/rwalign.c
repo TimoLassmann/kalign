@@ -1101,7 +1101,7 @@ int read_clu(struct in_buffer* b , struct msa** m)
                 ni++;
                 //line_len = nread;
                 //line[line_len-1] = 0;
-                line_len--;
+                /* line_len--; */
                 break;
         }
         active_seq =0;
@@ -1113,7 +1113,7 @@ int read_clu(struct in_buffer* b , struct msa** m)
                 //line_len = strnlen(line, BUFFER_LEN);
                 //line_len = nread;
                 //line[line_len-1] = 0;
-                line_len--;     /* last character is newline  */
+                /* line_len--;     /\* last character is newline  *\/ */
                 if(!line_len){
                         active_seq = 0;
                 }else{
@@ -1144,8 +1144,7 @@ int read_clu(struct in_buffer* b , struct msa** m)
                                                 if(seq_ptr->alloc_len == seq_ptr->len){
                                                         resize_msa_seq(seq_ptr);
                                                 }
-                                        }
-                                        if(ispunct((int)p[i])){
+                                        }else if(ispunct((int)p[i])){
                                                 seq_ptr->gaps[seq_ptr->len]++;
                                         }
                                 }
@@ -1185,7 +1184,7 @@ int read_msf(struct in_buffer* b,struct msa** m)
                 line = b->l[nl]->line;
                 line_len = b->l[nl]->len;
                 li++;
-                line_len--;     /* last character is newline  */
+                /* line_len--;     /\* last character is newline  *\/ */
                 //fprintf(stdout,"%d \"%s\"\n",line_len,line);
                 if(strstr(line, "//")){
                         //      LOG_MSG("Header done");
@@ -1221,7 +1220,7 @@ int read_msf(struct in_buffer* b,struct msa** m)
         for(nl = li; nl < b->n_lines;nl++){
                 line = b->l[nl]->line;
                 line_len = b->l[nl]->len;
-                line_len--;     /* last character is newline  */
+                /* line_len--;     /\* last character is newline  *\/ */
                 if(!line_len){
                         active_seq = 0;
                 }else{
@@ -1242,8 +1241,7 @@ int read_msf(struct in_buffer* b,struct msa** m)
                                                 if(seq_ptr->alloc_len == seq_ptr->len){
                                                         resize_msa_seq(seq_ptr);
                                                 }
-                                        }
-                                        if(ispunct((int)p[i])){
+                                        }else if(ispunct((int)p[i])){
                                                 seq_ptr->gaps[seq_ptr->len]++;
                                         }
                                 }
@@ -1305,7 +1303,7 @@ int read_fasta( struct in_buffer* b,struct msa** m)
                                 RUN(resize_msa(msa));
                         }
 
-                        line[line_len-1] = 0;
+                        /* line[line_len-1] = 0; */
                         for(i =0 ; i < line_len;i++){
                                 if(isspace(line[i])){
                                         line[i] = 0;
@@ -1328,8 +1326,7 @@ int read_fasta( struct in_buffer* b,struct msa** m)
 
                                         seq_ptr->seq[seq_ptr->len] = line[i];
                                         seq_ptr->len++;
-                                }
-                                if(ispunct((int)line[i])){
+                                }else if(ispunct((int)line[i])){
                                         seq_ptr->gaps[seq_ptr->len]++;
                                 }
                         }
@@ -1554,7 +1551,7 @@ int resize_msa_seq(struct msa_seq* seq)
         MREALLOC(seq->s, sizeof(uint8_t) * seq->alloc_len);
         MREALLOC(seq->gaps, sizeof(int) * (seq->alloc_len+1));
 
-        for(i = old_len;i < seq->alloc_len+1;i++){
+        for(i = old_len+1;i < seq->alloc_len+1;i++){
                 seq->gaps[i] = 0;
         }
 
@@ -1694,7 +1691,7 @@ int read_file_stdin(struct in_buffer** buffer,char* infile)
         char* tmp = NULL;
         size_t b_len = 0;
         ssize_t nread;
-
+        int i;
         //char line[BUFFER_LEN];
         int line_len;
 
@@ -1720,11 +1717,19 @@ int read_file_stdin(struct in_buffer** buffer,char* infile)
                 line_len = nread;
                 //tmp = b->l[b->n_lines]->line;
                 tmp= NULL;
-                MMALLOC(tmp, sizeof(char) * (line_len));
-                memcpy(tmp, line, line_len);
-                tmp[line_len-1] = 0;
+                MMALLOC(tmp, sizeof(char) * (line_len+1));
+                for(i = 0; i < line_len;i++){
+
+                        if(iscntrl((int) line[i])){
+                                break;
+                        }
+                        tmp[i] = line[i];
+                }
+                tmp[i] = 0;
+                //memcpy(tmp, line, line_len);
+                //tmp[line_len-1] = 0;
                 b->l[b->n_lines]->line = tmp;
-                b->l[b->n_lines]->len = line_len;
+                b->l[b->n_lines]->len = i;
                 b->n_lines++;
                 if(b->n_lines == b->alloc_lines){
                         RUN(resize_in_buffer(b));
