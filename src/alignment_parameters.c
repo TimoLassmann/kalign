@@ -63,14 +63,14 @@ int init_ap(struct aln_param** aln_param, struct parameters* param, int numseq,i
                         }
                 }
         }
-        if(L == defDNA){
+        if(L == ALPHA_defDNA){
                 RUN(set_subm_gaps_DNA(ap));
-        }else if(L == defPROTEIN){
+        }else if(L == ALPHA_defPROTEIN){
 
                 RUN(set_subm_gaps(ap));
-        }else if(L == redPROTEIN){
+        }else if(L == ALPHA_redPROTEIN){
                 RUN(set_subm_gaps(ap));
-        }else if(L == ambigiousPROTEIN){
+        }else if(L == ALPHA_ambigiousPROTEIN){
                 RUN(new_aln_matrices(ap));
         }
 

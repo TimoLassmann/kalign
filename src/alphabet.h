@@ -25,10 +25,13 @@
 
 #include "global.h"
 
-#define defPROTEIN 21
-#define ambigiousPROTEIN 23
-#define redPROTEIN 13
-#define defDNA 5
+#define ALPHA_defPROTEIN 21
+#define ALPHA_ambigiousPROTEIN 23
+#define ALPHA_redPROTEIN 13
+#define ALPHA_defDNA 5
+
+#define ALPHA_UNKNOWN 255
+#define ALPHA_UNDEFINED -1
 
 struct alphabet{
         int8_t to_internal[128];

@@ -520,9 +520,9 @@ int run_kalign(struct parameters* param)
         }
         /* by default all protein sequences are converted into a reduced alphabet
            when read from file. Here we turn them back into the default representation. */
-        if(msa->L == redPROTEIN){
+        if(msa->L == ALPHA_redPROTEIN){
                 //RUN(convert_msa_to_internal(msa, defPROTEIN));
-                RUN(convert_msa_to_internal(msa, ambigiousPROTEIN));
+                RUN(convert_msa_to_internal(msa, ALPHA_ambigiousPROTEIN));
         }
         /* allocate aln parameters  */
         RUN(init_ap(&ap,param,msa->numseq,msa->L ));

@@ -88,23 +88,23 @@ struct alphabet* create_alphabet(int type)
         }
 
         switch (type) {
-        case defPROTEIN : {
+        case ALPHA_defPROTEIN : {
                 create_default_protein(a);
                 break;
         }
-        case ambigiousPROTEIN :{
+        case ALPHA_ambigiousPROTEIN :{
                 create_protein_BZX(a);
                 break;
         }
-        case defDNA : {
+        case ALPHA_defDNA : {
                 create_default_DNA(a);
                 break;
         }
-                        case redPROTEIN : {
-                                create_reduced_protein(a);
-                                break;
-                        }
-                                default:
+        case ALPHA_redPROTEIN : {
+                create_reduced_protein(a);
+                break;
+        }
+        default:
                 break;
         }
 
@@ -130,11 +130,11 @@ int switch_alphabet(struct alphabet* a, int type)
         }
 
         switch (type) {
-        case defPROTEIN : {
+        case ALPHA_defPROTEIN : {
                 create_default_protein(a);
                 break;
         }
-        case redPROTEIN : {
+        case ALPHA_redPROTEIN : {
                 create_reduced_protein(a);
                 break;
         }

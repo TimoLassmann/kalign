@@ -506,6 +506,9 @@ int run_and_score(struct parameters_br* param)
 
         return OK;
 ERROR:
+        WARNING_MSG("Failed");
+        WARNING_MSG("ref: %s", param->refseq);
+
         snprintf(ret, BUFFER_LEN, "%s/evalaln_%d.msf",path,param->uniq);
         if(my_file_exists(ret)){
                 /* remove(ret); */
