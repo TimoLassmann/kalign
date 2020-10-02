@@ -34,6 +34,7 @@ int weave(struct msa* msa,struct aln_tasks*t)
         int a,b,c;
 
         //RUN(clean_aln(aln)
+
         for(i = 0; i < t->n_tasks;i++){
                 a = t->list[i]->a;
                 b = t->list[i]->b;

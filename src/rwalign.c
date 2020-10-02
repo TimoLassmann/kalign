@@ -374,7 +374,7 @@ int detect_alphabet(struct msa* msa)
 
         double DNA[128];
         double protein[128];
-        char DNA_letters[]= "acgtuACGTUnN";
+        char DNA_letters[]= "acgtunACGTUN";
         char protein_letters[] = "acdefghiklmnpqrstvwyACDEFGHIKLMNPQRSTVWY";
 
         double dna_prob;
@@ -382,31 +382,26 @@ int detect_alphabet(struct msa* msa)
 
         ASSERT(msa != NULL, "No alignment");
 
-
-        for(i = 0; i <128;i++){
-                DNA[i] = 1.0;
-                protein[i] = 1.0;
-
+        for(i = 0; i < 128;i++){
+                DNA[i] = log(0.0001 * 1.0 / 116.0);
+                protein[i] = log(0.0001 * 1.0 / 88.0);
         }
 
         for(i = 0 ; i < (int)strlen(DNA_letters);i++){
-                DNA[(int) DNA_letters[i]] += 1000.0;
+                DNA[(int) DNA_letters[i]] = log(0.9999 * 1.0 / 12.0);
         }
 
         for(i = 0 ; i < (int)strlen(protein_letters);i++){
-                protein[(int) protein_letters[i]] += 1000.0;
+                protein[(int) protein_letters[i]] = log(0.9999 * 1.0 / 40.0);
         }
-        dna_prob = 0.0;
-        prot_prob = 0.0;
-        for(i = 0; i <128;i++){
-                dna_prob += DNA[i];
-                prot_prob += protein[i];
-        }
+        /* dna_prob = 0.0; */
+        /* prot_prob = 0.0; */
+        /* for(i = 0; i <128;i++){ */
+        /*         dna_prob += exp(DNA[i]); */
 
-        for(i = 0; i <128;i++){
-                DNA[i] /= dna_prob;
-                protein[i] /= prot_prob;
-        }
+        /*         prot_prob += exp(protein[i]); */
+        /* } */
+        /* LOG_MSG("DNA: %f PROT: %f",dna_prob,prot_prob); */
 
         dna_prob = 0.0;
         prot_prob = 0.0;
@@ -415,11 +410,10 @@ int detect_alphabet(struct msa* msa)
                         dna_prob += DNA[i] * (double) msa->letter_freq[i];
                         prot_prob += protein[i]* (double) msa->letter_freq[i];
                 }
-                /* LOG_MSG("%d %d %d %d -> %d %d", i, msa->letter_freq[i], DNA[i],protein[i], diff[0],diff[1]); */
         }
 
         /* LOG_MSG("DNA: %f PROT: %f",dna_prob,prot_prob); */
-
+        /* exit(0); */
         if( dna_prob == prot_prob){
                 WARNING_MSG("Could not determine whether we have a DNA or Protein alignment");
                 msa->L = ALPHA_UNKNOWN;
@@ -573,6 +567,7 @@ int convert_msa_to_internal(struct msa* msa, int type)
                         if(t[(int) seq->seq[j]] == -1){
                                 WARNING_MSG("there should be no character not matching the alphabet");
                                 WARNING_MSG("offending character: >>>%c<<<", seq->seq[j]);
+                                /* exit(0); */
                         }else{
                                 seq->s[j] = t[(int) seq->seq[j]];
                         }

@@ -2,6 +2,7 @@
 #define ALN_TASK_H
 
 struct task{
+        float score;            /* score of output alignment */
         int a;                  /* input 1 */
         int b;                  /* input 2 */
         int c;                  /* output  */

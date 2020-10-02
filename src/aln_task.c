@@ -13,7 +13,7 @@ int alloc_tasks(struct aln_tasks** tasks,int numseq)
         MMALLOC(t, sizeof(struct aln_tasks));
 
         t->n_tasks = 0;
-        t->n_alloc_tasks = numseq-1;
+        t->n_alloc_tasks = numseq;
         t->list = NULL;
         t->profile = NULL;
         t->map = NULL;
@@ -41,6 +41,8 @@ ERROR:
         return FAIL;
 }
 
+
+
 void free_tasks(struct aln_tasks* t)
 {
         if(t){
@@ -50,7 +52,7 @@ void free_tasks(struct aln_tasks* t)
 
                         MFREE(t->list[i]);
                 }
-                np = t->n_alloc_tasks+1;
+                np = t->n_alloc_tasks;
                 np =  (np << 1) - 1;
                 for(i = 0; i < np;i++){
                         if(t->map[i]){
@@ -61,7 +63,9 @@ void free_tasks(struct aln_tasks* t)
 
                 MFREE(t->list);
                 MFREE(t->map);
-                MFREE(t->profile);
+                if(t->profile){
+                        MFREE(t->profile);
+                }
                 MFREE(t);
         }
 

@@ -95,8 +95,11 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_tasks** t
         //ASSERT(param != NULL, "No input parameters.");
         ASSERT(ap != NULL, "No alignment parameters.");
 
-        t = *tasks;
 
+        t = *tasks;
+        if(!t){
+                RUN(alloc_tasks(&t, msa->numseq));
+        }
         numseq = msa->numseq;
 
         DECLARE_TIMER(timer);

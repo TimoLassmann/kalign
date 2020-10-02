@@ -87,7 +87,6 @@ int aln_runner(struct aln_mem* m, int* path)
 #ifdef HAVE_OPENMP
 #pragma omp taskwait
 #endif
-
                 aln_seqseq_meetup(m,old_cor,&meet,&transition,&score);
         }else if(m->prof2){
 #ifdef HAVE_OPENMP

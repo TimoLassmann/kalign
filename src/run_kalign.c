@@ -533,13 +533,17 @@ int run_kalign(struct parameters* param)
         LOG_MSG("Aligning");
         START_TIMER(t1);
         if(param->chaos){
-                RUN(create_chaos_msa(msa, ap,tasks));
+#ifdef HAVE_OPENMP
+                RUN(create_chaos_msa_openMP(msa, ap,tasks));
+#else
+                RUN(create_chaos_msa_serial(msa, ap,tasks));
+#endif
         }else{
-                #ifdef HAVE_OPENMP
+#ifdef HAVE_OPENMP
                 RUN(create_msa_openMP(msa,ap, tasks));
-                #else
+#else
                 RUN(create_msa_serial(msa,ap, tasks));
-                #endif
+#endif
         }
         //RUNP(map = hirschberg_alignment(msa, ap));
         STOP_TIMER(t1);

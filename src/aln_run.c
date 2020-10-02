@@ -17,12 +17,11 @@
 #define ALN_RUN_IMPORT
 #include "aln_run.h"
 
-static int score_aln(struct aln_mem* m,float** profile, struct msa* msa, int a,int b,int numseq,float* score);
+static int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id);
+static int do_score(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id);
+
 static int SampleWithoutReplacement(struct rng_state* rng, int N, int n,int* samples);
 static int int_cmp(const void *a, const void *b);
-//static int do_align(struct msa* msa, struct aln_param* ap,struct aln_mem* m, int a,int b, int c);
-
-static int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id);
 
 int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
 {
@@ -56,7 +55,7 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
         MMALLOC(t->map[c],sizeof(int) * (g+2));
 
         RUN(resize_aln_mem(m, g));
-
+        m->mode = ALN_MODE_FULL;
         /* I should not need to do this */
         for (j = 0; j < (g+2);j++){
                 t->map[c][j] = -1;
@@ -86,7 +85,7 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                         /* ap->mode = ALN_MODE_SCORE_ONLY; */
                         /* aln_runner(m, ap, map[c]); */
                         /* LOG_MSG("SCORE: %f", ap->score); */
-                        m->mode = ALN_MODE_FULL;
+
 #ifdef HAVE_OPENMP
                         /* omp_set_num_threads(4); */
 #pragma omp parallel
@@ -110,11 +109,6 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                         m->prof1 = t->profile[b];
                         m->prof2 = NULL;
                         m->sip = msa->nsip[b];
-
-                        /* ap->mode = ALN_MODE_SCORE_ONLY; */
-                        /* aln_runner(m, ap, map[c]); */
-                        /* LOG_MSG("SCORE: %f", ap->score); */
-                        m->mode = ALN_MODE_FULL;
 #ifdef HAVE_OPENMP
                         /* omp_set_num_threads(4); */
 #pragma omp parallel
@@ -137,10 +131,6 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                         m->prof1 = t->profile[a];
                         m->prof2 = NULL;
                         m->sip = msa->nsip[a];
-                        /* m->mode = ALN_MODE_SCORE_ONLY; */
-                        /* aln_runner(m, ap, map[c]); */
-                        /* LOG_MSG("SCORE: %f", m->score); */
-                        m->mode = ALN_MODE_FULL;
 #ifdef HAVE_OPENMP
                         /* omp_set_num_threads(4); */
 #pragma omp parallel
@@ -177,10 +167,6 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                                 m->seq2 = NULL;
                                 m->prof1 = t->profile[b];
                                 m->prof2 = t->profile[a];
-                                /* m->mode = ALN_MODE_SCORE_ONLY; */
-                                /* aln_runner(m, ap, map[c]); */
-                                /* LOG_MSG("SCORE: %f", m->score); */
-                                m->mode = ALN_MODE_FULL;
 #ifdef HAVE_OPENMP
                                 /* omp_set_num_threads(4); */
 #pragma omp parallel
@@ -228,6 +214,110 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
         }
         MFREE(t->profile[a]);
         MFREE(t->profile[b]);
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+int do_score(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
+/* int score_aln(struct aln_mem* m,float** profile, struct msa* msa, int a,int b,int numseq,float* score) */
+{
+        int g;
+        int len_a;
+        int len_b;
+        int a,b;
+        int numseq;
+
+        numseq = msa->numseq;
+        a = t->list[task_id]->a;
+        b = t->list[task_id]->b;
+
+
+        if(a < numseq){
+                len_a = msa->sequences[a]->len;//  aln->sl[a];
+        }else{
+                len_a = msa->plen[a];
+        }
+        if(b < numseq){
+
+                len_b = msa->sequences[b]->len;// aln->sl[b];
+        }else{
+                len_b = msa->plen[b];
+        }
+        m->mode = ALN_MODE_SCORE_ONLY;
+
+        g = (len_a > len_b)? len_a:len_b;
+
+        RUN(resize_aln_mem(m, g));
+
+
+        if (a > numseq){
+                RUN(set_gap_penalties_n(t->profile[a],len_a,msa->nsip[b]));
+        }
+        if (b > numseq){
+                RUN(set_gap_penalties_n(t->profile[b],len_b,msa->nsip[a]));
+        }
+
+        init_alnmem(m, len_a, len_b);
+        //fprintf(stderr,"LENA:%d	LENB:%d	numseq:%d\n",len_a,len_b,numseq);
+        if(a < numseq){
+                if(b < numseq){
+                        m->seq1 = msa->sequences[a]->s;
+                        m->seq2 = msa->sequences[b]->s;
+                        m->prof1 = NULL;
+                        m->prof2 = NULL;
+
+                        aln_runner(m,  NULL);
+                }else{
+                        m->enda = len_b;
+                        m->endb = len_a;
+                        m->len_a = len_b;
+                        m->len_b = len_a;
+
+                        m->seq1 = NULL;
+                        m->seq2 = msa->sequences[a]->s;
+                        m->prof1 = t->profile[b];
+                        m->prof2 = NULL;
+                        m->sip = msa->nsip[b];
+
+                        aln_runner(m,  NULL);
+                        m->score = m->score / (float) msa->nsip[b];
+
+                }
+        }else{
+                if(b < numseq){
+                        m->seq1 = NULL;
+                        m->seq2 = msa->sequences[b]->s;
+                        m->prof1 = t->profile[a];
+                        m->prof2 = NULL;
+                        m->sip = msa->nsip[a];
+                        aln_runner(m, NULL);
+                        m->score = m->score / (float)msa->nsip[a];
+                }else{
+                        if(len_a < len_b){
+                                m->seq1 = NULL;
+                                m->seq2 = NULL;
+                                m->prof1 = t->profile[a];
+                                m->prof2 = t->profile[b];
+                                aln_runner(m, NULL);
+
+                        }else{
+                                m->enda = len_b;
+                                m->endb = len_a;
+                                m->len_a = len_b;
+                                m->len_b = len_a;
+
+                                m->seq1 = NULL;
+                                m->seq2 = NULL;
+                                m->prof1 = t->profile[b];
+                                m->prof2 = t->profile[a];
+                                aln_runner(m, NULL);
+
+                        }
+                        m->score = m->score / (float)(msa->nsip[a] * msa->nsip[b]);
+                }
+        }
+        t->list[task_id]->score = m->score;
         return OK;
 ERROR:
         return FAIL;
@@ -287,6 +377,123 @@ ERROR:
         }
         return FAIL;
 }
+
+int create_chaos_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
+{
+        struct aln_mem** m = NULL;
+        struct aln_tasks* t_chaos = NULL;
+        int i,j,g,f,a,b,l;
+        int best;
+
+        int* samples = NULL;
+
+
+        int* active = NULL;
+        float max_score;
+
+        int numseq;
+        int n_threads =  omp_get_max_threads();
+
+        RUN(alloc_tasks(&t_chaos, (ap->chaos * (ap->chaos-1)) / 2));
+
+        MFREE(t_chaos->profile);
+        t_chaos->profile = t->profile;
+
+
+        MMALLOC(m, sizeof(struct aln_mem*) * n_threads);
+        for(i = 0; i < n_threads;i++){
+                m[i] = NULL;
+                RUN(alloc_aln_mem(&m[i], 2048));
+                m[i]->ap = ap;
+                m[i]->mode = ALN_MODE_FULL;
+        }
+
+
+        g = msa->num_profiles;
+        numseq = msa->numseq;
+
+        MMALLOC(samples,sizeof(int) * m[0]->ap->chaos);
+        MMALLOC(active, sizeof(int) * numseq);
+        for(i = 0; i < numseq;i++){
+                active[i] = i;
+        }
+        qsort(active, numseq, sizeof(int), int_cmp);
+        t->n_tasks = 0;
+        for(i = 0; i < numseq-1;i++){
+                /* pick one sequence / profile  */
+                max_score = -FLT_MAX;
+                l = MACRO_MIN(ap->chaos, numseq-i);
+                SampleWithoutReplacement(ap->rng, numseq-i, l, samples);
+
+                t_chaos->n_tasks = 0;
+                /* prepare tasks */
+                for(g = 0;g < l-1;g++){
+                        for(f = g + 1; f < l;f++){
+                                t_chaos->list[t_chaos->n_tasks]->a = active[samples[g]];
+                                t_chaos->list[t_chaos->n_tasks]->b = active[samples[f]];
+                                /* HACK! -> used below to update the active array */
+                                t_chaos->list[t_chaos->n_tasks]->c = samples[g];
+                                t_chaos->list[t_chaos->n_tasks]->p = samples[f];
+                                t_chaos->list[t_chaos->n_tasks]->score = 0.0F;
+                                t_chaos->n_tasks++;
+                        }
+                }
+
+                /* Run chaos tasks in parallel  */
+#pragma omp parallel for shared(msa,t_chaos,m) private(j)
+                for(j = 0; j < t_chaos->n_tasks;j++){
+                        int tid = omp_get_thread_num();
+                        do_score(msa, t_chaos, m[tid], j);
+                        //LOG_MSG("%d running %d %d", tid, t_chaos->list[j]->a, t_chaos->list[j]->b);
+                }
+
+                max_score = -FLT_MAX;
+                best = -1;
+                for(j = 0; j < t_chaos->n_tasks;j++){
+                        //fprintf(stdout,"%5d\t%5d -> %f\n", t_chaos->list[j]->a,t_chaos->list[j]->b ,t_chaos->list[j]->score);
+
+                        if(t_chaos->list[j]->score > max_score){
+                                max_score = t_chaos->list[j]->score;
+                                best = j;
+                        }
+                }
+
+
+                //LOG_MSG("samples: %d %d", active[a],active[b]);
+                t->list[t->n_tasks]->a = t_chaos->list[best]->a;
+                t->list[t->n_tasks]->b = t_chaos->list[best]->b;
+                t->list[t->n_tasks]->c = numseq+i;
+
+                active[t_chaos->list[best]->c ] = numseq+i;
+                active[t_chaos->list[best]->p ] = -1;
+                qsort(active, numseq-i, sizeof(int), int_cmp);
+                do_align(msa,t,m[0],t->n_tasks);
+                t->n_tasks++;
+                //score_aln(m, ap, profile, msa, a, b, numseq, &score);
+                //fprintf(stdout,"Aligning:%d %d->%d	done:%f score:%f\n",a,b,c,((float)(i+1)/(float)numseq)*100,score);
+
+        }
+        for(i = 0; i < n_threads;i++){
+                free_aln_mem(m[i]);
+        }
+        MFREE(m);
+
+        MFREE(active);
+        MFREE(samples);
+        t_chaos->profile = NULL;
+        free_tasks(t_chaos);
+        return OK;
+ERROR:
+        if(m){
+                for(i = 0; i < n_threads;i++){
+                        free_aln_mem(m[i]);
+                }
+                MFREE(m);
+
+        }
+        return FAIL;
+}
+
 #endif
 
 int create_msa_serial(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
@@ -294,6 +501,9 @@ int create_msa_serial(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
 
         int i,j,g,s;
         struct aln_mem* m = NULL;
+
+
+
         RUN(alloc_aln_mem(&m, 2048));
 
 
@@ -331,8 +541,9 @@ ERROR:
 }
 
 
-int create_chaos_msa(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
+int create_chaos_msa_serial(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
 {
+        struct aln_tasks* t_chaos = NULL;
         struct aln_mem* m = NULL;
         int i,g,f,a,b,l;
         int best_a, best_b;
@@ -342,23 +553,32 @@ int create_chaos_msa(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
 
         int* active = NULL;
         float max_score;
-        float score;
+
         int numseq;
 
-        m->mode = ALN_MODE_FULL;
+        numseq = msa->numseq;
+
+
+        /* LOG_MSG("Allocating %d",f); */
+
+        RUN(alloc_tasks(&t_chaos,2));
+
+        MFREE(t_chaos->profile);
+        t_chaos->profile = t->profile;
 
         g = msa->num_profiles;
-        numseq = msa->numseq;
+
 
         RUN(alloc_aln_mem(&m, 2048));
         m->ap = ap;
+        m->mode = ALN_MODE_FULL;
         MMALLOC(samples,sizeof(int) * m->ap->chaos);
         MMALLOC(active, sizeof(int) * numseq);
         for(i = 0; i < numseq;i++){
                 active[i] = i;
         }
         qsort(active, numseq, sizeof(int), int_cmp);
-
+        t->n_tasks = 0;
         for(i = 0; i < numseq-1;i++){
                 /* pick one sequence / profile  */
                 max_score = -FLT_MAX;
@@ -369,66 +589,52 @@ int create_chaos_msa(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
                         a = samples[g];
                         for(f = g + 1; f < l;f++){
                                 b = samples[f];
-                                score_aln(m, t->profile, msa, active[a], active[b], numseq, &score);
-                                //LOG_MSG("TEsting %d %d : %f", a,b, ap->score);
-                                if(m->score > max_score){
+                                t_chaos->list[0]->a = active[a];
+                                t_chaos->list[0]->b = active[b];
+                                do_score(msa, t_chaos , m, 0);
+                                /* score_aln(m, t->profile, msa, active[a], active[b], numseq, &score); */
+                                //LOG_MSG("TEsting %d %d : %f", a,b, t_chaos->list[0]->score);
+                                if(t_chaos->list[0]->score > max_score){
                                         best_a = a;
                                         best_b = b;
-                                        max_score = m->score;
+                                        max_score = t_chaos->list[0]->score;
                                 }
                         }
                 }
 
-                /* //LOG_MSG("L:%d", l); */
-                /* for(g = 0; g < l;g++){ */
-                /*         a = tl_random_int(ap->rng, numseq-i); */
-                /*         b = tl_random_int(ap->rng, numseq-i); */
-                /*         while(b == a){ */
-                /*                 b = tl_random_int(ap->rng, numseq-i); */
-                /*         } */
-                /*         score_aln(m, ap, profile, msa, active[a], active[b], numseq, &score); */
-                /*         //LOG_MSG("TEsting %d %d : %f", a,b, ap->score); */
-                /*         if(ap->score > max_score){ */
-                /*                 best_a = a; */
-                /*                 best_b = b; */
-                /*                 max_score = ap->score; */
-                /*         } */
-                /* } */
-                //exit(0);
-                a = best_a;
-                b = best_b;
+
                 //LOG_MSG("samples: %d %d", active[a],active[b]);
-                t->list[i]->a = active[a];
-                t->list[i]->b = active[b];
-                t->list[i]->c = numseq+i;
+                t->list[t->n_tasks]->a = active[best_a];
+                t->list[t->n_tasks]->b = active[best_b];
+                t->list[t->n_tasks]->c = numseq+i;
+                t->list[t->n_tasks]->p = 0;
 
-                /* ap->tree[i*3] = active[a]; */
-                /* ap->tree[i*3+1] = active[b]; */
-                /* ap->tree[i*3+2] = numseq+i; */
-
-                active[a] = numseq+i;
-                active[b] = -1;
+                active[best_a] = numseq+i;
+                active[best_b] = -1;
                 qsort(active, numseq-i, sizeof(int), int_cmp);
 
-                /* a = ap->tree[i*3]; */
-                /* b = ap->tree[i*3+1]; */
-                /* c = ap->tree[i*3+2]; */
-                do_align(msa,t,m,i);
-                //score_aln(m, ap, profile, msa, a, b, numseq, &score);
-                //fprintf(stdout,"Aligning:%d %d->%d	done:%f score:%f\n",a,b,c,((float)(i+1)/(float)numseq)*100,score);
+                do_align(msa,t,m,t->n_tasks);
 
+                t->n_tasks++;
         }
 
         MFREE(active);
         MFREE(samples);
+        t_chaos->profile = NULL;
+        free_tasks(t_chaos);
         free_aln_mem(m);
         return OK;
 ERROR:
         if(m){
                 free_aln_mem(m);
         }
+        if(t_chaos){
+                t_chaos->profile = NULL;
+                free_tasks(t_chaos);
+        }
         return FAIL;
 }
+
 
 
 
@@ -452,7 +658,6 @@ int SampleWithoutReplacement(struct rng_state* rng, int N, int n,int* samples)
         {
                 u = tl_random_double(rng);
                 //u = GetUniform(); // call a uniform(0,1) random number generator
-
                 if ( (N - t)*u >= n - m ){
                         t++;
                 }else{
@@ -462,100 +667,4 @@ int SampleWithoutReplacement(struct rng_state* rng, int N, int n,int* samples)
                 }
         }
         return OK;
-}
-
-
-int score_aln(struct aln_mem* m,float** profile, struct msa* msa, int a,int b,int numseq,float* score)
-{
-        int g;
-        int len_a;
-        int len_b;
-        if(a < numseq){
-                len_a = msa->sequences[a]->len;//  aln->sl[a];
-        }else{
-                len_a = msa->plen[a];
-        }
-        if(b < numseq){
-
-                len_b = msa->sequences[b]->len;// aln->sl[b];
-        }else{
-                len_b = msa->plen[b];
-        }
-        m->mode = ALN_MODE_SCORE_ONLY;
-
-        g = (len_a > len_b)? len_a:len_b;
-
-        RUN(resize_aln_mem(m, g));
-
-
-        if (a > numseq){
-                RUN(set_gap_penalties_n(profile[a],len_a,msa->nsip[b]));
-        }
-        if (b > numseq){
-                RUN(set_gap_penalties_n(profile[b],len_b,msa->nsip[a]));
-        }
-
-        init_alnmem(m, len_a, len_b);
-        //fprintf(stderr,"LENA:%d	LENB:%d	numseq:%d\n",len_a,len_b,numseq);
-        if(a < numseq){
-                if(b < numseq){
-                        m->seq1 = msa->sequences[a]->s;
-                        m->seq2 = msa->sequences[b]->s;
-                        m->prof1 = NULL;
-                        m->prof2 = NULL;
-
-                        aln_runner(m,  NULL);
-                }else{
-                        m->enda = len_b;
-                        m->endb = len_a;
-                        m->len_a = len_b;
-                        m->len_b = len_a;
-
-                        m->seq1 = NULL;
-                        m->seq2 = msa->sequences[a]->s;
-                        m->prof1 = profile[b];
-                        m->prof2 = NULL;
-                        m->sip = msa->nsip[b];
-
-                        aln_runner(m,  NULL);
-                        m->score = m->score / msa->nsip[b];
-
-                }
-        }else{
-                if(b < numseq){
-                        m->seq1 = NULL;
-                        m->seq2 = msa->sequences[b]->s;
-                        m->prof1 = profile[a];
-                        m->prof2 = NULL;
-                        m->sip = msa->nsip[a];
-                        aln_runner(m, NULL);
-                        m->score = m->score / msa->nsip[a];
-                }else{
-                        if(len_a < len_b){
-                                m->seq1 = NULL;
-                                m->seq2 = NULL;
-                                m->prof1 = profile[a];
-                                m->prof2 = profile[b];
-                                aln_runner(m, NULL);
-
-                        }else{
-                                m->enda = len_b;
-                                m->endb = len_a;
-                                m->len_a = len_b;
-                                m->len_b = len_a;
-
-                                m->seq1 = NULL;
-                                m->seq2 = NULL;
-                                m->prof1 = profile[b];
-                                m->prof2 = profile[a];
-                                aln_runner(m, NULL);
-
-                        }
-                        m->score = m->score / (msa->nsip[a] * msa->nsip[b]);
-                }
-        }
-        *score = m->score;
-        return OK;
-ERROR:
-        return FAIL;
 }
