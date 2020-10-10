@@ -539,11 +539,9 @@ int label_internal(struct node*n, int label)
 void create_tasks(struct node*n, struct aln_tasks* t)
 {
         int i;
-        for(i = 0; i < n->d;i++){
-                //fprintf(stdout," ");
-        }
+
         if(n->left && n->right){
-                struct task*task;
+                struct task* task;
 
                 task = t->list[t->n_tasks];
                 task->a = n->left->id;

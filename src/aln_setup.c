@@ -92,6 +92,7 @@ ERROR:
 int set_gap_penalties_n(float* prof,int len,int nsip)
 {
         int i;
+
         prof +=  (64 *(len+1));
 
         prof[27] = prof[55] * (float)nsip;//gap open or close  23
