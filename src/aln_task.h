@@ -7,6 +7,7 @@ struct task{
         int b;                  /* input 2 */
         int c;                  /* output  */
         int p;                  /* priority */
+        int n;                  /* amount of work */
 };
 
 struct aln_tasks{
@@ -23,6 +24,10 @@ struct aln_tasks{
 #define EXTERN extern
 #endif
 
+#define TASK_ORDER_PRIORITY 1
+#define TASK_ORDER_TREE 2
+
+EXTERN int sort_tasks(struct aln_tasks* t , int order);
 EXTERN int alloc_tasks(struct aln_tasks** tasks,int numseq);
 EXTERN void free_tasks(struct aln_tasks* tasks);
 

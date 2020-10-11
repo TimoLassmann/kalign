@@ -50,6 +50,7 @@ struct node{
         struct node* right;
         int id;
         int d;
+        int n;
 };
 
 struct kmeans_result{
@@ -65,14 +66,14 @@ static struct kmeans_result* alloc_kmeans_result(int num_samples);
 static void free_kmeans_results(struct kmeans_result* k);
 
 struct node* upgma(float **dm,int* samples, int numseq);
-struct node* alloc_node(void);
+static struct node* alloc_node(void);
 
 int label_internal(struct node*n, int label);
 //int label_internal(struct node*n, int label);
 int* readbitree(struct node* p,int* tree);
 /* void print_tree(struct node*n, struct aln_tasks  *t) ; */
 static void create_tasks(struct node*n, struct aln_tasks* t);
-static int sort_tasks_by_priority(const void *a, const void *b);
+
 /* void printTree(struct node* curr,int depth); */
 //struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples,struct rng_state* rng);
 
@@ -121,8 +122,6 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_tasks** t
                 samples[i] = i;
         }
 
-
-
         //RUNP(root = alloc_node());
 
         START_TIMER(timer);
@@ -150,15 +149,14 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_tasks** t
         create_tasks(root, t);
 
 
-        qsort(t->list, t->n_tasks, sizeof(struct task*), sort_tasks_by_priority);
+        sort_tasks(t, TASK_ORDER_TREE);
+        for(i = 0; i < t->n_tasks;i++){
+                fprintf(stdout,"%d %3d %3d -> %3d (p: %d)\n",i + msa->numseq,  t->list[i]->a, t->list[i]->b, t->list[i]->c, t->list[i]->p);
+        }
 
-        /* for(i = 0; i < t->n_tasks;i++){ */
-        /*         fprintf(stdout,"%3d %3d -> %3d (p: %d)\n", t->list[i]->a, t->list[i]->b, t->list[i]->c, t->list[i]->p); */
-        /* } */
 
 
-        //*task_list = t;
-
+        exit(0);
         /*exit(0);
         ap->tree[0] = 1;
         ap->tree = readbitree(root, ap->tree);
@@ -511,6 +509,7 @@ struct node* alloc_node(void)
         n->right = NULL;
         n->id = -1;
         n->d = 0;
+        n->n = 1;
         return n;
 ERROR:
         return NULL;
@@ -527,6 +526,7 @@ int label_internal(struct node*n, int label)
         }
         if(n->left && n->right){
                 n->d = MACRO_MAX(n->left->d,n->right->d) + 1;
+                n->n = n->left->n + n->right->n;
         }
         if(n->id == -1){
                 n->id = label;
@@ -548,6 +548,7 @@ void create_tasks(struct node*n, struct aln_tasks* t)
                 task->b = n->right->id;
                 task->c = n->id;
                 task->p = n->d;
+                task->n = n->n;
                 //fprintf(stdout,"Node %d  %d  depends on %d %d \n", n->id, n->d  , n->left->id, n->right->id);
 
                 t->n_tasks++;
@@ -620,19 +621,5 @@ void free_kmeans_results(struct kmeans_result* k)
                         MFREE(k->sr);
                 }
                 MFREE(k);
-        }
-}
-
-
-
-int sort_tasks_by_priority(const void *a, const void *b)
-{
-        struct task* const *one = a;
-        struct task* const *two = b;
-
-        if((*one)->p >= (*two)->p){
-                return 1;
-        }else{
-                return -1;
         }
 }

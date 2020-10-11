@@ -76,8 +76,7 @@ int create_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
                                 do_align(msa,t,m[tid],j);
                         }
                         //fprintf(stdout,"\n");
-
-                        g =t->list[i]->p;
+                        g = t->list[i]->p;
                         s = i;
                 }
         }
