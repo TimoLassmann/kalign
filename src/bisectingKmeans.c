@@ -149,14 +149,8 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_tasks** t
         create_tasks(root, t);
 
 
-        sort_tasks(t, TASK_ORDER_TREE);
-        for(i = 0; i < t->n_tasks;i++){
-                fprintf(stdout,"%d %3d %3d -> %3d (p: %d)\n",i + msa->numseq,  t->list[i]->a, t->list[i]->b, t->list[i]->c, t->list[i]->p);
-        }
 
 
-
-        exit(0);
         /*exit(0);
         ap->tree[0] = 1;
         ap->tree = readbitree(root, ap->tree);
@@ -402,15 +396,17 @@ struct node* bisecting_kmeans(struct msa* msa, struct node* n, float** dm,int* s
 
         //LOG_MSG("Done");
 #ifdef HAVE_OPENMP
-#pragma omp task shared(n) if(numseq > 2000)
+#pragma omp task shared(msa,n,dm,numseq,num_anchors) if(numseq > 200)
 #endif
-        n->left = bisecting_kmeans(msa,n->left, dm, sl, numseq, num_anchors, num_l,rng,d);
+        {
+                n->left = bisecting_kmeans(msa,n->left, dm, sl, numseq, num_anchors, num_l,rng,d);
+        }
 
-
-#ifdef HAVE_OPENMP
-#pragma omp task shared(n) if(numseq > 2000)
-#endif
+/* #ifdef HAVE_OPENMP */
+/* #pragma omp task shared(msa,n,dm,numseq,num_anchors) if(numseq > 200) */
+/* #endif */
         n->right = bisecting_kmeans(msa,n->right, dm, sr, numseq, num_anchors, num_r,rng,d);
+
 #ifdef HAVE_OPENMP
 #pragma omp taskwait
 #endif

@@ -56,22 +56,60 @@ int aln_runner(struct aln_mem* m, int* path)
         m->enda_2 = old_cor[1];
 
         //fprintf(stderr,"Forward:%d-%d	%d-%d\n",m->starta,m->enda,m->startb,m->endb);
-        if(m->seq1){
+
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m) if(m->enda - m->starta > 1000)
+#pragma omp parallel num_threads(2)
+        {
+#pragma omp single nowait
+                {
 #endif
-                aln_seqseq_foward(m);
-        }else if(m->prof2){
+                        if(m->seq1){
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m)if(m->enda - m->starta > 1000)
+#pragma omp task shared(m) if(m->enda - m->starta > 200)
 #endif
-                aln_profileprofile_foward(m);
-        }else{
+                                aln_seqseq_foward(m);
+
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m)if(m->enda - m->starta > 1000)
+#pragma omp task shared(m) if(m->enda_2 - m->starta_2 > 200)
 #endif
-                aln_seqprofile_foward(m);
+                                aln_seqseq_backward(m);
+#ifdef HAVE_OPENMP
+#pragma omp taskwait
+#endif
+                                aln_seqseq_meetup(m,old_cor,&meet,&transition,&score);
+
+
+                        }else if(m->prof2){
+#ifdef HAVE_OPENMP
+#pragma omp task shared(m)if(m->enda - m->starta > 200)
+#endif
+                                aln_profileprofile_foward(m);
+#ifdef HAVE_OPENMP
+#pragma omp task shared(m)if(m->enda_2 - m->starta_2 > 200)
+#endif
+                                aln_profileprofile_backward(m);
+#ifdef HAVE_OPENMP
+#pragma omp taskwait
+#endif
+                                aln_profileprofile_meetup(m,old_cor,&meet,&transition,&score);
+                        }else{
+#ifdef HAVE_OPENMP
+#pragma omp task shared(m)if(m->enda - m->starta > 200)
+#endif
+                                aln_seqprofile_foward(m);
+#ifdef HAVE_OPENMP
+#pragma omp task shared(m)if(m->enda_2 - m->starta_2 > 200)
+#endif
+                                aln_seqprofile_backward(m);
+#ifdef HAVE_OPENMP
+#pragma omp taskwait
+#endif
+                                aln_seqprofile_meetup(m,old_cor,&meet,&transition,&score);
+                        }
+#ifdef HAVE_OPENMP
+                }
         }
+#endif
         /* CRITICAL  */
         //m->starta = mid;
         //m->enda = old_cor[1];
@@ -79,34 +117,12 @@ int aln_runner(struct aln_mem* m, int* path)
 //fprintf(stderr,"Backward:%d-%d	%d-%d\n",m->starta,m->enda,m->startb,m->endb);
 
 
-        if(m->seq1){
-#ifdef HAVE_OPENMP
-#pragma omp task shared(m) if(m->enda_2 - m->starta_2 > 1000)
-#endif
-                aln_seqseq_backward(m);
-#ifdef HAVE_OPENMP
-#pragma omp taskwait
-#endif
-                aln_seqseq_meetup(m,old_cor,&meet,&transition,&score);
-        }else if(m->prof2){
-#ifdef HAVE_OPENMP
-#pragma omp task shared(m)if(m->enda_2 - m->starta_2 > 1000)
-#endif
-                aln_profileprofile_backward(m);
-#ifdef HAVE_OPENMP
-#pragma omp taskwait
-#endif
-                aln_profileprofile_meetup(m,old_cor,&meet,&transition,&score);
-        }else{
-#ifdef HAVE_OPENMP
-#pragma omp task shared(m)if(m->enda_2 - m->starta_2 > 1000)
-#endif
-                aln_seqprofile_backward(m);
-#ifdef HAVE_OPENMP
-#pragma omp taskwait
-#endif
-                aln_seqprofile_meetup(m,old_cor,&meet,&transition,&score);
-        }
+        /* if(m->seq1){ */
+        /* }else if(m->prof2){ */
+
+        /* }else{ */
+
+        /* } */
 
         if(m->mode == ALN_MODE_SCORE_ONLY){
                 m->score = score;

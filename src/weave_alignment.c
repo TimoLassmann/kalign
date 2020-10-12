@@ -39,7 +39,7 @@ int weave(struct msa* msa,struct aln_tasks*t)
                 a = t->list[i]->a;
                 b = t->list[i]->b;
                 c = t->list[i]->c;
-                //fprintf(stdout,"%3d %3d -> %3d (p: %d)\n", t->list[i]->a, t->list[i]->b, t->list[i]->c, t->list[i]->p);
+                /* fprintf(stdout,"%3d %3d -> %3d (p: %d)\n", t->list[i]->a, t->list[i]->b, t->list[i]->c, t->list[i]->p); */
                 RUN(make_seq(msa,a,b,t->map[c]));
         }
 

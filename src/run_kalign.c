@@ -443,6 +443,8 @@ int run_kalign(struct parameters* param)
 
         int i;
 #ifdef HAVE_OPENMP
+        omp_set_nested(1);
+
         omp_set_num_threads(param->nthreads);
 #endif
         if(param->num_infiles == 1){
@@ -532,19 +534,24 @@ int run_kalign(struct parameters* param)
         DECLARE_TIMER(t1);
         LOG_MSG("Aligning");
         START_TIMER(t1);
-        if(param->chaos){
-#ifdef HAVE_OPENMP
-                RUN(create_chaos_msa_openMP(msa, ap,tasks));
-#else
-                RUN(create_chaos_msa_serial(msa, ap,tasks));
-#endif
-        }else{
-#ifdef HAVE_OPENMP
-                RUN(create_msa_openMP(msa,ap, tasks));
-#else
-                RUN(create_msa_serial(msa,ap, tasks));
-#endif
-        }
+
+        /* testing  */
+
+        RUN(create_msa_serial_tree(msa, ap, tasks));
+
+/*         if(param->chaos){ */
+/* #ifdef HAVE_OPENMP */
+/*                 RUN(create_chaos_msa_openMP(msa, ap,tasks)); */
+/* #else */
+/*                 RUN(create_chaos_msa_serial(msa, ap,tasks)); */
+/* #endif */
+/*         }else{ */
+/* #ifdef HAVE_OPENMP */
+/*                 RUN(create_msa_openMP(msa,ap, tasks)); */
+/* #else */
+/*                 RUN(create_msa_serial(msa,ap, tasks)); */
+/* #endif */
+/*         } */
         //RUNP(map = hirschberg_alignment(msa, ap));
         STOP_TIMER(t1);
         GET_TIMING(t1);

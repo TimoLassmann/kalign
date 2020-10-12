@@ -42,6 +42,8 @@ int create_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
         s = 0;
 
         g = t->list[0]->p;
+
+        RUN(sort_tasks(t, TASK_ORDER_PRIORITY));
 /* #pragma omp parallel shared(msa,t,m,s) private(i) */
 /* #pragma omp single */
 
@@ -218,6 +220,173 @@ ERROR:
 }
 
 /* #endif */
+static void recursive_aln_openMP(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, uint8_t* active, int c);
+static void recursive_aln_serial(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, uint8_t* active, int c);
+
+
+int create_msa_serial_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
+{
+        int i,j,c,g,s;
+        uint8_t* active = NULL;
+
+        RUN(sort_tasks(t, TASK_ORDER_TREE));
+        MMALLOC(active, sizeof(uint8_t)* msa->num_profiles);
+
+        for(i = 0; i < msa->numseq;i++){
+                active[i] = 1;
+        }
+        for(i = msa->numseq; i < msa->num_profiles;i++){
+                active[i] = 0;
+        }
+        /* for(i = 0; i < t->n_tasks;i++){ */
+        /*         fprintf(stdout,"%d %3d %3d -> %3d (p: %d)\n",i + msa->numseq, t->list[i]->a, t->list[i]->b, t->list[i]->c, t->list[i]->p); */
+        /* } */
+
+#ifdef HAVE_OPENMP
+        /* omp_set_nested(1); */
+                /* omp_set_num_threads(param->nthreads); */
+        omp_set_max_active_levels(4);
+        /* omp_set_num_threads(1); */
+        /* omp_set_dynamic(1); */
+/* #pragma omp parallel num_threads(1) */
+/*         { */
+/*                 #pragma omp single */
+/*                 { */
+        /* recursive_aln_serial(msa, t, ap, active, t->n_tasks-1); */
+        recursive_aln_openMP(msa, t, ap, active, t->n_tasks-1);
+                /* } */
+
+        /* } */
+#else
+        recursive_aln_serial(msa, t, ap, active, t->n_tasks-1);
+
+#endif
+
+        MFREE(active);
+
+        return OK;
+ERROR:
+        if(active){
+                MFREE(active);
+        }
+        return FAIL;
+}
+
+void recursive_aln_openMP(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, uint8_t* active, int c)
+{
+        struct task* local_t = NULL;
+
+        /* Follow left and right branch until I arrive at sequences / profiles
+           ready to align.
+        */
+        int a;
+        int b;
+        local_t = t->list[c];
+
+        /* LOG_MSG("Work: %d", local_t->n); */
+        /* if(local_t->n < 5){ */
+        /*         recursive_aln_serial(msa, t, ap, active, c); */
+        /* }else{ */
+
+        a = local_t->a - msa->numseq;
+        b = local_t->b - msa->numseq;
+#pragma omp parallel num_threads(2)
+        {
+#pragma omp single nowait
+                {
+
+                        if(local_t->a >= msa->numseq){ /* I have an internal node  */
+                                if(!active[local_t->a]){
+#pragma omp task shared(msa,t,ap,active) firstprivate(a)
+                                        {
+                                                recursive_aln_openMP(msa, t, ap, active, a);
+                                        }
+                                }
+                                /* I have a lead node - do nothing */
+                        }
+
+
+
+                        if(local_t->b >= msa->numseq){ /* I have an internal node */
+                                if(!active[local_t->b]){
+
+#pragma omp task shared(msa,t,ap,active) firstprivate(b)
+                                        {
+                                                recursive_aln_openMP(msa, t, ap, active,b);
+                                        }
+
+                                }
+                                /* I have a lead node - do nothing */
+                        }
+                }
+        }
+
+
+#pragma omp taskwait
+
+        struct aln_mem* ml = NULL;
+
+        alloc_aln_mem(&ml, 2048);
+
+        ml->ap = ap;
+        ml->mode = ALN_MODE_FULL;
+
+        /* if(active[local_t->a] && active[local_t->b]){ */
+        /* fprintf(stdout,"THREAD: %d %3d %3d -> %3d (p: %d)\n",tid, t->list[c]->a, t->list[c]->b, t->list[c]->c, t->list[c]->p); */
+        do_align(msa,t,ml,c);
+        active[local_t->c] = 1;
+
+        free_aln_mem(ml);
+        /* } */
+}
+
+
+void recursive_aln_serial(struct msa* msa, struct aln_tasks*t,struct aln_param* ap, uint8_t* active, int c)
+{
+        struct task* local_t = NULL;
+        local_t = t->list[c];
+        /* Follow left and right branch until I arrive at sequences / profiles
+           ready to align.
+        */
+        /* LOG_MSG("Work: %d", local_t->n); */
+        if(!active[local_t->a]){
+
+                if(local_t->a >= msa->numseq){ /* I have an internal node  */
+
+                        recursive_aln_serial(msa, t, ap, active, local_t->a - msa->numseq);
+                }
+                /* I have a lead node - do nothing */
+        }
+
+        if(!active[local_t->b]){
+
+                if(local_t->b >= msa->numseq){ /* I have an internal node */
+
+                        recursive_aln_serial(msa, t, ap, active, local_t->b - msa->numseq);
+                }
+                /* I have a lead node - do nothing */
+        }
+
+
+        /* if(active[local_t->a] && active[local_t->b]){ */
+        /* fprintf(stdout,"%3d %3d -> %3d (p: %d)\n", t->list[c]->a, t->list[c]->b, t->list[c]->c, t->list[c]->p);
+ */
+        struct aln_mem* ml = NULL;
+
+
+
+        alloc_aln_mem(&ml, 2048);
+
+
+        ml->ap = ap;
+        ml->mode = ALN_MODE_FULL;
+
+        do_align(msa,t,ml,c);
+        active[local_t->c] = 1;
+        free_aln_mem(ml);
+}
+
+
 
 int create_msa_serial(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
 {
@@ -226,6 +395,7 @@ int create_msa_serial(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
         struct aln_mem* m = NULL;
 
 
+        RUN(sort_tasks(t, TASK_ORDER_PRIORITY));
 
         RUN(alloc_aln_mem(&m, 2048));
 
@@ -429,18 +599,18 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                         /* aln_runner(m, ap, map[c]); */
                         /* LOG_MSG("SCORE: %f", ap->score); */
 
-#ifdef HAVE_OPENMP
-                        /* omp_set_num_threads(4); */
-#pragma omp parallel
-                        // Only the first thread will spawn other threads
-#pragma omp single nowait
-                        {
-#endif
+/* #ifdef HAVE_OPENMP */
+/*                         /\* omp_set_num_threads(4); *\/ */
+/* #pragma omp parallel omp_set_num_threads(4) */
+/*                         // Only the first thread will spawn other threads */
+/* #pragma omp single nowait */
+/*                         { */
+/* #endif */
                                 aln_runner(m, t->map[c]);
                                 //hirsch_ss_dyn(ap,msa->sequences[a]->s, msa->sequences[b]->s,hm,map[c]);
-#ifdef HAVE_OPENMP
-                        }
-#endif
+/* #ifdef HAVE_OPENMP */
+/*                         } */
+/* #endif */
                 }else{
                         m->enda = len_b;
                         m->endb = len_a;
@@ -452,17 +622,17 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                         m->prof1 = t->profile[b];
                         m->prof2 = NULL;
                         m->sip = msa->nsip[b];
-#ifdef HAVE_OPENMP
-                        /* omp_set_num_threads(4); */
-#pragma omp parallel
-                        // Only the first thread will spawn other threads
-#pragma omp single nowait
-                        {
-#endif
+/* #ifdef HAVE_OPENMP */
+/*                         /\* omp_set_num_threads(4); *\/ */
+/* #pragma omp parallel */
+/*                         // Only the first thread will spawn other threads */
+/* #pragma omp single nowait */
+/*                         { */
+/* #endif */
                                 aln_runner(m,t->map[c]);
-#ifdef HAVE_OPENMP
-                        }
-#endif
+/* #ifdef HAVE_OPENMP */
+/*                         } */
+/* #endif */
                         //hirsch_ps_dyn(ap,profile[b], msa->sequences[a]->s,hm,map[c],msa->nsip[b]);
                         RUN(mirror_path_n(&t->map[c],len_a,len_b));
                         //RUNP(map[c] = mirror_hirsch_path(map[c],len_a,len_b));
@@ -474,18 +644,18 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                         m->prof1 = t->profile[a];
                         m->prof2 = NULL;
                         m->sip = msa->nsip[a];
-#ifdef HAVE_OPENMP
-                        /* omp_set_num_threads(4); */
-#pragma omp parallel
-                        // Only the first thread will spawn other threads
-#pragma omp single nowait
-                        {
-#endif
+/* #ifdef HAVE_OPENMP */
+/*                         /\* omp_set_num_threads(4); *\/ */
+/* #pragma omp parallel */
+/*                         // Only the first thread will spawn other threads */
+/* #pragma omp single nowait */
+/*                         { */
+/* #endif */
 
                                 aln_runner(m,t->map[c]);
-#ifdef HAVE_OPENMP
-                        }
-#endif
+/* #ifdef HAVE_OPENMP */
+/*                         } */
+/* #endif */
 
                         //hirsch_ps_dyn(ap,profile[a],msa->sequences[b]->s ,hm,map[c],msa->nsip[a]);
                 }else{
@@ -510,18 +680,18 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                                 m->seq2 = NULL;
                                 m->prof1 = t->profile[b];
                                 m->prof2 = t->profile[a];
-#ifdef HAVE_OPENMP
-                                /* omp_set_num_threads(4); */
-#pragma omp parallel
-                                // Only the first thread will spawn other threads
-#pragma omp single nowait
-                                {
-#endif
+/* #ifdef HAVE_OPENMP */
+/*                                 /\* omp_set_num_threads(4); *\/ */
+/* #pragma omp parallel */
+/*                                 // Only the first thread will spawn other threads */
+/* #pragma omp single nowait */
+/*                                 { */
+/* #endif */
 
-                                        aln_runner(m, t->map[c]);
-#ifdef HAVE_OPENMP
-                                }
-#endif
+                                aln_runner(m, t->map[c]);
+/* #ifdef HAVE_OPENMP */
+/*                                 } */
+/* #endif */
 
                                 //hirsch_pp_dyn(profile[b],profile[a],hm,map[c]);
                                 RUN(mirror_path_n(&t->map[c],len_a,len_b));
