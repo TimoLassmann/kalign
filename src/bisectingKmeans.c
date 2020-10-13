@@ -127,9 +127,6 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_tasks** t
         START_TIMER(timer);
         LOG_MSG("Building guide tree.");
 
-#ifdef HAVE_OPENMP
-        omp_set_max_active_levels(6);
-#endif
 
 
 /* #pragma omp parallel */

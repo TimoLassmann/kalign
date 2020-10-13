@@ -444,8 +444,8 @@ int run_kalign(struct parameters* param)
         int i;
 #ifdef HAVE_OPENMP
         omp_set_nested(1);
-
         omp_set_num_threads(param->nthreads);
+
 #endif
         if(param->num_infiles == 1){
                 RUN(read_input(param->infile[0],&msa));
@@ -518,6 +518,13 @@ int run_kalign(struct parameters* param)
 
         /* Start bi-secting K-means sequence clustering */
         if(!param->chaos){
+#ifdef HAVE_OPENMP
+                i = floor(log((double) param->nthreads) / log(2.0)) + 4;
+                i = MACRO_MIN(i, 10);
+                /* LOG_MSG("Set %d level (%d)", i, param->nthreads); */
+                omp_set_max_active_levels(i);
+#endif
+
                 RUN(build_tree_kmeans(msa,ap,&tasks));
         }
         /* by default all protein sequences are converted into a reduced alphabet
@@ -536,8 +543,18 @@ int run_kalign(struct parameters* param)
         START_TIMER(t1);
 
         /* testing  */
-
-        RUN(create_msa_tree(msa, ap, tasks));
+#ifdef HAVE_OPENMP
+        i = floor(log((double) param->nthreads) / log(2.0)) + 2;
+        i = MACRO_MIN(i, 10);
+        /* LOG_MSG("Set %d level (%d)", i, param->nthreads); */
+        omp_set_max_active_levels(i);
+#endif
+        if(param->chaos){
+                RUN(create_chaos_msa_openMP(msa, ap,tasks));
+        }else{
+                RUN(create_msa_tree(msa, ap, tasks));
+        }
+        /* RUN(create_msa_openMP(msa,ap, tasks)); */
 
 /*         if(param->chaos){ */
 /* #ifdef HAVE_OPENMP */

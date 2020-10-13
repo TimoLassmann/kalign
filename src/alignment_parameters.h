@@ -47,7 +47,7 @@ struct aln_param{
          int chaos;
         /* actual parameters  */
         float** subm;
-        int* tree;
+        /* int* tree; */
         float gpo;
         float gpe;
         float tgpe;

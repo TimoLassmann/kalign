@@ -17,8 +17,13 @@
 #define ALN_RUN_IMPORT
 #include "aln_run.h"
 
+static void recursive_aln_openMP(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, uint8_t* active, int c);
+static void recursive_aln_serial(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, uint8_t* active, int c);
+
+
 static int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id);
 static int do_score(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id);
+
 
 static int SampleWithoutReplacement(struct rng_state* rng, int N, int n,int* samples);
 static int int_cmp(const void *a, const void *b);
@@ -50,31 +55,6 @@ int create_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
         g = t->list[0]->p;
 
         RUN(sort_tasks(t, TASK_ORDER_PRIORITY));
-/* #pragma omp parallel shared(msa,t,m,s) private(i) */
-/* #pragma omp single */
-
-/*         { */
-/*                 for(i = 0; i < msa->numseq;i++){ */
-/* #pragma omp task firstprivate(i) */
-/*                         { */
-/* #pragma omp task depend(out: t->profile[i],msa->plen[i]) */
-/*                                 t->profile[i] = NULL; */
-/*                                 msa->plen[i] = 0; */
-/*                         } */
-/*                 } */
-
-/*                 for(i = 0; i < t->n_tasks;i++){ */
-
-/* #pragma omp task depend(in:msa->plen[t->list[i]->a],msa->plen[t->list[i]->b],t->profile[t->list[i]->a],t->profile[t->list[i]->b]) depend (out:t->profile[t->list[i]->c], msa->plen[t->list[i]->c]) */
-/*                         { */
-/*                                 int tid = omp_get_thread_num(); */
-/*                                 LOG_MSG("Aligning %d %d -> %d thread %d", t->list[i]->a,t->list[i]->b,t->list[i]->c,tid); */
-/*                                 do_align(msa,t,m[tid],i); */
-/*                                 LOG_MSG("SONE %d %d -> %d thread %d %d", t->list[i]->a,t->list[i]->b,t->list[i]->c,tid,msa->plen[t->list[i]->c]); */
-/*                         } */
-/*                 } */
-
-/*         } */
 
         for(i = 0; i < t->n_tasks;i++){
                 if(t->list[i]->p != g){
@@ -129,15 +109,18 @@ int create_chaos_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tas
         float max_score;
 
         int numseq;
-                #ifdef HAVE_OPENMP
+#ifdef HAVE_OPENMP
         int n_threads =  omp_get_max_threads();
-        #else
+#else
         int n_threads = 1;
-        #endif
+#endif
 
         RUNP(rng = init_rng(0));
+        numseq = msa->numseq;
+        g = numseq / ap->chaos *  (ap->chaos * (ap->chaos-1)) / 2   + (ap->chaos*2 * (ap->chaos*2-1)) / 2;
+        LOG_MSG("alloc: %d ",g);
 
-        RUN(alloc_tasks(&t_chaos, (ap->chaos * (ap->chaos-1)) / 2));
+        RUN(alloc_tasks(&t_chaos, g));// (ap->chaos * (ap->chaos-1)) / 2));
 
         MFREE(t_chaos->profile);
         t_chaos->profile = t->profile;
@@ -153,20 +136,62 @@ int create_chaos_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tas
 
 
         g = msa->num_profiles;
-        numseq = msa->numseq;
 
-        MMALLOC(samples,sizeof(int) * m[0]->ap->chaos);
+
+        MMALLOC(samples,sizeof(int) * numseq);
         MMALLOC(active, sizeof(int) * numseq);
         for(i = 0; i < numseq;i++){
                 active[i] = i;
+                samples[i] = i;
         }
         qsort(active, numseq, sizeof(int), int_cmp);
         t->n_tasks = 0;
         for(i = 0; i < numseq-1;i++){
+
+                int u = 0;
                 /* pick one sequence / profile  */
+                for(l = 0; l+ap->chaos*2 < numseq-i; l+= ap->chaos){
+                        for(g = 0; g < l+ ap->chaos-1;g++){
+                                for(f = g + 1; f < ap->chaos;f++){
+                                        u++;
+                                        fprintf(stdout,"%d Aln: %d and %d\n", u, g+l, f+l);
+                                        t_chaos->list[t_chaos->n_tasks]->a = active[samples[g+l]];
+                                        t_chaos->list[t_chaos->n_tasks]->b = active[samples[f+l]];
+                                        /* HACK! -> used below to update the active array */
+                                        t_chaos->list[t_chaos->n_tasks]->c = samples[g+l];
+                                        t_chaos->list[t_chaos->n_tasks]->p = samples[f+l];
+                                        t_chaos->list[t_chaos->n_tasks]->score = 0.0F;
+                                        t_chaos->n_tasks++;
+
+                                }
+                        }
+                        fprintf(stdout,"\n");
+                }
+                int size = numseq-i - l;
+                /* for(l = 0; l < numseq-i; l+= ap->chaos){ */
+                for(g = 0; g < size-1 ;g++){
+                        for(f = g + 1; f < size;f++){
+                                u++;
+                                fprintf(stdout,"%d Aln: %d and %d\n", u, g+l, f+l);
+                                t_chaos->list[t_chaos->n_tasks]->a = active[samples[g+l]];
+                                t_chaos->list[t_chaos->n_tasks]->b = active[samples[f+l]];
+                                /* HACK! -> used below to update the active array */
+                                t_chaos->list[t_chaos->n_tasks]->c = samples[g+l];
+                                t_chaos->list[t_chaos->n_tasks]->p = samples[f+l];
+                                t_chaos->list[t_chaos->n_tasks]->score = 0.0F;
+                                t_chaos->n_tasks++;
+
+                        }
+                }
+                fprintf(stdout,"\n");
+                /* } */
+
+                exit(0);
+
                 max_score = -FLT_MAX;
                 l = MACRO_MIN(ap->chaos, numseq-i);
                 SampleWithoutReplacement(rng, numseq-i, l, samples);
+
 
                 t_chaos->n_tasks = 0;
                 /* prepare tasks */
@@ -181,7 +206,7 @@ int create_chaos_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tas
                                 t_chaos->n_tasks++;
                         }
                 }
-
+                LOG_MSG("%d tasks", t_chaos->n_tasks);
                 /* Run chaos tasks in parallel  */
 #ifdef HAVE_OPENMP
 #pragma omp parallel for shared(msa,t_chaos,m) private(j)
@@ -193,9 +218,10 @@ int create_chaos_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tas
                         int tid = 0;
 #endif
                         do_score(msa, t_chaos, m[tid], j);
-                        //LOG_MSG("%d running %d %d", tid, t_chaos->list[j]->a, t_chaos->list[j]->b);
+                        LOG_MSG("%d running %d %d", tid, t_chaos->list[j]->a, t_chaos->list[j]->b);
                 }
 
+                exit(0);
                 max_score = -FLT_MAX;
                 best = -1;
                 for(j = 0; j < t_chaos->n_tasks;j++){
@@ -244,8 +270,6 @@ ERROR:
 }
 
 /* #endif */
-static void recursive_aln_openMP(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, uint8_t* active, int c);
-static void recursive_aln_serial(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, uint8_t* active, int c);
 
 
 int create_msa_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
@@ -262,32 +286,13 @@ int create_msa_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
         for(i = msa->numseq; i < msa->num_profiles;i++){
                 active[i] = 0;
         }
-        /* for(i = 0; i < t->n_tasks;i++){ */
-        /*         fprintf(stdout,"%d %3d %3d -> %3d (p: %d)\n",i + msa->numseq, t->list[i]->a, t->list[i]->b, t->list[i]->c, t->list[i]->p); */
-        /* } */
 
 #ifdef HAVE_OPENMP
-        /* omp_set_nested(1); */
-                /* omp_set_num_threads(param->nthreads); */
-        omp_set_max_active_levels(4);
-        /* omp_set_num_threads(1); */
-        /* omp_set_dynamic(1); */
-/* #pragma omp parallel num_threads(1) */
-/*         { */
-/*                 #pragma omp single */
-/*                 { */
-        /* recursive_aln_serial(msa, t, ap, active, t->n_tasks-1); */
         recursive_aln_openMP(msa, t, ap, active, t->n_tasks-1);
-                /* } */
-
-        /* } */
 #else
         recursive_aln_serial(msa, t, ap, active, t->n_tasks-1);
-
 #endif
-
         MFREE(active);
-
         return OK;
 ERROR:
         if(active){
