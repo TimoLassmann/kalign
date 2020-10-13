@@ -24,12 +24,18 @@ static int SampleWithoutReplacement(struct rng_state* rng, int N, int n,int* sam
 static int int_cmp(const void *a, const void *b);
 
 /* #ifdef HAVE_OPENMP */
+
 int create_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
 {
 
         int i,j,g,s;
         struct aln_mem** m = NULL;
+
+        #ifdef HAVE_OPENMP
         int n_threads =  omp_get_max_threads();
+        #else
+        int n_threads = 1;
+        #endif
 
         MMALLOC(m, sizeof(struct aln_mem*) * n_threads);
         for(i = 0; i < n_threads;i++){
@@ -72,9 +78,15 @@ int create_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
 
         for(i = 0; i < t->n_tasks;i++){
                 if(t->list[i]->p != g){
+                        #ifdef HAVE_OPENMP
 #pragma omp parallel for shared(msa,t,m,s,i) private(j)
+                        #endif
                         for(j = s; j < i;j++){
+                                #ifdef HAVE_OPENMP
                                 int tid = omp_get_thread_num();
+                                #else
+                                int tid = 1;
+                                #endif
                                 do_align(msa,t,m[tid],j);
                         }
                         //fprintf(stdout,"\n");
@@ -107,17 +119,23 @@ int create_chaos_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tas
 {
         struct aln_mem** m = NULL;
         struct aln_tasks* t_chaos = NULL;
-        int i,j,g,f,a,b,l;
+        struct rng_state* rng = NULL;
+        int i,j,g,f,l;
         int best;
 
         int* samples = NULL;
-
-
         int* active = NULL;
+
         float max_score;
 
         int numseq;
+                #ifdef HAVE_OPENMP
         int n_threads =  omp_get_max_threads();
+        #else
+        int n_threads = 1;
+        #endif
+
+        RUNP(rng = init_rng(0));
 
         RUN(alloc_tasks(&t_chaos, (ap->chaos * (ap->chaos-1)) / 2));
 
@@ -148,7 +166,7 @@ int create_chaos_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tas
                 /* pick one sequence / profile  */
                 max_score = -FLT_MAX;
                 l = MACRO_MIN(ap->chaos, numseq-i);
-                SampleWithoutReplacement(ap->rng, numseq-i, l, samples);
+                SampleWithoutReplacement(rng, numseq-i, l, samples);
 
                 t_chaos->n_tasks = 0;
                 /* prepare tasks */
@@ -165,9 +183,15 @@ int create_chaos_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tas
                 }
 
                 /* Run chaos tasks in parallel  */
+#ifdef HAVE_OPENMP
 #pragma omp parallel for shared(msa,t_chaos,m) private(j)
+#endif
                 for(j = 0; j < t_chaos->n_tasks;j++){
+#ifdef HAVE_OPENMP
                         int tid = omp_get_thread_num();
+#else
+                        int tid = 0;
+#endif
                         do_score(msa, t_chaos, m[tid], j);
                         //LOG_MSG("%d running %d %d", tid, t_chaos->list[j]->a, t_chaos->list[j]->b);
                 }
@@ -224,9 +248,9 @@ static void recursive_aln_openMP(struct msa* msa, struct aln_tasks*t, struct aln
 static void recursive_aln_serial(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, uint8_t* active, int c);
 
 
-int create_msa_serial_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
+int create_msa_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
 {
-        int i,j,c,g,s;
+        int i;
         uint8_t* active = NULL;
 
         RUN(sort_tasks(t, TASK_ORDER_TREE));
@@ -290,14 +314,17 @@ void recursive_aln_openMP(struct msa* msa, struct aln_tasks*t, struct aln_param*
 
         a = local_t->a - msa->numseq;
         b = local_t->b - msa->numseq;
+#ifdef HAVE_OPENMP
 #pragma omp parallel num_threads(2)
         {
 #pragma omp single nowait
                 {
-
+#endif
                         if(local_t->a >= msa->numseq){ /* I have an internal node  */
                                 if(!active[local_t->a]){
+#ifdef HAVE_OPENMP
 #pragma omp task shared(msa,t,ap,active) firstprivate(a)
+#endif
                                         {
                                                 recursive_aln_openMP(msa, t, ap, active, a);
                                         }
@@ -305,24 +332,24 @@ void recursive_aln_openMP(struct msa* msa, struct aln_tasks*t, struct aln_param*
                                 /* I have a lead node - do nothing */
                         }
 
-
-
                         if(local_t->b >= msa->numseq){ /* I have an internal node */
                                 if(!active[local_t->b]){
-
+#ifdef HAVE_OPENMP
 #pragma omp task shared(msa,t,ap,active) firstprivate(b)
+#endif
                                         {
                                                 recursive_aln_openMP(msa, t, ap, active,b);
                                         }
 
                                 }
                                 /* I have a lead node - do nothing */
+
                         }
+#ifdef HAVE_OPENMP
                 }
         }
-
-
 #pragma omp taskwait
+#endif
 
         struct aln_mem* ml = NULL;
 
@@ -438,6 +465,7 @@ int create_chaos_msa_serial(struct msa* msa, struct aln_param* ap,struct aln_tas
 {
         struct aln_tasks* t_chaos = NULL;
         struct aln_mem* m = NULL;
+        struct rng_state* rng = NULL;
         int i,g,f,a,b,l;
         int best_a, best_b;
 
@@ -448,7 +476,7 @@ int create_chaos_msa_serial(struct msa* msa, struct aln_param* ap,struct aln_tas
         float max_score;
 
         int numseq;
-
+        RUNP(rng = init_rng(0));
         numseq = msa->numseq;
 
 
@@ -476,7 +504,7 @@ int create_chaos_msa_serial(struct msa* msa, struct aln_param* ap,struct aln_tas
                 /* pick one sequence / profile  */
                 max_score = -FLT_MAX;
                 l = MACRO_MIN(ap->chaos, numseq-i);
-                SampleWithoutReplacement(ap->rng, numseq-i, l, samples);
+                SampleWithoutReplacement(rng, numseq-i, l, samples);
 
                 for(g = 0;g < l-1;g++){
                         a = samples[g];

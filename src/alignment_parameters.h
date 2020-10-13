@@ -33,7 +33,7 @@ struct rng_state;
 #define ALN_MODE_FULL 1
 
 struct aln_param{
-        struct rng_state* rng;
+        /* struct rng_state* rng; */
         /* run specific settings */
         /* const float* prof1; */
         /* const float* prof2; */

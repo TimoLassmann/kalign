@@ -24,7 +24,7 @@
 
 #include "alphabet.h"
 
-#include "tlrng.h"
+/* #include "tlrng.h" */
 
 int set_subm_gaps(struct aln_param* ap);
 int set_subm_gaps_DNA(struct aln_param* ap);
@@ -52,7 +52,7 @@ int init_ap(struct aln_param** aln_param, struct parameters* param, int numseq,i
                 }
                 ap->subm = NULL;
                 ap->chaos = param->chaos;
-                RUNP(ap->rng = init_rng(42));
+                /* RUNP(ap->rng = init_rng(42)); */
                 MMALLOC(ap->subm,sizeof (float*) * 23);
 
                 for (i = 23;i--;){
@@ -111,9 +111,9 @@ void free_ap(struct aln_param* ap)
                         }
                         MFREE(ap->subm);
                 }
-                if(ap->rng){
-                        free_rng(ap->rng);
-                }
+                /* if(ap->rng){ */
+                /*         free_rng(ap->rng); */
+                /* } */
                 if(ap->tree){
                         MFREE(ap->tree);
                 }

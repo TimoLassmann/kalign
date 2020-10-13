@@ -537,7 +537,7 @@ int run_kalign(struct parameters* param)
 
         /* testing  */
 
-        RUN(create_msa_serial_tree(msa, ap, tasks));
+        RUN(create_msa_tree(msa, ap, tasks));
 
 /*         if(param->chaos){ */
 /* #ifdef HAVE_OPENMP */
