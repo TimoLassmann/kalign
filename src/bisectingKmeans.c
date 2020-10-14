@@ -44,13 +44,10 @@
 #include "pick_anchor.h"
 #include "esl_stopwatch.h"
 
-
 struct node{
         struct node* left;
         struct node* right;
         int id;
-        int d;
-        int n;
 };
 
 struct kmeans_result{
@@ -61,17 +58,13 @@ struct kmeans_result{
         float score;
 };
 
-
 static struct kmeans_result* alloc_kmeans_result(int num_samples);
 static void free_kmeans_results(struct kmeans_result* k);
 
 struct node* upgma(float **dm,int* samples, int numseq);
 static struct node* alloc_node(void);
 
-int label_internal(struct node*n, int label);
-//int label_internal(struct node*n, int label);
-int* readbitree(struct node* p,int* tree);
-/* void print_tree(struct node*n, struct aln_tasks  *t) ; */
+static int label_internal(struct node*n, int label);
 static void create_tasks(struct node*n, struct aln_tasks* t);
 
 
@@ -179,7 +172,7 @@ struct node* bisecting_kmeans_parallel(struct msa* msa, struct node* n, float** 
         struct kmeans_result* best = NULL;
         struct kmeans_result** res_ptr = NULL;
         int i,j;
-        int tries = 50;
+        int tries = 40;
         /* int t_iter; */
         /* int r; */
         int* sl = NULL;
@@ -202,24 +195,24 @@ struct node* bisecting_kmeans_parallel(struct msa* msa, struct node* n, float** 
         best = NULL;
         res_tmp = NULL;
 
-        MMALLOC(res_ptr, sizeof(struct kmeans_result*) * 5);
-        for(i = 0; i < 5;i++){
+        MMALLOC(res_ptr, sizeof(struct kmeans_result*) * 4);
+        for(i = 0; i < 4;i++){
                 res_ptr[i] = NULL;
         }
         tries = MACRO_MIN(tries, num_samples);
         int step = num_samples / tries;
         int change = 0;
-        for(i = 0;i < tries;i += 5){
+        for(i = 0;i < tries;i += 4){
                 change = 0;
 #ifdef HAVE_OPENMP
-#pragma omp parallel for num_threads(5)
+#pragma omp parallel for num_threads(4)
 #endif
-                for(j = 0; j < 5;j++){
+                for(j = 0; j < 4;j++){
                         split(dm,samples,num_anchors, num_samples, (i+ j)*step, &res_ptr[j]);
                 }
 
 
-                for(j = 0; j < 5;j++){
+                for(j = 0; j < 4;j++){
                         if(!best){
                                 change++;
                                 best = res_ptr[j];
@@ -250,7 +243,7 @@ struct node* bisecting_kmeans_parallel(struct msa* msa, struct node* n, float** 
 
         num_r = best->nr;
 
-        for(i = 0; i < 5;i++){
+        for(i = 0; i < 4;i++){
                 free_kmeans_results(res_ptr[i]);
         }
         MFREE(res_ptr);
@@ -648,8 +641,6 @@ struct node* alloc_node(void)
         n->left = NULL;
         n->right = NULL;
         n->id = -1;
-        n->d = 0;
-        n->n = 1;
         return n;
 ERROR:
         return NULL;
@@ -663,10 +654,6 @@ int label_internal(struct node*n, int label)
         }
         if(n->right){
                 label = label_internal(n->right, label);
-        }
-        if(n->left && n->right){
-                n->d = MACRO_MAX(n->left->d,n->right->d) + 1;
-                n->n = n->left->n + n->right->n;
         }
         if(n->id == -1){
                 n->id = label;
@@ -687,8 +674,8 @@ void create_tasks(struct node*n, struct aln_tasks* t)
                 task->a = n->left->id;
                 task->b = n->right->id;
                 task->c = n->id;
-                task->p = n->d;
-                task->n = n->n;
+                /* task->p = n->d; */
+                /* task->n = n->n; */
                 //fprintf(stdout,"Node %d  %d  depends on %d %d \n", n->id, n->d  , n->left->id, n->right->id);
 
                 t->n_tasks++;
@@ -705,29 +692,6 @@ void create_tasks(struct node*n, struct aln_tasks* t)
                         MFREE(n->right);
                 }
         }
-}
-
-
-int* readbitree(struct node* p,int* tree)
-{
-        if(p->left){
-                tree = readbitree(p->left,tree);
-        }
-        if(p->right){
-                tree = readbitree(p->right,tree);
-        }
-
-        if(p->left){
-                if(p->right){
-                        tree[tree[0]] = p->left->id;
-                        tree[tree[0]+1] = p->right->id;
-                        tree[tree[0]+2] = p->id;
-                        tree[0] +=3;
-                        MFREE(p->left);
-                        MFREE(p->right);
-                }
-        }
-        return tree;
 }
 
 

@@ -24,7 +24,7 @@
 
 
 //struct alignment* make_seq(struct alignment* aln,int a,int b,int* path);
-int make_seq(struct msa* msa,int a,int b,int* path);
+
 //int update_gaps(int old_len,int*gis,int new_len,int *newgaps);
 int update_gaps(int old_len,int*gis,int *newgaps);
 

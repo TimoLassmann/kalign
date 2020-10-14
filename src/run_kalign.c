@@ -572,16 +572,16 @@ int run_kalign(struct parameters* param)
         //RUNP(map = hirschberg_alignment(msa, ap));
         STOP_TIMER(t1);
         GET_TIMING(t1);
-//LOG_MSG("Done in %f sec.", GET_TIMING(t1));
+
 
 /* set to aligned */
         msa->aligned = ALN_STATUS_ALIGNED;
-        LOG_MSG("Weaving");
-        START_TIMER(t1);
+        //LOG_MSG("Weaving");
+        //START_TIMER(t1);
 
-        RUN(weave(msa,tasks));
-        STOP_TIMER(t1);
-        GET_TIMING(t1);
+        /* RUN(weave(msa,tasks)); */
+        //STOP_TIMER(t1);
+        //GET_TIMING(t1);
 /* clean up map */
 
         free_tasks(tasks);

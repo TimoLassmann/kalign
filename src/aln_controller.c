@@ -49,14 +49,12 @@ int aln_runner(struct aln_mem* m, int* path)
                 return OK;///hirsch_path;
         }
 
-        //fprintf(stderr,"Forward:%d-%d	%d-%d\n",m->starta,m->enda,m->startb,m->endb);
-
+        /* fprintf(stderr,"Forward:%d-%d	%d-%d\n",m->starta,m->enda,m->startb,m->endb); */
         m->enda = mid;
         m->starta_2 = mid;
         m->enda_2 = old_cor[1];
 
-        //fprintf(stderr,"Forward:%d-%d	%d-%d\n",m->starta,m->enda,m->startb,m->endb);
-
+        /* fprintf(stderr,"Forward:%d-%d	%d-%d\n",m->starta,m->enda,m->startb,m->endb); */
 #ifdef HAVE_OPENMP
 #pragma omp parallel num_threads(2)
         {
@@ -65,27 +63,25 @@ int aln_runner(struct aln_mem* m, int* path)
 #endif
                         if(m->seq1){
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m) if(m->enda - m->starta > 200)
+#pragma omp task shared(m) if(m->enda - m->starta > 500)
 #endif
                                 aln_seqseq_foward(m);
 
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m) if(m->enda_2 - m->starta_2 > 200)
+#pragma omp task shared(m) if(m->enda_2 - m->starta_2 > 500)
 #endif
                                 aln_seqseq_backward(m);
 #ifdef HAVE_OPENMP
 #pragma omp taskwait
 #endif
                                 aln_seqseq_meetup(m,old_cor,&meet,&transition,&score);
-
-
                         }else if(m->prof2){
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m)if(m->enda - m->starta > 200)
+#pragma omp task shared(m)if(m->enda - m->starta > 500)
 #endif
                                 aln_profileprofile_foward(m);
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m)if(m->enda_2 - m->starta_2 > 200)
+#pragma omp task shared(m)if(m->enda_2 - m->starta_2 > 500)
 #endif
                                 aln_profileprofile_backward(m);
 #ifdef HAVE_OPENMP
@@ -94,11 +90,11 @@ int aln_runner(struct aln_mem* m, int* path)
                                 aln_profileprofile_meetup(m,old_cor,&meet,&transition,&score);
                         }else{
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m)if(m->enda - m->starta > 200)
+#pragma omp task shared(m)if(m->enda - m->starta > 500)
 #endif
                                 aln_seqprofile_foward(m);
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m)if(m->enda_2 - m->starta_2 > 200)
+#pragma omp task shared(m)if(m->enda_2 - m->starta_2 > 500)
 #endif
                                 aln_seqprofile_backward(m);
 #ifdef HAVE_OPENMP
