@@ -114,7 +114,7 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_tasks** t
         for(i = 0; i < numseq;i++){
                 samples[i] = i;
         }
-
+        LOG_MSG("%d anchors ", num_anchors);
         //RUNP(root = alloc_node());
 
         START_TIMER(timer);
@@ -136,13 +136,10 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_tasks** t
 /* #endif */
         STOP_TIMER(timer);
         GET_TIMING(timer);
-        //LOG_MSG("Done in %f sec.", GET_TIMING(timer));
 
         label_internal(root, numseq);
 
         create_tasks(root, t);
-
-
 
 
         /*exit(0);

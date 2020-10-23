@@ -13,7 +13,7 @@ struct task{
 struct aln_tasks{
         struct task** list;     /* list of pairwise alignments and their priority */
         float** profile;        /* buffer to hold output profiles */
-        int** map;              /* traceback paths */
+        /* int** map;              /\* traceback paths *\/ */
         int n_tasks;
         int n_alloc_tasks;
 };

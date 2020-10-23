@@ -12,9 +12,16 @@ CLEANFILES = ihmm_seq_itest_read_test.fa test_model_file.txt test.lfa test_dna.l
 AM_LDFLAGS = @DEAD_STRIP@
 AM_LDFLAGS += -Wno-undef
 
-bin_PROGRAMS = kalign
+bin_PROGRAMS = kalign kchaos
 
 noinst_PROGRAMS = timescorealn benchrunner genruncmds genkaligndiffcmds
+
+kchaos_SOURCES = \
+tldevel.h \
+tldevel.c \
+queue.h \
+queue.c \
+kchaos.c
 
 genruncmds_SOURCES = \
 tldevel.h \

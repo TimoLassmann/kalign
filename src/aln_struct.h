@@ -22,7 +22,7 @@ struct aln_mem{
         struct aln_param* ap;
         struct states* f;
         struct states* b;
-
+        int* path;
         float score;
 
         int starta;

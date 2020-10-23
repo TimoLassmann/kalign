@@ -27,6 +27,14 @@ int aln_runner(struct aln_mem* m, int* path)
         int meet;
         int transition;
 
+        if(m->starta >= m->enda){
+                return OK;//hirsch_path;
+        }
+        if(m->startb >= m->endb){
+                return OK;///hirsch_path;
+        }
+
+
         input_states[0] = m->f[0].a;
         input_states[1] = m->f[0].ga;
         input_states[2] = m->f[0].gb;
@@ -42,12 +50,6 @@ int aln_runner(struct aln_mem* m, int* path)
         old_cor[3] = m->endb;
         old_cor[4] = mid;
 
-        if(m->starta >= m->enda){
-                return OK;//hirsch_path;
-        }
-        if(m->startb >= m->endb){
-                return OK;///hirsch_path;
-        }
 
         /* fprintf(stderr,"Forward:%d-%d	%d-%d\n",m->starta,m->enda,m->startb,m->endb); */
         m->enda = mid;
@@ -63,12 +65,12 @@ int aln_runner(struct aln_mem* m, int* path)
 #endif
                         if(m->seq1){
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m) if(m->enda - m->starta > 500)
+#pragma omp task shared(m) //if(m->enda - m->starta > 10000)
 #endif
                                 aln_seqseq_foward(m);
 
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m) if(m->enda_2 - m->starta_2 > 500)
+#pragma omp task shared(m) //if(m->enda_2 - m->starta_2 > 10000)
 #endif
                                 aln_seqseq_backward(m);
 #ifdef HAVE_OPENMP
@@ -77,11 +79,11 @@ int aln_runner(struct aln_mem* m, int* path)
                                 aln_seqseq_meetup(m,old_cor,&meet,&transition,&score);
                         }else if(m->prof2){
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m)if(m->enda - m->starta > 500)
+#pragma omp task shared(m)//if(m->enda - m->starta > 10000)
 #endif
                                 aln_profileprofile_foward(m);
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m)if(m->enda_2 - m->starta_2 > 500)
+#pragma omp task shared(m)//if(m->enda_2 - m->starta_2 > 10000)
 #endif
                                 aln_profileprofile_backward(m);
 #ifdef HAVE_OPENMP
@@ -90,11 +92,11 @@ int aln_runner(struct aln_mem* m, int* path)
                                 aln_profileprofile_meetup(m,old_cor,&meet,&transition,&score);
                         }else{
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m)if(m->enda - m->starta > 500)
+#pragma omp task shared(m)//if(m->enda - m->starta > 10000)
 #endif
                                 aln_seqprofile_foward(m);
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m)if(m->enda_2 - m->starta_2 > 500)
+#pragma omp task shared(m)//if(m->enda_2 - m->starta_2 > 10000)
 #endif
                                 aln_seqprofile_backward(m);
 #ifdef HAVE_OPENMP

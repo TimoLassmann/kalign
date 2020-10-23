@@ -34,8 +34,10 @@ int alloc_aln_mem(struct aln_mem** mem, int x)
         m->len_b = 0;
         m->f = NULL;
         m->b = NULL;
+        m->path = NULL;
         MMALLOC(m->f,sizeof(struct states)* (x+1));
         MMALLOC(m->b,sizeof(struct states)* (x+1));
+        MMALLOC(m->path, sizeof(int) * (x+2));
         *mem = m;
         return OK;
 ERROR:
@@ -50,6 +52,7 @@ int resize_aln_mem(struct aln_mem* m,int x)
 
                 MREALLOC(m->f,sizeof(struct states)* (x+1));
                 MREALLOC(m->b,sizeof(struct states)* (x+1));
+                MREALLOC(m->path, sizeof(int) * (x+2));
         }
         return OK;
 ERROR:
@@ -60,6 +63,7 @@ ERROR:
 void free_aln_mem(struct aln_mem* m)
 {
         if(m){
+                MFREE(m->path);
                 MFREE(m->f);
                 MFREE(m->b);
                 MFREE(m);

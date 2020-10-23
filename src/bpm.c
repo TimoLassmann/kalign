@@ -472,13 +472,13 @@ uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
 
         int i,j, k,diff;
 
-        alignas(32)  uint32_t f[23][8];
+        alignas(32)  uint32_t f[13][8];
         //int ALIGNED_(64) f[8];
         if(m > 255){
                 m = 255;
         }
 
-        for(i = 0; i < 23;i++){
+        for(i = 0; i < 13;i++){
                 for(j = 0;j < 8;j++){
                         f[i][j] =0u;
                 }
@@ -488,9 +488,23 @@ uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
                 f[p[i]][i/32] |= (1 << (i % 32));
         }
 
-        for(i = 0; i < 13;i++){
-                B[i] = _mm256_load_si256((__m256i const*) &f[i]);
-        }
+        /* for(i = 0; i < 13;i++){ */
+        /*         B[i] = _mm256_load_si256((__m256i const*) &f[i]); */
+        /* } */
+
+        B[0] = _mm256_load_si256((__m256i const*) &f[0]);
+        B[1] = _mm256_load_si256((__m256i const*) &f[1]);
+        B[2] = _mm256_load_si256((__m256i const*) &f[2]);
+        B[3] = _mm256_load_si256((__m256i const*) &f[3]);
+        B[4] = _mm256_load_si256((__m256i const*) &f[4]);
+        B[5] = _mm256_load_si256((__m256i const*) &f[5]);
+        B[6] = _mm256_load_si256((__m256i const*) &f[6]);
+        B[7] = _mm256_load_si256((__m256i const*) &f[7]);
+        B[8] = _mm256_load_si256((__m256i const*) &f[8]);
+        B[9] = _mm256_load_si256((__m256i const*) &f[9]);
+        B[10] = _mm256_load_si256((__m256i const*) &f[10]);
+        B[11] = _mm256_load_si256((__m256i const*) &f[11]);
+        B[12] = _mm256_load_si256((__m256i const*) &f[12]);
 
         diff = m;
         k = m;

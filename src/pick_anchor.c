@@ -40,11 +40,10 @@ int* pick_anchor(struct msa* msa, int* n)
         int num_anchor = 0;
 
 
-
-
         ASSERT(msa != NULL, "No alignment.");
 
-        num_anchor = MACRO_MAX(MACRO_MIN(32, msa->numseq), (int) pow(log2((double) msa->numseq), 2.0));
+        /* num_anchor = MACRO_MAX(MACRO_MIN(32, msa->numseq), (int) pow(log2((double) msa->numseq), 2.0)); */
+        num_anchor = MACRO_MIN(32, msa->numseq);
         RUNP(anchors = select_seqs(msa, num_anchor));
         *n = num_anchor;
         return anchors;

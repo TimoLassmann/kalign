@@ -14,7 +14,7 @@
 
 int aln_profileprofile_foward(struct aln_mem* m)
 {
-        unsigned int freq[23];
+        unsigned int freq[24];
         const float* prof1 = m->prof1;
         const float* prof2 = m->prof2;
         struct states* s = m->f;
@@ -117,7 +117,6 @@ int aln_profileprofile_foward(struct aln_mem* m)
 
                         pa = ca;
 
-
                         xa = s[j].a;
                         xga = s[j].ga;
                 }
@@ -128,7 +127,6 @@ int aln_profileprofile_foward(struct aln_mem* m)
 
                 prof2 += 32;
                 for (c = f;c >= 0;c--){
-                        //for (c = 0;c < f;c++){
                         pa += prof1[freq[c]]*prof2[freq[c]];
                 }
                 prof2 -= 32;
@@ -151,7 +149,7 @@ int aln_profileprofile_foward(struct aln_mem* m)
 
 int aln_profileprofile_backward(struct aln_mem* m)
 {
-        unsigned int freq[23];
+        unsigned int freq[24];
         struct states* s = m->b;
         const float* prof1 = m->prof1;
         const float* prof2 = m->prof2;
