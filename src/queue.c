@@ -65,3 +65,18 @@ void print_queue(queue q)
         }
         fprintf(stdout,"\t(%d)\n",n);
 }
+
+void free_queue(queue q)
+{
+        node tmp = HEAD(q);
+        node p = NULL;
+        while(tmp){
+                /* fprintf(stdout,"%d ", tmp->val); */
+                p = tmp;
+                tmp = tmp->next;
+
+                free(p);
+        }
+        free(q);
+
+}

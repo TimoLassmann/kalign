@@ -14,6 +14,7 @@ EXTERN queue q_new();
 EXTERN void enqueue(queue q, int n);
 EXTERN int dequeue(queue q, int *val);
 EXTERN void print_queue(queue q);
+EXTERN void free_queue(queue q);
 #undef QUEUE_IMPORT
 #undef EXTERN
 
