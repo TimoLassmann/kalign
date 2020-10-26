@@ -10,7 +10,7 @@
 #endif
 
 /* EXTERN int aln_runner(struct aln_mem* m,struct aln_param* ap,int* path); */
-EXTERN int aln_runner(struct aln_mem* m, int* path);
+EXTERN int aln_runner(struct aln_mem* m);
 #undef ALN_CONTROLLER_IMPORT
 #undef EXTERN
 #endif

@@ -23,6 +23,8 @@ struct aln_mem{
         struct states* f;
         struct states* b;
         int* path;
+        int* tmp_path;
+        int alloc_path_len;
         float score;
 
         int starta;

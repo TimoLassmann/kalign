@@ -93,20 +93,20 @@ ERROR:
 
 struct topo* build_forest(struct topo* t, int* lab, int total_n,int index, int d)
 {
-        if(d == 0){
-                /* create  */
-        }
-        int i;
+        /* if(d == 0){ */
+        /*         /\* create  *\/ */
+        /* } */
+        /* int i; */
 
-        if(n == 1){
-                fprintf(stdout,"%d\n", lab[0]);
-        }else{
-                for(i = 0; i < n;i++){
-                        res = enum_unordered(lab+1,n-1);
-                }
+        /* if(n == 1){ */
+        /*         fprintf(stdout,"%d\n", lab[0]); */
+        /* }else{ */
+        /*         for(i = 0; i < n;i++){ */
+        /*                 res = enum_unordered(lab+1,n-1); */
+        /*         } */
 
 
-        }
+        /* } */
 }
 
 void print_topo( struct node* n,int pos)

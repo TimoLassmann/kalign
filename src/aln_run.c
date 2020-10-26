@@ -634,60 +634,48 @@ ERROR:
 
 int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
 {
-        int* path = NULL;
+        float* tmp = NULL;
         int a,b,c;
         int len_a;
         int len_b;
         int j,g;
-        int numseq;
 
         a = t->list[task_id]->a;
         b = t->list[task_id]->b;
         c = t->list[task_id]->c;
 
-        /* LOG_MSG("Aligning %d %d -> %d", a,b,c); */
-        numseq = msa->numseq;
-
         if(msa->nsip[a] == 1){
-                len_a = msa->sequences[a]->len;//  aln->sl[a];
-                RUN(make_profile_n(m->ap, msa->sequences[a]->s,len_a,&t->profile[a]));
+                m->len_a = msa->sequences[a]->len;//  aln->sl[a];
+                RUN(make_profile_n(m->ap, msa->sequences[a]->s,m->len_a,&t->profile[a]));
         }else{
-                len_a = msa->plen[a];
-                RUN(set_gap_penalties_n(t->profile[a],len_a,msa->nsip[b]));
+                m->len_a = msa->plen[a];
+                RUN(set_gap_penalties_n(t->profile[a],m->len_a,msa->nsip[b]));
         }
 
         if(msa->nsip[b] == 1){
-                len_b = msa->sequences[b]->len;// aln->sl[b];
-                RUN(make_profile_n(m->ap, msa->sequences[b]->s,len_b,&t->profile[b]));
+                m->len_b = msa->sequences[b]->len;// aln->sl[b];
+                RUN(make_profile_n(m->ap, msa->sequences[b]->s,m->len_b,&t->profile[b]));
         }else{
-                len_b = msa->plen[b];
-                RUN(set_gap_penalties_n(t->profile[b],len_b,msa->nsip[a]));
+                m->len_b = msa->plen[b];
+                RUN(set_gap_penalties_n(t->profile[b],m->len_b,msa->nsip[a]));
         }
 
-        g = (len_a > len_b)? len_a:len_b;
+        RUN(init_alnmem(m));
 
-        /* MMALLOC(path,sizeof(int) * (g+2)); */
-        /* MMALLOC(t->map[c],sizeof(int) * (g+2)); */
-
-        RUN(resize_aln_mem(m, g));
-
-        path = m->path;
         m->mode = ALN_MODE_FULL;
-        /* I should not need to do this */
-        for (j = 0; j < (g+2);j++){
-                path[j] = -1;
-        }
-
-        init_alnmem(m, len_a, len_b);
-
         if(msa->nsip[a] == 1){
                 if(msa->nsip[b] == 1){
                         m->seq1 = msa->sequences[a]->s;
                         m->seq2 = msa->sequences[b]->s;
                         m->prof1 = NULL;
                         m->prof2 = NULL;
-                        aln_runner(m, path);
+                        aln_runner(m);
                 }else{
+
+                        len_b = m->len_b;
+                        len_a = m->len_a;
+
+
                         m->enda = len_b;
                         m->endb = len_a;
                         m->len_a = len_b;
@@ -699,26 +687,30 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                         m->prof2 = NULL;
                         m->sip = msa->nsip[b];
 
-                        aln_runner(m,path);
-                        RUN(mirror_path_n(&path,len_a,len_b));
+                        aln_runner(m);
+                        RUN(mirror_path_n(m, len_a,len_b));
+                        m->len_a = len_a;
+                        m->len_b = len_b;
                 }
         }else{
-                if(b < numseq){
+                if(msa->nsip[b] == 1){
                         m->seq1 = NULL;
                         m->seq2 = msa->sequences[b]->s;
                         m->prof1 = t->profile[a];
                         m->prof2 = NULL;
                         m->sip = msa->nsip[a];
-
-                        aln_runner(m,path);
+                        aln_runner(m);
                 }else{
-                        if(len_a < len_b){
+                        if(m->len_a < m->len_b){
                                 m->seq1 = NULL;
                                 m->seq2 = NULL;
                                 m->prof1 = t->profile[a];
                                 m->prof2 = t->profile[b];
-                                aln_runner(m, path);
+                                aln_runner(m);
                         }else{
+                                len_b = m->len_b;
+                                len_a = m->len_a;
+
                                 m->enda = len_b;
                                 m->endb = len_a;
                                 m->len_a = len_b;
@@ -729,40 +721,37 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                                 m->prof1 = t->profile[b];
                                 m->prof2 = t->profile[a];
 
-                                aln_runner(m, path);
+                                aln_runner(m);
 
-                                RUN(mirror_path_n(&path,len_a,len_b));
+                                RUN(mirror_path_n(m,len_a,len_b));
+                                m->len_a = len_a;
+                                m->len_b = len_b;
                         }
                 }
+
         }
 
-        RUN(add_gap_info_to_path_n(&path, len_a, len_b));
-        //map[c] = add_gap_info_to_hirsch_path(map[c],len_a,len_b);
+        RUN(add_gap_info_to_path_n(m)) ;
 
-        m->path = path;
-
-
-        float* tmp = NULL;
-        MMALLOC(tmp,sizeof(float)*64*(path[0]+2));
+        MMALLOC(tmp,sizeof(float)*64*(m->path[0]+2));
 
         /* LOG_MSG("%d TASK ID", task_id); */
         if(task_id != t->n_tasks-1){
-                //if(i != numseq-2){
-                //MREALLOC(profile_ptr, sizeof(float)*64*(map[c][0]+2));
-                /* MMALLOC(t->profile[c],sizeof(float)*64*(path[0]+2)); */
-                //update(profile[a],profile[b],profile[c],map[c]);
-                update_n(t->profile[a],t->profile[b],tmp,m->ap,path,msa->nsip[a],msa->nsip[b]);
+                update_n(t->profile[a],t->profile[b],tmp,m->ap,m->path,msa->nsip[a],msa->nsip[b]);
         }
 
         MFREE(t->profile[a]);
         MFREE(t->profile[b]);
 
         t->profile[c] = tmp;
-        RUN(make_seq(msa,a,b,path));
-        msa->plen[c] = path[0];//t->map[c][0];
+        RUN(make_seq(msa,a,b,m->path));
+
+        msa->plen[c] = m->path[0];
 
         msa->nsip[c] = msa->nsip[a] + msa->nsip[b];
+
         MREALLOC(msa->sip[c],sizeof(int)*(msa->nsip[a] + msa->nsip[b]));
+
         g =0;
         for (j = msa->nsip[a];j--;){
                 msa->sip[c][g] = msa->sip[a][j];
@@ -773,10 +762,6 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                 g++;
         }
 
-        /* t->profile[c] = tmp; */
-
-
-        /* MFREE(path); */
         return OK;
 ERROR:
         return FAIL;
@@ -785,7 +770,6 @@ ERROR:
 int do_score(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
 /* int score_aln(struct aln_mem* m,float** profile, struct msa* msa, int a,int b,int numseq,float* score) */
 {
-        int g;
         int len_a;
         int len_b;
         int a,b;
@@ -809,10 +793,9 @@ int do_score(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
         }
         m->mode = ALN_MODE_SCORE_ONLY;
 
-        g = (len_a > len_b)? len_a:len_b;
-
-        RUN(resize_aln_mem(m, g));
-
+        m->len_a = len_a;
+        m->len_b = len_b;
+         /* = (len_a > len_b)? len_a:len_b; */
 
         if (a > numseq){
                 RUN(set_gap_penalties_n(t->profile[a],len_a,msa->nsip[b]));
@@ -820,8 +803,8 @@ int do_score(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
         if (b > numseq){
                 RUN(set_gap_penalties_n(t->profile[b],len_b,msa->nsip[a]));
         }
-
-        init_alnmem(m, len_a, len_b);
+        RUN(resize_aln_mem(m));
+        init_alnmem(m);
         //fprintf(stderr,"LENA:%d	LENB:%d	numseq:%d\n",len_a,len_b,numseq);
         if(a < numseq){
                 if(b < numseq){
@@ -830,7 +813,7 @@ int do_score(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                         m->prof1 = NULL;
                         m->prof2 = NULL;
 
-                        aln_runner(m,  NULL);
+                        aln_runner(m);
                 }else{
                         m->enda = len_b;
                         m->endb = len_a;
@@ -843,7 +826,7 @@ int do_score(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                         m->prof2 = NULL;
                         m->sip = msa->nsip[b];
 
-                        aln_runner(m,  NULL);
+                        aln_runner(m);
                         m->score = m->score / (float) msa->nsip[b];
 
                 }
@@ -854,7 +837,7 @@ int do_score(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                         m->prof1 = t->profile[a];
                         m->prof2 = NULL;
                         m->sip = msa->nsip[a];
-                        aln_runner(m, NULL);
+                        aln_runner(m);
                         m->score = m->score / (float)msa->nsip[a];
                 }else{
                         if(len_a < len_b){
@@ -862,7 +845,7 @@ int do_score(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                                 m->seq2 = NULL;
                                 m->prof1 = t->profile[a];
                                 m->prof2 = t->profile[b];
-                                aln_runner(m, NULL);
+                                aln_runner(m);
 
                         }else{
                                 m->enda = len_b;
@@ -874,7 +857,7 @@ int do_score(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                                 m->seq2 = NULL;
                                 m->prof1 = t->profile[b];
                                 m->prof2 = t->profile[a];
-                                aln_runner(m, NULL);
+                                aln_runner(m);
 
                         }
                         m->score = m->score / (float)(msa->nsip[a] * msa->nsip[b]);

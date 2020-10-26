@@ -5,19 +5,22 @@
 #include "aln_struct.h"
 #include "alignment_parameters.h"
 
+#include "aln_mem.h"
 
 #define ALN_SETUP_IMPORT
 #include "aln_setup.h"
 
-
-int init_alnmem(struct aln_mem* m, int len_a, int len_b)
+int init_alnmem(struct aln_mem* m)
 {
+        int i;
+        int g;
         m->starta = 0;
         m->startb = 0;
-        m->enda = len_a;
-        m->endb = len_b;
-        m->len_a = len_a;
-        m->len_b = len_b;
+        m->enda = m->len_a;
+        m->endb = m->len_b;
+
+        /* m->len_a = len_a; */
+        /* m->len_b = len_b; */
 
         m->f[0].a  = 0.0F;
         m->f[0].ga = -FLT_MAX;
@@ -25,7 +28,19 @@ int init_alnmem(struct aln_mem* m, int len_a, int len_b)
         m->b[0].a  = 0.0F;
         m->b[0].ga = -FLT_MAX;
         m->b[0].gb = -FLT_MAX;
+
+        RUN(resize_aln_mem(m));
+
+        g = MACRO_MAX(m->len_a, m->len_b) + 2;
+        for(i = 0 ;i  < g ;i++){
+                m->path[i] = -1;
+        }
+
+
+
         return OK;
+ERROR:
+        return FAIL;
 }
 
 int make_profile_n(struct aln_param* ap,const uint8_t* seq,const int len, float** p)
@@ -109,130 +124,114 @@ int set_gap_penalties_n(float* prof,int len,int nsip)
         return OK;
 }
 
-int add_gap_info_to_path_n(int** p_path,int len_a,int len_b)
+int add_gap_info_to_path_n(struct aln_mem* m)
 {
         int* path = NULL;
+        int* o_path = NULL;
+        int* tmp_path = NULL;
         int i,j;
         int a = 0;
         int b = 0;
+        int len_a;
+        int len_b;
 
-        int* np = NULL;
+        len_a = m->len_a;
+        len_b = m->len_b;
+        path = m->path;
+        o_path = m->tmp_path;
 
-        path = *p_path;
-
-        MMALLOC(np,sizeof(int)*(len_a+len_b+2));
-        for(i =0; i < len_a+len_b+2;i++){
-                np[i] = 0;
+        for(i = 0; i < len_a+len_b+2;i++){
+                o_path[i] = 0;
         }
 
         j = 1;
         b = -1;
         if(path[1] == -1){
-                np[j] = 2;
+                o_path[j] = 2;
                 j++;
         }else{
                 if(path[1] != 1){
                         for ( a = 0;a < path[1] -1;a++){
-                                np[j] = 1;
+                                o_path[j] = 1;
                                 j++;
                         }
-                        np[j] = 0;
+                        o_path[j] = 0;
                         j++;
                 }else{
-                        np[j] = 0;
+                        o_path[j] = 0;
                         j++;
                 }
         }
         b = path[1];
 
-        /*for ( i= 0;i <= len_a;i++){
-          fprintf(stderr,"%d,",path[i]);
-          }
-          fprintf(stderr,"\n");*/
-
         for(i = 2; i <= len_a;i++){
 
                 if(path[i] == -1){
-                        np[j] = 2;
+                        o_path[j] = 2;
                         j++;
                 }else{
                         if(path[i]-1 != b && b != -1){
                                 for ( a = 0;a < path[i] - b-1;a++){
-                                        np[j] = 1;
+                                        o_path[j] = 1;
                                         j++;
                                 }
-                                np[j] = 0;
+                                o_path[j] = 0;
                                 j++;
                         }else{
-                                np[j] = 0;
+                                o_path[j] = 0;
                                 j++;
                         }
                 }
                 b = path[i];
         }
 
-
-
-
-
         if(path[len_a] < len_b && path[len_a] != -1){
                 //	fprintf(stderr,"WARNING:%d	%d\n",path[len_a],len_b);
                 for ( a = 0;a < len_b - path[len_a];a++){
-                        np[j] = 1;
+                        o_path[j] = 1;
                         j++;
                 }
         }
-        np[0] = j-1;
-        np[j] = 3;
 
-        MREALLOC(np,sizeof(int)* (np[0]+2));
-        //for ( i= 0;i <= np[0];i++){
-        //	fprintf(stderr,"%d,",np[i]);
-        //}
-        //fprintf(stderr,"\n");
-
-        MFREE(path);
+        o_path[0] = j-1;
+        o_path[j] = 3;
 
         //add gap info..
         i = 2;
-        while(np[i] != 3){
-                if ((np[i-1] &3) && !(np[i] & 3)){
-                        if(np[i-1] & 8){
-                                np[i-1] += 8;
+        while(o_path[j] != 3){
+                if ((o_path[i-1] &3) && !(o_path[i] & 3)){
+                        if(o_path[i-1] & 8){
+                                o_path[i-1] += 8;
                         }else{
-                                np[i-1] |= 16;
+                                o_path[i-1] |= 16;
                         }
-                }else if (!(np[i-1] & 3) &&(np[i] &3)){
-                        np[i] |= 4;
-                }else if ((np[i-1] & 1) && (np[i] & 1)){
-                        np[i] |= 8;
-                }else if ((np[i-1] & 2) && (np[i] & 2)){
-                        np[i] |= 8;
+                }else if (!(o_path[i-1] & 3) &&(o_path[i] &3)){
+                        o_path[i] |= 4;
+                }else if ((o_path[i-1] & 1) && (o_path[i] & 1)){
+                        o_path[i] |= 8;
+                }else if ((o_path[i-1] & 2) && (o_path[i] & 2)){
+                        o_path[i] |= 8;
                 }
                 i++;
         }
         //add terminal gap...
         i = 1;
-        while(np[i] != 0){
-                np[i] |= 32;
+        while(o_path[i] != 0){
+                o_path[i] |= 32;
                 i++;
         }
-        j = i;
-        i = np[0];
-        while(np[i] != 0){
-                np[i] |= 32;
+        /* j = i; */
+        i = o_path[0];
+        while(o_path[i] != 0){
+                o_path[i] |= 32;
                 i--;
         }
-        //for ( i= 0;i <= np[0];i++){
-        //	fprintf(stderr,"%d,",np[i]);
-        //}
-        //fprintf(stderr,"\n");
-        *p_path = np;
+
+        tmp_path = m->path;
+        m->path = m->tmp_path;
+        m->tmp_path = tmp_path;
         return OK;
 ERROR:
-        if(np){
-                MFREE(np);
-        }
         return FAIL;
 }
 
@@ -383,28 +382,34 @@ int update_n(const float* profa, const float* profb,float* newp, struct aln_para
         return OK;
 }
 
-int mirror_path_n(int** p_path,int len_a,int len_b)
+int mirror_path_n(struct aln_mem* m,int len_a,int len_b)
 {
-        int* path = NULL;
+        int* apath = NULL;
+        int* opath = NULL;
+        int* tmppath = NULL;
         int* np =NULL;
 
         int i;
 
-        path = *p_path;
+        apath = m->path;
+        opath = m->tmp_path;
 
-        MMALLOC(np,sizeof(int)*(len_a+2));
+
         for(i =0; i < len_a+2;i++){
-                np[i] = -1;
+                opath[i] = -1;
+
         }
 
         for(i = 1; i <= len_b;i++){
-                if(path[i] != -1){
-                        np[path[i]] = i;
+                if(apath[i] != -1){
+                        opath[apath[i]] = i;
                 }
         }
 
-        MFREE(path);
-        *p_path = np;
+        tmppath = m->path;
+        m->path = m->tmp_path;
+        m->tmp_path = tmppath;
+
         return OK;
 ERROR:
         return FAIL;

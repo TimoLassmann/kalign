@@ -16,9 +16,9 @@
 
 //static int aln_continue(struct aln_mem* m,struct aln_param* ap,int* path,int meet,int transition);
 
-static int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int* path,int meet,int transition);
+static int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int meet,int transition);
 
-int aln_runner(struct aln_mem* m, int* path)
+int aln_runner(struct aln_mem* m)
 {
         float input_states[6];
         int old_cor[5];
@@ -125,16 +125,18 @@ int aln_runner(struct aln_mem* m, int* path)
         if(m->mode == ALN_MODE_SCORE_ONLY){
                 m->score = score;
         }else{
-                aln_continue(m, input_states,old_cor,path, meet, transition);
+                aln_continue(m, input_states,old_cor, meet, transition);
         }
         return OK;
 }
 
-int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int* path,int meet,int transition)
+int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int meet,int transition)
 {
         //fprintf(stderr,"Transition:%d	at:%d\n",transition,c);
         //LOG_MSG("MAX: %f",max);
         //j = hirsch_path[0];
+        int* path = m->path;
+
         switch(transition){
         case 1: //a -> a = 1
 
@@ -158,7 +160,7 @@ int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int* path,
                 m->startb = old_cor[2];
                 m->endb = meet-1;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,m->starta,m->enda,m->startb,m->endb);
-                aln_runner(m,path);
+                aln_runner(m);
                 //backward:
                 m->starta = old_cor[4]+1;
                 m->enda = old_cor[1];
@@ -172,7 +174,7 @@ int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int* path,
                 m->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d  what:%d-%d	%d-%d\n",c+1,m->starta,m->enda,m->startb,m->endb);
-                aln_runner(m,path);
+                aln_runner(m);
                 break;
         case 2:// a -> ga = 2
                 path[old_cor[4]] = meet;
@@ -192,7 +194,7 @@ int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int* path,
                 m->startb = old_cor[2];
                 m->endb = meet-1;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,m->starta,m->enda,m->startb,m->endb);
-                aln_runner(m,path);
+                aln_runner(m);
 
                 //backward:
                 m->starta = old_cor[4];
@@ -207,7 +209,7 @@ int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int* path,
                 m->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d  what:%d-%d	%d-%d\n",c+1,m->starta,m->enda,m->startb,m->endb);
-                aln_runner(m,path);
+                aln_runner(m);
                 break;
         case 3:// a -> gb = 3
                 path[old_cor[4]] = meet;
@@ -226,7 +228,7 @@ int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int* path,
                 m->startb = old_cor[2];
                 m->endb = meet-1;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,m->starta,m->enda,m->startb,m->endb);
-                aln_runner(m,path);
+                aln_runner(m);
                 //backward:
                 m->starta = old_cor[4]+1;
                 m->enda = old_cor[1];
@@ -240,7 +242,7 @@ int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int* path,
                 m->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d\n",c+1);
-                aln_runner(m,path);
+                aln_runner(m);
 
 
                 break;
@@ -262,7 +264,7 @@ int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int* path,
                 m->startb = old_cor[2];
                 m->endb = meet-1;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,m->starta,m->enda,m->startb,m->endb);
-                aln_runner(m,path);
+                aln_runner(m);
                 //backward:
                 m->starta = old_cor[4]+1;
                 m->enda = old_cor[1];
@@ -276,7 +278,7 @@ int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int* path,
                 m->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d\n",c+1);
-                aln_runner(m,path);
+                aln_runner(m);
                 break;
         case 6://gb->gb = 6;
 
@@ -294,7 +296,7 @@ int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int* path,
                 m->endb = meet;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,m->starta,m->enda,m->startb,m->endb);
 
-                aln_runner(m,path);
+                aln_runner(m);
                 //backward:
                 m->starta = old_cor[4]+1;
                 m->enda = old_cor[1];
@@ -308,7 +310,7 @@ int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int* path,
                 m->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d\n",c+
-                aln_runner(m,path);
+                aln_runner(m);
                 break;
         case 7://gb->a = 7;
 
@@ -328,7 +330,7 @@ int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int* path,
                 m->endb = meet;
                 //fprintf(stderr,"Following first: %d  what:%d-%d	%d-%d\n",c-1,m->starta,m->enda,m->startb,m->endb);
 
-                aln_runner(m,path);
+                aln_runner(m);
                 //backward:
                 m->starta = old_cor[4]+1;
                 m->enda = old_cor[1];
@@ -342,7 +344,7 @@ int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int* path,
                 m->b[0].gb = input_states[5];
 
                 //fprintf(stderr,"Following last: %d\n",c+1);
-                aln_runner(m,path);
+                aln_runner(m);
                 break;
         default:
                 break;
