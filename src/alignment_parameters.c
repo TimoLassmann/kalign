@@ -43,7 +43,7 @@ int init_ap(struct aln_param** aln_param, struct parameters* param, int numseq,i
                 MMALLOC(ap, sizeof(struct aln_param));
                 ap->subm = NULL;
                 ap->chaos = param->chaos;
-
+                ap->nthreads = param->nthreads;
                 MMALLOC(ap->subm,sizeof (float*) * 23);
 
                 for (i = 23;i--;){

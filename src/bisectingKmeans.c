@@ -120,20 +120,12 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_tasks** t
         START_TIMER(timer);
         LOG_MSG("Building guide tree.");
 
+        if(ap->nthreads == 1){
+                root = bisecting_kmeans_serial(msa,root, dm, samples, numseq, num_anchors, numseq);
+        }else{
+                root = bisecting_kmeans_parallel(msa,root, dm, samples, numseq, num_anchors, numseq);
+        }
 
-
-/* #pragma omp parallel */
-
-/*         // Only the first thread will spawn other threads */
-/* #pragma omp single nowait */
-/*         { */
-/* #endif */
-
-        root = bisecting_kmeans_parallel(msa,root, dm, samples, numseq, num_anchors, numseq);
-
-/* #ifdef HAVE_OPENMP */
-/*         } */
-/* #endif */
         STOP_TIMER(timer);
         GET_TIMING(timer);
 
@@ -283,9 +275,9 @@ struct node* bisecting_kmeans_serial(struct msa* msa, struct node* n, float** dm
 {
         struct kmeans_result* res_tmp = NULL;
         struct kmeans_result* best = NULL;
-        struct kmeans_result* res_ptr = NULL;
+        struct kmeans_result** res_ptr = NULL;
         int i,j;
-        int tries = 50;
+        int tries = 40;
         /* int t_iter; */
         /* int r; */
         int* sl = NULL;
@@ -300,30 +292,41 @@ struct node* bisecting_kmeans_serial(struct msa* msa, struct node* n, float** dm
                 MFREE(samples);
                 return n;
         }
+
         best = NULL;
         res_tmp = NULL;
 
+        MMALLOC(res_ptr, sizeof(struct kmeans_result*) * 4);
+        for(i = 0; i < 4;i++){
+                res_ptr[i] = NULL;
+        }
         tries = MACRO_MIN(tries, num_samples);
         int step = num_samples / tries;
         int change = 0;
-        for(i = 0;i < tries;i += 5){
+        for(i = 0;i < tries;i += 4){
                 change = 0;
-                for(j = 0; j < 5;j++){
-                        /* LOG_MSG("Looking at %d limit: %d", i+j, tries); */
-                        split(dm,samples,num_anchors, num_samples, (i+ j)*step, &res_ptr);
+                for(j = 0; j < 4;j++){
+                        split(dm,samples,num_anchors, num_samples, (i+ j)*step, &res_ptr[j]);
+                }
+
+
+                for(j = 0; j < 4;j++){
                         if(!best){
                                 change++;
-                                best = res_ptr;
-                                res_tmp = NULL;
+                                best = res_ptr[j];
+                                res_ptr[j] = NULL;
                         }else{
-                                if(best->score > res_ptr->score){
+                                if(best->score > res_ptr[j]->score){
                                         res_tmp = best;
-                                        best = res_ptr;
-                                        res_ptr = res_tmp;
+                                        best = res_ptr[j];
+                                        res_ptr[j] = res_tmp;
                                         /* LOG_MSG("Better!!! %f %f", res_tmp->score,best->score); */
 
                                         change++;
                                 }
+
+
+
                         }
                 }
                 if(!change){
@@ -338,15 +341,17 @@ struct node* bisecting_kmeans_serial(struct msa* msa, struct node* n, float** dm
 
         num_r = best->nr;
 
+        for(i = 0; i < 4;i++){
+                free_kmeans_results(res_ptr[i]);
+        }
+        MFREE(res_ptr);
         MFREE(best);
 
         MFREE(samples);
         n = alloc_node();
 
         n->left = bisecting_kmeans_serial(msa,n->left, dm, sl, numseq, num_anchors,num_l);
-
         n->right = bisecting_kmeans_serial(msa,n->right, dm, sr, numseq, num_anchors, num_r);
-
         return n;
 ERROR:
         return NULL;

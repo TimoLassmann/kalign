@@ -37,7 +37,6 @@ struct aln_mem{
         int len_a;
         int len_b;
 
-
         int sip;
         int mode;
 };

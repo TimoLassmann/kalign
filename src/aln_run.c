@@ -24,6 +24,7 @@ static void recursive_aln_serial(struct msa* msa, struct aln_tasks*t, struct aln
 
 
 static int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id);
+static int do_align_serial(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id);
 static int do_score(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id);
 
 static int SampleWithoutReplacement(struct rng_state* rng, int N, int n,int* samples);
@@ -357,7 +358,7 @@ ERROR:
 /* #endif */
 
 
-int create_msa_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
+int create_msa_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t, int n_threads)
 {
         int i;
         uint8_t* active = NULL;
@@ -372,7 +373,12 @@ int create_msa_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
                 active[i] = 0;
         }
 #ifdef HAVE_OPENMP
-        recursive_aln_openMP(msa, t, ap, active, t->n_tasks-1);
+
+        if(n_threads == 1){
+                recursive_aln_serial(msa, t, ap, active, t->n_tasks-1);
+        }else{
+                recursive_aln_openMP(msa, t, ap, active, t->n_tasks-1);
+        }
 #else
         recursive_aln_serial(msa, t, ap, active, t->n_tasks-1);
 #endif
@@ -453,18 +459,14 @@ void recursive_aln_serial(struct msa* msa, struct aln_tasks*t,struct aln_param* 
         */
         /* LOG_MSG("Work: %d", local_t->n); */
         if(!active[local_t->a]){
-
                 if(local_t->a >= msa->numseq){ /* I have an internal node  */
-
                         recursive_aln_serial(msa, t, ap, active, local_t->a - msa->numseq);
                 }
                 /* I have a lead node - do nothing */
         }
 
         if(!active[local_t->b]){
-
                 if(local_t->b >= msa->numseq){ /* I have an internal node */
-
                         recursive_aln_serial(msa, t, ap, active, local_t->b - msa->numseq);
                 }
                 /* I have a lead node - do nothing */
@@ -476,15 +478,12 @@ void recursive_aln_serial(struct msa* msa, struct aln_tasks*t,struct aln_param* 
  */
         struct aln_mem* ml = NULL;
 
-
-
         alloc_aln_mem(&ml, 2048);
-
 
         ml->ap = ap;
         ml->mode = ALN_MODE_FULL;
 
-        do_align(msa,t,ml,c);
+        do_align_serial(msa,t,ml,c);
         active[local_t->c] = 1;
         free_aln_mem(ml);
 }
@@ -671,10 +670,8 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                         m->prof2 = NULL;
                         aln_runner(m);
                 }else{
-
                         len_b = m->len_b;
                         len_a = m->len_a;
-
 
                         m->enda = len_b;
                         m->endb = len_a;
@@ -728,7 +725,6 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                                 m->len_b = len_b;
                         }
                 }
-
         }
 
         RUN(add_gap_info_to_path_n(m)) ;
@@ -752,7 +748,7 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
 
         MREALLOC(msa->sip[c],sizeof(int)*(msa->nsip[a] + msa->nsip[b]));
 
-        g =0;
+        g = 0;
         for (j = msa->nsip[a];j--;){
                 msa->sip[c][g] = msa->sip[a][j];
                 g++;
@@ -766,6 +762,139 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
 ERROR:
         return FAIL;
 }
+
+int do_align_serial(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
+{
+        float* tmp = NULL;
+        int a,b,c;
+        int len_a;
+        int len_b;
+        int j,g;
+
+        a = t->list[task_id]->a;
+        b = t->list[task_id]->b;
+        c = t->list[task_id]->c;
+
+        if(msa->nsip[a] == 1){
+                m->len_a = msa->sequences[a]->len;//  aln->sl[a];
+                RUN(make_profile_n(m->ap, msa->sequences[a]->s,m->len_a,&t->profile[a]));
+        }else{
+                m->len_a = msa->plen[a];
+                RUN(set_gap_penalties_n(t->profile[a],m->len_a,msa->nsip[b]));
+        }
+
+        if(msa->nsip[b] == 1){
+                m->len_b = msa->sequences[b]->len;// aln->sl[b];
+                RUN(make_profile_n(m->ap, msa->sequences[b]->s,m->len_b,&t->profile[b]));
+        }else{
+                m->len_b = msa->plen[b];
+                RUN(set_gap_penalties_n(t->profile[b],m->len_b,msa->nsip[a]));
+        }
+
+        RUN(init_alnmem(m));
+
+        m->mode = ALN_MODE_FULL;
+        if(msa->nsip[a] == 1){
+                if(msa->nsip[b] == 1){
+                        m->seq1 = msa->sequences[a]->s;
+                        m->seq2 = msa->sequences[b]->s;
+                        m->prof1 = NULL;
+                        m->prof2 = NULL;
+                        aln_runner_serial(m);
+                }else{
+                        len_b = m->len_b;
+                        len_a = m->len_a;
+
+                        m->enda = len_b;
+                        m->endb = len_a;
+                        m->len_a = len_b;
+                        m->len_b = len_a;
+
+                        m->seq1 = NULL;
+                        m->seq2 = msa->sequences[a]->s;
+                        m->prof1 = t->profile[b];
+                        m->prof2 = NULL;
+                        m->sip = msa->nsip[b];
+
+                        aln_runner_serial(m);
+                        RUN(mirror_path_n(m, len_a,len_b));
+                        m->len_a = len_a;
+                        m->len_b = len_b;
+                }
+        }else{
+                if(msa->nsip[b] == 1){
+                        m->seq1 = NULL;
+                        m->seq2 = msa->sequences[b]->s;
+                        m->prof1 = t->profile[a];
+                        m->prof2 = NULL;
+                        m->sip = msa->nsip[a];
+                        aln_runner_serial(m);
+                }else{
+                        if(m->len_a < m->len_b){
+                                m->seq1 = NULL;
+                                m->seq2 = NULL;
+                                m->prof1 = t->profile[a];
+                                m->prof2 = t->profile[b];
+                                aln_runner_serial(m);
+                        }else{
+                                len_b = m->len_b;
+                                len_a = m->len_a;
+
+                                m->enda = len_b;
+                                m->endb = len_a;
+                                m->len_a = len_b;
+                                m->len_b = len_a;
+
+                                m->seq1 = NULL;
+                                m->seq2 = NULL;
+                                m->prof1 = t->profile[b];
+                                m->prof2 = t->profile[a];
+
+                                aln_runner_serial(m);
+
+                                RUN(mirror_path_n(m,len_a,len_b));
+                                m->len_a = len_a;
+                                m->len_b = len_b;
+                        }
+                }
+        }
+
+        RUN(add_gap_info_to_path_n(m)) ;
+
+        MMALLOC(tmp,sizeof(float)*64*(m->path[0]+2));
+
+        /* LOG_MSG("%d TASK ID", task_id); */
+        if(task_id != t->n_tasks-1){
+                update_n(t->profile[a],t->profile[b],tmp,m->ap,m->path,msa->nsip[a],msa->nsip[b]);
+        }
+
+        MFREE(t->profile[a]);
+        MFREE(t->profile[b]);
+
+        t->profile[c] = tmp;
+        RUN(make_seq(msa,a,b,m->path));
+
+        msa->plen[c] = m->path[0];
+
+        msa->nsip[c] = msa->nsip[a] + msa->nsip[b];
+
+        MREALLOC(msa->sip[c],sizeof(int)*(msa->nsip[a] + msa->nsip[b]));
+
+        g = 0;
+        for (j = msa->nsip[a];j--;){
+                msa->sip[c][g] = msa->sip[a][j];
+                g++;
+        }
+        for (j = msa->nsip[b];j--;){
+                msa->sip[c][g] = msa->sip[b][j];
+                g++;
+        }
+
+        return OK;
+ERROR:
+        return FAIL;
+}
+
 
 int do_score(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
 /* int score_aln(struct aln_mem* m,float** profile, struct msa* msa, int a,int b,int numseq,float* score) */

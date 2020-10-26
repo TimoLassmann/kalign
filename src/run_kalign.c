@@ -552,7 +552,7 @@ int run_kalign(struct parameters* param)
         if(param->chaos){
                 RUN(create_chaos_msa_openMP(msa, ap,tasks));
         }else{
-                RUN(create_msa_tree(msa, ap, tasks));
+                RUN(create_msa_tree(msa, ap, tasks,param->nthreads));
         }
         /* RUN(create_msa_openMP(msa,ap, tasks)); */
 

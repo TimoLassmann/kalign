@@ -43,8 +43,8 @@ struct aln_param{
         /* int sip; */
         /* int mode; */
 
-
-         int chaos;
+        int nthreads;
+        int chaos;
         /* actual parameters  */
         float** subm;
         /* int* tree; */
