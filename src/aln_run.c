@@ -22,7 +22,6 @@
 static void recursive_aln_openMP(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, uint8_t* active, int c);
 static void recursive_aln_serial(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, uint8_t* active, int c);
 
-
 static int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id);
 static int do_align_serial(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id);
 static int do_score(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id);
@@ -123,7 +122,6 @@ int create_chaos_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tas
         MFREE(t_chaos->profile);
         t_chaos->profile = t->profile;
 
-
         MMALLOC(m, sizeof(struct aln_mem*) * n_threads);
         for(i = 0; i < n_threads;i++){
                 m[i] = NULL;
@@ -131,7 +129,6 @@ int create_chaos_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tas
                 m[i]->ap = ap;
                 m[i]->mode = ALN_MODE_FULL;
         }
-
 
         g = msa->num_profiles;
 

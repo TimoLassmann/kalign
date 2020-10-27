@@ -19,9 +19,6 @@ int init_alnmem(struct aln_mem* m)
         m->enda = m->len_a;
         m->endb = m->len_b;
 
-        /* m->len_a = len_a; */
-        /* m->len_b = len_b; */
-
         m->f[0].a  = 0.0F;
         m->f[0].ga = -FLT_MAX;
         m->f[0].gb = -FLT_MAX;
@@ -35,9 +32,6 @@ int init_alnmem(struct aln_mem* m)
         for(i = 0 ;i  < g ;i++){
                 m->path[i] = -1;
         }
-
-
-
         return OK;
 ERROR:
         return FAIL;
@@ -45,7 +39,6 @@ ERROR:
 
 int make_profile_n(struct aln_param* ap,const uint8_t* seq,const int len, float** p)
 {
-
         float** subm = NULL;
         float* prof = NULL;
         float gpo;
@@ -231,8 +224,6 @@ int add_gap_info_to_path_n(struct aln_mem* m)
         m->path = m->tmp_path;
         m->tmp_path = tmp_path;
         return OK;
-ERROR:
-        return FAIL;
 }
 
 int update_n(const float* profa, const float* profb,float* newp, struct aln_param*ap, int* path,int sipa,int sipb)
@@ -387,17 +378,13 @@ int mirror_path_n(struct aln_mem* m,int len_a,int len_b)
         int* apath = NULL;
         int* opath = NULL;
         int* tmppath = NULL;
-        int* np =NULL;
-
         int i;
 
         apath = m->path;
         opath = m->tmp_path;
 
-
         for(i =0; i < len_a+2;i++){
                 opath[i] = -1;
-
         }
 
         for(i = 1; i <= len_b;i++){
@@ -409,8 +396,5 @@ int mirror_path_n(struct aln_mem* m,int len_a,int len_b)
         tmppath = m->path;
         m->path = m->tmp_path;
         m->tmp_path = tmppath;
-
         return OK;
-ERROR:
-        return FAIL;
 }

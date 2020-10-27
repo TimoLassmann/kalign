@@ -246,11 +246,11 @@ int new_aln_matrices(struct aln_param* ap)
 
         for(i = 0; i < 23;i++){
                 for(j = 0; j < 23;j++){
-                        ap->subm[i][j] = (float)(CorBLOSUM66_13plus[i][j]);
+                        ap->subm[i][j] = (float)(CorBLOSUM66_13plus[i][j]) *2.0F;
                 }
         }
-        ap->gpo = 5.5F;
-        ap->gpe = 2.0F;
-        ap->tgpe = 1.0F;
+        ap->gpo = 5.5F * 2.0F;
+        ap->gpe = 2.0 * 2.0F;
+        ap->tgpe = 1.0F * 2.0F;
         return OK;
 }
