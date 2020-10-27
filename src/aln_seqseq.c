@@ -7,10 +7,8 @@
 #include "aln_struct.h"
 #define ALN_SEQSEQ
 #include "aln_seqseq.h"
-
 #define MAX(a, b) (a > b ? a : b)
 #define MAX3(a,b,c) MAX(MAX(a,b),c)
-
 
 int aln_seqseq_foward(struct aln_mem* m)
 {
