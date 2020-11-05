@@ -260,9 +260,8 @@ int aln_seqseq_meetup(struct aln_mem* m,int old_cor[],int* meet,int* t,float* sc
         c = -1;
         //for(i = hm->startb; i < hm->endb;i++){
         for(i = old_cor[2]; i < old_cor[3];i++){
-
                 sub = fabsf(middle - (float)i);
-                sub /= 1000;
+                sub /= 1000.0F;
                 //	fprintf(stderr,"%d-%d	%f\n",hm->startb,hm->endb,sub);
                 if(f[i].a+b[i].a-sub > max){
                         max = f[i].a+b[i].a-sub;

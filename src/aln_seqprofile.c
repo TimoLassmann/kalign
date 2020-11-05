@@ -270,7 +270,7 @@ int aln_seqprofile_meetup(struct aln_mem* m,int old_cor[],int* meet,int* t,float
         //for(i = m->startb; i < m->endb;i++){
         for(i = old_cor[2]; i < old_cor[3];i++){
                 sub = fabsf(middle -i);
-                sub /= 1000;
+                sub /= 1000.0F;
                 if(f[i].a+b[i].a-sub> max){
                         max = f[i].a+b[i].a-sub;
                         //		fprintf(stderr,"aligned->aligned:%d + %d = %d\n",f[i].a,b[i].a,f[i].a+b[i].a);
@@ -323,7 +323,7 @@ int aln_seqprofile_meetup(struct aln_mem* m,int old_cor[],int* meet,int* t,float
         i = old_cor[3];
 
         sub = fabsf(middle -i);
-        sub /= 1000;
+        sub /= 1000.0F;
         if(f[i].a+b[i].gb+prof1[27]-sub > max){
                 max = f[i].a+b[i].gb+prof1[27]-sub;
                 //		fprintf(stderr,"aligned->gap_b:%d + %d +%d = %d\n",f[i].a,b[i].gb,prof1[27],f[i].a+b[i].gb+prof1[27]);

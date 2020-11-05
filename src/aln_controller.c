@@ -168,12 +168,10 @@ int aln_runner_serial(struct aln_mem* m)
         old_cor[3] = m->endb;
         old_cor[4] = mid;
 
-
         /* fprintf(stderr,"Forward:%d-%d	%d-%d\n",m->starta,m->enda,m->startb,m->endb); */
         m->enda = mid;
         m->starta_2 = mid;
         m->enda_2 = old_cor[1];
-
 
         if(m->seq1){
                 aln_seqseq_foward(m);

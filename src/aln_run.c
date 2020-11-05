@@ -475,7 +475,7 @@ void recursive_aln_serial(struct msa* msa, struct aln_tasks*t,struct aln_param* 
  */
         struct aln_mem* ml = NULL;
 
-        alloc_aln_mem(&ml, 2048);
+        alloc_aln_mem(&ml, 256);
 
         ml->ap = ap;
         ml->mode = ALN_MODE_FULL;
@@ -886,7 +886,6 @@ int do_align_serial(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int t
                 msa->sip[c][g] = msa->sip[b][j];
                 g++;
         }
-
         return OK;
 ERROR:
         return FAIL;

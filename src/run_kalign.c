@@ -283,14 +283,17 @@ int main(int argc, char *argv[])
                         abort ();
                 }
         }
+
         if(version){
                 fprintf(stdout,"%s %s\n",PACKAGE_NAME, PACKAGE_VERSION);
                 free_parameters(param);
                 return EXIT_SUCCESS;
         }
+
         if(!param->dump_internal){
                 print_kalign_header();
         }
+
 #ifndef HAVE_AVX2
         RUN(print_AVX_warning());
 #endif
@@ -300,6 +303,7 @@ int main(int argc, char *argv[])
                 free_parameters(param);
                 return EXIT_SUCCESS;
         }
+
         if(param->help_flag){
                 RUN(print_kalign_help(argv));
                 free_parameters(param);
@@ -312,8 +316,6 @@ int main(int argc, char *argv[])
                 free_parameters(param);
                 return EXIT_FAILURE;
         }
-
-
 
         param->num_infiles = 0;
 
@@ -348,6 +350,7 @@ int main(int argc, char *argv[])
                 param->infile[c] = in;
                 c++;
         }
+
         if (optind < argc){
                 while (optind < argc){
                         param->infile[c] =  argv[optind++];
@@ -410,6 +413,7 @@ int main(int argc, char *argv[])
                         return EXIT_SUCCESS;
                 }
         }
+
         if(param->chaos){
                 if(param->chaos == 1){
                         ERROR_MSG("Param chaos need to be bigger than 1 (currently %d)", param->chaos);
@@ -418,7 +422,6 @@ int main(int argc, char *argv[])
                         ERROR_MSG("Param chaos bigger than 10 (currently %d)",param->chaos);
                 }
         }
-        //log_command_line(argc, argv);
 
         RUN(run_kalign(param));
 
@@ -427,6 +430,7 @@ int main(int argc, char *argv[])
                         MFREE(param->infile[c]);
                 }
         }
+
         free_parameters(param);
         return EXIT_SUCCESS;
 ERROR:
@@ -442,11 +446,12 @@ int run_kalign(struct parameters* param)
         struct aln_tasks* tasks = NULL;
 
         int i;
+
 #ifdef HAVE_OPENMP
         omp_set_nested(1);
         omp_set_num_threads(param->nthreads);
-
 #endif
+
         if(param->num_infiles == 1){
                 RUN(read_input(param->infile[0],&msa));
         }else{
@@ -498,7 +503,6 @@ int run_kalign(struct parameters* param)
         /* allocate aln parameters  */
         RUN(init_ap(&ap,param,msa->numseq,msa->L ));
 
-
         if(param->dump_internal){
                 double* s;
                 int s_len;
@@ -537,7 +541,7 @@ int run_kalign(struct parameters* param)
         RUN(init_ap(&ap,param,msa->numseq,msa->L ));
 
 
-/* Start alignment stuff */
+        /* Start alignment stuff */
         DECLARE_TIMER(t1);
         LOG_MSG("Aligning");
         START_TIMER(t1);

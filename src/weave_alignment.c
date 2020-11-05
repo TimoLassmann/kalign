@@ -133,6 +133,12 @@ int make_seq(struct msa* msa,int a,int b,int* path)
         MFREE(gap_b);
         return OK;
 ERROR:
+        if(gap_a){
+                MFREE(gap_a);
+        }
+        if(gap_b){
+                MFREE(gap_b);
+        }
         return FAIL;
 }
 

@@ -15,9 +15,9 @@
 int aln_profileprofile_foward(struct aln_mem* m)
 {
         unsigned int freq[24];
-        const float* prof1 = m->prof1;
-        const float* prof2 = m->prof2;
-        struct states* s = m->f;
+        const float* restrict prof1 = m->prof1;
+        const float* restrict prof2 = m->prof2;
+        struct states* restrict s = m->f;
         register float pa = 0;
         register float pga = 0;
         register float pgb = 0;
@@ -150,9 +150,9 @@ int aln_profileprofile_foward(struct aln_mem* m)
 int aln_profileprofile_backward(struct aln_mem* m)
 {
         unsigned int freq[24];
-        struct states* s = m->b;
-        const float* prof1 = m->prof1;
-        const float* prof2 = m->prof2;
+        struct states* restrict s = m->b;
+        const float* restrict prof1 = m->prof1;
+        const float* restrict prof2 = m->prof2;
 
         register float pa = 0;
         register float pga = 0;
@@ -167,6 +167,7 @@ int aln_profileprofile_backward(struct aln_mem* m)
         register int c = 0;
 
         register int f = 0;
+
         prof1 += (m->enda_2 +1) << 6;
         prof2 += (m->endb+1) << 6;
         s[m->endb].a = s[0].a;
@@ -198,7 +199,6 @@ int aln_profileprofile_backward(struct aln_mem* m)
         while(i--){
                 prof1 -= 64;
 
-                //c = 1;
                 f = 0;
                 for (j = 0;j < 23; j++){
                         if(prof1[j]){
@@ -226,6 +226,8 @@ int aln_profileprofile_backward(struct aln_mem* m)
 
                 prof2 += (m->endb-m->startb) << 6;
                 for(j = m->endb-1;j > m->startb;j--){
+
+
                         prof2 -= 64;
                         ca = s[j].a;
 
@@ -371,7 +373,7 @@ int aln_profileprofile_meetup(struct aln_mem* m,int old_cor[], int* meet,int* t,
         //i = m->endb;
         i = old_cor[3];
         sub = fabsf(middle - (float)i);
-        sub /= 1000;
+        sub /= 1000.0F;
         if(f[i].a+b[i].gb+prof1[27]-sub > max){
                 max = f[i].a+b[i].gb+prof1[27]-sub;
                 //		fprintf(stderr,"aligned->gap_b:%d + %d +%d = %d\n",f[i].a,b[i].gb,prof1[27],f[i].a+b[i].gb+prof1[27]);
