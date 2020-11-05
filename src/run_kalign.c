@@ -65,10 +65,10 @@
 static int run_kalign(struct parameters* param);
 static int check_for_sequences(struct msa* msa);
 
-int print_kalign_header(void);
-int print_kalign_help(char * argv[]);
-int print_kalign_warranty(void);
-int print_AVX_warning(void);
+static int print_kalign_header(void);
+static int print_kalign_help(char * argv[]);
+static int print_kalign_warranty(void);
+static int print_AVX_warning(void);
 
 int print_kalign_help(char * argv[])
 {
@@ -326,13 +326,16 @@ int main(int argc, char *argv[])
         if (!isatty(fileno(stdin))){
                 param->num_infiles++;
         }
+
         if(in){
                 param->num_infiles++;
         }
+
         if (optind < argc){
                 param->num_infiles += argc-optind;
         }
-        if(param->num_infiles ==0){
+
+        if(param->num_infiles == 0){
                 RUN(print_kalign_help(argv));
                 LOG_MSG("No input files");
                 free_parameters(param);
