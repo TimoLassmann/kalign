@@ -15,15 +15,16 @@ data/BB11001.tfa \
 data/BB12006.msf \
 data/BB12006.tfa \
 data/BB30014.msf \
-data/BB30014.tfa
+data/BB30014.tfa \
+data/BB11001_EOF.msf
 
 @VALGRIND_CHECK_RULES@
 
 TESTS_ENVIRONMENT = \
-      myprog_abspath='$(top_srcdir)'/src/; \
-         export myprog_abspath;\
-	      testdatafiledir='$(top_srcdir)'/dev/data/; \
-         export testdatafiledir;
+			myprog_abspath='$(top_srcdir)'/src/; \
+				 export myprog_abspath;\
+				testdatafiledir='$(top_srcdir)'/dev/data/; \
+				 export testdatafiledir;
 
 
 TESTS = run_io_test.sh run_aln_test.sh
