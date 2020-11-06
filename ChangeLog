@@ -1,3 +1,13 @@
+2020-11-06  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+
+	* version 3.3 - Threading and more
+	- Kalign now runs pairwise distance estimation, guide tree building and alignments in parallel.
+	- Memory optimisations.
+	- Optimised bi-sectional K-means algorithm.
+	- added -clean option to check for sequences with identical names but different sequences.
+	- fixed minor bug in alignment I/O module
+
+
 2020-09-24  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
 
 	* version 3.2.7 - Development version
