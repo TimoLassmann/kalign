@@ -21,9 +21,6 @@ int help(char * argv[])
         fprintf(stdout,"Options:\n\n");
 
         fprintf(stdout,"\nTo plot results :\n\n");
-
-
-
         fprintf(stdout,"dat = read.csv(\"results_DNA.csv\",header = T)\n");
         fprintf(stdout,"l = str_split(dat$Alignment, \"_\")\n");
         fprintf(stdout,"c = data.frame(sapply(l, \"[[\", 1))\n");
@@ -149,10 +146,6 @@ int main(int argc, char *argv[])
         runname[j] = 0;
 
 
-        //LOG_MSG("runname = %s", runname);
-
-
-
         snprintf(cmd, BUFSIZ, "find %s  -name \"*.fa\"", param->inputdir);
         //snprintf(cmd, BUFSIZ, "find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name \"*.msf\" | grep structural");
         RUNP(pipe = popen(cmd,"r"));
@@ -163,7 +156,6 @@ int main(int argc, char *argv[])
                 ret[strcspn(ret, "\r\n")] = 0;
                 go = 1;
                 snprintf(filename, 512, "%s", ret);
-
 
                 l = strlen(filename);
 
@@ -242,9 +234,6 @@ int main(int argc, char *argv[])
         if (rc != EXIT_SUCCESS) { // == 0
                 ERROR_MSG("COMMAND FAILED: %s" , cmd);
         }
-
-
-
 
         snprintf(cmd, BUFSIZ, "%s_plotting.R", param->outfile);
 

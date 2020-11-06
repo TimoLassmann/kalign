@@ -728,7 +728,6 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
 
         MMALLOC(tmp,sizeof(float)*64*(m->path[0]+2));
 
-        /* LOG_MSG("%d TASK ID", task_id); */
         if(task_id != t->n_tasks-1){
                 update_n(t->profile[a],t->profile[b],tmp,m->ap,m->path,msa->nsip[a],msa->nsip[b]);
         }

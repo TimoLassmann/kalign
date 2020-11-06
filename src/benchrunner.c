@@ -48,7 +48,6 @@ int run_and_score(struct parameters_br* param);
 
 int main(int argc, char *argv[])
 {
-
         struct parameters_br* param = NULL;
         MMALLOC(param, sizeof(struct parameters_br));
         param->testseq = NULL;
@@ -207,7 +206,6 @@ int run_and_score(struct parameters_br* param)
         FILE* out_ptr = NULL;
         struct msa* ref_aln = NULL;
         struct msa* test_aln = NULL;
-
 
         char* basename = NULL;
         //struct parameters* param = NULL;

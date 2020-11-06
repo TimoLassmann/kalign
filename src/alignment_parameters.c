@@ -30,7 +30,6 @@ int set_param_number(struct aln_param* ap,int L, int sel);
 
 int new_aln_matrices(struct aln_param* ap);
 
-
 int init_ap(struct aln_param** aln_param, struct parameters* param, int numseq,int L)
 {
         struct aln_param* ap = NULL;
@@ -39,7 +38,6 @@ int init_ap(struct aln_param** aln_param, struct parameters* param, int numseq,i
         if(*aln_param){
                 ap = *aln_param;
         }else{
-
                 MMALLOC(ap, sizeof(struct aln_param));
                 ap->subm = NULL;
                 ap->chaos = param->chaos;

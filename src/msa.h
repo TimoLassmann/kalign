@@ -57,7 +57,8 @@ struct msa{
 /* dealign */
 int dealign_msa(struct msa* msa);
 
-
+/* clean */
+int run_extra_checks_on_msa(struct msa* msa);
 /* convert */
 int convert_msa_to_internal(struct msa* msa, int type);
 /* rw functions */

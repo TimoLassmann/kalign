@@ -62,6 +62,8 @@
 #define OPT_DUMP_INTERNAL 12
 #define OPT_NTHREADS 14
 
+#define OPT_CLEAN 15
+
 static int run_kalign(struct parameters* param);
 static int check_for_sequences(struct msa* msa);
 
@@ -192,6 +194,7 @@ int main(int argc, char *argv[])
                         {"devtest",  no_argument, 0, OPT_DEVTEST},
                         {"dumpinternal",no_argument, 0, OPT_DUMP_INTERNAL},
                         {"changename",  0, 0, OPT_RENAME},
+                        {"clean",  0, 0, OPT_CLEAN},
                         {"gpo",  required_argument, 0, OPT_GPO},
                         {"gpe",  required_argument, 0, OPT_GPE},
                         {"tgpe",  required_argument, 0, OPT_TGPE},
@@ -219,6 +222,9 @@ int main(int argc, char *argv[])
                         break;
                 }
                 switch(c) {
+                case OPT_CLEAN:
+                        param->clean = 1;
+                        break;
                 case OPT_CHAOS:
                         param->chaos = atoi(optarg);
                         break;
@@ -343,6 +349,7 @@ int main(int argc, char *argv[])
         }
         //fprintf(stdout,"%d fgiles\n",param->num_infiles);
         MMALLOC(param->infile, sizeof(char*) * param->num_infiles);
+
         c = 0;
         if (!isatty(fileno(stdin))){
                 param->infile[c] = NULL;
@@ -470,19 +477,25 @@ int run_kalign(struct parameters* param)
         /* check if we have sequences  */
         RUN(check_for_sequences(msa));
 
-        LOG_MSG("Detected: %d sequences.", msa->numseq);
+        /* extra checks for input alignments */
+        if(param->clean){
+                RUN(run_extra_checks_on_msa(msa));
+        }
 
+        LOG_MSG("Detected: %d sequences.", msa->numseq);
         /* If we just want to reformat end here */
         if(param->reformat){
                 //LOG_MSG("%s reformat",param->reformat);
                 for (i = 0 ;i < msa->numseq;i++){
                         msa->nsip[i] = i;
                 }
+
                 if(param->rename){
                         for (i = 0 ;i < msa->numseq;i++){
                                 snprintf(msa->sequences[i]->name, 128, "SEQ%d", i+1);
                         }
                 }
+
                 if(param->out_format == FORMAT_FA){
                         RUN(dealign_msa(msa));
                 }
@@ -494,7 +507,9 @@ int run_kalign(struct parameters* param)
                 if (byg_start(param->format,"fastaFASTAfaFA") != -1){
                         RUN(dealign_msa(msa));
                 }
+
                 RUN(write_msa(msa, param->outfile, param->out_format));
+
                 free_msa(msa);
                 return OK;
         }
@@ -515,12 +530,11 @@ int run_kalign(struct parameters* param)
                 }
                 fprintf(stdout,"\n");
                 MFREE(s);
-                //exit(0);
                 free_msa(msa);
                 return OK;
         }
-        /* Allocate tasks  */
 
+        /* Allocate tasks  */
         RUN(alloc_tasks(&tasks, msa->numseq));
 
         /* Start bi-secting K-means sequence clustering */
@@ -531,7 +545,6 @@ int run_kalign(struct parameters* param)
                 /* LOG_MSG("Set %d level (%d)", i, param->nthreads); */
                 omp_set_max_active_levels(i);
 #endif
-
                 RUN(build_tree_kmeans(msa,ap,&tasks));
         }
         /* by default all protein sequences are converted into a reduced alphabet
@@ -542,7 +555,6 @@ int run_kalign(struct parameters* param)
         }
         /* allocate aln parameters  */
         RUN(init_ap(&ap,param,msa->numseq,msa->L ));
-
 
         /* Start alignment stuff */
         DECLARE_TIMER(t1);
@@ -580,17 +592,10 @@ int run_kalign(struct parameters* param)
         STOP_TIMER(t1);
         GET_TIMING(t1);
 
-
-/* set to aligned */
+        /* set to aligned */
         msa->aligned = ALN_STATUS_ALIGNED;
-        //LOG_MSG("Weaving");
-        //START_TIMER(t1);
 
-        /* RUN(weave(msa,tasks)); */
-        //STOP_TIMER(t1);
-        //GET_TIMING(t1);
-/* clean up map */
-
+        /* clean up map */
         free_tasks(tasks);
 
         /* We are done. */

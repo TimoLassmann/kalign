@@ -51,6 +51,7 @@ struct parameters*init_param(void)
         param->matadd = 0.0F;
         param->chaos = 0;
         param->nthreads = 4;
+        param->clean = 0;
         return param;
 ERROR:
         free_parameters(param);
