@@ -177,7 +177,7 @@ float calc_distance(uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b, int L)
                 hash[i] = 0;
         }
         /* Protein sequence  */
-        if( L > defDNA){
+        if( L > ALPHA_defDNA){
 
                 for (i = len_a-2;i--;){
                         hv = (seq_a[i] << 5) + seq_a[i+1];
