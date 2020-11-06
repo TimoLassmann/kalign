@@ -27,6 +27,7 @@
 #include <immintrin.h>
 #endif
 
+#include <mm_malloc.h>
 
 #include "float.h"
 
