@@ -39,17 +39,17 @@ int main(void)
 {
         struct alphabet* a = NULL;
 
-        RUNP(a = create_alphabet(defPROTEIN));
+        RUNP(a = create_alphabet(ALPHA_defPROTEIN));
 
         print_alphabet(a);
         MFREE(a);
         a = NULL;
-        RUNP(a = create_alphabet(redPROTEIN));
+        RUNP(a = create_alphabet(ALPHA_redPROTEIN));
 
         print_alphabet(a);
         MFREE(a);
 
-        RUNP(a = create_alphabet(defDNA));
+        RUNP(a = create_alphabet(ALPHA_defDNA));
 
         print_alphabet(a);
         MFREE(a);

@@ -65,7 +65,7 @@ int hash_test(void)
         int i;
         uint8_t* internal = NULL;
 
-        RUNP(a = create_alphabet(defPROTEIN));
+        RUNP(a = create_alphabet(ALPHA_defPROTEIN));
 
         char seq[] = "GKGDPKKPRGKMSSYAFFVQTSREEHKKKHPDASVNFSEFSKKCSERWKTMSAKEKGKFEDMAKADKARYEREMKTYIPPKGE";
 
