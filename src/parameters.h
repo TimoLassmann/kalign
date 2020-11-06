@@ -48,6 +48,7 @@ struct parameters{
         int dump_internal;
         int nthreads;
         int clean;
+        int unalign;
         int help_flag;
 };
 

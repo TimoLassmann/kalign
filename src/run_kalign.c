@@ -63,6 +63,7 @@
 #define OPT_NTHREADS 14
 
 #define OPT_CLEAN 15
+#define OPT_UNALIGN 16
 
 static int run_kalign(struct parameters* param);
 static int check_for_sequences(struct msa* msa);
@@ -195,6 +196,7 @@ int main(int argc, char *argv[])
                         {"dumpinternal",no_argument, 0, OPT_DUMP_INTERNAL},
                         {"changename",  0, 0, OPT_RENAME},
                         {"clean",  0, 0, OPT_CLEAN},
+                        {"unalign",  0, 0, OPT_UNALIGN},
                         {"gpo",  required_argument, 0, OPT_GPO},
                         {"gpe",  required_argument, 0, OPT_GPE},
                         {"tgpe",  required_argument, 0, OPT_TGPE},
@@ -224,6 +226,9 @@ int main(int argc, char *argv[])
                 switch(c) {
                 case OPT_CLEAN:
                         param->clean = 1;
+                        break;
+                case OPT_UNALIGN:
+                        param->unalign = 1;
                         break;
                 case OPT_CHAOS:
                         param->chaos = atoi(optarg);
@@ -403,9 +408,9 @@ int main(int argc, char *argv[])
                 }else if(strstr(param->format,"clu")){
                         param->out_format = FORMAT_CLU;
                 }else if(strstr(param->format,"fasta")){
-                        param->out_format  =FORMAT_FA;
+                        param->out_format  = FORMAT_FA;
                 }else if(strstr(param->format,"fa")){
-                        param->out_format  =FORMAT_FA;
+                        param->out_format  = FORMAT_FA;
                 }else{
                         ERROR_MSG("Format %s not recognized.",param->format);
                 }
@@ -495,17 +500,13 @@ int run_kalign(struct parameters* param)
                                 snprintf(msa->sequences[i]->name, 128, "SEQ%d", i+1);
                         }
                 }
-
-                if(param->out_format == FORMAT_FA){
+                if(param->unalign){
+                        /* if(param->out_format == FORMAT_FA){ */
                         RUN(dealign_msa(msa));
                 }
 
                 if(param->out_format != FORMAT_FA && msa->aligned != ALN_STATUS_ALIGNED){
                         ERROR_MSG("Input sequences are not aligned - cannot write to MSA format: %s", param->format);
-                }
-
-                if (byg_start(param->format,"fastaFASTAfaFA") != -1){
-                        RUN(dealign_msa(msa));
                 }
 
                 RUN(write_msa(msa, param->outfile, param->out_format));
