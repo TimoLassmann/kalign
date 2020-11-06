@@ -569,7 +569,9 @@ int run_kalign(struct parameters* param)
         omp_set_max_active_levels(i);
 #endif
         if(param->chaos){
+
                 RUN(create_chaos_msa_openMP(msa, ap,tasks));
+
         }else{
                 RUN(create_msa_tree(msa, ap, tasks,param->nthreads));
         }
