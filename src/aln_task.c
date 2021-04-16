@@ -7,7 +7,6 @@ static int sort_tasks_by_priority(const void *a, const void *b);
 static int sort_tasks_by_c(const void *a, const void *b);
 
 
-
 int sort_tasks(struct aln_tasks* t , int order)
 {
         ASSERT(t != NULL, "No tasks");
