@@ -18,5 +18,4 @@ do
         printf "with ERROR $status and Message:\n\n$error\n\n";
         exit 1;
     fi
-
 done

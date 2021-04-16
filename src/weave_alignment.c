@@ -28,32 +28,6 @@
 //int update_gaps(int old_len,int*gis,int new_len,int *newgaps);
 int update_gaps(int old_len,int*gis,int *newgaps);
 
-int weave(struct msa* msa,struct aln_tasks*t)
-{
-        int i;
-        int a,b,c;
-
-        //RUN(clean_aln(aln)
-
-        for(i = 0; i < t->n_tasks;i++){
-                a = t->list[i]->a;
-                b = t->list[i]->b;
-                c = t->list[i]->c;
-                /* fprintf(stdout,"%3d %3d -> %3d (p: %d)\n", t->list[i]->a, t->list[i]->b, t->list[i]->c, t->list[i]->p); */
-                /* RUN(make_seq(msa,a,b,t->map[c])); */
-        }
-
-        /*for (i = 0; i < (msa->numseq-1)*3;i +=3){
-                a = tree[i];
-                b = tree[i+1];
-                RUN(make_seq(msa,a,b,map[tree[i+2]]));
-                }*/
-
-        return OK;
-ERROR:
-        return FAIL;
-}
-
 int clean_aln(struct msa* msa)
 {
         int i,j;

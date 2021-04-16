@@ -1,7 +1,7 @@
 /*
     Kalign - a multiple sequence alignment program
 
-    Copyright 2006, 2019, 2020 Timo Lassmann
+    Copyright 2006, 2019, 2020, 2021 Timo Lassmann
 
     This file is part of kalign.
 
@@ -132,7 +132,7 @@ int print_kalign_header(void)
         fprintf(stdout,"\n");
         fprintf(stdout,"Kalign (%s)\n", PACKAGE_VERSION);
         fprintf(stdout,"\n");
-        fprintf(stdout,"Copyright (C) 2006,2019,2020 Timo Lassmann\n");
+        fprintf(stdout,"Copyright (C) 2006,2019,2020,2021 Timo Lassmann\n");
         fprintf(stdout,"\n");
         fprintf(stdout,"This program comes with ABSOLUTELY NO WARRANTY; for details type:\n");
         fprintf(stdout,"`kalign -showw'.\n");
@@ -520,7 +520,7 @@ int run_kalign(struct parameters* param)
         }
 
         /* allocate aln parameters  */
-        RUN(init_ap(&ap,param,msa->numseq,msa->L ));
+        RUN(init_ap(&ap,param,msa->L ));
 
         if(param->dump_internal){
                 double* s;
@@ -555,7 +555,7 @@ int run_kalign(struct parameters* param)
                 RUN(convert_msa_to_internal(msa, ALPHA_ambigiousPROTEIN));
         }
         /* allocate aln parameters  */
-        RUN(init_ap(&ap,param,msa->numseq,msa->L ));
+        RUN(init_ap(&ap,param,msa->L ));
 
         /* Start alignment stuff */
         DECLARE_TIMER(t1);

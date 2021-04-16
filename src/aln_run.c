@@ -868,6 +868,7 @@ int do_align_serial(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int t
         MFREE(t->profile[b]);
 
         t->profile[c] = tmp;
+
         RUN(make_seq(msa,a,b,m->path));
 
         msa->plen[c] = m->path[0];

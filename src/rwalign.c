@@ -65,29 +65,29 @@ struct out_line{
 
 
 
+static int aln_unknown_warning_message(struct msa* msa);
+static int read_fasta(struct in_buffer* b, struct msa** msa);
+static int read_msf(struct in_buffer* b, struct msa** msa);
+static int read_clu(struct in_buffer* b, struct msa** msa);
 
-int read_fasta(struct in_buffer* b, struct msa** msa);
-int read_msf(struct in_buffer* b, struct msa** msa);
-int read_clu(struct in_buffer* b, struct msa** msa);
-
-int write_msa_fasta(struct msa* msa,char* outfile);
-int write_msa_clustal(struct msa* msa,char* outfile);
-int write_msa_msf(struct msa* msa,char* outfile);
+static int write_msa_fasta(struct msa* msa,char* outfile);
+static int write_msa_clustal(struct msa* msa,char* outfile);
+static int write_msa_msf(struct msa* msa,char* outfile);
 
 /* memory functions  */
-struct msa* alloc_msa(void);
-int resize_msa(struct msa* msa);
+static struct msa* alloc_msa(void);
+static int resize_msa(struct msa* msa);
 
 
-struct msa_seq* alloc_msa_seq(void);
-int resize_msa_seq(struct msa_seq* seq);
-void free_msa_seq(struct msa_seq* seq);
+static struct msa_seq* alloc_msa_seq(void);
+static int resize_msa_seq(struct msa_seq* seq);
+static void free_msa_seq(struct msa_seq* seq);
 
 
 
-struct line_buffer* alloc_line_buffer(int max_line_len);
-int resize_line_buffer(struct line_buffer* lb);
-void free_line_buffer(struct line_buffer* lb);
+static struct line_buffer* alloc_line_buffer(int max_line_len);
+static int resize_line_buffer(struct line_buffer* lb);
+static void free_line_buffer(struct line_buffer* lb);
 
 static int read_file_stdin(struct in_buffer** buffer,char* infile);
 static int alloc_in_buffer(struct in_buffer** buffer, int n);
@@ -105,8 +105,6 @@ static int make_linear_sequence(struct msa_seq* seq, char* linear_seq);
 static int GCGMultchecksum(struct msa* msa);
 /* Taken from squid library by Sean Eddy  */
 static int GCGchecksum(char *seq, int len);
-
-
 
 static int sort_by_name(const void *a, const void *b);
 static int sort_by_chksum(const void *a, const void *b);
@@ -248,7 +246,6 @@ int read_input(char* infile,struct msa** msa)
         STOP_TIMER(timer);
         GET_TIMING(timer);
         DESTROY_TIMER(timer);
-        //LOG_MSG("Done reading input sequences in %f seconds.", GET_TIMING(timer));
         *msa = m;
         return OK;
 ERROR:
@@ -465,7 +462,8 @@ int detect_aligned(struct msa* msa)
         min_len = INT32_MAX;
         max_len = 0;
         gaps = 0;
-        n = MACRO_MIN(50, msa->numseq);
+        /* n = MACRO_MIN(50, msa->numseq); */
+        n = msa->numseq;
         for(i = 0; i < n;i++){
                 l = 0;
                 for (j = 0; j <= msa->sequences[i]->len;j++){
@@ -480,12 +478,17 @@ int detect_aligned(struct msa* msa)
                 if(min_len == max_len){ /* sequences have gaps and total length is identical - clearly aligned  */
                         msa->aligned = ALN_STATUS_ALIGNED;
                 }else{          /* odd there are gaps but total length differs - unknown status  */
+                        aln_unknown_warning_message(msa);
+
                         msa->aligned = ALN_STATUS_UNKNOWN;
                 }
         }else{
                 if(min_len == max_len){ /* no gaps and sequences have same length. Can' tell if they are aligned  */
+                        aln_unknown_warning_message(msa);
                         msa->aligned = ALN_STATUS_UNKNOWN;
                 }else{          /* No gaps and sequences have different lengths - unaligned */
+
+
                         msa->aligned = ALN_STATUS_UNALIGNED;
                 }
         }
@@ -493,15 +496,36 @@ int detect_aligned(struct msa* msa)
         return OK;
 }
 
+static int aln_unknown_warning_message(struct msa* msa)
+{
+        int i;
+        WARNING_MSG("--------------------------------------------");
+        WARNING_MSG("The input sequences contain gap characters: ");
+
+        for(i = 0; i < 128;i++){
+                if(msa->letter_freq[i] && ispunct(i)){
+                         WARNING_MSG("\"%c\" : %4d found                            ", (char)i,msa->letter_freq[i] );
+                }
+        }
+
+        WARNING_MSG("BUT the sequences do not seem to be aligned!");
+        WARNING_MSG("                                            ");
+        WARNING_MSG("Kalign will remove the gap characters and   ");
+        WARNING_MSG("align the sequences.                        ");
+        WARNING_MSG("--------------------------------------------");
+        return OK;
+}
+
+
 /* Checks if sequence names are duplicated */
 /* Checks if sequences are duplicated */
 int run_extra_checks_on_msa(struct msa* msa)
 {
         char* tmp_name = NULL;
-        char* tmp_ptr;
+        /* char* tmp_ptr; */
         struct sort_struct_name_chksum** a = NULL;
         int i;
-        int j;
+        /* int j; */
         int c;
         int l;
 
@@ -1174,50 +1198,30 @@ int read_clu(struct in_buffer* b , struct msa** m)
 {
         struct msa* msa = NULL;
         struct msa_seq* seq_ptr = NULL;
-        //FILE* f_ptr = NULL;
+
         char* line = NULL;
-        //size_t b_len = 0;
-        //ssize_t nread;
         int i,j;
         char* p;
         int active_seq = 0;
         int line_len;
         int nl,ni;
-        /* sanity checks  */
-        //if(!my_file_exists(infile)){
-        //ERROR_MSG("File: %s does not exist.",infile);
-        //}
+
         if(msa == NULL){
                 msa = alloc_msa();
         }
 
-        //RUNP(f_ptr = fopen(infile, "r"));
-        //LOG_MSG("GAGA");
-        /* scan through first line header  */
-        //while(fgets(line, BUFFER_LEN, f_ptr)){
-        //while ((nread = getline(&line, &b_len, f_ptr)) != -1){
-                //fprintf(stdout,"LINE: %s", line);
-                //line_len = strnlen(line, BUFFER_LEN);
         ni =0;
         for(nl = 0; nl < b->n_lines;nl++){
                 line = b->l[nl]->line;
                 line_len = b->l[nl]->len;
                 ni++;
-                //line_len = nread;
-                //line[line_len-1] = 0;
-                /* line_len--; */
                 break;
         }
         active_seq =0;
         for(nl = ni; nl < b->n_lines;nl++){
                 line = b->l[nl]->line;
                 line_len = b->l[nl]->len;
-                //while ((nread = getline(&line, &b_len, f_ptr)) != -1){
-                //while(fgets(line, BUFFER_LEN, f_ptr)){
-                //line_len = strnlen(line, BUFFER_LEN);
-                //line_len = nread;
-                //line[line_len-1] = 0;
-                /* line_len--;     /\* last character is newline  *\/ */
+
                 if(!line_len){
                         active_seq = 0;
                 }else{
@@ -1226,9 +1230,6 @@ int read_clu(struct in_buffer* b , struct msa** m)
                                         RUN(resize_msa(msa));
                                 }
                                 seq_ptr = msa->sequences[active_seq];
-                                //p = strstr(line,seq_ptr->name);
-                                //if(p){
-                                //LOG_MSG("Found bitsof seq %s", seq_ptr->name);
 
                                 p = line;
                                 j = 0;
@@ -1254,11 +1255,8 @@ int read_clu(struct in_buffer* b , struct msa** m)
                                 }
                                 active_seq++;
                                 msa->numseq = MACRO_MAX(msa->numseq, active_seq);
-
                         }
-
                 }
-                //fprintf(stdout,"%d \"%s\"\n",line_len,line);
         }
         RUN(null_terminate_sequences(msa));
 
@@ -1372,35 +1370,19 @@ int read_fasta( struct in_buffer* b,struct msa** m)
 {
         struct msa* msa = NULL;
         struct msa_seq* seq_ptr = NULL;
-        //FILE* f_ptr = NULL;
-        char* line = NULL;
-        //size_t b_len = 0;
-        //ssize_t nread;
 
-        //char line[BUFFER_LEN];
+        char* line = NULL;
         int line_len;
         int i;
         int nl;
 
-        /* sanity checks  */
-        //if(!my_file_exists(infile)){
-        //ERROR_MSG("File: %s does not exist.",infile);
-        //}
         if(msa == NULL){
                 msa = alloc_msa();
         }
 
-
         for(nl = 0; nl < b->n_lines;nl++){
                 line = b->l[nl]->line;
                 line_len = b->l[nl]->len;
-                //RUNP(f_ptr = fopen(infile, "r"));
-
-                //while ((nread = getline(&line, &b_len, f_ptr)) != -1){
-                //while(fgets(line, BUFFER_LEN, f_ptr)){
-                //line_len = nread;
-
-                //fprintf(stdout,"%d %s\n",line_len,line);
                 if(line[0] == '>'){
                         /* alloc seq if buffer is full */
                         if(msa->alloc_numseq == msa->numseq){
@@ -1424,12 +1406,11 @@ int read_fasta( struct in_buffer* b,struct msa** m)
                                         if(!seq_ptr){
                                                 ERROR_MSG("Encountered a sequence before encountering it's name");
                                         }
+                                        seq_ptr->seq[seq_ptr->len] = line[i];
+                                        seq_ptr->len++;
                                         if(seq_ptr->alloc_len == seq_ptr->len){
                                                 resize_msa_seq(seq_ptr);
                                         }
-
-                                        seq_ptr->seq[seq_ptr->len] = line[i];
-                                        seq_ptr->len++;
                                 }else if(ispunct((int)line[i])){
                                         seq_ptr->gaps[seq_ptr->len]++;
                                 }
@@ -1440,17 +1421,10 @@ int read_fasta( struct in_buffer* b,struct msa** m)
 
 
         *m = msa;
-        //fclose(f_ptr);
-        //MFREE(line);
+
         return OK;
 ERROR:
         free_msa(msa);
-        //if(line){
-        //MFREE(line);
-        //}
-        //if(f_ptr){
-        //fclose(f_ptr);
-        //}
         return FAIL;
 }
 

@@ -30,7 +30,7 @@ int set_param_number(struct aln_param* ap,int L, int sel);
 
 int new_aln_matrices(struct aln_param* ap);
 
-int init_ap(struct aln_param** aln_param, struct parameters* param, int numseq,int L)
+int init_ap(struct aln_param** aln_param, struct parameters* param,int L)
 {
         struct aln_param* ap = NULL;
         int i,j;

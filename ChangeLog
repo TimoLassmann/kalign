@@ -1,3 +1,25 @@
+2021-04-16  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+
+	* version 3.3.1 - Bug Fix
+	The previous version kalign checked the top 50 sequences in inputs to determine
+	whether the sequences are aligned or not. If the first 50 sequences are not aligned,
+	but following sequences contain gaps (or other characters!) kalign can crash. In this
+	version (3.3.1) kalign checks all sequences, thereby avoiding this issue.
+	To alert users to the situation described above and to warn users about the presence of
+	odd characters, kalign now produces a warning message like this:
+
+	[Date Time] :     LOG : Start io tests.
+	[Date Time] :     LOG : reading: dev/data/a2m.good.1
+	[Date Time] :     LOG : Detected protein sequences.
+	[Date Time] : WARNING : -------------------------------------------- (rwalign.c line 505)
+	[Date Time] : WARNING : The input sequences contain gap characters:  (rwalign.c line 506)
+	[Date Time] : WARNING : "-" :   36 found                             (rwalign.c line 510)
+	[Date Time] : WARNING : BUT the sequences do not seem to be aligned! (rwalign.c line 514)
+	[Date Time] : WARNING :                                              (rwalign.c line 515)
+	[Date Time] : WARNING : Kalign will remove the gap characters and    (rwalign.c line 516)
+	[Date Time] : WARNING : align the sequences.                         (rwalign.c line 517)
+	[Date Time] : WARNING : -------------------------------------------- (rwalign.c line 518)
+
 2020-11-06  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
 
 	* version 3.3 - Threading and more

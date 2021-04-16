@@ -29,7 +29,7 @@
 
 //extern int weave(struct msa* msa, int** map, int* tree);
 
-extern int weave(struct msa* msa,struct aln_tasks*t);
+/* extern int weave(struct aln_tasks* t); */
 extern int make_seq(struct msa* msa,int a,int b,int* path);
 
 extern int clean_aln(struct msa* msa);

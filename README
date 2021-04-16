@@ -1,48 +1,106 @@
 -----------------------------------------------------------------------
-  Kalign version 2.03, Copyright (C) 2006 Timo Lassmann
+    Kalign - a multiple sequence alignment program
 
-  http://msa.cgb.ki.se/
-  timolassmann@gmail.com
+    Copyright 2006, 2019, 2020, 2021 Timo Lassmann
 
-	This program is free software; you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation; either version 2 of the License, or
-	any later version.
+    This file is part of kalign.
 
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
+    Kalign is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
-	You should have received a copy of the GNU General Public License
-	along with this program; if not, write to the Free Software
-	Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-  
-	A copy of this license is in the COPYING file.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 -----------------------------------------------------------------------
-Installation:
 
-% ./configure 
-% make
+Kalign is a fast multiple sequence alignment program for biological sequences.
 
-and as root:
+1) Installation
 
-% make install
+1.1) Release Tarball
+
+Download tarball from [releases](https://github.com/TimoLassmann/kalign/releases). Then:
+
+tar -zxvf kalign-<version>.tar.gz
+cd kalign-<version>
+./autogen.sh
+./configure
+make
+make check
+make install
 
 
-Usage:
+1.2) Homebrew
 
-        kalign [Options]  infile.fasta outfile.fasta
-        
-        or:
-        
-        kalign [Options] -i infile.fasta -o outfile.fasta
-        
-        or:
-        
-        kalign [Options] < infile.fasta > outfile.fasta
+brew install brewsci/bio/kalign
 
-        Options:
-        
-	type: kalign -h 
-	
+1.3) Developer version
+
+git clone https://github.com/TimoLassmann/kalign.git
+cd kalign
+./autogen.sh
+./configure
+make
+make check
+make install
+
+
+1.4) on macOS, install [brew](https://brew.sh/) then:
+
+brew install libtool
+brew install automake
+git clone https://github.com/TimoLassmann/kalign.git
+cd kalign
+./autogen.sh
+./configure
+make
+make check
+make install
+
+
+2) Usage
+
+Usage: kalign  -i <seq file> -o <out aln>
+
+Options:
+
+   --format           : Output format. [Fasta]
+   --reformat         : Reformat existing alignment. [NA]
+   --version          : Print version and exit
+
+Kalign expects the input to be a set of unaligned sequences in fasta format or aligned sequences in aligned fasta, MSF or clustal format. Kalign automatically detects whether the input sequences are protein, RNA or DNA.
+
+Since version 3.2.0 kalign supports passing sequence in via stdin and support alignment of sequences from multiple files.
+
+3) Examples
+
+Passing sequences via stdin:
+
+   cat input.fa | kalign -f fasta > out.afa
+
+Combining multiple input files:
+
+   kalign seqsA.fa seqsB.fa seqsC.fa -f fasta > combined.afa
+
+Align sequences and output the alignment in MSF format:
+
+   kalign -i BB11001.tfa -f msf  -o out.msf
+
+Align sequences and output the alignment in clustal format:
+
+   kalign -i BB11001.tfa -f clu -o out.clu
+
+Re-align sequences in an existing alignment:
+
+   kalign -i BB11001.msf  -o out.afa
+
+Reformat existing alignment:
+
+   kalign -i BB11001.msf -r afa -o out.afa
