@@ -30,7 +30,7 @@
 #include "misc.h"
 #include  <stdalign.h>
 #include <string.h>
-#include <immintrin.h>
+/* #include <immintrin.h> */
 #ifdef ITEST_MISC
 
 
