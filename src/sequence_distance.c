@@ -21,11 +21,13 @@
 
 */
 
+#include "tldevel.h"
 #ifdef HAVE_AVX2
 #include <xmmintrin.h>
+#include <mm_malloc.h>
 #endif
 
-#include <mm_malloc.h>
+
 #include "sequence_distance.h"
 
 #include "alphabet.h"
@@ -106,8 +108,12 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
 
                 for(i = 0; i < numseq;i++){
                         dm[i] = NULL;
-
+#ifdef HAVE_AVX2
                         dm[i] = _mm_malloc(sizeof(float) * a,32);
+#else
+                        MMALLOC(dm[i], sizeof(float) *a);
+#endif
+
                         for(j = 0; j < a;j++){
                                 dm[i][j] = 0.0F;
                         }
@@ -139,6 +145,8 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                 //dm[i][j] = dist;
                         }
                 }
+
+
                 /* for(i = 0; i < numseq;i++){ */
                 /*         seq_a = msa->sequences[i]->s;// aln->s[i]; */
                 /*         len_a = msa->sequences[i]->len;//  aln->sl[i]; */

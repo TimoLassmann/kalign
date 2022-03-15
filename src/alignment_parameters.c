@@ -26,6 +26,7 @@
 
 int set_subm_gaps(struct aln_param* ap);
 int set_subm_gaps_DNA(struct aln_param* ap);
+int set_subm_gaps_blast(struct aln_param* ap);
 int set_param_number(struct aln_param* ap,int L, int sel);
 
 int new_aln_matrices(struct aln_param* ap);
@@ -54,6 +55,7 @@ int init_ap(struct aln_param** aln_param, struct parameters* param,int L)
         }
         if(L == ALPHA_defDNA){
                 RUN(set_subm_gaps_DNA(ap));
+                set_subm_gaps_blast(ap);
         }else if(L == ALPHA_defPROTEIN){
 
                 RUN(set_subm_gaps(ap));
@@ -104,6 +106,22 @@ void free_ap(struct aln_param* ap)
         }
 }
 
+int set_subm_gaps_blast(struct aln_param* ap)
+{
+        int i,j;
+        for(i = 0; i < 5; i++){
+                for(j =0; j < 5;j++){
+                        ap->subm[i][j] = -3;
+                        if(i == j){
+                                ap->subm[i][j] = 4;
+                        }
+                }
+        }
+        ap->gpo = 5;
+        ap->gpe = 5;
+        ap->tgpe = 0;
+        return OK;
+}
 /* These are old parameters from kalign 2 */
 int set_subm_gaps_DNA(struct aln_param* ap)
 {

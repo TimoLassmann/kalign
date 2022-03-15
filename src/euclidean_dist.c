@@ -25,9 +25,10 @@
 #ifdef HAVE_AVX2
 #include <xmmintrin.h>
 #include <immintrin.h>
+#include <mm_malloc.h>
 #endif
 
-#include <mm_malloc.h>
+
 
 #include "float.h"
 
@@ -55,7 +56,11 @@ int main(void)
 
         MMALLOC(mat, sizeof(float*)* 100);
         for(i = 0; i < 100;i++){
+#ifdef HAVE_AVX2
                 mat[i] = _mm_malloc(sizeof(float)*num_element, 32);
+#else
+                MMALLOC(mat[i],sizeof(float)*num_element);
+#endif
         }
 
         RUNP( rng =init_rng(0));
@@ -89,8 +94,6 @@ int main(void)
         for(i = 0; i < 100;i++){
                 for(j = 0; j <= i;j++){
                         edist_serial(mat[i], mat[j], num_element, &d1);
-
-
                 }
         }
         }
@@ -116,7 +119,11 @@ int main(void)
 
 #endif
         for(i = 0; i < 100;i++){
+#ifdef HAVE_AVX2
                 _mm_free(mat[i]);
+#else
+                MFREE(mat[i]);
+#endif
         }
         MFREE(mat);
 

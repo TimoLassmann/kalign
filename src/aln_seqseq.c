@@ -90,7 +90,6 @@ int aln_seqseq_foward(struct aln_mem* m)
 
                         xa = s[j].a;
                         xga = s[j].ga;
-
                 }
                 ca = s[j].a;
                 pa = MAX3(pa,pga-gpo,pgb-gpo);
@@ -104,7 +103,6 @@ int aln_seqseq_foward(struct aln_mem* m)
                 }else{
                         s[j].gb = MAX(s[j].gb,ca)-tgpe;
                 }
-
         }
         return OK;
 }
@@ -137,14 +135,11 @@ int aln_seqseq_backward(struct aln_mem* m)
         const float tgpe = m->ap->tgpe;
         float** subm = m->ap->subm;
 
-
         s[endb].a = s[0].a ;
         s[endb].ga = s[0].ga;
         s[endb].gb = s[0].gb;
 
-
         //init of first row;
-
         //j = endb-startb;
         if(endb != m->len_b){
                 for(j = endb-1;j > startb;j--){
@@ -159,7 +154,6 @@ int aln_seqseq_backward(struct aln_mem* m)
                         s[j].gb = -FLT_MAX;
                 }
         }
-
 
         s[startb].a = -FLT_MAX;
         s[startb].ga = -FLT_MAX;

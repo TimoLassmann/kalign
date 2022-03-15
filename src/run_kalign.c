@@ -20,6 +20,7 @@
 
 */
 
+#include <stdio.h>
 #ifdef HAVE_OPENMP
 #include <omp.h>
 #endif
@@ -96,6 +97,7 @@ int print_kalign_help(char * argv[])
 
         fprintf(stdout,"Passing sequences via stdin:\n\n   cat input.fa | kalign -f fasta > out.afa\n\n");
         fprintf(stdout,"Combining multiple input files:\n\n   kalign seqsA.fa seqsB.fa seqsC.fa -f fasta > combined.afa\n\n");
+
 
 
         if(basename){

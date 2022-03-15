@@ -19,15 +19,17 @@
   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 */
+#include "tldevel.h"
 #ifdef HAVE_OPENMP
 #include <omp.h>
 #endif
 
 #ifdef HAVE_AVX2
 #include <xmmintrin.h>
+#include <mm_malloc.h>
 #endif
 
-#include <mm_malloc.h>
+
 
 #include "tlrng.h"
 #include "msa.h"
@@ -142,7 +144,11 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_tasks** t
                 }*/
         MFREE(root);
         for(i =0 ; i < msa->numseq;i++){
+#ifdef HAVE_AVX2
                 _mm_free(dm[i]);
+#else
+                MFREE(dm[i]);
+#endif
         }
         MFREE(dm);
         DESTROY_TIMER(timer);
@@ -150,10 +156,6 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_tasks** t
 ERROR:
         return FAIL;
 }
-
-
-
-
 
 struct node* bisecting_kmeans_parallel(struct msa* msa, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples)
 {
@@ -199,7 +201,6 @@ struct node* bisecting_kmeans_parallel(struct msa* msa, struct node* n, float** 
                 for(j = 0; j < 4;j++){
                         split(dm,samples,num_anchors, num_samples, (i+ j)*step, &res_ptr[j]);
                 }
-
 
                 for(j = 0; j < 4;j++){
                         if(!best){
@@ -324,9 +325,6 @@ struct node* bisecting_kmeans_serial(struct msa* msa, struct node* n, float** dm
 
                                         change++;
                                 }
-
-
-
                         }
                 }
                 if(!change){
@@ -384,14 +382,24 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
         num_var = num_var << 3;
 
 
+
+
+#ifdef HAVE_AVX2
         wr = _mm_malloc(sizeof(float) * num_var,32);
         wl = _mm_malloc(sizeof(float) * num_var,32);
         cr = _mm_malloc(sizeof(float) * num_var,32);
         cl = _mm_malloc(sizeof(float) * num_var,32);
         w = _mm_malloc(sizeof(float) * num_var,32);
+#else
+        MMALLOC(wr,sizeof(float) * num_var);
+        MMALLOC(wl,sizeof(float) * num_var);
+        MMALLOC(cr,sizeof(float) * num_var);
+        MMALLOC(cl,sizeof(float) * num_var);
+        MMALLOC(w,sizeof(float) * num_var);
+#endif
+
         if(*ret){
                 res = *ret;
-
         }else{
                 RUNP(res = alloc_kmeans_result(num_samples));
         }
@@ -433,7 +441,11 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                 //      fprintf(stdout,"%f %f  %f\n", cl[j],cr[j],w[j]);
         }
 
+#ifdef HAVE_AVX2
         _mm_free(w);
+#else
+        MFREE(w);
+#endif
 
         /* check if cr == cl - we have identical sequences  */
         s = 0;
@@ -448,10 +460,19 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                 score = 0.0F;
                 num_l = 0;
                 num_r = 0;
-                sl[num_l] = samples[0];
-                num_l++;
+                /* The code below caused sequence sets of size 1 to be passed to clustering...  */
+                /* sl[num_l] = samples[0]; */
+                /* num_l++; */
 
-                for(i =1 ; i <num_samples;i++){
+                /* for(i =1 ; i <num_samples;i++){ */
+                /*         sr[num_r] = samples[i]; */
+                /*         num_r++; */
+                /* } */
+                for(i = 0; i < num_samples/2;i++){
+                        sl[num_l] = samples[i];
+                        num_l++;
+                }
+                for(i = num_samples/2; i < num_samples;i++){
                         sr[num_r] = samples[i];
                         num_r++;
                 }
@@ -490,6 +511,16 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                                         sl[num_l] = s;
                                         num_l++;
                                 }else{
+                                        /* Assign sequence to smaller group  */
+                                        /* if(num_l < num_r){ */
+                                        /*         w = wl; */
+                                        /*         sl[num_l] = s; */
+                                        /*         num_l++; */
+                                        /* }else{ */
+                                        /*         w = wr; */
+                                        /*         sr[num_r] = s; */
+                                        /*         num_r++; */
+                                        /* } */
                                         if(i & 1){
                                                 w = wr;
                                                 sr[num_r] = s;
@@ -500,11 +531,9 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                                                 num_l++;
                                         }
                                 }
-
                                 for(j = 0; j < num_anchors;j++){
                                         w[j] += dm[s][j];
                                 }
-
                         }
 
                         for(j = 0; j < num_anchors;j++){
@@ -538,10 +567,18 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                         }
                 }
         }
+
+#ifdef HAVE_AVX2
         _mm_free(wr);
         _mm_free(wl);
         _mm_free(cr);
         _mm_free(cl);
+#else
+        MFREE(wr);
+        MFREE(wl);
+        MFREE(cr);
+        MFREE(cl);
+#endif
 
         res->nl =  num_l;
         res->nr =  num_r;
