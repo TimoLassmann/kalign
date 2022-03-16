@@ -72,6 +72,7 @@ int aln_seqseq_foward(struct aln_mem* m)
                 }else{
                         s[startb].gb = MAX(pgb,pa) - tgpe;
                 }
+
                 for (j = startb+1; j < endb;j++){
                         ca = s[j].a;
                         pa = MAX3(pa,pga-gpo,pgb-gpo);

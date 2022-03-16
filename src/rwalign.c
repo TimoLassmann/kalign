@@ -221,7 +221,7 @@ int read_input(char* infile,struct msa** msa)
 
         RUN(detect_alignment_format(b, &type));
 
-        LOG_MSG("FORMAT: %d", type);
+        //LOG_MSG("FORMAT: %d", type);
         if(type == FORMAT_FA){
                 //RUNP(msa = read_msf(infile,msa));
                 //RUNP(msa = read_clu(infile,msa));
@@ -255,7 +255,6 @@ int read_input(char* infile,struct msa** msa)
         *msa = m;
         return OK;
 ERROR:
-
         free_msa(m);
         return FAIL;
 }

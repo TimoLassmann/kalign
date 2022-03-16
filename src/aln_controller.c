@@ -208,8 +208,6 @@ int aln_runner_serial(struct aln_mem* m)
         return OK;
 }
 
-
-
 int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int meet,int transition)
 {
         //fprintf(stderr,"Transition:%d	at:%d\n",transition,c);
@@ -433,8 +431,7 @@ int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int meet,i
         return OK;
 }
 
-
-int aln_continue_serial (struct aln_mem* m,float input_states[],int old_cor[],int meet,int transition)
+int aln_continue_serial(struct aln_mem* m,float input_states[],int old_cor[],int meet,int transition)
 {
         //fprintf(stderr,"Transition:%d	at:%d\n",transition,c);
         //LOG_MSG("MAX: %f",max);
