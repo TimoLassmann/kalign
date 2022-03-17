@@ -20,6 +20,7 @@
 
 */
 
+#include "tldevel.h"
 #include <stdio.h>
 #ifdef HAVE_OPENMP
 #include <omp.h>
@@ -418,7 +419,7 @@ int main(int argc, char *argv[])
                 }
         }
 
-        if (param->num_infiles == 0){
+        if(param->num_infiles == 0){
                 if (!isatty(fileno(stdin))){
                         LOG_MSG("Attempting stdin");
                         param->num_infiles =1;
