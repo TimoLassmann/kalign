@@ -6,7 +6,7 @@
 	when there were thousands of identical sequences.
 
 	In addition Kalign now compiles on Apple's M1 chip and possibly on other ARM architectures
-	as well (although I did not test the latter). 
+	as well (although I did not test the latter).
 
 2021-04-16  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
 
