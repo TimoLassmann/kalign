@@ -1,3 +1,13 @@
+2022-03-21  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+
+	* version 3.3.2 - Bug Fix
+	There was a bug in building a guide tree from highly similar sequences. The fix
+	was involved distributing identical sequences equally among branches. This only happened
+	when there were thousands of identical sequences.
+
+	In addition Kalign now compiles on Apple's M1 chip and possibly on other ARM architectures
+	as well (although I did not test the latter). 
+
 2021-04-16  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
 
 	* version 3.3.1 - Bug Fix
