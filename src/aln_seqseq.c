@@ -92,6 +92,7 @@ int aln_seqseq_foward(struct aln_mem* m)
                         xa = s[j].a;
                         xga = s[j].ga;
                 }
+
                 ca = s[j].a;
                 pa = MAX3(pa,pga-gpo,pgb-gpo);
                 pa += subp[seq2[j]];
