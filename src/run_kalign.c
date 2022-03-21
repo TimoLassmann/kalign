@@ -502,6 +502,7 @@ int run_kalign(struct parameters* param)
                                 snprintf(msa->sequences[i]->name, 128, "SEQ%d", i+1);
                         }
                 }
+
                 if(param->unalign){
                         /* if(param->out_format == FORMAT_FA){ */
                         RUN(dealign_msa(msa));

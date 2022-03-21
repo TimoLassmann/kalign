@@ -55,7 +55,7 @@ int init_ap(struct aln_param** aln_param, struct parameters* param,int L)
         }
         if(L == ALPHA_defDNA){
                 RUN(set_subm_gaps_DNA(ap));
-                set_subm_gaps_blast(ap);
+                //set_subm_gaps_blast(ap);
         }else if(L == ALPHA_defPROTEIN){
 
                 RUN(set_subm_gaps(ap));
@@ -131,7 +131,7 @@ int set_subm_gaps_DNA(struct aln_param* ap)
                         ap->subm[i][j] = 283;
                 }
         }
-        //	A   91 -114  -31 -123    0  -43
+//	A   91 -114  -31 -123    0  -43
         ap->subm[0][0] += 91;
         ap->subm[0][1] += -114;
         ap->subm[0][2] += -31;
