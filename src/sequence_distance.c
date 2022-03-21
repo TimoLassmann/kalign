@@ -177,6 +177,7 @@ float calc_distance(uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b, int L)
         }
         return (float)dist;
 #else
+
         struct bignode* hash[1024];
         int i;
         float dist;
