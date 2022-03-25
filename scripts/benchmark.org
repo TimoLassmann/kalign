@@ -552,9 +552,6 @@
    #+END_SRC
 
 
-
-
-
    To plot the scores: 
    #+NAME: Rplotheader
    #+BEGIN_SRC R :session  one :results none :export none :noweb yes 

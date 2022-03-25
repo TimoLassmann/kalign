@@ -20,6 +20,8 @@
 
 */
 
+#include "tldevel.h"
+#include <stdio.h>
 #ifdef HAVE_OPENMP
 #include <omp.h>
 #endif
@@ -96,6 +98,7 @@ int print_kalign_help(char * argv[])
 
         fprintf(stdout,"Passing sequences via stdin:\n\n   cat input.fa | kalign -f fasta > out.afa\n\n");
         fprintf(stdout,"Combining multiple input files:\n\n   kalign seqsA.fa seqsB.fa seqsC.fa -f fasta > combined.afa\n\n");
+
 
 
         if(basename){
@@ -416,7 +419,7 @@ int main(int argc, char *argv[])
                 }
         }
 
-        if (param->num_infiles == 0){
+        if(param->num_infiles == 0){
                 if (!isatty(fileno(stdin))){
                         LOG_MSG("Attempting stdin");
                         param->num_infiles =1;
@@ -500,6 +503,7 @@ int run_kalign(struct parameters* param)
                                 snprintf(msa->sequences[i]->name, 128, "SEQ%d", i+1);
                         }
                 }
+
                 if(param->unalign){
                         /* if(param->out_format == FORMAT_FA){ */
                         RUN(dealign_msa(msa));

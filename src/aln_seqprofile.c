@@ -7,11 +7,8 @@
 #include "aln_struct.h"
 #define ALN_SEQPROF_IMPORT
 #include "aln_seqprofile.h"
-
-
 #define MAX(a, b) (a > b ? a : b)
 #define MAX3(a,b,c) MAX(MAX(a,b),c)
-
 
 int aln_seqprofile_foward(struct aln_mem* m)
 {
@@ -52,9 +49,7 @@ int aln_seqprofile_foward(struct aln_mem* m)
                         s[j].ga = MAX(s[j-1].ga,s[j-1].a) - text;
                         s[j].gb = -FLT_MAX;
                 }
-
         }
-
 
         s[m->endb].a = -FLT_MAX;
         s[m->endb].ga = -FLT_MAX;
@@ -73,7 +68,6 @@ int aln_seqprofile_foward(struct aln_mem* m)
                 xa = s[m->startb].a;
                 xga = s[m->startb].ga;
 
-
                 if(m->startb){
                         s[m->startb].gb = MAX(pgb+prof1[28],pa+prof1[27]);
                 }else{
@@ -86,14 +80,12 @@ int aln_seqprofile_foward(struct aln_mem* m)
 
                         pa += prof1[32 + seq2[j]];
 
-
                         s[j].a = pa;
 
                         pga = s[j].ga;
 
                         //s[j].ga = MAX(s[j-1].ga-ext,s[j-1].a-open);
                         s[j].ga = MAX(xga-ext,xa-open);
-
 
                         pgb = s[j].gb;
 
@@ -110,7 +102,6 @@ int aln_seqprofile_foward(struct aln_mem* m)
 
                 pa += prof1[32 + seq2[j]];
 
-
                 s[j].a = pa;
 
                 s[j].ga = -FLT_MAX;//MAX(s[j-1].ga-ext,s[j-1].a-open);
@@ -120,7 +111,6 @@ int aln_seqprofile_foward(struct aln_mem* m)
                 }else{
                         s[j].gb = MAX(s[j].gb,ca)+ prof1[29];
                 }
-
         }
         //prof1 -= m->enda << 6;
         return OK;
@@ -146,7 +136,6 @@ int aln_seqprofile_backward(struct aln_mem* m)
         const float open = m->ap->gpo  * (float)sip;
         const float ext  = m->ap->gpe  * (float)sip;
         const float text = m->ap->tgpe * (float)sip;
-
 
         prof1 += (m->enda_2 +1) << 6;
 
@@ -184,7 +173,6 @@ int aln_seqprofile_backward(struct aln_mem* m)
                 xa = s[m->endb].a;
                 xga = s[m->endb].ga;
 
-
                 if(m->endb != m->len_b){
                         s[m->endb].gb = MAX(pgb+prof1[28],pa+prof1[27]);
                 }else{
@@ -211,8 +199,6 @@ int aln_seqprofile_backward(struct aln_mem* m)
                         pa = ca;
                         xa = s[j].a;
                         xga = s[j].ga;
-
-
                 }
                 ca = s[j].a;
 
@@ -221,14 +207,12 @@ int aln_seqprofile_backward(struct aln_mem* m)
 
                 s[j].a = pa;
 
-
                 s[j].ga = -FLT_MAX;//MAX(s[j+1].ga-ext,s[j+1].a-open);
                 if(m->startb){
                         s[j].gb = MAX(s[j].gb+prof1[28], ca+prof1[27]);
                 }else{
                         s[j].gb = MAX(s[j].gb,ca)+prof1[29];
                 }
-
         }
         return OK;
 }

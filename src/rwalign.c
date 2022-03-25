@@ -21,6 +21,7 @@
 */
 
 
+#include "tldevel.h"
 #include "tlmisc.h"
 
 #include "global.h"
@@ -65,7 +66,11 @@ struct out_line{
 
 
 
-static int aln_unknown_warning_message(struct msa* msa);
+
+
+static int aln_unknown_warning_message_gaps_but_len_diff(struct msa* msa);
+static int aln_unknown_warning_message_same_len_no_gaps(struct msa* msa);
+
 static int read_fasta(struct in_buffer* b, struct msa** msa);
 static int read_msf(struct in_buffer* b, struct msa** msa);
 static int read_clu(struct in_buffer* b, struct msa** msa);
@@ -216,10 +221,11 @@ int read_input(char* infile,struct msa** msa)
 
         RUN(detect_alignment_format(b, &type));
 
-        /* LOG_MSG("FORMAT: %d", type); */
+        //LOG_MSG("FORMAT: %d", type);
         if(type == FORMAT_FA){
                 //RUNP(msa = read_msf(infile,msa));
                 //RUNP(msa = read_clu(infile,msa));
+                LOG_MSG("reading fasta");
                 RUN(read_fasta(b,&m));
         }else if(type == FORMAT_MSF){
                 RUN(read_msf(b,&m));
@@ -249,7 +255,6 @@ int read_input(char* infile,struct msa** msa)
         *msa = m;
         return OK;
 ERROR:
-
         free_msa(m);
         return FAIL;
 }
@@ -468,27 +473,29 @@ int detect_aligned(struct msa* msa)
                 l = 0;
                 for (j = 0; j <= msa->sequences[i]->len;j++){
                         l += msa->sequences[i]->gaps[j];
+
+
                 }
                 gaps += l;
+
                 l += msa->sequences[i]->len;
                 min_len = MACRO_MIN(min_len, l);
                 max_len = MACRO_MAX(max_len, l);
+                /* LOG_MSG("%d %d", max_len, min_len); */
         }
         if(gaps){
                 if(min_len == max_len){ /* sequences have gaps and total length is identical - clearly aligned  */
                         msa->aligned = ALN_STATUS_ALIGNED;
                 }else{          /* odd there are gaps but total length differs - unknown status  */
-                        aln_unknown_warning_message(msa);
+                        aln_unknown_warning_message_gaps_but_len_diff(msa);
 
                         msa->aligned = ALN_STATUS_UNKNOWN;
                 }
         }else{
                 if(min_len == max_len){ /* no gaps and sequences have same length. Can' tell if they are aligned  */
-                        aln_unknown_warning_message(msa);
+                        aln_unknown_warning_message_same_len_no_gaps(msa);
                         msa->aligned = ALN_STATUS_UNKNOWN;
                 }else{          /* No gaps and sequences have different lengths - unaligned */
-
-
                         msa->aligned = ALN_STATUS_UNALIGNED;
                 }
         }
@@ -496,7 +503,7 @@ int detect_aligned(struct msa* msa)
         return OK;
 }
 
-static int aln_unknown_warning_message(struct msa* msa)
+static int aln_unknown_warning_message_gaps_but_len_diff(struct msa* msa)
 {
         int i;
         WARNING_MSG("--------------------------------------------");
@@ -508,10 +515,25 @@ static int aln_unknown_warning_message(struct msa* msa)
                 }
         }
 
-        WARNING_MSG("BUT the sequences do not seem to be aligned!");
+        WARNING_MSG("BUT the presumably aligned sequences do not have the length.");
         WARNING_MSG("                                            ");
         WARNING_MSG("Kalign will remove the gap characters and   ");
         WARNING_MSG("align the sequences.                        ");
+        WARNING_MSG("--------------------------------------------");
+        return OK;
+}
+
+
+static int aln_unknown_warning_message_same_len_no_gaps(struct msa* msa)
+{
+        int i;
+        WARNING_MSG("--------------------------------------------");
+        WARNING_MSG("All input sequences have the same length.   ");
+        WARNING_MSG("BUT there are no gap characters.            ");
+        WARNING_MSG("                                            ");
+        WARNING_MSG("Unable to determine whether the sequences   ");
+        WARNING_MSG("are already aligned.                        ");
+        WARNING_MSG("Kalign will align the sequences.            ");
         WARNING_MSG("--------------------------------------------");
         return OK;
 }
@@ -1234,6 +1256,11 @@ int read_clu(struct in_buffer* b , struct msa** m)
                                 p = line;
                                 j = 0;
                                 for(i = 0;i < line_len;i++){
+                                        if(i == MSA_NAME_LEN-1){
+                                                seq_ptr->name[i] = 0;
+                                                j = i;
+                                                break;
+                                        }
                                         if(isspace((int)p[i])){
                                                 j = i;
                                                 break;
@@ -1298,14 +1325,17 @@ int read_msf(struct in_buffer* b,struct msa** m)
                         if(msa->alloc_numseq == msa->numseq){
                                 RUN(resize_msa(msa));
                         }
-
-                        p+= 5;  /* length of name: */
+                        p += 5;  /* length of name: */
                         while( isspace((int)*p)){
                                 p++;
                         }
+                        /* LOG_MSG("Found name: %s len %d", p, strlen(p)); */
                         seq_ptr = msa->sequences[active_seq];
-
                         for(i = 0;i < line_len;i++){
+                                if(i == MSA_NAME_LEN-1){
+                                        seq_ptr->name[i] = 0;
+                                        break;
+                                }
                                 if(isspace((int)p[i])){
                                         seq_ptr->name[i] = 0;
                                         break;
@@ -1318,7 +1348,7 @@ int read_msf(struct in_buffer* b,struct msa** m)
                         //LOG_MSG("Got a name %s",p);
                 }
         }
-        active_seq =0;
+        active_seq = 0;
         for(nl = li; nl < b->n_lines;nl++){
                 line = b->l[nl]->line;
                 line_len = b->l[nl]->len;
@@ -1390,13 +1420,20 @@ int read_fasta( struct in_buffer* b,struct msa** m)
                         }
 
                         /* line[line_len-1] = 0; */
-                        for(i =0 ; i < line_len;i++){
+                        /*for(i = 0; i < line_len;i++){
                                 if(isspace(line[i])){
                                         line[i] = 0;
                                 }
-                        }
+                                }*/
+
                         seq_ptr = msa->sequences[msa->numseq];
-                        snprintf(seq_ptr->name ,MSA_NAME_LEN ,"%s",line+1);
+                        MFREE(seq_ptr->name);
+                        MMALLOC(seq_ptr->name, sizeof(char) * line_len);
+                        memcpy(seq_ptr->name, line+1, line_len);
+
+                        /* snprintf(seq_ptr->name ,MSA_NAME_LEN ,"%s",line+1); */
+                        //LOG_MSG("Name %d: len %d  name : %s ",msa->numseq, line_len, seq_ptr->name);
+                        //fprintf(stdout,"%s\n%s\n", line, seq_ptr->name);
                         msa->numseq++;
 
                 }else{
@@ -1415,6 +1452,7 @@ int read_fasta( struct in_buffer* b,struct msa** m)
                                         seq_ptr->gaps[seq_ptr->len]++;
                                 }
                         }
+
                 }
         }
         RUN(null_terminate_sequences(msa));

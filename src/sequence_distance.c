@@ -21,11 +21,13 @@
 
 */
 
+#include "tldevel.h"
 #ifdef HAVE_AVX2
 #include <xmmintrin.h>
+#include <mm_malloc.h>
 #endif
 
-#include <mm_malloc.h>
+
 #include "sequence_distance.h"
 
 #include "alphabet.h"
@@ -88,7 +90,6 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                 //dist = dist / (float) MACRO_MIN(len_a, len_b);
                                 dm[i][j] = dist;// + (float)( i * num_samples + j) / (float) ( num_samples * num_samples);
                                 dm[j][i] = dm[i][j];
-                                //fprintf(stdout,"%f ", dm[i][j]);
                         }
 
                         //fprintf(stdout,"\n");
@@ -106,8 +107,12 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
 
                 for(i = 0; i < numseq;i++){
                         dm[i] = NULL;
-
+#ifdef HAVE_AVX2
                         dm[i] = _mm_malloc(sizeof(float) * a,32);
+#else
+                        MMALLOC(dm[i], sizeof(float) *a);
+#endif
+
                         for(j = 0; j < a;j++){
                                 dm[i][j] = 0.0F;
                         }
@@ -139,6 +144,8 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                 //dm[i][j] = dist;
                         }
                 }
+
+
                 /* for(i = 0; i < numseq;i++){ */
                 /*         seq_a = msa->sequences[i]->s;// aln->s[i]; */
                 /*         len_a = msa->sequences[i]->len;//  aln->sl[i]; */
@@ -169,49 +176,13 @@ float calc_distance(uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b, int L)
         }
         return (float)dist;
 #else
-        struct bignode* hash[1024];
-        int i;
-        float dist;
-        unsigned int hv;
-        for (i = 0;i < 1024;i++){
-                hash[i] = 0;
-        }
-        /* Protein sequence  */
-        if( L > ALPHA_defDNA){
-
-                for (i = len_a-2;i--;){
-                        hv = (seq_a[i] << 5) + seq_a[i+1];
-                        hash[hv] = big_insert_hash(hash[hv],i);
-                        hv = (seq_a[i] << 5) + seq_a[i+2];
-                        hash[hv] = big_insert_hash(hash[hv],i);
-                }
-
-                dist = protein_wu_distance_calculation(hash,seq_b,len_b,len_a+len_b,58.9);
+        uint8_t dist;
+        if(len_a > len_b){
+                dist = bpm(seq_a, seq_b, len_a, len_b);
         }else{
-
-                for (i = len_a-5;i--;){
-                        hv = ((seq_a[i]&3)<<8) + ((seq_a[i+1]&3)<<6) + ((seq_a[i+2]&3)<<4)  + ((seq_a[i+3]&3)<<2) + (seq_a[i+4]&3);//ABCDE
-                        hash[hv] = big_insert_hash(hash[hv],i);
-                        hv = ((seq_a[i]&3)<<8) + ((seq_a[i+1]&3)<<6) + ((seq_a[i+2]&3)<<4)  + ((seq_a[i+3]&3)<<2) + (seq_a[i+5]&3);//ABCDF
-                        hash[hv] = big_insert_hash(hash[hv],i);
-                        hv = ((seq_a[i]&3)<<8) + ((seq_a[i+1]&3)<<6) + ((seq_a[i+2]&3)<<4)  + ((seq_a[i+4]&3)<<2) + (seq_a[i+5]&3);//ABCEF
-                        hash[hv] = big_insert_hash(hash[hv],i);
-                        hv = ((seq_a[i]&3)<<8) + ((seq_a[i+1]&3)<<6) + ((seq_a[i+3]&3)<<4)  + ((seq_a[i+4]&3)<<2) + (seq_a[i+5]&3);//ABDEF
-                        hash[hv] = big_insert_hash(hash[hv],i);
-                        hv = ((seq_a[i]&3)<<8) + ((seq_a[i+2]&3)<<6) + ((seq_a[i+3]&3)<<4) + ((seq_a[i+4]&3)<<2) + (seq_a[i+5]&3);//ACDEF
-                        hash[hv] = big_insert_hash(hash[hv],i);
-                }
-                dist = dna_distance_calculation(hash,seq_b,len_b,len_a+len_b, 61.08);
+                dist = bpm(seq_b, seq_a, len_b, len_a);
         }
-
-
-        for (i = 1024;i--;){
-                if (hash[i]){
-                        big_remove_nodes(hash[i]);
-                        hash[i] = 0;
-                }
-        }
-        return dist;
+        return (float)dist;
 #endif
 
 }

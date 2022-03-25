@@ -19,15 +19,17 @@
   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 */
+#include "tldevel.h"
 #ifdef HAVE_OPENMP
 #include <omp.h>
 #endif
 
 #ifdef HAVE_AVX2
 #include <xmmintrin.h>
+#include <mm_malloc.h>
 #endif
 
-#include <mm_malloc.h>
+
 
 #include "tlrng.h"
 #include "msa.h"
@@ -68,8 +70,8 @@ static int label_internal(struct node*n, int label);
 static void create_tasks(struct node*n, struct aln_tasks* t);
 
 
-static struct node* bisecting_kmeans_serial(struct msa* msa, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples);
-static struct node* bisecting_kmeans_parallel(struct msa* msa, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples);
+static int bisecting_kmeans_serial(struct msa* msa, struct node** ret_n, float** dm,int* samples, int num_samples);
+static int bisecting_kmeans_parallel(struct msa* msa, struct node** ret_n, float** dm,int* samples, int num_samples);
 
 static int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick,struct kmeans_result** ret);
 
@@ -121,9 +123,9 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_tasks** t
         LOG_MSG("Building guide tree.");
 
         if(ap->nthreads == 1){
-                root = bisecting_kmeans_serial(msa,root, dm, samples, numseq, num_anchors, numseq);
+                RUN(bisecting_kmeans_serial(msa,&root, dm, samples, numseq));
         }else{
-                root = bisecting_kmeans_parallel(msa,root, dm, samples, numseq, num_anchors, numseq);
+                RUN(bisecting_kmeans_parallel(msa,&root, dm, samples, numseq));
         }
 
         STOP_TIMER(timer);
@@ -142,7 +144,11 @@ int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct aln_tasks** t
                 }*/
         MFREE(root);
         for(i =0 ; i < msa->numseq;i++){
+#ifdef HAVE_AVX2
                 _mm_free(dm[i]);
+#else
+                MFREE(dm[i]);
+#endif
         }
         MFREE(dm);
         DESTROY_TIMER(timer);
@@ -151,15 +157,14 @@ ERROR:
         return FAIL;
 }
 
-
-
-
-
-struct node* bisecting_kmeans_parallel(struct msa* msa, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples)
+int bisecting_kmeans_parallel(struct msa* msa, struct node** ret_n, float** dm,int* samples, int num_samples)
 {
         struct kmeans_result* res_tmp = NULL;
         struct kmeans_result* best = NULL;
         struct kmeans_result** res_ptr = NULL;
+        struct node* n = NULL;
+        int num_anchors = 0;
+
         int i,j;
         int tries = 40;
         /* int t_iter; */
@@ -167,17 +172,22 @@ struct node* bisecting_kmeans_parallel(struct msa* msa, struct node* n, float** 
         int* sl = NULL;
         int* sr = NULL;
         int num_l,num_r;
+
+        num_anchors = MACRO_MIN(32, msa->numseq);
+
         if(num_samples < 100){
                 float** dm = NULL;
                 RUNP(dm = d_estimation(msa, samples, num_samples,1));// anchors, num_anchors,1));
                 n = upgma(dm,samples, num_samples);
-
+                *ret_n = n;
                 gfree(dm);
                 MFREE(samples);
-                return n;
+                return OK;
+                //return n;
         }else if(num_samples < 1000){
-                n = bisecting_kmeans_serial(msa, n, dm, samples, numseq, num_anchors, num_samples);
-                return n;
+                RUN(bisecting_kmeans_serial(msa, &n, dm, samples, num_samples));
+                *ret_n = n;
+                return OK;
         }
 
 
@@ -200,7 +210,6 @@ struct node* bisecting_kmeans_parallel(struct msa* msa, struct node* n, float** 
                         split(dm,samples,num_anchors, num_samples, (i+ j)*step, &res_ptr[j]);
                 }
 
-
                 for(j = 0; j < 4;j++){
                         if(!best){
                                 change++;
@@ -215,9 +224,6 @@ struct node* bisecting_kmeans_parallel(struct msa* msa, struct node* n, float** 
 
                                         change++;
                                 }
-
-
-
                         }
                 }
                 if(!change){
@@ -248,17 +254,17 @@ struct node* bisecting_kmeans_parallel(struct msa* msa, struct node* n, float** 
                 {
                         //LOG_MSG("Done");
 
-#pragma omp task shared(msa,n,dm,numseq,num_anchors)
+#pragma omp task shared(msa,n,dm,num_anchors)
 #endif
                         {
-                                n->left = bisecting_kmeans_parallel(msa,n->left, dm, sl, numseq, num_anchors,num_l);
+                                bisecting_kmeans_parallel(msa,&n->left, dm, sl, num_l);
                         }
 
 #ifdef HAVE_OPENMP
-#pragma omp task shared(msa,n,dm,numseq,num_anchors)
+#pragma omp task shared(msa,n,dm,num_anchors)
 #endif
                         {
-                                n->right = bisecting_kmeans_parallel(msa,n->right, dm, sr, numseq, num_anchors, num_r);
+                                bisecting_kmeans_parallel(msa,&n->right, dm, sr, num_r);
                         }
 
 #ifdef HAVE_OPENMP
@@ -266,16 +272,20 @@ struct node* bisecting_kmeans_parallel(struct msa* msa, struct node* n, float** 
                 }
         }
 #endif
-        return n;
+
+        *ret_n =n;
+        return OK;
 ERROR:
-        return NULL;
+        return FAIL;
 }
 
-struct node* bisecting_kmeans_serial(struct msa* msa, struct node* n, float** dm,int* samples,int numseq, int num_anchors,int num_samples)
+int bisecting_kmeans_serial(struct msa* msa, struct node** ret_n, float** dm,int* samples, int num_samples)
 {
         struct kmeans_result* res_tmp = NULL;
         struct kmeans_result* best = NULL;
         struct kmeans_result** res_ptr = NULL;
+        int num_anchors = 0;
+        struct node* n = NULL;
         int i,j;
         int tries = 40;
         /* int t_iter; */
@@ -283,14 +293,17 @@ struct node* bisecting_kmeans_serial(struct msa* msa, struct node* n, float** dm
         int* sl = NULL;
         int* sr = NULL;
         int num_l,num_r;
+
+        num_anchors = MACRO_MIN(32, msa->numseq);
+
         if(num_samples < 100){
                 float** dm = NULL;
                 RUNP(dm = d_estimation(msa, samples, num_samples,1));// anchors, num_anchors,1));
                 n = upgma(dm,samples, num_samples);
-
+                *ret_n = n;
                 gfree(dm);
                 MFREE(samples);
-                return n;
+                return OK;
         }
 
         best = NULL;
@@ -324,9 +337,6 @@ struct node* bisecting_kmeans_serial(struct msa* msa, struct node* n, float** dm
 
                                         change++;
                                 }
-
-
-
                         }
                 }
                 if(!change){
@@ -350,11 +360,12 @@ struct node* bisecting_kmeans_serial(struct msa* msa, struct node* n, float** dm
         MFREE(samples);
         n = alloc_node();
 
-        n->left = bisecting_kmeans_serial(msa,n->left, dm, sl, numseq, num_anchors,num_l);
-        n->right = bisecting_kmeans_serial(msa,n->right, dm, sr, numseq, num_anchors, num_r);
-        return n;
+        bisecting_kmeans_serial(msa,&n->left , dm, sl, num_l);
+        bisecting_kmeans_serial(msa,&n->right, dm, sr, num_r);
+        *ret_n = n;
+        return OK;
 ERROR:
-        return NULL;
+        return FAIL;
 }
 
 int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick,struct kmeans_result** ret)
@@ -384,14 +395,24 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
         num_var = num_var << 3;
 
 
+
+
+#ifdef HAVE_AVX2
         wr = _mm_malloc(sizeof(float) * num_var,32);
         wl = _mm_malloc(sizeof(float) * num_var,32);
         cr = _mm_malloc(sizeof(float) * num_var,32);
         cl = _mm_malloc(sizeof(float) * num_var,32);
         w = _mm_malloc(sizeof(float) * num_var,32);
+#else
+        MMALLOC(wr,sizeof(float) * num_var);
+        MMALLOC(wl,sizeof(float) * num_var);
+        MMALLOC(cr,sizeof(float) * num_var);
+        MMALLOC(cl,sizeof(float) * num_var);
+        MMALLOC(w,sizeof(float) * num_var);
+#endif
+
         if(*ret){
                 res = *ret;
-
         }else{
                 RUNP(res = alloc_kmeans_result(num_samples));
         }
@@ -433,7 +454,11 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                 //      fprintf(stdout,"%f %f  %f\n", cl[j],cr[j],w[j]);
         }
 
+#ifdef HAVE_AVX2
         _mm_free(w);
+#else
+        MFREE(w);
+#endif
 
         /* check if cr == cl - we have identical sequences  */
         s = 0;
@@ -448,10 +473,19 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                 score = 0.0F;
                 num_l = 0;
                 num_r = 0;
-                sl[num_l] = samples[0];
-                num_l++;
+                /* The code below caused sequence sets of size 1 to be passed to clustering...  */
+                /* sl[num_l] = samples[0]; */
+                /* num_l++; */
 
-                for(i =1 ; i <num_samples;i++){
+                /* for(i =1 ; i <num_samples;i++){ */
+                /*         sr[num_r] = samples[i]; */
+                /*         num_r++; */
+                /* } */
+                for(i = 0; i < num_samples/2;i++){
+                        sl[num_l] = samples[i];
+                        num_l++;
+                }
+                for(i = num_samples/2; i < num_samples;i++){
                         sr[num_r] = samples[i];
                         num_r++;
                 }
@@ -490,6 +524,16 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                                         sl[num_l] = s;
                                         num_l++;
                                 }else{
+                                        /* Assign sequence to smaller group  */
+                                        /* if(num_l < num_r){ */
+                                        /*         w = wl; */
+                                        /*         sl[num_l] = s; */
+                                        /*         num_l++; */
+                                        /* }else{ */
+                                        /*         w = wr; */
+                                        /*         sr[num_r] = s; */
+                                        /*         num_r++; */
+                                        /* } */
                                         if(i & 1){
                                                 w = wr;
                                                 sr[num_r] = s;
@@ -500,11 +544,9 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                                                 num_l++;
                                         }
                                 }
-
                                 for(j = 0; j < num_anchors;j++){
                                         w[j] += dm[s][j];
                                 }
-
                         }
 
                         for(j = 0; j < num_anchors;j++){
@@ -538,10 +580,18 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                         }
                 }
         }
+
+#ifdef HAVE_AVX2
         _mm_free(wr);
         _mm_free(wl);
         _mm_free(cr);
         _mm_free(cl);
+#else
+        MFREE(wr);
+        MFREE(wl);
+        MFREE(cr);
+        MFREE(cl);
+#endif
 
         res->nl =  num_l;
         res->nr =  num_r;
