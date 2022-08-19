@@ -26,6 +26,7 @@
 #include <omp.h>
 #endif
 
+#include "version.h"
 #include "global.h"
 
 #include "tlmisc.h"
@@ -526,18 +527,18 @@ int run_kalign(struct parameters* param)
         /* allocate aln parameters  */
         RUN(init_ap(&ap,param,msa->L ));
 
-        if(param->dump_internal){
-                double* s;
-                int s_len;
-                RUN(get_internal_data(msa,ap,&s, &s_len));
-                for(i = 0; i < s_len;i++){
-                        fprintf(stdout,"%0.2f ", s[i]);
-                }
-                fprintf(stdout,"\n");
-                MFREE(s);
-                free_msa(msa);
-                return OK;
-        }
+        /* if(param->dump_internal){ */
+        /*         double* s; */
+        /*         int s_len; */
+        /*         RUN(get_internal_data(msa,ap,&s, &s_len)); */
+        /*         for(i = 0; i < s_len;i++){ */
+        /*                 fprintf(stdout,"%0.2f ", s[i]); */
+        /*         } */
+        /*         fprintf(stdout,"\n"); */
+        /*         MFREE(s); */
+        /*         free_msa(msa); */
+        /*         return OK; */
+        /* } */
 
         /* Allocate tasks  */
         RUN(alloc_tasks(&tasks, msa->numseq));
