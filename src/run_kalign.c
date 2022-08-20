@@ -33,22 +33,22 @@
 
 #include "msa.h"
 #include "parameters.h"
-//#include "align_io.h"
-#include "alignment_parameters.h"
+
+#include "aln_param.h"
 
 #include "bisectingKmeans.h"
-/* #include "alignment.h" */
+
 #include "weave_alignment.h"
 
 #include "esl_stopwatch.h"
-#include "misc.h"
+
 #include <getopt.h>
 #include <string.h>
-#include "idata.h"
+
 #include "alphabet.h"
 
 #include "aln_run.h"
-#include "aln_task.h"
+#include "task.h"
 
 #define OPT_SET 1
 #define OPT_ALNPARAM 2
@@ -551,7 +551,7 @@ int run_kalign(struct parameters* param)
                 /* LOG_MSG("Set %d level (%d)", i, param->nthreads); */
                 omp_set_max_active_levels(i);
 #endif
-                RUN(build_tree_kmeans(msa,ap,&tasks));
+                RUN(build_tree_kmeans(msa,ap->nthreads,&tasks));
         }
         /* by default all protein sequences are converted into a reduced alphabet
            when read from file. Here we turn them back into the default representation. */

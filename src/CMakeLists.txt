@@ -18,6 +18,7 @@ endif()
 
 target_link_libraries(kalign PRIVATE
   tldevel
+  module_task
   module_param
   module_alphabet
   module_tree
