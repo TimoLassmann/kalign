@@ -101,7 +101,7 @@ aln_profileprofile.c
 
 
 
-check_PROGRAMS = edist alphabet misc_test bpm_test rwaln rstdin_test
+check_PROGRAMS = edist alphabet2 misc_test bpm_test rwaln rstdin_test
 TESTS = edist alphabet  misc_test bpm_test rstdin_test
 
 # TESTS_ENVIRONMENT = $(VALGRIND)
@@ -162,12 +162,12 @@ alphabet.c
 
 misc_test_CPPFLAGS = $(AM_CPPFLAGS) -DITEST_MISC
 
-alphabet_SOURCES = \
+alphabet2_SOURCES = \
 tldevel.h \
 tldevel.c \
 alphabet.h \
 alphabet.c
-alphabet_CPPFLAGS = $(AM_CPPFLAGS) -DITEST_ALPHABET
+alphabet2_CPPFLAGS = $(AM_CPPFLAGS) -DITEST_ALPHABET
 
 edist_SOURCES = \
 tldevel.h \

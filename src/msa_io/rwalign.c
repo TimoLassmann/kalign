@@ -127,7 +127,11 @@ int main(int argc, char *argv[])
 
 
         char* datadir = NULL;
+        if(!argc){
+                LOG_MSG("no arguments.");
+                return EXIT_SUCCESS;
 
+        }
         LOG_MSG("Start io tests.");
         datadir = getenv("testdatafiledir");
         if(!datadir){

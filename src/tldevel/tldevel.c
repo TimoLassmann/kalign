@@ -28,19 +28,21 @@ const char* tldevel_version(void)
         return TLDEVEL_VERSION;
 }
 
-
+#define UNUSED(expr) do { (void)(expr); } while (0)
 int galloc_unknown_type_error (void* p, ...)
 {
+        UNUSED(p);
         error(AT, "galloc was called with pointer of unknown type");
         return FAIL;
 }
 
 int galloc_too_few_arg_error (void* p)
 {
+        UNUSED(p);
         error(AT,"galloc was called with only one argument");
         return FAIL;
 }
-
+#undef UNUSED
 
 /* g memory stuff */
 

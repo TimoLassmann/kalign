@@ -19,6 +19,69 @@ target_link_libraries(module_msa PRIVATE
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
+add_executable(misc_utest
+  misc.c  
+  )
+target_link_libraries(misc_utest PRIVATE tldevel module_alphabet)
+set_target_properties(misc_utest PROPERTIES COMPILE_FLAGS "-DUTEST_MISC")
+add_test(
+  NAME misc_utest
+  COMMAND misc_utest
+  )
+
+add_executable(rwaln_utest
+  rwalign.c
+  )
+target_link_libraries(rwaln_utest PRIVATE
+  tldevel
+  module_alphabet
+  module_param
+  )
+set_target_properties(rwaln_utest PROPERTIES COMPILE_FLAGS "-DRWALIGN_TEST")
+add_test(
+  NAME rwaln_utest_a2m.good.1
+  COMMAND rwaln_utest ${CMAKE_CURRENT_SOURCE_DIR}/test_data/a2m.good.1
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+
+add_test(
+  NAME rwaln_utest_a2m.good.2
+  COMMAND rwaln_utest ${CMAKE_CURRENT_SOURCE_DIR}/test_data/a2m.good.2
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+  
+add_test(
+  NAME rwaln_utest_clustal.good.1
+  COMMAND rwaln_utest ${CMAKE_CURRENT_SOURCE_DIR}/test_data/clustal.good.1
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+
+add_test(
+  NAME rwaln_utest_clustal.good.2
+  COMMAND rwaln_utest ${CMAKE_CURRENT_SOURCE_DIR}/test_data/clustal.good.2
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+
+   
+add_test(
+  NAME rwaln_utest_afa.good.1
+  COMMAND rwaln_utest ${CMAKE_CURRENT_SOURCE_DIR}/test_data/afa.good.1
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+
+add_test(
+  NAME rwaln_utest_afa.good.2
+  COMMAND rwaln_utest ${CMAKE_CURRENT_SOURCE_DIR}/test_data/afa.good.2
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+
+
+add_test(
+  NAME rwaln_utest_afa.good.3
+  COMMAND rwaln_utest ${CMAKE_CURRENT_SOURCE_DIR}/test_data/afa.good.3
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+
 
 
 # add_executable(mcc_history_itest

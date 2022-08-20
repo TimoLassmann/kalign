@@ -31,17 +31,13 @@
 #include  <stdalign.h>
 #include <string.h>
 /* #include <immintrin.h> */
-#ifdef ITEST_MISC
-
-
+#ifdef UTEST_MISC
 #include "alphabet.h"
-
-
 
 int hash_test(void);
 
 //int  mutate_seq(uint8_t* s, int len,int k,int L, struct rng_state* rng);
-int main(int argc, char *argv[])
+int main(void)
 {
         //int a = 2345;
 

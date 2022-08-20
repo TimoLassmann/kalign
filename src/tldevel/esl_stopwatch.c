@@ -14,7 +14,7 @@
 
 #define TRUE 1
 
-static double stopwatch_getRealTime(void);
+double stopwatch_getRealTime(void);
 
 /*****************************************************************
  * ESL_STOPWATCH object maintenance
@@ -33,8 +33,6 @@ static double stopwatch_getRealTime(void);
 ESL_STOPWATCH * esl_stopwatch_Create(void)
 {
         ESL_STOPWATCH *w = NULL;
-        int status;
-
         MMALLOC(w, sizeof(ESL_STOPWATCH));
         //ESL_ALLOC(w, sizeof(ESL_STOPWATCH));
         w->elapsed = 0.;

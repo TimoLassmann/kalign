@@ -32,7 +32,7 @@ int clean_and_set_to_extern(struct alphabet* a);
 
 int merge_codes(struct alphabet*a,const int X, const int Y);
 
-#ifdef ITEST_ALPHABET
+#ifdef UTEST_ALPHABET
 int print_alphabet(struct alphabet* a);
 
 

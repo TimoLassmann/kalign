@@ -382,7 +382,7 @@ void jump(struct rng_state* s)
         uint64_t s1 = 0;
         uint64_t s2 = 0;
         uint64_t s3 = 0;
-        for(int i = 0; i < sizeof JUMP / sizeof *JUMP; i++)
+        for(uint64_t i = 0; i < sizeof JUMP / sizeof *JUMP; i++)
                 for(int b = 0; b < 64; b++) {
                         if (JUMP[i] & UINT64_C(1) << b) {
                                 s0 ^= s->s[0];
@@ -417,7 +417,7 @@ void long_jump(struct rng_state* s)
         uint64_t s1 = 0;
         uint64_t s2 = 0;
         uint64_t s3 = 0;
-        for(int i = 0; i < sizeof LONG_JUMP / sizeof *LONG_JUMP; i++)
+        for(uint64_t i = 0; i < sizeof LONG_JUMP / sizeof *LONG_JUMP; i++)
                 for(int b = 0; b < 64; b++) {
                         if (LONG_JUMP[i] & UINT64_C(1) << b) {
                                 s0 ^= s->s[0];

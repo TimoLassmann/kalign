@@ -178,8 +178,8 @@ int bpm_test(void)
 
 
 
-        double dyn_timing;
-        double bpm_timing;
+        /* double dyn_timing; */
+        /* double bpm_timing; */
         int timing_iter = 100;
         //fprintf(stdout,"Dyn\tAVX\tDYN/AVX\n");
         DECLARE_TIMER(t);

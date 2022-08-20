@@ -16,12 +16,13 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 # target_link_libraries(mcc_history_itest PRIVATE tld-dev module_mcc)
 
-# add_executable(queue_itest
-#   queue.c
-#   queue_itest.c
-#   )
-# target_link_libraries(queue_itest PRIVATE tld-dev)
-# add_test(
-#     NAME queue_itest
-#     COMMAND queue_itest
-# )
+add_executable(alphabet_utest
+  alphabet.c   
+  )
+target_link_libraries(alphabet_utest PRIVATE tldevel)
+set_target_properties(alphabet_utest PROPERTIES COMPILE_FLAGS "-DUTEST_ALPHABET")
+add_test(
+  NAME alphabet_utest
+  COMMAND alphabet_utest
+  )
+   

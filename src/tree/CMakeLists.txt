@@ -23,6 +23,28 @@ target_link_libraries(module_tree PRIVATE
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
+add_executable(edist_utest
+  euclidean_dist.c
+  )
+target_link_libraries(edist_utest PRIVATE tldevel module_param)
+set_target_properties(edist_utest PROPERTIES COMPILE_FLAGS "-DUTEST_EDIST")
+add_test(
+  NAME edist_utest
+  COMMAND edist_utest
+  )
+
+
+add_executable(bpm_utest
+  bpm.c
+  )
+target_link_libraries(bpm_utest PRIVATE tldevel module_alphabet)
+set_target_properties(bpm_utest PROPERTIES COMPILE_FLAGS "-DBPM_UTEST")
+add_test(
+  NAME bpm_utest
+  COMMAND bpm_utest
+  )
+
+
 
 
 # add_executable(mcc_history_itest

@@ -86,7 +86,7 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                   bpm_256(seq_a, seq_b, len_a, len_b),
                                   bpm_256(seq_b, seq_a, len_b, len_a)
                                   );*/
-                                dist = calc_distance(seq_a, seq_b, len_a, len_b,msa->L);
+                                dist = calc_distance(seq_a, seq_b, len_a, len_b);
                                 //dist = dist / (float) MACRO_MIN(len_a, len_b);
                                 dm[i][j] = dist;// + (float)( i * num_samples + j) / (float) ( num_samples * num_samples);
                                 dm[j][i] = dm[i][j];
@@ -133,11 +133,7 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                 l1 = s[i]->len;
                                 s2 = s[samples[j]]->s;
                                 l2 = s[samples[j]]->len;
-                                dm[i][j] = calc_distance(s1,
-                                                         s2,
-                                                         l1,
-                                                         l2,
-                                                         msa->L);
+                                dm[i][j] = calc_distance(s1,s2,l1,l2);
 
                                 //dm[i][j] += (float)MACRO_MIN(l1, l2) / (float)MACRO_MAX(l1, l2);
                                 //dm[i][j] = dm[i][j] / (float) MACRO_MIN(l1, l2);
@@ -165,7 +161,7 @@ ERROR:
         return NULL;
 }
 
-float calc_distance(uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b, int L)
+float calc_distance(uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b)
 {
 #ifdef HAVE_AVX2
         uint8_t dist;

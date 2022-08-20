@@ -40,14 +40,14 @@ float hsum256_ps_avx(__m256 v);
 float hsum_ps_sse3(__m128 v);
 #endif
 
-#ifdef ITEST_EDIST
+#ifdef UTEST_EDIST
 int main(void)
 {
         struct rng_state* rng;
 
         float** mat = NULL;
         double r;
-        float d1,d2;
+        float d1;
         int i,j,c;
         int max_iter = 10;
         int num_element = 128;
