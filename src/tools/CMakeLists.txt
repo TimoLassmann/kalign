@@ -41,3 +41,10 @@ target_link_libraries(timescorealn PRIVATE
   module_aln)
 
 
+add_executable(kchaos 
+  queue.c 
+  kchaos.c
+)
+target_link_libraries(kchaos PRIVATE
+  tldevel
+  )
