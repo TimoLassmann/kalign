@@ -27,6 +27,7 @@ target_link_libraries(benchrunner PRIVATE
   module_param
   module_alphabet
   module_msa
+  module_io
   )
 
 add_executable(timescorealn
@@ -35,6 +36,8 @@ add_executable(timescorealn
 
 target_link_libraries(timescorealn PRIVATE
   tldevel
+  module_msa
+  module_io
   module_param
   module_alphabet
   module_tree

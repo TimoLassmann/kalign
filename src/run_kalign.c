@@ -32,6 +32,7 @@
 #include "tlmisc.h"
 
 #include "msa.h"
+#include "io.h"
 #include "parameters.h"
 
 #include "aln_param.h"
@@ -99,8 +100,6 @@ int print_kalign_help(char * argv[])
 
         fprintf(stdout,"Passing sequences via stdin:\n\n   cat input.fa | kalign -f fasta > out.afa\n\n");
         fprintf(stdout,"Combining multiple input files:\n\n   kalign seqsA.fa seqsB.fa seqsC.fa -f fasta > combined.afa\n\n");
-
-
 
         if(basename){
                 MFREE(basename);
@@ -257,6 +256,9 @@ int main(int argc, char *argv[])
                         break;
                 case 'n':
                         param->nthreads = atoi(optarg);
+                        break;
+                case 'q':
+                        param->quiet = 1;
                         break;
                 case OPT_REFORMAT:
                         param->format = optarg;
@@ -472,10 +474,10 @@ int run_kalign(struct parameters* param)
 #endif
 
         if(param->num_infiles == 1){
-                RUN(read_input(param->infile[0],&msa));
+                RUN(read_input(param->infile[0], param->quiet, &msa));
         }else{
                 for(i = 0; i < param->num_infiles;i++){
-                        RUN(read_input(param->infile[i],&tmp_msa));
+                        RUN(read_input(param->infile[i], param->quiet, &tmp_msa));
                         if(tmp_msa){
                                 RUN(merge_msa(&msa, tmp_msa));
                                 free_msa(tmp_msa);
@@ -485,13 +487,15 @@ int run_kalign(struct parameters* param)
         }
         /* check if we have sequences  */
         RUN(check_for_sequences(msa));
-
+        /* Set the quiet flag */
+        msa->quiet = param->quiet;
         /* extra checks for input alignments */
         if(param->clean){
                 RUN(run_extra_checks_on_msa(msa));
         }
-
-        LOG_MSG("Detected: %d sequences.", msa->numseq);
+        if(!msa->quiet){
+                LOG_MSG("Detected: %d sequences.", msa->numseq);
+        }
         /* If we just want to reformat end here */
         if(param->reformat){
                 //LOG_MSG("%s reformat",param->reformat);
@@ -551,7 +555,7 @@ int run_kalign(struct parameters* param)
                 /* LOG_MSG("Set %d level (%d)", i, param->nthreads); */
                 omp_set_max_active_levels(i);
 #endif
-                RUN(build_tree_kmeans(msa,ap->nthreads,&tasks));
+                RUN(build_tree_kmeans(msa,ap->nthreads, param->quiet, &tasks));
         }
         /* by default all protein sequences are converted into a reduced alphabet
            when read from file. Here we turn them back into the default representation. */
@@ -564,7 +568,9 @@ int run_kalign(struct parameters* param)
 
         /* Start alignment stuff */
         DECLARE_TIMER(t1);
-        LOG_MSG("Aligning");
+        if(!msa->quiet){
+                LOG_MSG("Aligning");
+        }
         START_TIMER(t1);
 
         /* testing  */
@@ -598,7 +604,9 @@ int run_kalign(struct parameters* param)
 /*         } */
         //RUNP(map = hirschberg_alignment(msa, ap));
         STOP_TIMER(t1);
-        GET_TIMING(t1);
+        if(!msa->quiet){
+                GET_TIMING(t1);
+        }
 
         /* set to aligned */
         msa->aligned = ALN_STATUS_ALIGNED;
@@ -618,6 +626,7 @@ ERROR:
         free_msa(msa);
         return FAIL;
 }
+
 
 int check_for_sequences(struct msa* msa)
 

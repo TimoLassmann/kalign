@@ -32,7 +32,7 @@
 
 
 #include "tlrng.h"
-#include "msa.h"
+
 
 #include "bisectingKmeans.h"
 
@@ -75,7 +75,7 @@ static int bisecting_kmeans_parallel(struct msa* msa, struct node** ret_n, float
 
 static int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick,struct kmeans_result** ret);
 
-int build_tree_kmeans(struct msa* msa, int n_threads,struct aln_tasks** tasks)
+int build_tree_kmeans(struct msa* msa, int n_threads, int quiet, struct aln_tasks** tasks)
 {
         struct aln_tasks* t = NULL;
         struct node* root = NULL;
@@ -91,7 +91,6 @@ int build_tree_kmeans(struct msa* msa, int n_threads,struct aln_tasks** tasks)
         //ASSERT(param != NULL, "No input parameters.");
         /* ASSERT(ap != NULL, "No alignment parameters."); */
 
-
         t = *tasks;
         if(!t){
                 RUN(alloc_tasks(&t, msa->numseq));
@@ -100,14 +99,18 @@ int build_tree_kmeans(struct msa* msa, int n_threads,struct aln_tasks** tasks)
 
         DECLARE_TIMER(timer);
         /* pick anchors . */
-        LOG_MSG("Calculating pairwise distances");
+        if(!quiet){
+                LOG_MSG("Calculating pairwise distances");
+        }
         START_TIMER(timer);
         RUNP(anchors = pick_anchor(msa, &num_anchors));
 
         RUNP(dm = d_estimation(msa, anchors, num_anchors,0));//les,int pair)
 
         STOP_TIMER(timer);
-        GET_TIMING(timer);
+        if(!msa->quiet){
+                GET_TIMING(timer);
+        }
         //LOG_MSG("Done in %f sec.", GET_TIMING(timer));
 
         MFREE(anchors);
@@ -116,12 +119,15 @@ int build_tree_kmeans(struct msa* msa, int n_threads,struct aln_tasks** tasks)
         for(i = 0; i < numseq;i++){
                 samples[i] = i;
         }
-        LOG_MSG("%d anchors ", num_anchors);
+        if(!quiet){
+                LOG_MSG("%d anchors ", num_anchors);
+        }
         //RUNP(root = alloc_node());
 
         START_TIMER(timer);
-        LOG_MSG("Building guide tree.");
-
+        if(!quiet){
+                LOG_MSG("Building guide tree.");
+        }
         if(n_threads == 1){
                 RUN(bisecting_kmeans_serial(msa,&root, dm, samples, numseq));
         }else{
@@ -129,8 +135,9 @@ int build_tree_kmeans(struct msa* msa, int n_threads,struct aln_tasks** tasks)
         }
 
         STOP_TIMER(timer);
-        GET_TIMING(timer);
-
+        if(!msa->quiet){
+                GET_TIMING(timer);
+        }
         label_internal(root, numseq);
 
         create_tasks(root, t);

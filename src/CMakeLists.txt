@@ -1,6 +1,7 @@
 
 add_subdirectory(tldevel)
 add_subdirectory(interface)
+add_subdirectory(msa)
 add_subdirectory(msa_io)
 add_subdirectory(alphabet)
 add_subdirectory(tasks)
@@ -18,14 +19,33 @@ endif()
 
 target_link_libraries(kalign PRIVATE
   tldevel
+  module_msa
+  module_io
   module_task
   module_param
   module_alphabet
   module_tree
   module_aln)
 
+add_library(libkalign STATIC
+  libkalign.c
+  )
 
+target_link_libraries(libkalign PRIVATE
+  tldevel
+  module_msa
+  module_task
+  module_param
+  module_alphabet
+  module_tree
+  module_aln)
 
+add_executable(libtest 
+  lib_test.c
+  )
+target_link_libraries(libtest PRIVATE
+  tldevel
+  libkalign)
 #BB11001.msf
 add_test(
   NAME kalign_itest_BB11001.msf

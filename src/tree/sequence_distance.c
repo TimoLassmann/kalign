@@ -34,7 +34,7 @@
 /* #include "alignment.h" */
 /* #include "align_io.h" */
 
-#include "misc.h"
+/* #include "misc.h" */
 #include "bpm.h"
 
 #define NODESIZE 16

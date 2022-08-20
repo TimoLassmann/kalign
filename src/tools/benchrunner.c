@@ -4,6 +4,7 @@
 #include "tlmisc.h"
 
 #include "msa.h"
+#include "io.h"
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <getopt.h>
@@ -537,8 +538,8 @@ int read_clean_alignments(char* ref_filename, char* test_filename, struct msa** 
 
         int i,j,c,n;
 
-        RUN(read_input( ref_filename, &ref_aln));
-        RUN(read_input(test_filename, &test_aln));//  detect_and_read_sequences(param));
+        RUN(read_input( ref_filename,0, &ref_aln));
+        RUN(read_input(test_filename,0, &test_aln));//  detect_and_read_sequences(param));
 
         /* sort test and ref alignment  */
         qsort(test_aln->sequences , test_aln->numseq, sizeof(struct msa_seq *), sort_msa_by_name);
@@ -555,7 +556,7 @@ int read_clean_alignments(char* ref_filename, char* test_filename, struct msa** 
         }else if(ref_aln->numseq < test_aln->numseq){ /* Case 2 more test then ref  */
 
                 /* read ref in again */
-                RUN(read_input( ref_filename, &tmp_aln));
+                RUN(read_input( ref_filename,0, &tmp_aln));
 
                 /* free sequences  */
                 for(i = 0; i < tmp_aln->numseq;i++){

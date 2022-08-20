@@ -20,17 +20,19 @@
 
 */
 
-#ifndef BISECTINGKMEANS_H
-#define BISECTINGKMEANS_H
+#ifndef KMEANS_H
+#define KMEANS_H
 
-/* #include "alignment_parameters.h" */
 
-struct aln_tasks;
-struct msa;
-/* int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct  aln_tasks** task_list); */
+#include <float.h>
+#include "tldevel.h"
 
-int build_tree_kmeans(struct msa* msa, int n_threads, int quiet, struct aln_tasks** tasks);
-//int build_tree_kmeans(struct msa* msa, struct aln_param* ap);
 
-//extern int build_tree_kmeans(struct msa* msa, struct aln_param* ap);
+#include "misc.h"
+#include "euclidean_dist.h"
+
+
+double** kmeans(double** data,int* cluster_assignment, int len_a,int len_b, int k);
+
+
 #endif

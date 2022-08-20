@@ -50,6 +50,7 @@ struct parameters{
         int clean;
         int unalign;
         int help_flag;
+        int quiet;
 };
 
 extern struct parameters* init_param(void);

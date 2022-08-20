@@ -54,6 +54,7 @@ struct parameters*init_param(void)
         param->nthreads = 4;
         param->clean = 0;
         param->unalign = 0;
+        param->quiet = 0;
         return param;
 ERROR:
         free_parameters(param);

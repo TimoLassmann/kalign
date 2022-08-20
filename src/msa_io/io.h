@@ -20,53 +20,42 @@
 
 */
 
-#ifndef MSA_H
-#define MSA_H
+#ifndef IO_H
+#define IO_H
 
+#ifdef IO_IMPORT
+#define EXTERN
+#else
+#define EXTERN extern
+#endif
 
-#define MSA_NAME_LEN 128
 #define FORMAT_DETECT_FAIL -1
 #define FORMAT_FA 1
 #define FORMAT_MSF 2
 #define FORMAT_CLU 3
 
-#include <stdint.h>
-
-struct msa_seq{
-        char* name;
-        char* seq;
-        uint8_t* s;
-        int* gaps;
-        int len;
-        int alloc_len;
-};
-
-struct msa{
-        struct msa_seq** sequences;
-        int** sip;
-        int* nsip;
-        int* plen;
-        int numseq;
-        int num_profiles;
-        int alloc_numseq;
-        int aligned;
-        int letter_freq[128];
-        int L;
-};
-
+struct msa;
 /* dealign */
-int dealign_msa(struct msa* msa);
+/* EXTERN int dealign_msa(struct msa* msa); */
 
 /* clean */
-int run_extra_checks_on_msa(struct msa* msa);
+EXTERN int run_extra_checks_on_msa(struct msa* msa);
 /* convert */
-int convert_msa_to_internal(struct msa* msa, int type);
+/* EXTERN int convert_msa_to_internal(struct msa* msa, int type); */
 /* rw functions */
 
-int read_input(char* infile,struct msa** msa);
-int write_msa(struct msa* msa, char* outfile, int type);
-void free_msa(struct msa* msa);
 
-extern int merge_msa(struct msa** dest, struct msa* src);
+EXTERN int read_input(char* infile, int quiet, struct msa** msa);
+EXTERN int write_msa(struct msa* msa, char* outfile, int type);
+EXTERN void free_msa(struct msa* msa);
+
+EXTERN int merge_msa(struct msa** dest, struct msa* src);
+
+
+#undef IO_IMPORT
+#undef EXTERN
+
+
+
 
 #endif

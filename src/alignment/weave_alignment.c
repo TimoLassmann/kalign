@@ -23,6 +23,8 @@
 #include "weave_alignment.h"
 #include "task.h"
 #include "tldevel.h"
+
+#include "msa.h"
 //struct alignment* make_seq(struct alignment* aln,int a,int b,int* path);
 
 //int update_gaps(int old_len,int*gis,int new_len,int *newgaps);

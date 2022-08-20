@@ -16,6 +16,7 @@ target_include_directories(module_aln
 
 target_link_libraries(module_aln PRIVATE
   tldevel
+  module_msa
   module_param
   module_task
   module_alphabet)

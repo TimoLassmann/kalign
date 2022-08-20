@@ -1,4 +1,4 @@
-add_library(module_msa STATIC
+add_library(module_io STATIC
   rwalign.c
   #align_io.c
   misc.c
@@ -9,11 +9,12 @@ add_library(module_msa STATIC
 # endif()
 
 
-target_include_directories(module_msa
+target_include_directories(module_io
   INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}
   )
-target_link_libraries(module_msa PRIVATE
+target_link_libraries(module_io PRIVATE
   tldevel
+  module_msa
   module_alphabet
   module_param)
 
@@ -34,6 +35,7 @@ add_executable(rwaln_utest
   )
 target_link_libraries(rwaln_utest PRIVATE
   tldevel
+  module_msa
   module_alphabet
   module_param
   )
