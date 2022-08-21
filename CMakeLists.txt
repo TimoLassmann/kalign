@@ -41,7 +41,6 @@ include(CheckCSourceRuns)
 
 option(USE_OPENMP "Use OpenMP for parallelization" ON)
 
-
 option(ENABLE_SSE    "Enable compile-time SSE4.1 support." ON)
 option(ENABLE_AVX    "Enable compile-time AVX support."    ON)
 option(ENABLE_AVX2   "Enable compile-time AVX2 support."   ON)
@@ -58,7 +57,6 @@ if(USE_OPENMP)
     message(STATUS "OpenMP not supported")
   endif(OPENMP_FOUND OR OpenMP_FOUND)
 endif(USE_OPENMP)
-
 
 
 if (ENABLE_SSE)
@@ -173,6 +171,7 @@ configure_file ("${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in"
 
 add_subdirectory(src)
 
+install(TARGETS kalign DESTINATION bin)
 
 # Package Generator  #######################################################
 # set(CPACK_PACKAGE_VENDOR "Timo Lassmann")

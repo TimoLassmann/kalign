@@ -15,6 +15,7 @@ target_include_directories(module_tree
   INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}
   )
 target_link_libraries(module_tree PRIVATE
+  m
   tldevel
   module_msa
   module_param

@@ -21,15 +21,15 @@
 #endif
 
 static int to_msa(char** input_sequences, int* len, int numseq,struct msa** multiple_aln);
-static int echo_aln(struct msa* msa);
+int echo_aln(struct msa* msa);
 
-int kalign(char **seq, int *len,int numseq, char ***aligned, int *aln_len)
+int kalign(char **seq, int *len,int numseq, char ***aligned, int *out_aln_len)
 {
         struct msa* msa = NULL;
         struct aln_param* ap = NULL;
         struct aln_tasks* tasks = NULL;
         struct parameters* param = NULL;
-
+        char** out = NULL;
         RUNP(param = init_param());
 
         ASSERT(seq != NULL, "No sequences");
@@ -69,14 +69,41 @@ int kalign(char **seq, int *len,int numseq, char ***aligned, int *aln_len)
         msa->aligned = ALN_STATUS_ALIGNED;
 
 
-        echo_aln(msa);
+        /* echo_aln(msa); */
 
+        int aln_len = 0;
+        for (int j = 0; j <= msa->sequences[0]->len;j++){
+                aln_len += msa->sequences[0]->gaps[j];
+        }
+        aln_len += msa->sequences[0]->len;
+        aln_len += 1;
 
-        *aligned = NULL;
-        *aln_len = 0;
+        MMALLOC(out, sizeof(char*) * numseq);
+        for(int i = 0; i < numseq; i++){
+                out[i] = 0;
+                MMALLOC(out[i], sizeof(char) * (uint64_t)aln_len);
+                int pos = 0;
+                for(int j = 0;j < msa->sequences[i]->len;j++){
+                        for(int c = 0;c < msa->sequences[i]->gaps[j];c++){
+                                out[i][pos] = '-';
+                                pos++;
+                        }
+                        out[i][pos] = msa->sequences[i]->seq[j];
+                        pos++;
+                }
+                for(int c = 0;c < msa->sequences[i]->gaps[ msa->sequences[i]->len];c++){
+                        out[i][pos] = '-';
+                        pos++;
+                }
+                out[i][pos] = 0;
+                /* LOG_MSG("%d %d %s ", aln_len,pos, out[i]); */
+        }
+
+        *aligned = out;
+        *out_aln_len = aln_len;
         /* clean up map */
         free_tasks(tasks);
-
+        free_ap(ap);
         /* copy alignment  */
         free_parameters(param);
         free_msa(msa);
@@ -84,6 +111,7 @@ int kalign(char **seq, int *len,int numseq, char ***aligned, int *aln_len)
 ERROR:
         free_parameters(param);
         free_msa(msa);
+        free_ap(ap);
         return FAIL;
 }
 

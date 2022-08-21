@@ -8,7 +8,7 @@ add_library(tldevel STATIC
 target_include_directories(tldevel 
   INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}
   )
-#target_link_libraries(module_aln PRIVATE tldevel)
+target_link_libraries(tldevel PRIVATE m)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 

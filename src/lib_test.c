@@ -10,17 +10,33 @@ int main(void)
                 "MKKLKKHPDFPKKPLTPYFRFFMEKRAKYAKLHPEMSNLDLTKILSKKYKELPEKKKMKYIQDFQREKQEFERNLARFREDHPDLIQNAKK",
                 "MHIKKPLNAFMLYMKEMRANVVAESTLKESAAINQILGRRWHALSREEQAKYYELARKERQLHMQLYPGWSARDNYGKKKKRKREK",
         };
-
+        int numseq = 4;
         int* len = NULL;
-        MMALLOC(len, sizeof(int) * 4);
+        MMALLOC(len, sizeof(int) * numseq);
 
-        for(int i = 0 ; i < 4; i++){
+        for(int i = 0 ; i < numseq; i++){
                 len[i] = strnlen(array[i], 95);
         }
         char** aln = NULL;
         int aln_len = 0;
 
-        RUN(kalign(array,len, 4, &aln, &aln_len));
+        /* Call kalign  */
+        RUN(kalign(array,len, numseq, &aln, &aln_len));
+
+
+        fprintf(stdout,"Aligned:\n");
+        for(int i = 0; i < numseq;i++){
+                fprintf(stdout,"%s\n", aln[i]);
+        }
+        /* Free alignmenr  */
+        for(int i = 0; i < numseq;i++){
+                free(aln[i]);
+        }
+        free(aln);
+
+
+
+
 
         MFREE(len);
 

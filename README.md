@@ -14,10 +14,11 @@ Download tarball from [releases](https://github.com/TimoLassmann/kalign/releases
 ``` bash
 tar -zxvf kalign-<version>.tar.gz
 cd kalign-<version>
-./autogen.sh
-./configure
-make
-make check
+mkdir build 
+cd build
+cmake .. 
+make 
+make test 
 make install
 ```
 
@@ -30,24 +31,24 @@ brew install brewsci/bio/kalign
 ``` bash
 git clone https://github.com/TimoLassmann/kalign.git
 cd kalign
-./autogen.sh
-./configure
-make
-make check
+mkdir build 
+cd build 
+cmake ..
+make 
+make test 
 make install
 ```
 
 on macOS, install [brew](https://brew.sh/) then:
 
 ``` bash
-brew install libtool
-brew install automake
+brew install cmake 
 git clone https://github.com/TimoLassmann/kalign.git
 cd kalign
-./autogen.sh
-./configure
-make
-make check
+cd build 
+cmake ..
+make 
+make test 
 make install
 ```
 

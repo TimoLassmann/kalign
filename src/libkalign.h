@@ -7,8 +7,8 @@
 #define EXTERN extern
 #endif
 
-EXTERN int kalign(char **seq, int *len,int numseq, char ***aligned, int *aln_len);
 
+EXTERN int kalign(char **seq, int *len,int numseq, char ***aligned, int *out_aln_len);
 #undef LIBKALIGN_IMPORT
 #undef EXTERN
 
