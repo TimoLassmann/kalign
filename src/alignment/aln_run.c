@@ -540,7 +540,8 @@ int create_chaos_msa_serial(struct msa* msa, struct aln_param* ap,struct aln_tas
         struct aln_mem* m = NULL;
         struct rng_state* rng = NULL;
         int i,g,f,a,b,l;
-        int best_a, best_b;
+        int best_a = 0;
+        int best_b = 0;
 
         int* samples = NULL;
 
@@ -579,6 +580,8 @@ int create_chaos_msa_serial(struct msa* msa, struct aln_param* ap,struct aln_tas
                 l = MACRO_MIN(ap->chaos, numseq-i);
                 SampleWithoutReplacement(rng, numseq-i, l, samples);
 
+                best_a = -1;
+                best_b = -1;
                 for(g = 0;g < l-1;g++){
                         a = samples[g];
                         for(f = g + 1; f < l;f++){

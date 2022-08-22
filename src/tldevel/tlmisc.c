@@ -10,6 +10,56 @@
 
 #define MAX_CMD_LEN 16384
 
+int my_str_cpy(char* target, char* source, int t_size,int s_size)
+{
+        if(s_size > t_size){
+                ERROR_MSG("Target size is < than source size");
+        }
+        int s_len = strnlen(source, s_size);
+        int t_len = strnlen(target, t_size);
+
+        if(s_len > t_size){
+                ERROR_MSG("Target len is < than source size");
+        }
+
+        for(int i = 0; i < t_len;i++){
+                target[i] = source[i];
+        }
+        target[t_len] = 0;
+
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+int my_str_append(char* target, char* source, int t_size,int s_size)
+{
+        if(s_size > t_size){
+                ERROR_MSG("Target size is < than source size");
+        }
+        int s_len = strnlen(source, s_size);
+        int t_len = strnlen(target, t_size);
+
+        if(s_len > t_size){
+                ERROR_MSG("Target len is < than source size");
+        }
+
+        if(t_size - t_len < s_len){
+                ERROR_MSG("Target has insufficient space.");
+        }
+        int c = t_len;
+        for(int i = 0; i < t_len;i++){
+                target[c] = source[i];
+                c++;
+        }
+        target[c] = 0;
+
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+
 char* basename(const char* name)
 {
         int i= 0;

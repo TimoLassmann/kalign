@@ -22,6 +22,7 @@
 
 #include "tldevel.h"
 #include <stdio.h>
+#include <unistd.h>
 #ifdef HAVE_OPENMP
 #include <omp.h>
 #endif

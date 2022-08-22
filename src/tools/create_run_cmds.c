@@ -13,7 +13,7 @@ int main(void)
 
         char cmd[BUFSIZ];
         char ret[BUFSIZ];
-        char out[BUFSIZ];
+        char out[BUFSIZ*5];
 
         int rc;
 
@@ -51,7 +51,7 @@ int main(void)
                                 for(c = 0;c <15;c++){
                                         matadd = matadd_start;
                                         for(f = 0; f < 15; f++){
-                                                rc = snprintf(out, BUFSIZ, "benchrunner --scratch ~/tmp --gpo %f -gpe %f -tgpe %f -matadd %f -program kalign -test %s -ref %s -o big_run_out.csv -u %d \n", gpo,gpe,tgpe,matadd, ret,ret,  i << 12| j << 8 | c << 4 | f);
+                                                rc = snprintf(out, BUFSIZ*5, "benchrunner --scratch ~/tmp --gpo %f -gpe %f -tgpe %f -matadd %f -program kalign -test %s -ref %s -o big_run_out.csv -u %d \n", gpo,gpe,tgpe,matadd, ret,ret,  i << 12| j << 8 | c << 4 | f);
                                                 fprintf(stdout,"%s",out);
                                                 matadd += matadd_step;
                                         }

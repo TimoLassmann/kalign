@@ -42,9 +42,9 @@ int main(int argc, char *argv[])
 
         char cmd[BUFSIZ];
         char ret[BUFSIZ];
-        char out[BUFSIZ];
-        char filename[512];
-        char runname[512];
+        char out[BUFSIZ*5];
+        char filename[BUFSIZ*2];
+        char runname[BUFSIZ];
         /* char* hit; */
         int rc;
 
@@ -136,7 +136,6 @@ int main(int argc, char *argv[])
                                 j= 0;
                         }else{
                                 runname[j] = 0;
-
                         }
                 }else{
                         runname[j] = param->inputdir[i];
@@ -144,7 +143,6 @@ int main(int argc, char *argv[])
                 }
         }
         runname[j] = 0;
-
 
         snprintf(cmd, BUFSIZ, "find %s  -name \"*.fa\"", param->inputdir);
         //snprintf(cmd, BUFSIZ, "find ~/kalignbenchmark/data/data-set1  ~/kalignbenchmark/data/data-set2 -name \"*.msf\" | grep structural");
@@ -154,8 +152,11 @@ int main(int argc, char *argv[])
         while (fgets(ret, BUFSIZ, pipe)){
                 //fprintf(stderr,"%s", ret);
                 ret[strcspn(ret, "\r\n")] = 0;
+
+
+                
                 go = 1;
-                snprintf(filename, 512, "%s", ret);
+                snprintf(filename, BUFSIZ, "%s", ret);
 
                 l = strlen(filename);
 
@@ -178,19 +179,19 @@ int main(int argc, char *argv[])
                         }
                 }
                 if(go){
-                        rc = snprintf(out, BUFSIZ, "benchrunner --scratch %s --runname %s -program muscle -test %s -ref %s -o %s -u %d \n", param->scratchdir, runname,ret,filename,param->outfile, c);
+                        rc = snprintf(out, BUFSIZ*5, "benchrunner --scratch %s --runname %s -program muscle -test %s -ref %s -o %s -u %d \n", param->scratchdir, runname,ret,filename,param->outfile, c);
                         fprintf(stdout,"%s",out);
                         c++;
 
-                        rc = snprintf(out, BUFSIZ, "benchrunner --scratch %s --runname %s -program kalign -test %s -ref %s -o %s -u %d \n", param->scratchdir, runname,ret, filename,param->outfile, c);
+                        rc = snprintf(out, BUFSIZ*5, "benchrunner --scratch %s --runname %s -program kalign -test %s -ref %s -o %s -u %d \n", param->scratchdir, runname,ret, filename,param->outfile, c);
                         fprintf(stdout,"%s",out);
                         c++;
 
-                        rc = snprintf(out, BUFSIZ, "benchrunner --scratch %s @-n:1@ --runname %s -program kalign -test %s -ref %s -o %s -u %d \n", param->scratchdir, runname,ret, filename,param->outfile, c);
+                        rc = snprintf(out, BUFSIZ*5, "benchrunner --scratch %s @-n:1@ --runname %s -program kalign -test %s -ref %s -o %s -u %d \n", param->scratchdir, runname,ret, filename,param->outfile, c);
                         fprintf(stdout,"%s",out);
                         c++;
 
-                        rc = snprintf(out, BUFSIZ, "benchrunner --scratch %s  @-n:4@  --runname %s -program kalign -test %s -ref %s -o %s -u %d \n", param->scratchdir, runname,ret, filename,param->outfile, c);
+                        rc = snprintf(out, BUFSIZ*5, "benchrunner --scratch %s  @-n:4@  --runname %s -program kalign -test %s -ref %s -o %s -u %d \n", param->scratchdir, runname,ret, filename,param->outfile, c);
                         fprintf(stdout,"%s",out);
                         c++;
 
