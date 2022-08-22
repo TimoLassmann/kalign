@@ -23,23 +23,18 @@ int main(void)
         /* Call kalign  */
         RUN(kalign(array,len, numseq, &aln, &aln_len));
 
-
+        /* Print out alignment */
         fprintf(stdout,"Aligned:\n");
         for(int i = 0; i < numseq;i++){
                 fprintf(stdout,"%s\n", aln[i]);
         }
-        /* Free alignmenr  */
+        /* Free alignment  */
         for(int i = 0; i < numseq;i++){
                 free(aln[i]);
         }
         free(aln);
 
-
-
-
-
-        MFREE(len);
-
+        free(len);
 
         return OK;
 ERROR:
