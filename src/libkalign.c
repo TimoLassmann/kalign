@@ -15,7 +15,6 @@
 
 #include "weave_alignment.h"
 
-
 #ifdef HAVE_OPENMP
 #include <omp.h>
 #endif
