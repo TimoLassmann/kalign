@@ -1,19 +1,49 @@
-#include "tldevel.h"
+/* #include "tldevel.h" */
 #include "libkalign.h"
 
+/* tldevel  */
 
-#include "alphabet.h"
-#include "global.h"
-#include "msa.h"
+#include "mod_tldevel.c"
+/* Interface  */
 
-#include "aln_param.h"
-#include "aln_run.h"
-#include "task.h"
+#include "mod_interface.c"
+/* Alignment tasks  */
+
+#include "task.c"
+
+/* MSa  */
+
+#include "msa.c"
+
+/* MSA io */
+
+#include "mod_msaio.c"
+
+/* Tree */
+
+#include "mod_tree.c"
+/* Alphabet  */
+/* #include "alphabet.h" */
+/* #include "alphabet.c" */
+/* Alignment module  */
+
+#include "mod_aln.c"
+
+#include "alphabet.c"
+/*  */
+
+/* #include "alphabet.h" */
+/* #include "global.h" */
+/* #include "msa.h" */
+
+/* #include "aln_param.h" */
+/* #include "aln_run.h" */
+/* #include "task.h" */
 
 
-#include "bisectingKmeans.h"
+/* #include "bisectingKmeans.h" */
 
-#include "weave_alignment.h"
+/* #include "weave_alignment.h" */
 
 
 #ifdef HAVE_OPENMP

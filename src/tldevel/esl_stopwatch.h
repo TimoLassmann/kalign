@@ -7,7 +7,7 @@
 #ifndef eslSTOPWATCH_INCLUDED
 #define eslSTOPWATCH_INCLUDED
 
-#include "tldevel.h"
+/* #include "tldevel.h" */
 //#include "esl_config.h"
 
 
@@ -44,16 +44,16 @@ typedef struct {
 } ESL_STOPWATCH;
 
 
-extern ESL_STOPWATCH *esl_stopwatch_Create(void);
-extern void           esl_stopwatch_Destroy(ESL_STOPWATCH *w);
+kalign_extern ESL_STOPWATCH *esl_stopwatch_Create(void);
+kalign_extern void           esl_stopwatch_Destroy(ESL_STOPWATCH *w);
 
-extern int esl_stopwatch_Start(ESL_STOPWATCH *w);
-extern int esl_stopwatch_Stop(ESL_STOPWATCH *w);
-extern int esl_stopwatch_Display(FILE *fp, ESL_STOPWATCH *w, char *prefix);
-extern int tl_stopwatch_Display(ESL_STOPWATCH *w);
-extern double esl_stopwatch_GetElapsed(ESL_STOPWATCH *w);
+kalign_extern int esl_stopwatch_Start(ESL_STOPWATCH *w);
+kalign_extern int esl_stopwatch_Stop(ESL_STOPWATCH *w);
+kalign_extern int esl_stopwatch_Display(FILE *fp, ESL_STOPWATCH *w, char *prefix);
+kalign_extern int tl_stopwatch_Display(ESL_STOPWATCH *w);
+kalign_extern double esl_stopwatch_GetElapsed(ESL_STOPWATCH *w);
 
-extern int esl_stopwatch_Include(ESL_STOPWATCH *master, ESL_STOPWATCH *w);
+kalign_extern int esl_stopwatch_Include(ESL_STOPWATCH *master, ESL_STOPWATCH *w);
 
 
 #define DECLARE_TIMER(n)  ESL_STOPWATCH* timer_##n = esl_stopwatch_Create();

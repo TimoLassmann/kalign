@@ -22,12 +22,14 @@
 
 #ifndef IO_H
 #define IO_H
-
-#ifdef IO_IMPORT
-#define EXTERN
+#ifndef kalign_extern
+#ifdef __cplusplus
+#define kalign_extern extern "C"
 #else
-#define EXTERN extern
+#define kalign_extern extern
 #endif
+#endif
+
 
 #define FORMAT_DETECT_FAIL -1
 #define FORMAT_FA 1
@@ -39,21 +41,17 @@ struct msa;
 /* EXTERN int dealign_msa(struct msa* msa); */
 
 /* clean */
-EXTERN int run_extra_checks_on_msa(struct msa* msa);
+kalign_extern int run_extra_checks_on_msa(struct msa* msa);
 /* convert */
-/* EXTERN int convert_msa_to_internal(struct msa* msa, int type); */
+/* kalign_extern int convert_msa_to_internal(struct msa* msa, int type); */
 /* rw functions */
 
 
-EXTERN int read_input(char* infile, int quiet, struct msa** msa);
-EXTERN int write_msa(struct msa* msa, char* outfile, int type);
-EXTERN void free_msa(struct msa* msa);
+kalign_extern int read_input(char* infile, int quiet, struct msa** msa);
+kalign_extern int write_msa(struct msa* msa, char* outfile, int type);
+kalign_extern void free_msa(struct msa* msa);
 
-EXTERN int merge_msa(struct msa** dest, struct msa* src);
-
-
-#undef IO_IMPORT
-#undef EXTERN
+kalign_extern int merge_msa(struct msa** dest, struct msa* src);
 
 
 

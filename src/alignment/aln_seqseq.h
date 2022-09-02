@@ -1,15 +1,16 @@
 #ifndef ALN_SEQSEQ_H
 #define ALN_SEQSEQ_H
 
-#ifdef ALN_SEQSEQ_IMPORT
-#define EXTERN
+#ifndef kalign_extern
+#ifdef __cplusplus
+#define kalign_extern extern "C"
 #else
-#define EXTERN extern
+#define kalign_extern extern
+#endif
 #endif
 
-EXTERN int aln_seqseq_foward(struct aln_mem* m);
-EXTERN int aln_seqseq_backward(struct aln_mem* m);
-EXTERN int aln_seqseq_meetup(struct aln_mem* m,int old_cor[],int* meet,int* t,float* score);
-#undef ALN_SEQSEQ_IMPORT
-#undef EXTERN
+kalign_extern int aln_seqseq_foward(struct aln_mem* m);
+kalign_extern int aln_seqseq_backward(struct aln_mem* m);
+kalign_extern int aln_seqseq_meetup(struct aln_mem* m,int old_cor[],int* meet,int* t,float* score);
+
 #endif

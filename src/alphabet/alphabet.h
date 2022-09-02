@@ -23,6 +23,14 @@
 #ifndef ALPHABET_H
 #define ALPHABET_H
 
+#ifndef kalign_extern
+#ifdef __cplusplus
+#define kalign_extern extern "C"
+#else
+#define kalign_extern extern
+#endif
+#endif
+
 /* #include "global.h" */
 
 #include <inttypes.h>
@@ -43,9 +51,7 @@ struct alphabet{
 };
 
 
-extern struct alphabet* create_alphabet(int type);
-extern int switch_alphabet(struct alphabet* a, int type);
-
-
+kalign_extern struct alphabet* create_alphabet(int type);
+kalign_extern int switch_alphabet(struct alphabet* a, int type);
 
 #endif

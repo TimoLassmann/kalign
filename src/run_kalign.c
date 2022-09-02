@@ -20,37 +20,18 @@
 
 */
 
-#include "tldevel.h"
+/* #include "tldevel.h" */
 #include <stdio.h>
 #include <unistd.h>
 #ifdef HAVE_OPENMP
 #include <omp.h>
 #endif
-
+#include "libkalign.h"
 #include "version.h"
-#include "global.h"
-
-#include "tlmisc.h"
-
-#include "msa.h"
-#include "io.h"
-#include "parameters.h"
-
-#include "aln_param.h"
-
-#include "bisectingKmeans.h"
-
-#include "weave_alignment.h"
-
-#include "esl_stopwatch.h"
 
 #include <getopt.h>
 #include <string.h>
 
-#include "alphabet.h"
-
-#include "aln_run.h"
-#include "task.h"
 
 #define OPT_SET 1
 #define OPT_ALNPARAM 2

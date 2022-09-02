@@ -1,42 +1,45 @@
+#include <array>
+#include <iostream>
+#include <string>
 
 #include "libkalign.h"
-#include <string.h>
 
-int main(void)
-{
-        char * array[95] = {
+int main() {
+        // Initialize array
+        char * inseq[95] = {
                 "GKGDPKKPRGKMSSYAFFVQTSREEHKKKHPDASVNFSEFSKKCSERWKTMSAKEKGKFEDMAKADKARYEREMKTYIPPKGE",
                 "MQDRVKRPMNAFIVWSRDQRRKMALENPRMRNSEISKQLGYQWKMLTEAEKWPFFQEAQKLQAMHREKYPNYKYRPRRKAKMLPK",
                 "MKKLKKHPDFPKKPLTPYFRFFMEKRAKYAKLHPEMSNLDLTKILSKKYKELPEKKKMKYIQDFQREKQEFERNLARFREDHPDLIQNAKK",
                 "MHIKKPLNAFMLYMKEMRANVVAESTLKESAAINQILGRRWHALSREEQAKYYELARKERQLHMQLYPGWSARDNYGKKKKRKREK",
         };
         int numseq = 4;
-        int* len = NULL;
-        MMALLOC(len, sizeof(int) * numseq);
 
-        for(int i = 0 ; i < numseq; i++){
-                len[i] = strnlen(array[i], 95);
-        }
+        int* L = new int[numseq];        
+        L[0] = 83;
+        L[1] = 85;
+        L[2] = 91;
+        L[3] = 86;
+        
         char** aln = NULL;
         int aln_len = 0;
 
-        /* Call kalign  */
-        RUN(kalign(array,len, numseq, &aln, &aln_len));
+        kalign(inseq,L, numseq, &aln, &aln_len);
+        // foo(22);
 
-        /* Print out alignment */
-        fprintf(stdout,"Aligned:\n");
+        // fprintf(stdout,"Aligned:\n");
+        std::cout << "Aligned:\n";
         for(int i = 0; i < numseq;i++){
-                fprintf(stdout,"%s\n", aln[i]);
+                std::cout << aln[i] << "\n";
+                // fprintf(stdout,"%s\n", aln[i]);
         }
         /* Free alignment  */
         for(int i = 0; i < numseq;i++){
-                free(aln[i]);
+                delete[] aln[i];
+                // free(aln[i]);
         }
         free(aln);
 
-        free(len);
+        
 
-        return OK;
-ERROR:
-        return FAIL;
+        delete[] L;
 }

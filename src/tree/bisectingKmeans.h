@@ -25,11 +25,19 @@
 
 /* #include "alignment_parameters.h" */
 
+#ifndef kalign_extern
+#ifdef __cplusplus
+#define kalign_extern extern "C"
+#else
+#define kalign_extern extern
+#endif
+#endif
+
 struct aln_tasks;
 struct msa;
 /* int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct  aln_tasks** task_list); */
 
-int build_tree_kmeans(struct msa* msa, int n_threads, int quiet, struct aln_tasks** tasks);
+kalign_extern int build_tree_kmeans(struct msa* msa, int n_threads, int quiet, struct aln_tasks** tasks);
 //int build_tree_kmeans(struct msa* msa, struct aln_param* ap);
 
 //extern int build_tree_kmeans(struct msa* msa, struct aln_param* ap);

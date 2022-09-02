@@ -1,6 +1,15 @@
 #ifndef ALN_TASK_H
 #define ALN_TASK_H
 
+#ifndef kalign_extern
+#ifdef __cplusplus
+#define kalign_extern extern "C"
+#else
+#define kalign_extern extern
+#endif
+#endif
+
+
 struct task{
         float score;            /* score of output alignment */
         int a;                  /* input 1 */
@@ -18,19 +27,13 @@ struct aln_tasks{
         int n_alloc_tasks;
 };
 
-#ifdef ALN_TASK_IMPORT
-#define EXTERN
-#else
-#define EXTERN extern
-#endif
 
 #define TASK_ORDER_PRIORITY 1
 #define TASK_ORDER_TREE 2
 
-EXTERN int sort_tasks(struct aln_tasks* t , int order);
-EXTERN int alloc_tasks(struct aln_tasks** tasks,int numseq);
-EXTERN void free_tasks(struct aln_tasks* tasks);
+kalign_extern int sort_tasks(struct aln_tasks* t , int order);
+kalign_extern int alloc_tasks(struct aln_tasks** tasks,int numseq);
+kalign_extern void free_tasks(struct aln_tasks* tasks);
 
-#undef ALN_TASK_IMPORT
-#undef EXTERN
+
 #endif

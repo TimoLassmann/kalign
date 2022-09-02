@@ -1,7 +1,7 @@
 
 cmake_minimum_required(VERSION 3.1)
 
-project(kalign LANGUAGES C VERSION "3.3.3")
+project(kalign LANGUAGES C CXX VERSION "3.3.3")
 
 set (CMAKE_C_STANDARD 11)
 

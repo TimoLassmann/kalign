@@ -53,6 +53,6 @@ struct parameters{
         int quiet;
 };
 
-extern struct parameters* init_param(void);
-extern void free_parameters(struct parameters* param);
+kalign_extern struct parameters* init_param(void);
+kalign_extern void free_parameters(struct parameters* param);
 #endif

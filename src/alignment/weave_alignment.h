@@ -23,15 +23,22 @@
 #ifndef WEAVE_ALIGNMENT_H
 #define WEAVE_ALIGNMENT_H
 
-#include "global.h"
+/* #include "global.h" */
+#ifndef kalign_extern
+#ifdef __cplusplus
+#define kalign_extern extern "C"
+#else
+#define kalign_extern extern
+#endif
+#endif
 
 #include "msa.h"
 
 //extern int weave(struct msa* msa, int** map, int* tree);
 
 /* extern int weave(struct aln_tasks* t); */
-extern int make_seq(struct msa* msa,int a,int b,int* path);
+kalign_extern int make_seq(struct msa* msa,int a,int b,int* path);
 
-extern int clean_aln(struct msa* msa);
+kalign_extern int clean_aln(struct msa* msa);
 
 #endif

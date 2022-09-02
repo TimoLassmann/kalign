@@ -23,17 +23,27 @@
 #ifndef BPM_H
 #define BPM_H
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
+/* #ifdef HAVE_CONFIG_H */
+/* #include "config.h" */
+/* #endif */
+
+#include "stdint.h"
+
+#ifndef kalign_extern
+#ifdef __cplusplus
+#define kalign_extern extern "C"
+#else
+#define kalign_extern extern
+#endif
 #endif
 
-#include "tldevel.h"
+/* #include "tldevel.h" */
 
 /* Must be called before bpm_256!!!!  */
-extern void set_broadcast_mask(void);
+kalign_extern void set_broadcast_mask(void);
 
-extern uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m);
-extern uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m);
+kalign_extern uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m);
+kalign_extern uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m);
 
 
 
