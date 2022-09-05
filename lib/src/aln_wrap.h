@@ -17,7 +17,6 @@ struct msa;
 
 EXTERN int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, float tgpe);
 
-
 #undef ALN_WRAP_IMPORT
 #undef EXTERN
 

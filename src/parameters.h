@@ -45,6 +45,7 @@ struct parameters{
         char *outfile;
         char* format;
         char* aln_param_file;
+        int type;
         float gpo;
         float gpe;
         float tgpe;

@@ -13,6 +13,10 @@
    #endif
 #endif
 
+#define KALIGN_DNA 0
+#define KALIGN_DNA_INTERNAL 1
+#define KALIGN_RNA 2
+
 
 struct msa;
 /* input output routines  */
@@ -26,7 +30,6 @@ EXTERN int kalign_msa_to_arr(struct msa *msa, char ***aligned, int *out_aln_len)
 EXTERN int kalign_arr_to_msa(char **input_sequences, int *len, int numseq, struct msa **multiple_aln);
 
 EXTERN int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, float tgpe);
-
 /* Memory */
 EXTERN void kalign_free_msa(struct msa* msa);
 
@@ -36,6 +39,5 @@ EXTERN int kalign_check_msa(struct msa* msa);
 
 #undef KALIGN_IMPORT
 #undef EXTERN
-
 
 #endif

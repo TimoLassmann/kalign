@@ -27,25 +27,25 @@
 #include "parameters.h"
 
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <getopt.h>
-#include <string.h>
+
 
 
 #define OPT_SET 1
-#define OPT_ALNPARAM 2
-#define OPT_RENAME 3
-#define OPT_REFORMAT 4
+
+
 #define OPT_SHOWW 5
 #define OPT_GPO 6
 #define OPT_GPE 7
 #define OPT_TGPE 8
-#define OPT_MATADD 9
 
 #define OPT_NTHREADS 10
 
-#define OPT_CLEAN 11
-#define OPT_UNALIGN 12
+#define OPT_ALN_TYPE 13
+
+static int set_aln_type(char* in, int* type );
 
 static int run_kalign(struct parameters* param);
 
@@ -69,6 +69,7 @@ int print_kalign_help(char * argv[])
 
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--format","Output format." ,"[Fasta]"  );
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--reformat","Reformat existing alignment." ,"[NA]"  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--type","Alignment type (rna, dna, internal)." ,"[rna]"  );
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpo","Gap open penalty." ,"[5.5]"  );
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpe","Gap extension penalty." ,"[2.0]"  );
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--tgpe","Terminal gap extension penalty." ,"[1.0]"  );
@@ -162,6 +163,7 @@ int main(int argc, char *argv[])
         int showw = 0;
         struct parameters* param = NULL;
         char* in = NULL;
+        char* in_type = NULL;
         RUNP(param = init_param());
 
         param->num_infiles = 0;
@@ -169,17 +171,12 @@ int main(int argc, char *argv[])
         while (1){
                 static struct option long_options[] ={
                         {"showw", 0,0,OPT_SHOWW },
-                        {"alnp", required_argument,0,OPT_ALNPARAM},
                         {"set", required_argument,0,OPT_SET},
                         {"format",  required_argument, 0, 'f'},
-                        {"reformat",  required_argument, 0, OPT_REFORMAT},
-                        {"changename",  0, 0, OPT_RENAME},
-                        {"clean",  0, 0, OPT_CLEAN},
-                        {"unalign",  0, 0, OPT_UNALIGN},
+                        {"type",  required_argument, 0, OPT_ALN_TYPE},
                         {"gpo",  required_argument, 0, OPT_GPO},
                         {"gpe",  required_argument, 0, OPT_GPE},
                         {"tgpe",  required_argument, 0, OPT_TGPE},
-                        {"matadd",  required_argument, 0, OPT_MATADD},
                         {"nthreads",  required_argument, 0, 'n'},
                         {"input",  required_argument, 0, 'i'},
                         {"infile",  required_argument, 0, 'i'},
@@ -202,23 +199,14 @@ int main(int argc, char *argv[])
                         break;
                 }
                 switch(c) {
-                case OPT_CLEAN:
-                        param->clean = 1;
-                        break;
-                case OPT_UNALIGN:
-                        param->unalign = 1;
+                case OPT_ALN_TYPE:
+                        in_type = optarg;
                         break;
                 case OPT_SHOWW:
                         showw = 1;
                         break;
-                case OPT_ALNPARAM:
-                        param->aln_param_file = optarg;
-                        break;
                 case OPT_SET:
                         param->param_set = atoi(optarg);
-                        break;
-                case OPT_RENAME:
-                        param->rename = 1;
                         break;
                 case 'f':
                         param->format = optarg;
@@ -229,10 +217,6 @@ int main(int argc, char *argv[])
                 case 'q':
                         param->quiet = 1;
                         break;
-                case OPT_REFORMAT:
-                        param->format = optarg;
-                        param->reformat = 1;
-                        break;
                 case OPT_GPO:
                         param->gpo = atof(optarg);
                         break;
@@ -241,9 +225,6 @@ int main(int argc, char *argv[])
                         break;
                 case OPT_TGPE :
                         param->tgpe = atof(optarg);
-                        break;
-                case OPT_MATADD :
-                        param->matadd = atof(optarg);
                         break;
                 case 'h':
                         param->help_flag = 1;
@@ -346,6 +327,7 @@ int main(int argc, char *argv[])
         }
 
         RUN(check_msa_format_string(param->format));
+        RUN(set_aln_type(in_type, &param->type));
 
         if(param->num_infiles == 0){
                 if (!isatty(fileno(stdin))){
@@ -389,31 +371,49 @@ int run_kalign(struct parameters* param)
         struct msa* msa = NULL;
 
         if(param->num_infiles == 1){
-                kalign_read_input(param->infile[0], &msa,1);
+                RUN(kalign_read_input(param->infile[0], &msa,1));
         }else{
                 for(int i = 0; i < param->num_infiles;i++){
-                        kalign_read_input(param->infile[i], &msa,1);
+                        RUN(kalign_read_input(param->infile[i], &msa,1));
                 }
         }
+
         RUN(kalign_run(msa,
                        param->nthreads,
-                       0,
+                       param->type,
                        param->gpo,
                        param->gpe,
                        param->tgpe));
-
-        /* if(param->clean){ */
-                /* RUN(run_extra_checks_on_msa(msa)); */
-        /* } */
-        /* if(!msa->quiet){ */
-        /*         LOG_MSG("Detected: %d sequences.", msa->numseq); */
-        /* } */
 
         RUN(kalign_write_msa(msa, param->outfile, param->format));
         kalign_free_msa(msa);
         return OK;
 ERROR:
         kalign_free_msa(msa);
+        return FAIL;
+}
+
+
+int set_aln_type(char* in, int* type )
+{
+        int t = 0;
+        if(in){
+                if(strstr(in,"rna")){
+                        t = KALIGN_RNA;
+                }else if(strstr(in,"dna")){
+                        t = KALIGN_DNA;
+                }else if(strstr(in,"internal")){
+                        t = KALIGN_DNA_INTERNAL;
+                }else{
+                        ERROR_MSG("In %s not recognized.",in);
+                }
+
+        }else{
+                t = KALIGN_RNA;
+        }
+        *type = t;
+        return OK;
+ERROR:
         return FAIL;
 }
 

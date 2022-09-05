@@ -43,6 +43,8 @@ struct parameters*init_param(void)
         param->help_flag = 0;
         param->dump_internal = 0;
 
+        param->type = -1;
+
         param->gpo = -1.0;
         param->gpe = -1.0;
         param->tgpe = -1.0;

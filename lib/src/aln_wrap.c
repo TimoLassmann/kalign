@@ -50,8 +50,8 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
         /* if gap penalties are not negative they are set below */
         RUN(aln_param_init(&ap,
                            msa->biotype,
-                           type,
                            n_threads,
+                           type,
                            gpo,
                            gpe,
                            tgpe));

@@ -5,12 +5,12 @@
 #define ALN_PARAM_IMPORT
 #include "aln_param.h"
 
-static int set_subm_gaps_DNA(struct aln_param *ap);
-static int set_subm_gaps_blast(struct aln_param* ap);
 static int set_subm_gaps_CorBLOSUM66_13plus(struct aln_param* ap);
+static int set_subm_gaps_DNA(struct aln_param *ap);
+static int set_subm_gaps_DNA_internal(struct aln_param *ap);
+static int set_subm_gaps_RNA(struct aln_param *ap);
 
-
-int aln_param_init(struct aln_param **aln_param,int biotype , int type,int n_threads, float gpo, float gpe, float tgpe)
+int aln_param_init(struct aln_param **aln_param,int biotype , int n_threads, int type, float gpo, float gpe, float tgpe)
 {
         struct aln_param* ap = NULL;
 
@@ -29,8 +29,18 @@ int aln_param_init(struct aln_param **aln_param,int biotype , int type,int n_thr
                 }
         }
         if(biotype == ALN_BIOTYPE_DNA){
-                set_subm_gaps_DNA(ap);
-                set_subm_gaps_blast(ap);
+                /* include/kalign/ */
+                if(type == KALIGN_DNA){
+                        set_subm_gaps_DNA(ap);
+                }else if(type == KALIGN_DNA_INTERNAL){
+                        set_subm_gaps_DNA_internal(ap);
+                }else if(type == KALIGN_RNA){
+                        set_subm_gaps_RNA(ap);
+                }else{
+                        ERROR_MSG("DNA alignment type (%d) not recognised.");
+                }
+
+                /* set_subm_gaps_blast(ap); */
         }else if(biotype == ALN_BIOTYPE_PROTEIN){
                 set_subm_gaps_CorBLOSUM66_13plus(ap);
         }else{
@@ -53,23 +63,6 @@ int aln_param_init(struct aln_param **aln_param,int biotype , int type,int n_thr
 ERROR:
         aln_param_free(ap);
         return FAIL;
-}
-
-int set_subm_gaps_blast(struct aln_param* ap)
-{
-        int i,j;
-        for(i = 0; i < 5; i++){
-                for(j =0; j < 5;j++){
-                        ap->subm[i][j] = -3;
-                        if(i == j){
-                                ap->subm[i][j] = 4;
-                        }
-                }
-        }
-        ap->gpo = 5;
-        ap->gpe = 5;
-        ap->tgpe = 0;
-        return OK;
 }
 
 int set_subm_gaps_CorBLOSUM66_13plus(struct aln_param* ap)
@@ -118,8 +111,41 @@ int set_subm_gaps_CorBLOSUM66_13plus(struct aln_param* ap)
         return OK;
 }
 
+int set_subm_gaps_DNA(struct aln_param *ap)
+{
+        int i,j;
+        for(i = 0; i < 5; i++){
+                for(j =0; j < 5;j++){
+                        ap->subm[i][j] = -4;
+                        if(i == j){
+                                ap->subm[i][j] = 5;
+                        }
+                }
+        }
+        ap->gpo = 8;
+        ap->gpe = 6;
+        ap->tgpe = 0;
+        return OK;
+}
 
-int set_subm_gaps_DNA(struct aln_param* ap)
+int set_subm_gaps_DNA_internal(struct aln_param *ap)
+{
+        int i,j;
+        for(i = 0; i < 5; i++){
+                for(j =0; j < 5;j++){
+                        ap->subm[i][j] = -4;
+                        if(i == j){
+                                ap->subm[i][j] = 5;
+                        }
+                }
+        }
+        ap->gpo = 8;
+        ap->gpe = 6;
+        ap->tgpe = 8;
+        return OK;
+}
+
+int set_subm_gaps_RNA(struct aln_param* ap)
 {
         int i,j;
         for(i = 0; i < 5; i++){

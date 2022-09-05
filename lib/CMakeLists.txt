@@ -18,7 +18,7 @@ generate_export_header(${PROJECT_NAME}
   EXPORT_FILE_NAME ${PROJECT_NAME}/${PROJECT_NAME}_export.h
   )
 set(public_header_files
-  include/kalign/test_header.h
+  include/kalign/kalign.h
   ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}/${PROJECT_NAME}_export.h
   )
 set(source_files
