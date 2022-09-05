@@ -38,11 +38,8 @@ int* select_seqs(struct msa* msa, int num_anchor);
 
 int* pick_anchor(struct msa* msa, int* n)
 {
-
-
         int* anchors = NULL;
         int num_anchor = 0;
-
 
         ASSERT(msa != NULL, "No alignment.");
 
@@ -70,9 +67,9 @@ int* select_seqs(struct msa* msa, int num_anchor)
         }
 
         qsort(seq_sort, msa->numseq, sizeof(struct sort_struct*),sort_by_len);
-        //for(i = 0; i < aln->numseq;i++){
-        //fprintf(stdout,"%d\t%d\n", seq_sort[i]->id,seq_sort[i]->len);
-        //}
+        /* for(i = 0; i < msa->numseq;i++){ */
+        /* fprintf(stdout,"%d\t%d  id: %d \n", seq_sort[i]->id,seq_sort[i]->len,seq_sort[i]->id); */
+        /* } */
 
 
         //fprintf(stdout,"%d\t seeds\n", num_anchor);
@@ -83,6 +80,7 @@ int* select_seqs(struct msa* msa, int num_anchor)
         //c = 0;
         for(i = 0; i < num_anchor;i++){
                 anchors[i] = seq_sort[i*stride]->id;
+                /* LOG_MSG("Anchor: %d",anchors[i] ); */
         }
         ASSERT(i == num_anchor,"Cound not select all anchors\tnum_anchor:%d\t numseq:%d",num_anchor,msa->numseq);
 

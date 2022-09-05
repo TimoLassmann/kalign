@@ -735,7 +735,7 @@ void create_tasks(struct node*n, struct aln_tasks* t)
                 task->c = n->id;
                 /* task->p = n->d; */
                 /* task->n = n->n; */
-                //fprintf(stdout,"Node %d  %d  depends on %d %d \n", n->id, n->d  , n->left->id, n->right->id);
+                /* fprintf(stdout,"Node %d   depends on %d %d \n", n->id , n->left->id, n->right->id); */
 
                 t->n_tasks++;
         }

@@ -89,13 +89,17 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                   bpm_256(seq_b, seq_a, len_b, len_a)
                                   );*/
                                 dist = calc_distance(seq_a, seq_b, len_a, len_b);
+                                /* give shorter sequences a preference */
+                                float add = MACRO_MIN(1000.0, MACRO_MIN(len_a, len_b)) / 1000.0;
+                                dist += add;
+                                /* fprintf(stdout,"%f\n", add * 1000.0); */
                                 //dist = dist / (float) MACRO_MIN(len_a, len_b);
                                 dm[i][j] = dist;// + (float)( i * num_samples + j) / (float) ( num_samples * num_samples);
                                 dm[j][i] = dm[i][j];
                         }
-
-                        //fprintf(stdout,"\n");
+                        /* fprintf(stdout,"\n"); */
                 }
+                /* fprintf(stdout,"\n"); */
         }else{
                 int a;
                 int numseq = msa->numseq;
@@ -136,12 +140,14 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                 s2 = s[samples[j]]->s;
                                 l2 = s[samples[j]]->len;
                                 dm[i][j] = calc_distance(s1,s2,l1,l2);
-
+                                /* fprintf(stdout,"%f ",dm[i][j]); */
                                 //dm[i][j] += (float)MACRO_MIN(l1, l2) / (float)MACRO_MAX(l1, l2);
                                 //dm[i][j] = dm[i][j] / (float) MACRO_MIN(l1, l2);
                                 //dm[i][j] = dist;
                         }
+                        /* fprintf(stdout,"\n"); */
                 }
+                /* fprintf(stdout,"\n"); */
 
 
                 /* for(i = 0; i < numseq;i++){ */
@@ -182,7 +188,6 @@ float calc_distance(uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b)
         }
         return (float)dist;
 #endif
-
 }
 
 
