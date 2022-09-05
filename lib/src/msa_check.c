@@ -17,7 +17,7 @@ struct sort_struct_name_chksum{
 static int GCGchecksum(char *seq, int len);
 static int sort_by_name(const void *a, const void *b);
 static int sort_by_chksum(const void *a, const void *b);
-int check_msa(struct msa* msa)
+int kalign_check_msa(struct msa* msa)
 {
         char* tmp_name = NULL;
         /* char* tmp_ptr; */

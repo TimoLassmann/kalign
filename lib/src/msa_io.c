@@ -212,16 +212,20 @@ ERROR:
 int parse_format_argument(char* format, int* type)
 {
         int out_format = -1;
-        if(strstr(format,"msf")){
-                out_format = FORMAT_MSF;
-        }else if(strstr(format,"clu")){
-                out_format = FORMAT_CLU;
-        }else if(strstr(format,"fasta")){
-                out_format  = FORMAT_FA;
-        }else if(strstr(format,"fa")){
-                out_format  = FORMAT_FA;
+        if(format){
+                if(strstr(format,"msf")){
+                        out_format = FORMAT_MSF;
+                }else if(strstr(format,"clu")){
+                        out_format = FORMAT_CLU;
+                }else if(strstr(format,"fasta")){
+                        out_format  = FORMAT_FA;
+                }else if(strstr(format,"fa")){
+                        out_format  = FORMAT_FA;
+                }else{
+                        ERROR_MSG("Format %s not recognized.",format);
+                }
         }else{
-                ERROR_MSG("Format %s not recognized.",format);
+                out_format  = FORMAT_FA;
         }
         *type = out_format;
         return OK;

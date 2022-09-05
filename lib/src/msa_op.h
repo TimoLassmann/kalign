@@ -16,6 +16,8 @@ EXTERN int detect_alphabet(struct msa *msa);
 EXTERN int detect_aligned(struct msa *msa);
 EXTERN int set_sip_nsip(struct msa *msa);
 
+EXTERN int reformat_settings_msa(struct msa *msa, int rename, int unalign);
+
 EXTERN int convert_msa_to_internal(struct msa* msa, int type);
 
 /* convert alinged msa sequences to character array */

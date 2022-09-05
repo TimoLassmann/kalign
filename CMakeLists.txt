@@ -2,7 +2,19 @@ cmake_minimum_required(VERSION 3.1)
 
 project(kalign LANGUAGES C CXX)
 
-#option(BUILD_TEST_EXECUTABLE "Build the test executable" OFF)
+set(NAMESPACE_NAME "kalign")
+
+option(BUILD_SHARED_LIBS "Build the shared library" ON)
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+include(GenerateExportHeader)
+
+set(KALIGN_LIBRARY_VERSION_MAJOR 3)
+set(KALIGN_LIBRARY_VERSION_MINOR 3)
+set(KALIGN_LIBRARY_VERSION_PATCH 3)
+set(KALIGN_LIBRARY_VERSION_STRING ${KALIGN_LIBRARY_VERSION_MAJOR}.${KALIGN_LIBRARY_VERSION_MINOR}.${KALIGN_LIBRARY_VERSION_PATCH})
+
 
 set (CMAKE_C_STANDARD 11)
 
@@ -160,6 +172,7 @@ endif(HAVE_AVX2)
 
 
 add_subdirectory(lib)
+add_subdirectory(src)
 add_subdirectory(tests)
 
 

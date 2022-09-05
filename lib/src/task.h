@@ -11,7 +11,6 @@
 #endif
 #endif
 
-
 struct task{
         float score;            /* score of output alignment */
         int a;                  /* input 1 */

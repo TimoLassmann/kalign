@@ -1,149 +1,47 @@
+cmake_minimum_required(VERSION 3.1)
 
-add_subdirectory(tldevel)
-add_subdirectory(interface)
-add_subdirectory(libinterface)
-add_subdirectory(msa)
-add_subdirectory(msa_io)
-add_subdirectory(alphabet)
-add_subdirectory(tasks)
-add_subdirectory(tree)
-add_subdirectory(alignment)
-add_subdirectory(tools)
+# Build library in sub-directories
+if (NOT TARGET kalign::kalign)
+  add_subdirectory(${PROJECT_SOURCE_DIR}/lib build EXCLUDE_FROM_ALL)
+endif()
+
+# link to installed library 
+if (NOT TARGET kalign::kalign)
+  find_package(kalign)
+endif()
+
+if(NOT KALIGN_PACKAGE_NAME)
+  set(KALIGN_PACKAGE_NAME ${CMAKE_PROJECT_NAME})
+endif()
+
+if(NOT KALIGN_PACKAGE_VERSION)
+  set(KALIGN_PACKAGE_VERSION ${KALIGN_LIBRARY_VERSION_STRING})
+endif()
+
+configure_file ("${CMAKE_CURRENT_SOURCE_DIR}/version.h.in"
+  "${CMAKE_CURRENT_SOURCE_DIR}/version.h" )
 
 
-add_library(kalign INTERFACE "libkalign.c")
-target_link_libraries(kalign INTERFACE 
-  tldevel
-  module_libinterface
-  module_msa
-  module_task
-  module_param
-  module_alphabet
-  module_tree
-  module_aln)
-
-target_include_directories(kalign
-  INTERFACE     ${CMAKE_CURRENT_SOURCE_DIR}/"libkalign.h"
+add_executable(kalign-bin)
+target_sources(kalign-bin
+  PRIVATE     
+  run_kalign.c
+  parameters.c
   )
 
-add_library(kalign::kalign ALIAS kalign)
+target_link_libraries(kalign-bin PRIVATE tldevel kalign::kalign)
 
+set_target_properties(kalign-bin
+  PROPERTIES OUTPUT_NAME kalign)
 
-
-# add_executable(libtestcp
-#   lib_test.cpp)
-# target_link_libraries(libtestcp kalign::kalign)
-
-add_executable(libtest 
-  lib_test.c
-  )
-target_link_libraries(libtest kalign::kalign)
-
-#BB11001.msf
-add_test(
-  NAME kalign_itest_BB11001.msf
-  COMMAND kalign ${CMAKE_CURRENT_SOURCE_DIR}/test_data/BB11001.msf
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+add_executable(kalignfmt)
+target_sources(kalignfmt
+  PRIVATE
+  run_reformat.c
+  parameters.c
   )
 
-
-#target_link_libraries(kalign   lib1 lib2)
-
-# add_library(libkalign)
-# target_sources(libkalign PRIVATE "libkalign.c")
-
-# target_include_directories(libkalign PUBLIC "tldevel" "interface" "tasks" "msa" "msa_io" "tree" "alphabet" "alignment" )
-
-# if(OpenMP_C_FOUND)
-#     target_link_libraries(libkalign PUBLIC OpenMP::OpenMP_C)
-# endif()
-
-
-# target_link_libraries(libkalign PRIVATE m) 
-#   # tldevel  )
-
-# add_executable(kalign
-#   run_kalign.c
-#   )
-# target_link_libraries(kalign PUBLIC kalign)
-
-
-# if(OpenMP_C_FOUND)
-#     target_link_libraries(kalign PUBLIC OpenMP::OpenMP_C)
-#   endif()
-
-  
-
-
-# target_link_libraries(kalign PRIVATE libkalign)
-  # tldevel
-  # $<TARGET_OBJECTS:module_msa> 
-  # module_msa
-  # module_io
-  # module_task
-  # module_param
-  # module_alphabet
-  # module_tree
-  # module_aln)
-
-# add_library(libkalign
-#   )
-# target_sources(libkalign PRIVATE "libkalign.c")
-
-
-# target_include_directories(libkalign PUBLIC "alphabet" "alignment" )
-
-# target_link_libraries(libkalign PRIVATE
-#   tldevel  
-#   module_msa
-#   module_task
-#   module_param
-#   # module_alphabet
-#   module_tree)
-#   # module_aln)
-
-#BB11001.tfa     
-add_test(
-  NAME kalign_itest_BB11001.tfa
-  COMMAND kalign ${CMAKE_CURRENT_SOURCE_DIR}/test_data/BB11001.tfa
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  )
-
-#BB11001_EOF.msf
-add_test(
-  NAME kalign_itest_BB11001_EOF.msf
-  COMMAND kalign ${CMAKE_CURRENT_SOURCE_DIR}/test_data/BB11001_EOF.msf
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  )
-
-#BB12006.msf
-add_test(
-  NAME kalign_itest_BB12006.msf
-  COMMAND kalign ${CMAKE_CURRENT_SOURCE_DIR}/test_data/BB12006.msf
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  )
-
-#BB12006.tfa
-add_test(
-  NAME kalign_itest_BB12006.tfa
-  COMMAND kalign ${CMAKE_CURRENT_SOURCE_DIR}/test_data/BB12006.tfa
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  )
-
-#BB30014.msf     
-add_test(
-  NAME kalign_itest_BB30014.msf
-  COMMAND kalign ${CMAKE_CURRENT_SOURCE_DIR}/test_data/BB12006.tfa
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  )
-
-#BB30014.tfa
-add_test(
-  NAME kalign_itest_BB30014.tfa
-  COMMAND kalign ${CMAKE_CURRENT_SOURCE_DIR}/test_data/BB30014.tfa
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-  )
-
+target_link_libraries(kalignfmt PRIVATE tldevel kalign::kalign)
 
 
 

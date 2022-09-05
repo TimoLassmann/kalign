@@ -1,21 +1,5 @@
 cmake_minimum_required(VERSION 3.1)
 
-set(NAMESPACE_NAME "kalign")
-
-option(BUILD_SHARED_LIBS "Build the shared library" ON)
-
-include(GNUInstallDirs)
-include(CMakePackageConfigHelpers)
-include(GenerateExportHeader)
-
-set(KALIGN_LIBRARY_VERSION_MAJOR 3)
-set(KALIGN_LIBRARY_VERSION_MINOR 3)
-set(KALIGN_LIBRARY_VERSION_PATCH 3)
-set(KALIGN_LIBRARY_VERSION_STRING ${KALIGN_LIBRARY_VERSION_MAJOR}.${KALIGN_LIBRARY_VERSION_MINOR}.${KALIGN_LIBRARY_VERSION_PATCH})
-
-
-
-
 if(NOT KALIGN_PACKAGE_NAME)
   set(KALIGN_PACKAGE_NAME ${CMAKE_PROJECT_NAME})
 endif()
@@ -26,7 +10,6 @@ endif()
 
 configure_file ("${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/version.h" )
-
 
 add_library(${PROJECT_NAME})
 add_library(${NAMESPACE_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
@@ -113,7 +96,18 @@ if(OpenMP_C_FOUND)
     target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_C)
 endif()
 
-#   # tldevel  )
+
+add_library(tldevel STATIC
+  src/tldevel.c
+  src/tlmisc.c
+  src/tlrng.c
+  src/esl_stopwatch.c
+  )
+
+target_include_directories(tldevel 
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src
+  )
+target_link_libraries(tldevel PRIVATE m)
 
 # adjust this path depending where cmake searches for the target files
 set(ConfigPackageLocation "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
@@ -123,7 +117,7 @@ install(TARGETS ${PROJECT_NAME}
     EXPORT ${PROJECT_NAME}Targets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Library
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Library
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}  COMPONENT Library # This is for Windows
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Library # This is for Windows
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME} COMPONENT Development
     INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )

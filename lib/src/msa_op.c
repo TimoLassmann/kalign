@@ -11,6 +11,8 @@
 static int aln_unknown_warning_message_gaps_but_len_diff(struct msa *msa);
 static int aln_unknown_warning_message_same_len_no_gaps(void);
 
+
+
 int merge_msa(struct msa** dest, struct msa* src)
 {
         int i;
@@ -244,6 +246,24 @@ int set_sip_nsip(struct msa* msa)
                 msa->nsip[i] = 1;
                 msa->sip[i][0] = i;
                 msa->plen[i] = 0;
+        }
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+int reformat_settings_msa(struct msa *msa, int rename, int unalign)
+{
+        for (int i = 0 ;i < msa->numseq;i++){
+                        msa->nsip[i] = i;
+        }
+        if(rename){
+                for (int i = 0 ;i < msa->numseq;i++){
+                        snprintf(msa->sequences[i]->name, 128, "SEQ%d", i+1);
+                }
+        }
+        if(unalign){
+                RUN(dealign_msa(msa));
         }
         return OK;
 ERROR:

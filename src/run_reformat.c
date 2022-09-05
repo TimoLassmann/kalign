@@ -31,30 +31,17 @@
 #include <getopt.h>
 #include <string.h>
 
-
-#define OPT_SET 1
-#define OPT_ALNPARAM 2
 #define OPT_RENAME 3
 #define OPT_REFORMAT 4
 #define OPT_SHOWW 5
-#define OPT_GPO 6
-#define OPT_GPE 7
-#define OPT_TGPE 8
-#define OPT_MATADD 9
 
-#define OPT_NTHREADS 10
+#define OPT_CLEAN 15
+#define OPT_UNALIGN 16
 
-#define OPT_CLEAN 11
-#define OPT_UNALIGN 12
-
-static int run_kalign(struct parameters* param);
-
+static int run_reformat(struct parameters* param);
 static int print_kalign_header(void);
 static int print_kalign_help(char * argv[]);
 static int print_kalign_warranty(void);
-static int print_AVX_warning(void);
-
-
 
 int print_kalign_help(char * argv[])
 {
@@ -69,10 +56,9 @@ int print_kalign_help(char * argv[])
 
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--format","Output format." ,"[Fasta]"  );
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--reformat","Reformat existing alignment." ,"[NA]"  );
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpo","Gap open penalty." ,"[5.5]"  );
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpe","Gap extension penalty." ,"[2.0]"  );
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--tgpe","Terminal gap extension penalty." ,"[1.0]"  );
-
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--changename","Change sequence names to 1 .. N." ,"[NA]"  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--unalign","Remove gaps and write to fasta." ,"[NA]"  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--clean","Perform additional checks on alignment." ,"[NA]"  );
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--version (-V/-v)","Prints version." ,"[NA]"  );
 
         fprintf(stdout,"\nExamples:\n\n");
@@ -145,16 +131,6 @@ Bioinformatics, btz795, https://doi.org/10.1093/bioinformatics/btz795
         return OK;
 }
 
-int print_AVX_warning(void)
-{
-        fprintf(stdout,"\n");
-        fprintf(stdout,"WARNING: AVX2 instruction set not found!\n");
-        fprintf(stdout,"         Kalign will not run optimally.\n");
-        fprintf(stdout,"\n");
-        return OK;
-}
-
-
 int main(int argc, char *argv[])
 {
         int version = 0;
@@ -169,18 +145,11 @@ int main(int argc, char *argv[])
         while (1){
                 static struct option long_options[] ={
                         {"showw", 0,0,OPT_SHOWW },
-                        {"alnp", required_argument,0,OPT_ALNPARAM},
-                        {"set", required_argument,0,OPT_SET},
                         {"format",  required_argument, 0, 'f'},
                         {"reformat",  required_argument, 0, OPT_REFORMAT},
                         {"changename",  0, 0, OPT_RENAME},
-                        {"clean",  0, 0, OPT_CLEAN},
                         {"unalign",  0, 0, OPT_UNALIGN},
-                        {"gpo",  required_argument, 0, OPT_GPO},
-                        {"gpe",  required_argument, 0, OPT_GPE},
-                        {"tgpe",  required_argument, 0, OPT_TGPE},
-                        {"matadd",  required_argument, 0, OPT_MATADD},
-                        {"nthreads",  required_argument, 0, 'n'},
+                        {"clean",  0, 0, OPT_CLEAN},
                         {"input",  required_argument, 0, 'i'},
                         {"infile",  required_argument, 0, 'i'},
                         {"in",  required_argument, 0, 'i'},
@@ -211,12 +180,6 @@ int main(int argc, char *argv[])
                 case OPT_SHOWW:
                         showw = 1;
                         break;
-                case OPT_ALNPARAM:
-                        param->aln_param_file = optarg;
-                        break;
-                case OPT_SET:
-                        param->param_set = atoi(optarg);
-                        break;
                 case OPT_RENAME:
                         param->rename = 1;
                         break;
@@ -232,18 +195,6 @@ int main(int argc, char *argv[])
                 case OPT_REFORMAT:
                         param->format = optarg;
                         param->reformat = 1;
-                        break;
-                case OPT_GPO:
-                        param->gpo = atof(optarg);
-                        break;
-                case OPT_GPE:
-                        param->gpe = atof(optarg);
-                        break;
-                case OPT_TGPE :
-                        param->tgpe = atof(optarg);
-                        break;
-                case OPT_MATADD :
-                        param->matadd = atof(optarg);
                         break;
                 case 'h':
                         param->help_flag = 1;
@@ -277,10 +228,6 @@ int main(int argc, char *argv[])
                 print_kalign_header();
         }
 
-#ifndef HAVE_AVX2
-        RUN(print_AVX_warning());
-#endif
-
         if(showw){
                 print_kalign_warranty();
                 free_parameters(param);
@@ -293,18 +240,7 @@ int main(int argc, char *argv[])
                 return EXIT_SUCCESS;
         }
 
-        if(param->nthreads < 1){
-                RUN(print_kalign_help(argv));
-                LOG_MSG("Number of threads has to be >= 1.");
-                free_parameters(param);
-                return EXIT_FAILURE;
-        }
-
         param->num_infiles = 0;
-
-        /* Not sure if this is the best way to detect stdin input */
-        /* I fixed this by attempting to read and checking for valid
-           sequences */
 
         if (!isatty(fileno(stdin))){
                 param->num_infiles++;
@@ -345,6 +281,8 @@ int main(int argc, char *argv[])
                 }
         }
 
+
+
         RUN(check_msa_format_string(param->format));
 
         if(param->num_infiles == 0){
@@ -360,22 +298,8 @@ int main(int argc, char *argv[])
                 }
         }
 
-        /* if(param->chaos){ */
-        /*         if(param->chaos == 1){ */
-        /*                 ERROR_MSG("Param chaos need to be bigger than 1 (currently %d)", param->chaos); */
-        /*         } */
-        /*         if(param->chaos > 10){ */
-        /*                 ERROR_MSG("Param chaos bigger than 10 (currently %d)",param->chaos); */
-        /*         } */
-        /* } */
+        RUN(run_reformat(param));
 
-        RUN(run_kalign(param));
-
-        /* if(devtest){ */
-        /*         for(c = 0; c < param->num_infiles;c++){ */
-        /*                 MFREE(param->infile[c]); */
-        /*         } */
-        /* } */
 
         free_parameters(param);
         return EXIT_SUCCESS;
@@ -384,7 +308,7 @@ ERROR:
         return EXIT_FAILURE;
 }
 
-int run_kalign(struct parameters* param)
+int run_reformat(struct parameters* param)
 {
         struct msa* msa = NULL;
 
@@ -395,25 +319,32 @@ int run_kalign(struct parameters* param)
                         kalign_read_input(param->infile[i], &msa,1);
                 }
         }
-        RUN(kalign_run(msa,
-                       param->nthreads,
-                       0,
-                       param->gpo,
-                       param->gpe,
-                       param->tgpe));
 
+        reformat_settings_msa(msa, param->rename, param->unalign);
+
+        if(param->unalign){
+                param->format = NULL;
+        }
+        if(param->clean){
+                RUN(kalign_check_msa(msa));
+        }
+        /* extra checks for input alignments */
         /* if(param->clean){ */
                 /* RUN(run_extra_checks_on_msa(msa)); */
         /* } */
         /* if(!msa->quiet){ */
         /*         LOG_MSG("Detected: %d sequences.", msa->numseq); */
         /* } */
+        /* If we just want to reformat end here */
+        /* if(param->out_format != FORMAT_FA && msa->aligned != ALN_STATUS_ALIGNED){ */
+                /* ERROR_MSG("Input sequences are not aligned - cannot write to MSA format: %s", param->format); */
+        /* } */
 
         RUN(kalign_write_msa(msa, param->outfile, param->format));
+
         kalign_free_msa(msa);
         return OK;
 ERROR:
         kalign_free_msa(msa);
         return FAIL;
 }
-

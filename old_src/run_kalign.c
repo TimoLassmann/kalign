@@ -20,14 +20,15 @@
 
 */
 
-#include "tldevel.h"
-#include "tlmisc.h"
-#include "kalign/kalign.h"
-#include "version.h"
-#include "parameters.h"
-
+/* #include "tldevel.h" */
 #include <stdio.h>
 #include <unistd.h>
+#ifdef HAVE_OPENMP
+#include <omp.h>
+#endif
+#include "libkalign.h"
+#include "version.h"
+
 #include <getopt.h>
 #include <string.h>
 
@@ -42,19 +43,21 @@
 #define OPT_TGPE 8
 #define OPT_MATADD 9
 
-#define OPT_NTHREADS 10
+#define OPT_DEVTEST 10
+#define OPT_CHAOS 11
+#define OPT_DUMP_INTERNAL 12
+#define OPT_NTHREADS 14
 
-#define OPT_CLEAN 11
-#define OPT_UNALIGN 12
+#define OPT_CLEAN 15
+#define OPT_UNALIGN 16
 
 static int run_kalign(struct parameters* param);
+static int check_for_sequences(struct msa* msa);
 
 static int print_kalign_header(void);
 static int print_kalign_help(char * argv[]);
 static int print_kalign_warranty(void);
 static int print_AVX_warning(void);
-
-
 
 int print_kalign_help(char * argv[])
 {
@@ -112,7 +115,7 @@ int print_kalign_warranty(void)
 int print_kalign_header(void)
 {
         fprintf(stdout,"\n");
-        fprintf(stdout,"Kalign (%s)\n", KALIGN_PACKAGE_VERSION);
+        fprintf(stdout,"Kalign (%s)\n", PACKAGE_VERSION);
         fprintf(stdout,"\n");
         fprintf(stdout,"Copyright (C) 2006,2019,2020,2021 Timo Lassmann\n");
         fprintf(stdout,"\n");
@@ -160,6 +163,7 @@ int main(int argc, char *argv[])
         int version = 0;
         int c;
         int showw = 0;
+        int devtest = 0;
         struct parameters* param = NULL;
         char* in = NULL;
         RUNP(param = init_param());
@@ -173,6 +177,8 @@ int main(int argc, char *argv[])
                         {"set", required_argument,0,OPT_SET},
                         {"format",  required_argument, 0, 'f'},
                         {"reformat",  required_argument, 0, OPT_REFORMAT},
+                        {"devtest",  no_argument, 0, OPT_DEVTEST},
+                        {"dumpinternal",no_argument, 0, OPT_DUMP_INTERNAL},
                         {"changename",  0, 0, OPT_RENAME},
                         {"clean",  0, 0, OPT_CLEAN},
                         {"unalign",  0, 0, OPT_UNALIGN},
@@ -180,6 +186,7 @@ int main(int argc, char *argv[])
                         {"gpe",  required_argument, 0, OPT_GPE},
                         {"tgpe",  required_argument, 0, OPT_TGPE},
                         {"matadd",  required_argument, 0, OPT_MATADD},
+                        {"chaos",   required_argument, 0, OPT_CHAOS},
                         {"nthreads",  required_argument, 0, 'n'},
                         {"input",  required_argument, 0, 'i'},
                         {"infile",  required_argument, 0, 'i'},
@@ -208,6 +215,12 @@ int main(int argc, char *argv[])
                 case OPT_UNALIGN:
                         param->unalign = 1;
                         break;
+                case OPT_CHAOS:
+                        param->chaos = atoi(optarg);
+                        break;
+                case OPT_DUMP_INTERNAL:
+                        param->dump_internal = 1;
+                        break;
                 case OPT_SHOWW:
                         showw = 1;
                         break;
@@ -232,6 +245,9 @@ int main(int argc, char *argv[])
                 case OPT_REFORMAT:
                         param->format = optarg;
                         param->reformat = 1;
+                        break;
+                case OPT_DEVTEST:
+                        devtest =1 ;
                         break;
                 case OPT_GPO:
                         param->gpo = atof(optarg);
@@ -268,7 +284,7 @@ int main(int argc, char *argv[])
         }
 
         if(version){
-                fprintf(stdout,"%s %s\n",KALIGN_PACKAGE_NAME, KALIGN_PACKAGE_VERSION);
+                fprintf(stdout,"%s %s\n",PACKAGE_NAME, PACKAGE_VERSION);
                 free_parameters(param);
                 return EXIT_SUCCESS;
         }
@@ -345,7 +361,48 @@ int main(int argc, char *argv[])
                 }
         }
 
-        RUN(check_msa_format_string(param->format));
+        /* Just for internal development & testing */
+        if(devtest){
+                char* datadir = NULL;
+                char* tmp = NULL;
+                int f;
+                f = 0;
+                for(c = 0; c < param->num_infiles;c++){
+                        param->infile[f] = param->infile[c];
+                        if(param->infile[c] != NULL){
+                                f++;
+                        }
+                }
+                param->num_infiles = f;
+                LOG_MSG("Start aln tests.");
+                datadir = getenv("testdatafiledir");
+                for(c = 0; c < param->num_infiles;c++){
+                        tmp = NULL;
+                        MMALLOC(tmp, sizeof(char) * 1024);
+                        if(!datadir){
+                                snprintf(tmp,1024, "%s",param->infile[c]);
+                        }else{
+                                snprintf(tmp,1024, "%s/%s", datadir, param->infile[c]);
+                        }
+                        param->infile[c] = tmp;
+                }
+        }
+
+        if(!param->format){
+                param->out_format = FORMAT_FA;
+        }else{
+                if(strstr(param->format,"msf")){
+                        param->out_format = FORMAT_MSF;
+                }else if(strstr(param->format,"clu")){
+                        param->out_format = FORMAT_CLU;
+                }else if(strstr(param->format,"fasta")){
+                        param->out_format  = FORMAT_FA;
+                }else if(strstr(param->format,"fa")){
+                        param->out_format  = FORMAT_FA;
+                }else{
+                        ERROR_MSG("Format %s not recognized.",param->format);
+                }
+        }
 
         if(param->num_infiles == 0){
                 if (!isatty(fileno(stdin))){
@@ -360,22 +417,22 @@ int main(int argc, char *argv[])
                 }
         }
 
-        /* if(param->chaos){ */
-        /*         if(param->chaos == 1){ */
-        /*                 ERROR_MSG("Param chaos need to be bigger than 1 (currently %d)", param->chaos); */
-        /*         } */
-        /*         if(param->chaos > 10){ */
-        /*                 ERROR_MSG("Param chaos bigger than 10 (currently %d)",param->chaos); */
-        /*         } */
-        /* } */
+        if(param->chaos){
+                if(param->chaos == 1){
+                        ERROR_MSG("Param chaos need to be bigger than 1 (currently %d)", param->chaos);
+                }
+                if(param->chaos > 10){
+                        ERROR_MSG("Param chaos bigger than 10 (currently %d)",param->chaos);
+                }
+        }
 
         RUN(run_kalign(param));
 
-        /* if(devtest){ */
-        /*         for(c = 0; c < param->num_infiles;c++){ */
-        /*                 MFREE(param->infile[c]); */
-        /*         } */
-        /* } */
+        if(devtest){
+                for(c = 0; c < param->num_infiles;c++){
+                        MFREE(param->infile[c]);
+                }
+        }
 
         free_parameters(param);
         return EXIT_SUCCESS;
@@ -387,33 +444,186 @@ ERROR:
 int run_kalign(struct parameters* param)
 {
         struct msa* msa = NULL;
+        struct msa* tmp_msa = NULL;
+        struct aln_param* ap = NULL;
+        struct aln_tasks* tasks = NULL;
+
+        int i;
+
+#ifdef HAVE_OPENMP
+        omp_set_nested(1);
+        omp_set_num_threads(param->nthreads);
+#endif
 
         if(param->num_infiles == 1){
-                kalign_read_input(param->infile[0], &msa,1);
+                RUN(read_input(param->infile[0], param->quiet, &msa));
         }else{
-                for(int i = 0; i < param->num_infiles;i++){
-                        kalign_read_input(param->infile[i], &msa,1);
+                for(i = 0; i < param->num_infiles;i++){
+                        RUN(read_input(param->infile[i], param->quiet, &tmp_msa));
+                        if(tmp_msa){
+                                RUN(merge_msa(&msa, tmp_msa));
+                                free_msa(tmp_msa);
+                                tmp_msa = NULL;
+                        }
                 }
         }
-        RUN(kalign_run(msa,
-                       param->nthreads,
-                       0,
-                       param->gpo,
-                       param->gpe,
-                       param->tgpe));
+        /* check if we have sequences  */
+        RUN(check_for_sequences(msa));
+        /* Set the quiet flag */
+        msa->quiet = param->quiet;
+        /* extra checks for input alignments */
+        if(param->clean){
+                RUN(run_extra_checks_on_msa(msa));
+        }
+        if(!msa->quiet){
+                LOG_MSG("Detected: %d sequences.", msa->numseq);
+        }
+        /* If we just want to reformat end here */
+        if(param->reformat){
+                //LOG_MSG("%s reformat",param->reformat);
+                for (i = 0 ;i < msa->numseq;i++){
+                        msa->nsip[i] = i;
+                }
 
-        /* if(param->clean){ */
-                /* RUN(run_extra_checks_on_msa(msa)); */
-        /* } */
-        /* if(!msa->quiet){ */
-        /*         LOG_MSG("Detected: %d sequences.", msa->numseq); */
+                if(param->rename){
+                        for (i = 0 ;i < msa->numseq;i++){
+                                snprintf(msa->sequences[i]->name, 128, "SEQ%d", i+1);
+                        }
+                }
+
+                if(param->unalign){
+                        /* if(param->out_format == FORMAT_FA){ */
+                        RUN(dealign_msa(msa));
+                }
+
+                if(param->out_format != FORMAT_FA && msa->aligned != ALN_STATUS_ALIGNED){
+                        ERROR_MSG("Input sequences are not aligned - cannot write to MSA format: %s", param->format);
+                }
+
+                RUN(write_msa(msa, param->outfile, param->out_format));
+
+                free_msa(msa);
+                return OK;
+        }
+
+        if(msa->aligned != ALN_STATUS_UNALIGNED){
+                RUN(dealign_msa(msa));
+        }
+
+        /* allocate aln parameters  */
+        RUN(init_ap(&ap,param,msa->L ));
+
+        /* if(param->dump_internal){ */
+        /*         double* s; */
+        /*         int s_len; */
+        /*         RUN(get_internal_data(msa,ap,&s, &s_len)); */
+        /*         for(i = 0; i < s_len;i++){ */
+        /*                 fprintf(stdout,"%0.2f ", s[i]); */
+        /*         } */
+        /*         fprintf(stdout,"\n"); */
+        /*         MFREE(s); */
+        /*         free_msa(msa); */
+        /*         return OK; */
         /* } */
 
-        RUN(kalign_write_msa(msa, param->outfile, param->format));
-        kalign_free_msa(msa);
+        /* Allocate tasks  */
+        RUN(alloc_tasks(&tasks, msa->numseq));
+
+        /* Start bix-secting K-means sequence clustering */
+        if(!param->chaos){
+#ifdef HAVE_OPENMP
+                i = floor(log((double) param->nthreads) / log(2.0)) + 4;
+                i = MACRO_MIN(i, 10);
+                /* LOG_MSG("Set %d level (%d)", i, param->nthreads); */
+                omp_set_max_active_levels(i);
+#endif
+                RUN(build_tree_kmeans(msa,ap->nthreads, param->quiet, &tasks));
+        }
+        /* by default all protein sequences are converted into a reduced alphabet
+           when read from file. Here we turn them back into the default representation. */
+        if(msa->L == ALPHA_redPROTEIN){
+                //RUN(convert_msa_to_internal(msa, defPROTEIN));
+                RUN(convert_msa_to_internal(msa, ALPHA_ambigiousPROTEIN));
+        }
+        /* allocate aln parameters  */
+        RUN(init_ap(&ap,param,msa->L ));
+
+        /* Start alignment stuff */
+        DECLARE_TIMER(t1);
+        if(!msa->quiet){
+                LOG_MSG("Aligning");
+        }
+        START_TIMER(t1);
+
+        /* testing  */
+#ifdef HAVE_OPENMP
+        i = floor(log((double) param->nthreads) / log(2.0)) + 2;
+        i = MACRO_MIN(i, 10);
+        /* LOG_MSG("Set %d level (%d)", i, param->nthreads); */
+        omp_set_max_active_levels(i);
+#endif
+        if(param->chaos){
+
+                RUN(create_chaos_msa_openMP(msa, ap,tasks));
+
+        }else{
+                RUN(create_msa_tree(msa, ap, tasks,param->nthreads));
+        }
+        /* RUN(create_msa_openMP(msa,ap, tasks)); */
+
+/*         if(param->chaos){ */
+/* #ifdef HAVE_OPENMP */
+/*                 RUN(create_chaos_msa_openMP(msa, ap,tasks)); */
+/* #else */
+/*                 RUN(create_chaos_msa_serial(msa, ap,tasks)); */
+/* #endif */
+/*         }else{ */
+/* #ifdef HAVE_OPENMP */
+/*                 RUN(create_msa_openMP(msa,ap, tasks)); */
+/* #else */
+/*                 RUN(create_msa_serial(msa,ap, tasks)); */
+/* #endif */
+/*         } */
+        //RUNP(map = hirschberg_alignment(msa, ap));
+        STOP_TIMER(t1);
+        if(!msa->quiet){
+                GET_TIMING(t1);
+        }
+
+        /* set to aligned */
+        msa->aligned = ALN_STATUS_ALIGNED;
+
+        /* clean up map */
+        free_tasks(tasks);
+
+        /* We are done. */
+        RUN(write_msa(msa, param->outfile, param->out_format));
+
+        free_msa(msa);
+        free_ap(ap);
+        DESTROY_TIMER(t1);
         return OK;
 ERROR:
-        kalign_free_msa(msa);
+        free_msa(tmp_msa);
+        free_msa(msa);
         return FAIL;
 }
 
+
+int check_for_sequences(struct msa* msa)
+
+{
+        if(!msa){
+                ERROR_MSG("No sequences were found in the input files or standard input.");
+        }
+        if(msa->numseq < 2){
+                if(msa->numseq == 0){
+                        ERROR_MSG("No sequences were found in the input files or standard input.");
+                }else if (msa->numseq == 1){
+                        ERROR_MSG("Only 1 sequence was found in the input files or standard input");
+                }
+        }
+        return OK;
+ERROR:
+        return FAIL;
+}

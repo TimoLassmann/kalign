@@ -4,12 +4,15 @@
 #ifdef MSA_CHECK_IMPORT
 #define EXTERN
 #else
+#ifdef __cplusplus
+#define EXTERN extern "C"
+#else
 #define EXTERN extern
+#endif
 #endif
 
 struct msa;
-int check_msa(struct msa* msa);
-
+EXTERN int kalign_check_msa(struct msa* msa);
 
 #undef MSA_CHECK_IMPORT
 #undef EXTERN
