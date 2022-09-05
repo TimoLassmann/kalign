@@ -1,0 +1,2 @@
+#define KALIGN_PACKAGE_NAME "kalign"
+#define KALIGN_PACKAGE_VERSION "3.3.3"

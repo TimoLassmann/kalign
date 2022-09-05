@@ -1,5 +1,6 @@
 
 #include "libkalign.h"
+#include "tldevel.h"
 #include <string.h>
 
 int main(void)
@@ -19,7 +20,6 @@ int main(void)
         }
         char** aln = NULL;
         int aln_len = 0;
-
         /* Call kalign  */
         RUN(kalign(array,len, numseq, &aln, &aln_len));
 

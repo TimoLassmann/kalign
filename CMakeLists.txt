@@ -1,7 +1,8 @@
-
 cmake_minimum_required(VERSION 3.1)
 
-project(kalign LANGUAGES C CXX VERSION "3.3.3")
+project(kalign LANGUAGES C CXX)
+
+#option(BUILD_TEST_EXECUTABLE "Build the test executable" OFF)
 
 set (CMAKE_C_STANDARD 11)
 
@@ -157,21 +158,21 @@ else(HAVE_AVX2)
 endif(HAVE_AVX2)
 
 
-if(NOT PACKAGE_NAME)
-  set(PACKAGE_NAME ${CMAKE_PROJECT_NAME})
-endif()
 
-if(NOT PACKAGE_VERSION)
-  set(PACKAGE_VERSION ${CMAKE_PROJECT_VERSION})
-endif()
-
-configure_file ("${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in"
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/version.h" )
+add_subdirectory(lib)
+add_subdirectory(tests)
 
 
-add_subdirectory(src)
+# cmake_minimum_required(VERSION 3.1)
 
-install(TARGETS kalign DESTINATION bin)
+# project(kalign LANGUAGES C CXX VERSION "3.3.3")
+
+
+  
+#add_subdirectory(src)
+
+
+#install(TARGETS kalign DESTINATION bin)
 
 # Package Generator  #######################################################
 # set(CPACK_PACKAGE_VENDOR "Timo Lassmann")

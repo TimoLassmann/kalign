@@ -34,8 +34,8 @@ int main() {
         }
         /* Free alignment  */
         for(int i = 0; i < numseq;i++){
-                delete[] aln[i];
-                // free(aln[i]);
+                // delete[] aln[i];
+                free(aln[i]);
         }
         free(aln);
 

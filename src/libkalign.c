@@ -1,50 +1,19 @@
-/* #include "tldevel.h" */
+#include "tldevel.h"
 #include "libkalign.h"
 
-/* tldevel  */
 
-#include "mod_tldevel.c"
-/* Interface  */
+#include "alphabet.h"
+#include "global.h"
+#include "msa.h"
 
-#include "mod_interface.c"
-/* Alignment tasks  */
-
-#include "task.c"
-
-/* MSa  */
-
-#include "msa.c"
-
-/* MSA io */
-
-#include "mod_msaio.c"
-
-/* Tree */
-
-#include "mod_tree.c"
-/* Alphabet  */
-/* #include "alphabet.h" */
-/* #include "alphabet.c" */
-/* Alignment module  */
-
-#include "mod_aln.c"
-
-#include "alphabet.c"
-/*  */
-
-/* #include "alphabet.h" */
-/* #include "global.h" */
-/* #include "msa.h" */
-
-/* #include "aln_param.h" */
-/* #include "aln_run.h" */
-/* #include "task.h" */
+#include "aln_param.h"
+#include "aln_run.h"
+#include "task.h"
 
 
-/* #include "bisectingKmeans.h" */
+#include "bisectingKmeans.h"
 
-/* #include "weave_alignment.h" */
-
+#include "weave_alignment.h"
 
 #ifdef HAVE_OPENMP
 #include <omp.h>
@@ -53,17 +22,31 @@
 static int to_msa(char** input_sequences, int* len, int numseq,struct msa** multiple_aln);
 int echo_aln(struct msa* msa);
 
+static int dok(struct msa* msa,struct parameters* param);
+static int dca(struct msa* msa, char ***aligned, int *out_aln_len);
+/* int kalign_(char **seq, int *len, int numseq, float gpo, float gpe, float tgpe, int nthreads, char ***aligned, int *out_aln_len) */
+/* { */
+/*         return OK; */
+/* ERROR: */
+/*         return FAIL; */
+/* } */
+
 int kalign(char **seq, int *len,int numseq, char ***aligned, int *out_aln_len)
 {
         struct msa* msa = NULL;
-        struct aln_param* ap = NULL;
-        struct aln_tasks* tasks = NULL;
+        /* struct aln_param* ap = NULL; */
+        /* struct aln_tasks* tasks = NULL; */
         struct parameters* param = NULL;
-        char** out = NULL;
+        /* char** out = NULL; */
         RUNP(param = init_param());
 
         ASSERT(seq != NULL, "No sequences");
         /* get sequences into aln struct  */
+
+#ifdef HAVE_OPENMP
+        omp_set_nested(1);
+        omp_set_num_threads(param->nthreads);
+#endif
 
         RUN(to_msa(seq, len, numseq,&msa));
 
@@ -77,31 +60,59 @@ int kalign(char **seq, int *len,int numseq, char ***aligned, int *out_aln_len)
         if(msa->aligned != ALN_STATUS_UNALIGNED){
                 RUN(dealign_msa(msa));
         }
-        RUN(init_ap(&ap,param,msa->L ));
 
-        RUN(alloc_tasks(&tasks, msa->numseq));
-        /* msa =  alloc_msa(); */
-        /* test for dna / proten  */
-        /* align  */
+        dok(msa,param);
+        dca(msa, aligned, out_aln_len);
+        /* int aln_len = 0; */
+        /* for (int j = 0; j <= msa->sequences[0]->len;j++){ */
+        /*         aln_len += msa->sequences[0]->gaps[j]; */
+        /* } */
+        /* aln_len += msa->sequences[0]->len; */
+        /* aln_len += 1; */
 
-        RUN(build_tree_kmeans(msa,ap->nthreads,1,&tasks));
+        /* MMALLOC(out, sizeof(char*) * numseq); */
+        /* for(int i = 0; i < numseq; i++){ */
+        /*         out[i] = 0; */
+        /*         MMALLOC(out[i], sizeof(char) * (uint64_t)aln_len); */
+        /*         int pos = 0; */
+        /*         for(int j = 0;j < msa->sequences[i]->len;j++){ */
+        /*                 for(int c = 0;c < msa->sequences[i]->gaps[j];c++){ */
+        /*                         out[i][pos] = '-'; */
+        /*                         pos++; */
+        /*                 } */
+        /*                 out[i][pos] = msa->sequences[i]->seq[j]; */
+        /*                 pos++; */
+        /*         } */
+        /*         for(int c = 0;c < msa->sequences[i]->gaps[ msa->sequences[i]->len];c++){ */
+        /*                 out[i][pos] = '-'; */
+        /*                 pos++; */
+        /*         } */
+        /*         out[i][pos] = 0; */
+        /* } */
 
-        /* by default all protein sequences are converted into a reduced alphabet
-           when read from file. Here we turn them back into the default representation. */
-        if(msa->L == ALPHA_redPROTEIN){
-                //RUN(convert_msa_to_internal(msa, defPROTEIN));
-                RUN(convert_msa_to_internal(msa, ALPHA_ambigiousPROTEIN));
-        }
-        /* allocate aln parameters  */
-        RUN(init_ap(&ap,param,msa->L ));
-        /* align */
-        RUN(create_msa_tree(msa, ap, tasks,param->nthreads));
-        msa->aligned = ALN_STATUS_ALIGNED;
+        /* *aligned = out; */
+        /* *out_aln_len = aln_len; */
+        /* clean up map */
+        /* free_tasks(tasks); */
+        /* free_ap(ap); */
+        /* copy alignment  */
+        free_parameters(param);
+        free_msa(msa);
+        return OK;
+ERROR:
+        free_parameters(param);
+        free_msa(msa);
+        /* free_ap(ap); */
+        return FAIL;
+}
 
-
-        /* echo_aln(msa); */
+int dca(struct msa* msa, char ***aligned, int *out_aln_len)
+{
 
         int aln_len = 0;
+        char** out = NULL;
+
+        int numseq = msa->numseq;
         for (int j = 0; j <= msa->sequences[0]->len;j++){
                 aln_len += msa->sequences[0]->gaps[j];
         }
@@ -126,24 +137,48 @@ int kalign(char **seq, int *len,int numseq, char ***aligned, int *out_aln_len)
                         pos++;
                 }
                 out[i][pos] = 0;
-                /* LOG_MSG("%d %d %s ", aln_len,pos, out[i]); */
         }
 
         *aligned = out;
         *out_aln_len = aln_len;
-        /* clean up map */
-        free_tasks(tasks);
-        free_ap(ap);
-        /* copy alignment  */
-        free_parameters(param);
-        free_msa(msa);
         return OK;
 ERROR:
-        free_parameters(param);
-        free_msa(msa);
-        free_ap(ap);
         return FAIL;
 }
+
+int dok(struct msa* msa,struct parameters* param)
+{
+        struct aln_param* ap = NULL;
+        struct aln_tasks* tasks = NULL;
+        RUN(init_ap(&ap,param,msa->L ));
+
+        RUN(alloc_tasks(&tasks, msa->numseq));
+
+        RUN(build_tree_kmeans(msa,ap->nthreads,1,&tasks));
+
+        /* by default all protein sequences are converted into a reduced alphabet
+           when read from file. Here we turn them back into the default representation. */
+        if(msa->L == ALPHA_redPROTEIN){
+                RUN(convert_msa_to_internal(msa, ALPHA_ambigiousPROTEIN));
+        }
+        /* allocate aln parameters  */
+        RUN(init_ap(&ap,param,msa->L ));
+        /* align */
+#ifdef HAVE_OPENMP
+        int i = floor(log((double) param->nthreads) / log(2.0)) + 2;
+        i = MACRO_MIN(i, 10);
+        omp_set_max_active_levels(i);
+#endif
+        RUN(create_msa_tree(msa, ap, tasks,param->nthreads));
+        msa->aligned = ALN_STATUS_ALIGNED;
+
+        free_tasks(tasks);
+        free_ap(ap);
+        return OK;
+ERROR:
+        return FAIL;
+}
+
 
 int echo_aln(struct msa* msa)
 {

@@ -529,7 +529,7 @@ int run_kalign(struct parameters* param)
         /* Allocate tasks  */
         RUN(alloc_tasks(&tasks, msa->numseq));
 
-        /* Start bi-secting K-means sequence clustering */
+        /* Start bix-secting K-means sequence clustering */
         if(!param->chaos){
 #ifdef HAVE_OPENMP
                 i = floor(log((double) param->nthreads) / log(2.0)) + 4;

@@ -20,38 +20,8 @@
 
 */
 
-#ifndef PARAMETERS_H
-#define PARAMETERS_H
-
-
-#define KALIGNDIST_ALN 0
-#define KALIGNDIST_BPM 1
-#define KALIGNDIST_WU 2
-
-struct parameters{
-        char **infile;
-        char *input;
-        char *outfile;
-        char* format;
-        char* aln_param_file;
-        float gpo;
-        float gpe;
-        float tgpe;
-        float matadd;
-        int chaos;
-        int out_format;
-        int param_set;
-        int dist_method;
-        int num_infiles;
-        int reformat;
-        int rename;             /* rename sequences - to make bali_score swallow the alignments */
-        int dump_internal;
-        int nthreads;
-        int clean;
-        int unalign;
-        int help_flag;
-        int quiet;
-};
+#ifndef ALPHABET_H
+#define ALPHABET_H
 
 #ifndef kalign_extern
 #ifdef __cplusplus
@@ -61,6 +31,27 @@ struct parameters{
 #endif
 #endif
 
-kalign_extern struct parameters* init_param(void);
-kalign_extern void free_parameters(struct parameters* param);
+/* #include "global.h" */
+
+#include <inttypes.h>
+
+#define ALPHA_defPROTEIN 21
+#define ALPHA_ambigiousPROTEIN 23
+#define ALPHA_redPROTEIN 13
+#define ALPHA_defDNA 5
+
+#define ALPHA_UNKNOWN 255
+#define ALPHA_UNDEFINED -1
+
+struct alphabet{
+        int8_t to_internal[128];
+        int8_t to_external[32];
+        int type;
+        int L;
+};
+
+
+kalign_extern struct alphabet* create_alphabet(int type);
+kalign_extern int switch_alphabet(struct alphabet* a, int type);
+
 #endif
