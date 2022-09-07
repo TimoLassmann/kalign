@@ -90,9 +90,9 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                   );*/
                                 dist = calc_distance(seq_a, seq_b, len_a, len_b);
                                 /* give shorter sequences a preference */
-                                int s = (len_a + len_b) / 2;
-                                float add = MACRO_MIN(10000.0, s) / 10000.0;
-                                dist += add;
+                                /* int s = (len_a + len_b) / 2; */
+                                /* float add = MACRO_MIN(10000.0, s) / 10000.0; */
+                                /* dist += add; */
                                 /* fprintf(stdout,"%f\n", add * 1000.0); */
                                 //dist = dist / (float) MACRO_MIN(len_a, len_b);
                                 dm[i][j] = dist;// + (float)( i * num_samples + j) / (float) ( num_samples * num_samples);
