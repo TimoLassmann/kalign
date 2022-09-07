@@ -10,25 +10,19 @@ if (NOT TARGET kalign::kalign)
   find_package(kalign)
 endif()
 
-add_executable(kalign_io_test)
-target_sources(kalign_io_test
-  PRIVATE
+add_executable(kalign_io_test
   kalign_io_test.c
   )
 
 target_link_libraries(kalign_io_test kalign::kalign)
 
-add_executable(kalign_lib_test)
-target_sources(kalign_lib_test
-  PRIVATE
+add_executable(kalign_lib_test
   kalign_lib_test.c
   )
 
 target_link_libraries(kalign_lib_test kalign::kalign)
 
-add_executable(kalign_cmp_test)
-target_sources(kalign_cmp_test
-  PRIVATE
+add_executable(kalign_cmp_test
   kalign_cmp_test.c
   )
 
