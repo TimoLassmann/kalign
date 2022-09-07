@@ -9,6 +9,7 @@
 #include "msa_check.h"
 
 struct sort_struct_name_chksum{
+        struct msa_seq* seq;
         char** name;
         int chksum;
         int action;
@@ -17,7 +18,45 @@ struct sort_struct_name_chksum{
 static int GCGchecksum(char *seq, int len);
 static int sort_by_name(const void *a, const void *b);
 static int sort_by_chksum(const void *a, const void *b);
-int kalign_check_msa(struct msa* msa)
+static int sort_by_both(const void *a, const void *b);
+
+int kalign_sort_msa(struct msa *msa)
+{
+        struct sort_struct_name_chksum** a = NULL;
+
+        MMALLOC(a, sizeof(struct sort_struct_name_chksum *) * msa->numseq);
+
+        for(int i = 0; i < msa->numseq;i++){
+                a[i] = NULL;
+                MMALLOC(a[i], sizeof(struct sort_struct_name_chksum));
+                a[i]->seq = msa->sequences[i];
+                a[i]->name = &msa->sequences[i]->name;
+                a[i]->chksum = GCGchecksum(msa->sequences[i]->seq, msa->sequences[i]->len);
+                a[i]->action = 0;
+        }
+
+        qsort(a, msa->numseq, sizeof(struct sort_struct*),sort_by_both);
+
+        for(int i = 0; i < msa->numseq;i++){
+                msa->sequences[i] = a[i]->seq;
+        }
+
+        for(int i = 0; i < msa->numseq;i++){
+                MFREE(a[i]);
+        }
+        MFREE(a);
+        return OK;
+ERROR:
+        if(a){
+                for(int i = 0; i < msa->numseq;i++){
+                        MFREE(a[i]);
+                }
+                MFREE(a);
+        }
+        return FAIL;
+}
+
+int kalign_check_msa(struct msa* msa, int exit_on_error)
 {
         char* tmp_name = NULL;
         /* char* tmp_ptr; */
@@ -32,6 +71,7 @@ int kalign_check_msa(struct msa* msa)
         for(i = 0; i < msa->numseq;i++){
                 a[i] = NULL;
                 MMALLOC(a[i], sizeof(struct sort_struct_name_chksum));
+                a[i]->seq = msa->sequences[i];
                 a[i]->name = &msa->sequences[i]->name;
                 a[i]->chksum = GCGchecksum(msa->sequences[i]->seq, msa->sequences[i]->len);
                 a[i]->action = 0;
@@ -50,6 +90,9 @@ int kalign_check_msa(struct msa* msa)
                                         a[i]->chksum);
                                 a[i-1]->action = 1;
                                 a[i]->action = 1;
+                                if(exit_on_error){
+                                        ERROR_MSG("Same seq with same name!");
+                                }
                         }else{
                                 WARNING_MSG("Found sequence pair with same name but different sequence:\n%s checksum: %d\n%s checksum: %d\n",
                                             *a[i-1]->name,
@@ -59,7 +102,11 @@ int kalign_check_msa(struct msa* msa)
 
                                 a[i-1]->action = 1;
                                 a[i]->action = 1;
-                                WARNING_MSG("This is a problem if we want to compare alignments down the track. Will append \"_X\" to the sequence name.");
+                                if(exit_on_error){
+                                        ERROR_MSG("This is a problem if we want to compare alignments down the track. Will append \"_X\" to the sequence name.");
+                                }else{
+                                        WARNING_MSG("This is a problem if we want to compare alignments down the track. Will append \"_X\" to the sequence name.");
+                                }
                         }
                 }
         }
@@ -107,6 +154,23 @@ ERROR:
         return FAIL;
 }
 
+int sort_by_both(const void *a, const void *b)
+{
+        struct sort_struct_name_chksum* const *one = a;
+        struct sort_struct_name_chksum* const *two = b;
+
+        if(strncmp(*(*one)->name, *(*two)->name,MSA_NAME_LEN) < 0){
+                return -1;
+        }else if(strncmp(*(*one)->name, *(*two)->name,MSA_NAME_LEN) == 0 ){
+                if((*one)->chksum > (*two)->chksum){
+                        return -1;
+                }else{
+                        return 1;
+                }
+        }else{
+                return 1;
+        }
+}
 int sort_by_name(const void *a, const void *b)
 {
         struct sort_struct_name_chksum* const *one = a;

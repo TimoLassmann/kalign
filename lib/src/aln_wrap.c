@@ -1,5 +1,5 @@
 #include "tldevel.h"
-
+#include "esl_stopwatch.h"
 #include "task.h"
 #include "msa_struct.h"
 #include "msa_op.h"
@@ -40,7 +40,7 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
         /* Start the heavy lifting  */
         RUN(alloc_tasks(&tasks, msa->numseq));
         /* Build guide tree */
-        RUN(build_tree_kmeans(msa,n_threads,1,&tasks));
+        RUN(build_tree_kmeans(msa,n_threads,&tasks));
 
         /* Convert to full alphabet after having converted to reduced alphabet for tree building above  */
         if(msa->biotype == ALN_BIOTYPE_PROTEIN){
@@ -62,9 +62,24 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
         i = MACRO_MIN(i, 10);
         omp_set_max_active_levels(i);
 #endif
+
+        DECLARE_TIMER(t1);
+        if(!msa->quiet){
+                LOG_MSG("Aligning");
+        }
+        START_TIMER(t1);
+
         RUN(create_msa_tree(msa, ap, tasks));
         /* Hurrah we have aligned sequences  */
         msa->aligned = ALN_STATUS_ALIGNED;
+
+        RUN(finalise_alignment(msa));
+
+        STOP_TIMER(t1);
+        if(!msa->quiet){
+                GET_TIMING(t1);
+        }
+        DESTROY_TIMER(t1);
 
         aln_param_free(ap);
         free_tasks(tasks);

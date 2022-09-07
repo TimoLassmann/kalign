@@ -32,6 +32,7 @@ set(source_files
   src/msa_io.c
   src/msa_misc.c
   src/msa_check.c
+  src/msa_cmp.c
   src/alphabet.c
 
   src/task.c

@@ -41,7 +41,7 @@ struct aln_tasks;
 struct msa;
 /* int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct  aln_tasks** task_list); */
 
-EXTERN int build_tree_kmeans(struct msa* msa, int n_threads, int quiet, struct aln_tasks** tasks);
+EXTERN int build_tree_kmeans(struct msa* msa, int n_threads, struct aln_tasks** tasks);
 //int build_tree_kmeans(struct msa* msa, struct aln_param* ap);
 
 // extern int build_tree_kmeans(struct msa* msa, struct aln_param* ap);

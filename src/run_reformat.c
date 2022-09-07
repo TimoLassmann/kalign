@@ -326,7 +326,7 @@ int run_reformat(struct parameters* param)
                 param->format = NULL;
         }
         if(param->clean){
-                RUN(kalign_check_msa(msa));
+                RUN(kalign_check_msa(msa,0));
         }
         /* extra checks for input alignments */
         /* if(param->clean){ */

@@ -436,3 +436,57 @@ static int aln_unknown_warning_message_same_len_no_gaps(void)
         WARNING_MSG("--------------------------------------------");
         return OK;
 }
+
+int finalise_alignment(struct msa* msa)
+{
+        ASSERT(msa->aligned == ALN_STATUS_ALIGNED, "Sequences are not aligned");
+        struct msa_seq* seq = NULL;
+        char* linear_seq = NULL;
+        int aln_len = 0;
+
+        
+        for(int i = 0; i <= msa->sequences[0]->len;i++){
+                aln_len += msa->sequences[0]->gaps[i];
+        }
+        aln_len += msa->sequences[0]->len;
+
+        for(int i = 0; i < msa->numseq;i++){
+                MMALLOC(linear_seq, sizeof(char)* (aln_len+1));
+                seq = msa->sequences[i];
+                RUN(make_linear_sequence(seq,linear_seq));
+                MFREE(seq->seq);
+                seq->seq = linear_seq;
+                /* seq->len = aln_len; */
+                linear_seq = NULL;
+        }
+        msa->alnlen = aln_len;
+        msa->aligned = ALN_STATUS_FINAL;
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+int make_linear_sequence(struct msa_seq* seq, char* linear_seq)
+{
+        int c,j,f;
+        f = 0;
+        for(j = 0;j < seq->len;j++){
+                //LOG_MSG("%d %d",j,seq->gaps[j]);
+                for(c = 0;c < seq->gaps[j];c++){
+                        linear_seq[f] = '-';
+                        f++;
+
+                }
+                //LOG_MSG("%d %d %d",j,f,seq->gaps[j]);
+                linear_seq[f] = seq->seq[j];
+                f++;
+        }
+        for(c = 0;c < seq->gaps[ seq->len];c++){
+                //LOG_MSG("%d %d",j,seq->gaps[seq->len]);
+                linear_seq[f] = '-';
+                f++;
+        }
+        linear_seq[f] = 0;
+        ///fprintf(stdout,"LINEAR:%s\n",linear_seq);
+        return OK;
+}

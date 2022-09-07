@@ -18,6 +18,7 @@ int alloc_msa(struct msa** msa)
         m->L = ALPHA_UNDEFINED;
         m->biotype = ALN_BIOTYPE_UNDEF;
         m->aligned = 0;
+        m->alnlen = 0;
         m->quiet = 0;
         m->plen = NULL;
         m->sip = NULL;

@@ -1,5 +1,5 @@
-#+TITLE:  Test kalign on BAliBASE 
-#+AUTHOR: Timo Lassmann
+#+TITLE:  Test kalign on BAliBASE
+#+AUTHOR: Timo Lassmann 
 #+EMAIL:  timo.lassmann@telethonkids.org.au
 #+DATE:   2019-04-23
 #+LATEX_CLASS: report
@@ -28,7 +28,7 @@
 
    BAliBASE comes with a C program to score alignments. Unfortunately, something is wrong with the bundled expat library. To fix this install expat system and remove the links to the bundled library by editing the makefile: 
 
-   #+BEGIN_EXAMPLE makefile 
+   #+BEGIN_EXAMPLE makefile
    CC	= cc
    CFLAGS  = -c -O #-I$(EXPAT_INC)
    LFLAGS	= -O -lm -lexpat #-L$(EXPAT_LIB) -lexpat
@@ -50,7 +50,7 @@
 
    Then compile:
 
-   #+BEGIN_SRC sh 
+   #+BEGIN_SRC sh
      cd ~/data/bb3_release/bali_score_src
      make 
    #+END_SRC

@@ -371,10 +371,10 @@ int run_kalign(struct parameters* param)
         struct msa* msa = NULL;
 
         if(param->num_infiles == 1){
-                RUN(kalign_read_input(param->infile[0], &msa,1));
+                RUN(kalign_read_input(param->infile[0], &msa,param->quiet));
         }else{
                 for(int i = 0; i < param->num_infiles;i++){
-                        RUN(kalign_read_input(param->infile[i], &msa,1));
+                        RUN(kalign_read_input(param->infile[i], &msa,param->quiet));
                 }
         }
 

@@ -75,7 +75,7 @@ static int bisecting_kmeans_parallel(struct msa* msa, struct node** ret_n, float
 
 static int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick,struct kmeans_result** ret);
 
-int build_tree_kmeans(struct msa* msa, int n_threads, int quiet, struct aln_tasks** tasks)
+int build_tree_kmeans(struct msa* msa, int n_threads, struct aln_tasks** tasks)
 {
         struct aln_tasks* t = NULL;
         struct node* root = NULL;
@@ -99,7 +99,7 @@ int build_tree_kmeans(struct msa* msa, int n_threads, int quiet, struct aln_task
 
         DECLARE_TIMER(timer);
         /* pick anchors . */
-        if(!quiet){
+        if(!msa->quiet){
                 LOG_MSG("Calculating pairwise distances");
         }
         START_TIMER(timer);
@@ -111,6 +111,7 @@ int build_tree_kmeans(struct msa* msa, int n_threads, int quiet, struct aln_task
         if(!msa->quiet){
                 GET_TIMING(timer);
         }
+
         //LOG_MSG("Done in %f sec.", GET_TIMING(timer));
 
         MFREE(anchors);
@@ -119,13 +120,13 @@ int build_tree_kmeans(struct msa* msa, int n_threads, int quiet, struct aln_task
         for(i = 0; i < numseq;i++){
                 samples[i] = i;
         }
-        if(!quiet){
-                LOG_MSG("%d anchors ", num_anchors);
-        }
+        /* if(!msa->quiet){ */
+        /*         LOG_MSG("%d anchors ", num_anchors); */
+        /* } */
         //RUNP(root = alloc_node());
 
         START_TIMER(timer);
-        if(!quiet){
+        if(!msa->quiet){
                 LOG_MSG("Building guide tree.");
         }
         if(n_threads == 1){

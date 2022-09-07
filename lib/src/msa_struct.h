@@ -13,6 +13,7 @@
 
 #define ALN_STATUS_UNALIGNED 1   /* no gaps sequences may or may not have equal lengths  */
 #define ALN_STATUS_ALIGNED 2   /* sequences have equal lengths and may or may not contain gaps*/
+#define ALN_STATUS_FINAL 3   /* sequences have equal lengths and may or may not contain gaps*/
 #define ALN_STATUS_UNKNOWN 3     /* sequences have un-equal length and contain gaps  */
 
 #define ALN_BIOTYPE_PROTEIN 0
@@ -37,6 +38,7 @@ struct msa{
         int num_profiles;
         int alloc_numseq;
         int aligned;
+        int alnlen;
         int letter_freq[128];
         uint8_t L;
         uint8_t biotype;

@@ -21,7 +21,7 @@
 struct msa;
 /* input output routines  */
 
-EXTERN int kalign_read_input(char* infile, struct msa** msa,int verbose);
+EXTERN int kalign_read_input(char* infile, struct msa** msa,int quiet);
 
 EXTERN int kalign_write_msa(struct msa *msa, char *outfile, char *format);
 
@@ -35,8 +35,10 @@ EXTERN void kalign_free_msa(struct msa* msa);
 
 /* Auxillary...  */
 EXTERN int reformat_settings_msa(struct msa *msa, int rename, int unalign);
-EXTERN int kalign_check_msa(struct msa* msa);
 
+EXTERN int kalign_check_msa(struct msa* msa, int exit_on_error);
+
+EXTERN int kalign_msa_compare(struct msa *r, struct msa *t, int cmp_type, float *score);
 #undef KALIGN_IMPORT
 #undef EXTERN
 

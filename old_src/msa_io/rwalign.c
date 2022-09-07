@@ -1520,30 +1520,30 @@ int null_terminate_sequences(struct msa* msa)
         return OK;
 }
 
-int make_linear_sequence(struct msa_seq* seq, char* linear_seq)
-{
-        int c,j,f;
-        f = 0;
-        for(j = 0;j < seq->len;j++){
-                //LOG_MSG("%d %d",j,seq->gaps[j]);
-                for(c = 0;c < seq->gaps[j];c++){
-                        linear_seq[f] = '-';
-                        f++;
+/* int make_linear_sequence(struct msa_seq* seq, char* linear_seq) */
+/* { */
+/*         int c,j,f; */
+/*         f = 0; */
+/*         for(j = 0;j < seq->len;j++){ */
+/*                 //LOG_MSG("%d %d",j,seq->gaps[j]); */
+/*                 for(c = 0;c < seq->gaps[j];c++){ */
+/*                         linear_seq[f] = '-'; */
+/*                         f++; */
 
-                }
-                //LOG_MSG("%d %d %d",j,f,seq->gaps[j]);
-                linear_seq[f] = seq->seq[j];
-                f++;
-        }
-        for(c = 0;c < seq->gaps[ seq->len];c++){
-                //LOG_MSG("%d %d",j,seq->gaps[seq->len]);
-                linear_seq[f] = '-';
-                f++;
-        }
-        linear_seq[f] = 0;
-        ///fprintf(stdout,"LINEAR:%s\n",linear_seq);
-        return OK;
-}
+/*                 } */
+/*                 //LOG_MSG("%d %d %d",j,f,seq->gaps[j]); */
+/*                 linear_seq[f] = seq->seq[j]; */
+/*                 f++; */
+/*         } */
+/*         for(c = 0;c < seq->gaps[ seq->len];c++){ */
+/*                 //LOG_MSG("%d %d",j,seq->gaps[seq->len]); */
+/*                 linear_seq[f] = '-'; */
+/*                 f++; */
+/*         } */
+/*         linear_seq[f] = 0; */
+/*         ///fprintf(stdout,"LINEAR:%s\n",linear_seq); */
+/*         return OK; */
+/* } */
 
 
 /* memory functions */

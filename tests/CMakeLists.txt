@@ -26,6 +26,15 @@ target_sources(kalign_lib_test
 
 target_link_libraries(kalign_lib_test kalign::kalign)
 
+add_executable(kalign_cmp_test)
+target_sources(kalign_cmp_test
+  PRIVATE
+  kalign_cmp_test.c
+  )
+
+target_link_libraries(kalign_cmp_test kalign::kalign)
+
+
 #BB11001.tfa     
 add_test(
   NAME kalign_itest_BB11001.tfa

@@ -8,6 +8,8 @@
 #endif
 
 struct msa;
+struct msa_seq;
+
 EXTERN int merge_msa(struct msa** dest, struct msa* src);
 
 EXTERN int dealign_msa(struct msa *msa);
@@ -24,6 +26,9 @@ EXTERN int convert_msa_to_internal(struct msa* msa, int type);
 EXTERN int kalign_msa_to_arr(struct msa *msa, char ***aligned, int *out_aln_len);
 /* Used to convert sequences read by non-kalign code into the msa struct.. */
 EXTERN int kalign_arr_to_msa(char **input_sequences, int *len, int numseq, struct msa **multiple_aln);
+
+EXTERN int finalise_alignment(struct msa* msa);
+EXTERN int make_linear_sequence(struct msa_seq *seq, char *linear_seq);
 
 #undef MSA_OP_IMPORT
 #undef EXTERN
