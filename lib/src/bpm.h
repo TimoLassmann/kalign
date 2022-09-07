@@ -45,7 +45,7 @@ EXTERN uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m);
 EXTERN uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m);
 
 
-
+EXTERN uint8_t dyn_256(const uint8_t* t,const uint8_t* p,int n,int m);
 #undef BPM_IMPORT
 #undef EXTERN
 

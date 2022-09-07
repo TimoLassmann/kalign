@@ -668,33 +668,33 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
         m->mode = ALN_MODE_FULL;
         if(msa->nsip[a] == 1){
                 if(msa->nsip[b] == 1){
-                        if(m->len_a < m->len_b){
+                        /* if(m->len_a < m->len_b){ */
                                 m->seq1 = msa->sequences[a]->s;
                                 m->seq2 = msa->sequences[b]->s;
                                 /* LOG_MSG("%d %d", m->len_a, m->len_b); */
                                 m->prof1 = NULL;
                                 m->prof2 = NULL;
                                 aln_runner(m);
-                        }else{
-                                len_b = m->len_b;
-                                len_a = m->len_a;
+                        /* }else{ */
+                        /*         len_b = m->len_b; */
+                        /*         len_a = m->len_a; */
 
-                                m->enda = len_b;
-                                m->endb = len_a;
-                                m->len_a = len_b;
-                                m->len_b = len_a;
+                        /*         m->enda = len_b; */
+                        /*         m->endb = len_a; */
+                        /*         m->len_a = len_b; */
+                        /*         m->len_b = len_a; */
 
-                                m->seq1 = msa->sequences[b]->s;
-                                m->seq2 = msa->sequences[a]->s;
-                                m->prof1 = NULL;
-                                m->prof2 = NULL;
+                        /*         m->seq1 = msa->sequences[b]->s; */
+                        /*         m->seq2 = msa->sequences[a]->s; */
+                        /*         m->prof1 = NULL; */
+                        /*         m->prof2 = NULL; */
 
-                                aln_runner(m);
+                        /*         aln_runner(m); */
 
-                                RUN(mirror_path_n(m,len_a,len_b));
-                                m->len_a = len_a;
-                                m->len_b = len_b;
-                        }
+                        /*         RUN(mirror_path_n(m,len_a,len_b)); */
+                        /*         m->len_a = len_a; */
+                        /*         m->len_b = len_b; */
+                        /* } */
                 }else{
                         len_b = m->len_b;
                         len_a = m->len_a;

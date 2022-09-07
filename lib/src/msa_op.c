@@ -394,7 +394,9 @@ int kalign_arr_to_msa(char** input_sequences, int* len, int numseq,struct msa** 
                 msa->sequences[i] = seq;
                 /* LOG_MSG("%s",msa->sequences[i]->seq); */
         }
-
+        RUN(detect_alphabet(msa));
+        RUN(detect_aligned(msa));
+        RUN(set_sip_nsip(msa));
         *multiple_aln = msa;
         return OK;
 

@@ -25,9 +25,14 @@ EXTERN int kalign_read_input(char* infile, struct msa** msa,int quiet);
 
 EXTERN int kalign_write_msa(struct msa *msa, char *outfile, char *format);
 
-EXTERN int kalign_msa_to_arr(struct msa *msa, char ***aligned, int *out_aln_len);
+/* EXTERN int kalign_msa_to_arr(struct msa *msa, char ***aligned, int *out_aln_len); */
 /* Used to convert sequences read by non-kalign code into the msa struct.. */
-EXTERN int kalign_arr_to_msa(char **input_sequences, int *len, int numseq, struct msa **multiple_aln);
+/* EXTERN int kalign_arr_to_msa(char **input_sequences, int *len, int numseq, struct msa **multiple_aln); */
+
+
+EXTERN int kalign(char **seq, int *len, int numseq, int n_threads, int type,
+                  float gpo, float gpe, float tgpe, char ***aligned,
+                  int *out_aln_len);
 
 EXTERN int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, float tgpe);
 /* Memory */

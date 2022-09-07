@@ -22,6 +22,7 @@
 */
 
 #include "tldevel.h"
+#include <stdint.h>
 #ifdef HAVE_AVX2
 #include <xmmintrin.h>
 #include <mm_malloc.h>
@@ -181,12 +182,74 @@ float calc_distance(uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b)
         }
         return (float)dist;
 #else
-        uint8_t dist;
-        if(len_a > len_b){
-                dist = bpm(seq_a, seq_b, len_a, len_b);
-        }else{
-                dist = bpm(seq_b, seq_a, len_b, len_a);
+        uint8_t dist = 0;
+        if(len_a < len_b){
+                int tmp_len = 0;
+                uint8_t* tmp = NULL;
+
+                tmp = seq_a;
+                seq_a = seq_b;
+                seq_b = tmp;
+
+                tmp_len = len_a;
+                len_a = len_b;
+                len_b = tmp_len;
         }
+
+
+
+
+        dist = UINT8_MAX;
+        /* dist = bpm(seq_a, seq_b, len_a, len_b); */
+        for(int i = 0; i < len_b;i+=64){
+                /* dist = MACRO_MIN(dist,bpm(seq_a, seq_b+i, len_a, len_b-i)); */
+                dist = dist + bpm(seq_a, seq_b+i, len_a, len_b-i);
+        }
+        /* dist =  dyn_256(seq_a, seq_b, len_a, len_b); */
+
+        /* if(len_a < 64 && len_b < 64){ /\* both are short  *\/ */
+        /*         dist = bpm(seq_a, seq_b, len_a, len_b); */
+        /* }else if(len_a >= 64 && len_b < 64){ /\* A is longer *\/ */
+        /*         dist = bpm(seq_a, seq_b, len_a, len_b); */
+        /*         /\* int mida = len_a / 2 - 32; *\/ */
+        /*         /\* dist += bpm(seq_a+mida, seq_b, MACRO_MIN(64,len_a - mida), len_b); *\/ */
+        /*         /\* dist += bpm(seq_a+len_a-64, seq_b, 64, len_b); *\/ */
+        /*         /\* dist = dist / 3; *\/ */
+        /* }else if(len_a < 64 && len_b >= 64){ /\* b is longer *\/ */
+        /*         dist = bpm(seq_b, seq_a, len_b, len_a); */
+        /*         /\* int midb = len_b / 2 - 32; *\/ */
+        /*         /\* dist += bpm(seq_b+midb    , seq_a,  MACRO_MIN(64,len_b - midb), len_a); *\/ */
+        /*         /\* dist += bpm(seq_b+len_b-64, seq_a, 64, len_a); *\/ */
+        /*         /\* dist = dist / 3; *\/ */
+        /* }else if(len_a >= 64 && len_b >= 64){ /\* both long *\/ */
+        /*         dist = bpm(seq_a, seq_b, 64,64); */
+        /*         int mida = len_a / 2 - 32; */
+
+        /*         int midb = len_b / 2 - 32; */
+        /*         dist += bpm(seq_a+mida, seq_b+midb, MACRO_MIN(64,len_a - mida), MACRO_MIN(64,len_b-midb)); */
+        /*         dist += bpm(seq_b+len_b-64, seq_a+len_a-64, 64, 64); */
+        /*         dist = dist / 3; */
+        /* } */
+
+        /* if(len_a > len_b){ */
+
+        /*         dist = bpm(seq_a, seq_b, len_a, len_b); */
+        /*         if(len_b > 64 && len_a > 64){ */
+        /*                 dist += bpm(seq_a+32, seq_b+32, len_a-32, len_b-32); */
+        /*         } */
+        /*         if(len_b > 96 && len_a > 96){ */
+        /*                 dist += bpm(seq_a+64, seq_b+64, len_a-64, len_b-64); */
+        /*         } */
+
+        /* }else{ */
+        /*         dist = bpm(seq_b, seq_a, len_b, len_a); */
+        /*         if(len_a > 64 && len_b > 64){ */
+        /*                 dist += bpm(seq_b+32, seq_a+32, len_b-32, len_a-32); */
+        /*         } */
+        /*         if(len_a > 96 && len_b > 96){ */
+        /*                 dist += bpm(seq_b+64, seq_a+64, len_b-64, len_a-64); */
+        /*         } */
+        /* } */
         return (float)dist;
 #endif
 }

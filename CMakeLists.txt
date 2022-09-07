@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.1)
 project(kalign LANGUAGES C CXX)
 
 set(NAMESPACE_NAME "kalign")
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BUILD_SHARED_LIBS "Build the shared library" ON)
 
@@ -52,8 +53,7 @@ include(GNUInstallDirs)
 include(CTest)
 include(CheckCSourceRuns)
 
-option(USE_OPENMP "Use OpenMP for parallelization" ON)
-
+option(USE_OPENMP    "Use OpenMP for parallelization" ON)
 option(ENABLE_SSE    "Enable compile-time SSE4.1 support." ON)
 option(ENABLE_AVX    "Enable compile-time AVX support."    ON)
 option(ENABLE_AVX2   "Enable compile-time AVX2 support."   ON)
@@ -64,7 +64,7 @@ option(ENABLE_AVX2   "Enable compile-time AVX2 support."   ON)
 if(USE_OPENMP)
   find_package(OpenMP)
   if(OPENMP_FOUND OR OpenMP_FOUND)
-    message(STATUS "OpenMP flags = ${OpenMP_C_FLAGS}")
+     message(STATUS "OpenMP is enabled.")
     add_definitions (-DHAVE_OPENMP)
   else(OPENMP_FOUND OR OpenMP_FOUND)
     message(STATUS "OpenMP not supported")
@@ -165,8 +165,10 @@ endif()
 
 if (HAVE_AVX2)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx2 -DHAVE_AVX2")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx2 -DHAVE_AVX2")
 else(HAVE_AVX2)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNOHAVE_AVX2")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNOHAVE_AVX2")
 endif(HAVE_AVX2)
 
 
@@ -175,6 +177,14 @@ add_subdirectory(lib)
 add_subdirectory(src)
 add_subdirectory(tests)
 
+MESSAGE(STATUS "Build type                : " ${CMAKE_BUILD_TYPE})
+MESSAGE(STATUS "Library Type              : " ${LIB_TYPE})
+MESSAGE(STATUS "Compiler flags            : " ${CMAKE_C_COMPILE_FLAGS})
+MESSAGE(STATUS "Compiler c debug flags    : " ${CMAKE_C_FLAGS_DEBUG})
+MESSAGE(STATUS "Compiler c release flags  : " ${CMAKE_C_FLAGS_RELEASE})
+MESSAGE(STATUS "Compiler c min size flags : " ${CMAKE_C_FLAGS_MINSIZEREL})
+MESSAGE(STATUS "Compiler c flags          : " ${CMAKE_C_FLAGS})
+message(STATUS "OpenMP flags              : " ${OpenMP_C_FLAGS})
 
 # cmake_minimum_required(VERSION 3.1)
 

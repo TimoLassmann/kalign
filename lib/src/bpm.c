@@ -20,6 +20,7 @@
 
 */
 #define BPM_IMPORT
+#include "tldevel.h"
 #include "bpm.h"
 #include  <stdalign.h>
 
@@ -47,7 +48,7 @@ __m256i bitShiftRight256ymm (__m256i *data, int count);
 #include "esl_stopwatch.h"
 
 /* Functions needed for the unit test*/
-uint8_t dyn_256(const uint8_t* t,const uint8_t* p,int n,int m);
+
 uint8_t dyn_256_print(const uint8_t* t,const uint8_t* p,int n,int m);
 int  mutate_seq(uint8_t* s, int len,int k,int L, struct rng_state* rng);
 
@@ -246,66 +247,6 @@ int mutate_seq(uint8_t* s, int len,int k,int L, struct rng_state* rng)
 }
 
 
-uint8_t dyn_256(const uint8_t* t,const uint8_t* p,int n,int m)
-{
-        uint8_t* prev = NULL;
-        uint8_t* cur = NULL;
-
-        uint8_t* tmp = NULL;
-        int i,j,c;
-
-        MMALLOC(prev, sizeof(uint8_t)* 257);
-        MMALLOC(cur, sizeof(uint8_t)* 257);
-        cur[0] = 0;
-        //fprintf(stdout,"%d ", cur[0]);
-        for(j = 1; j <= m;j++){
-
-                cur[j] = cur[j-1] +1;
-                //fprintf(stdout,"%d ", cur[j]);
-        }
-        //fprintf(stdout,"\n");
-        tmp  = cur;
-        cur = prev;
-        prev = tmp;
-
-        for(i = 1; i <= n;i++){
-                cur[0] = prev[0];
-                //fprintf(stdout,"%d ", cur[0]);
-                for(j = 1; j < m;j++){
-                        c = 1;
-                        if(t[i-1] == p[j-1]){
-                                c = 0;
-
-                        }
-                        cur[j] = prev[j-1] +c ;
-                        cur[j] = MACRO_MIN(cur[j], prev[j]+1);
-                        cur[j] = MACRO_MIN(cur[j], cur[j-1]+1);
-             }
-                j = m;
-
-                c = 1;
-                if(t[i-1] == p[j-1]){
-                        c = 0;
-
-                }
-                cur[j] = prev[j-1] +c ;
-
-                cur[j] = MACRO_MIN(cur[j], prev[j]);
-                cur[j] = MACRO_MIN(cur[j], cur[j-1]+1);
-                //fprintf(stdout,"\n");
-                tmp  = cur;
-                cur = prev;
-                prev = tmp;
-
-        }
-        c = prev[m];
-        MFREE(prev);
-        MFREE(cur);
-        return c;
-ERROR:
-        return 255;
-
-}
 
 uint8_t dyn_256_print(const uint8_t* t,const uint8_t* p,int n,int m)
 {
@@ -397,6 +338,70 @@ void print_256_all(__m256i X)
 #endif
 
 
+uint8_t dyn_256(const uint8_t* t,const uint8_t* p,int n,int m)
+{
+        uint8_t* prev = NULL;
+        uint8_t* cur = NULL;
+
+        uint8_t* tmp = NULL;
+        int i,j,c;
+        if(m > 255){
+                m = 255;
+        }
+
+
+        MMALLOC(prev, sizeof(uint8_t)* 257);
+        MMALLOC(cur, sizeof(uint8_t)* 257);
+        cur[0] = 0;
+        //fprintf(stdout,"%d ", cur[0]);
+        for(j = 1; j <= m;j++){
+
+                cur[j] = cur[j-1] +1;
+                //fprintf(stdout,"%d ", cur[j]);
+        }
+        //fprintf(stdout,"\n");
+        tmp  = cur;
+        cur = prev;
+        prev = tmp;
+
+        for(i = 1; i <= n;i++){
+                cur[0] = prev[0];
+                //fprintf(stdout,"%d ", cur[0]);
+                for(j = 1; j < m;j++){
+                        c = 1;
+                        if(t[i-1] == p[j-1]){
+                                c = 0;
+
+                        }
+                        cur[j] = prev[j-1] +c ;
+                        cur[j] = MACRO_MIN(cur[j], prev[j]+1);
+                        cur[j] = MACRO_MIN(cur[j], cur[j-1]+1);
+                }
+                j = m;
+
+                c = 1;
+                if(t[i-1] == p[j-1]){
+                        c = 0;
+
+                }
+                cur[j] = prev[j-1] +c ;
+
+                cur[j] = MACRO_MIN(cur[j], prev[j]);
+                cur[j] = MACRO_MIN(cur[j], cur[j-1]+1);
+                //fprintf(stdout,"\n");
+                tmp  = cur;
+                cur = prev;
+                prev = tmp;
+
+        }
+        c = prev[m];
+        MFREE(prev);
+        MFREE(cur);
+        return c;
+ERROR:
+        return 255;
+
+}
 
 
 uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m)
