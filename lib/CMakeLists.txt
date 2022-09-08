@@ -156,3 +156,37 @@ install(
   COMPONENT
     Development
 )
+
+
+add_executable(bpm_utest
+  src/tldevel.c
+  src/tlrng.c
+  src/esl_stopwatch.c
+  src/alphabet.c
+  src/bpm.c
+  src/bpm_test.c 
+  
+  
+  )
+target_link_libraries(bpm_utest PRIVATE m)
+# set_target_properties(bpm_utest PROPERTIES COMPILE_FLAGS "-DBPM_UTEST")
+
+
+add_test(
+  NAME bpm_utest
+  COMMAND bpm_utest
+  )
+
+
+
+add_executable(alphabet_utest
+  src/tldevel.c
+  src/alphabet.c   
+  )
+
+set_target_properties(alphabet_utest PROPERTIES COMPILE_FLAGS "-DUTEST_ALPHABET")
+add_test(
+  NAME alphabet_utest
+  COMMAND alphabet_utest
+  )
+   

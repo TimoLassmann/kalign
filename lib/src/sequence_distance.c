@@ -91,9 +91,9 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                   );*/
                                 dist = calc_distance(seq_a, seq_b, len_a, len_b);
                                 /* give shorter sequences a preference */
-                                /* int s = (len_a + len_b) / 2; */
-                                /* float add = MACRO_MIN(10000.0, s) / 10000.0; */
-                                /* dist += add; */
+                                int s = (len_a + len_b) / 2;
+                                float add = MACRO_MIN(10000.0, s) / 10000.0;
+                                dist += add;
                                 /* fprintf(stdout,"%f\n", add * 1000.0); */
                                 //dist = dist / (float) MACRO_MIN(len_a, len_b);
                                 dm[i][j] = dist;// + (float)( i * num_samples + j) / (float) ( num_samples * num_samples);
@@ -143,8 +143,8 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                 l2 = s[samples[j]]->len;
                                 dm[i][j] = calc_distance(s1,s2,l1,l2);
                                 /* fprintf(stdout,"%f ",dm[i][j]); */
-                                //dm[i][j] += (float)MACRO_MIN(l1, l2) / (float)MACRO_MAX(l1, l2);
-                                //dm[i][j] = dm[i][j] / (float) MACRO_MIN(l1, l2);
+                                /* dm[i][j] += (float)MACRO_MIN(l1, l2) / (float)MACRO_MAX(l1, l2); */
+                                /* dm[i][j] = dm[i][j] / (float) MACRO_MIN(l1, l2); */
                                 //dm[i][j] = dist;
                         }
                         /* fprintf(stdout,"\n"); */
@@ -173,85 +173,40 @@ ERROR:
 
 float calc_distance(uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b)
 {
-#ifdef HAVE_AVX2
-        uint8_t dist;
+        uint32_t dist;
         if(len_a > len_b){
-                dist = bpm_256(seq_a, seq_b, len_a, len_b);
+                dist = bpm_block(seq_a, seq_b, len_a, len_b);
         }else{
-                dist = bpm_256(seq_b, seq_a, len_b, len_a);
-        }
-        return (float)dist;
-#else
-        uint8_t dist = 0;
-        if(len_a < len_b){
-                int tmp_len = 0;
-                uint8_t* tmp = NULL;
-
-                tmp = seq_a;
-                seq_a = seq_b;
-                seq_b = tmp;
-
-                tmp_len = len_a;
-                len_a = len_b;
-                len_b = tmp_len;
+                dist = bpm_block(seq_b, seq_a, len_b, len_a);
         }
 
+        /* return  (float) dist / (float) MACRO_MIN( len_a, len_b); */
 
-
-
-        dist = UINT8_MAX;
-        /* dist = bpm(seq_a, seq_b, len_a, len_b); */
-        for(int i = 0; i < len_b;i+=64){
-                /* dist = MACRO_MIN(dist,bpm(seq_a, seq_b+i, len_a, len_b-i)); */
-                dist = dist + bpm(seq_a, seq_b+i, len_a, len_b-i);
-        }
-        /* dist =  dyn_256(seq_a, seq_b, len_a, len_b); */
-
-        /* if(len_a < 64 && len_b < 64){ /\* both are short  *\/ */
-        /*         dist = bpm(seq_a, seq_b, len_a, len_b); */
-        /* }else if(len_a >= 64 && len_b < 64){ /\* A is longer *\/ */
-        /*         dist = bpm(seq_a, seq_b, len_a, len_b); */
-        /*         /\* int mida = len_a / 2 - 32; *\/ */
-        /*         /\* dist += bpm(seq_a+mida, seq_b, MACRO_MIN(64,len_a - mida), len_b); *\/ */
-        /*         /\* dist += bpm(seq_a+len_a-64, seq_b, 64, len_b); *\/ */
-        /*         /\* dist = dist / 3; *\/ */
-        /* }else if(len_a < 64 && len_b >= 64){ /\* b is longer *\/ */
-        /*         dist = bpm(seq_b, seq_a, len_b, len_a); */
-        /*         /\* int midb = len_b / 2 - 32; *\/ */
-        /*         /\* dist += bpm(seq_b+midb    , seq_a,  MACRO_MIN(64,len_b - midb), len_a); *\/ */
-        /*         /\* dist += bpm(seq_b+len_b-64, seq_a, 64, len_a); *\/ */
-        /*         /\* dist = dist / 3; *\/ */
-        /* }else if(len_a >= 64 && len_b >= 64){ /\* both long *\/ */
-        /*         dist = bpm(seq_a, seq_b, 64,64); */
-        /*         int mida = len_a / 2 - 32; */
-
-        /*         int midb = len_b / 2 - 32; */
-        /*         dist += bpm(seq_a+mida, seq_b+midb, MACRO_MIN(64,len_a - mida), MACRO_MIN(64,len_b-midb)); */
-        /*         dist += bpm(seq_b+len_b-64, seq_a+len_a-64, 64, 64); */
-        /*         dist = dist / 3; */
-        /* } */
-
+/* #ifdef HAVE_AVX2 */
+        /* uint8_t dist; */
         /* if(len_a > len_b){ */
-
-        /*         dist = bpm(seq_a, seq_b, len_a, len_b); */
-        /*         if(len_b > 64 && len_a > 64){ */
-        /*                 dist += bpm(seq_a+32, seq_b+32, len_a-32, len_b-32); */
-        /*         } */
-        /*         if(len_b > 96 && len_a > 96){ */
-        /*                 dist += bpm(seq_a+64, seq_b+64, len_a-64, len_b-64); */
-        /*         } */
-
+        /*         dist = bpm_256(seq_a, seq_b, len_a, len_b); */
         /* }else{ */
-        /*         dist = bpm(seq_b, seq_a, len_b, len_a); */
-        /*         if(len_a > 64 && len_b > 64){ */
-        /*                 dist += bpm(seq_b+32, seq_a+32, len_b-32, len_a-32); */
-        /*         } */
-        /*         if(len_a > 96 && len_b > 96){ */
-        /*                 dist += bpm(seq_b+64, seq_a+64, len_b-64, len_a-64); */
-        /*         } */
+        /*         dist = bpm_256(seq_b, seq_a, len_b, len_a); */
         /* } */
         return (float)dist;
-#endif
+/* #else */
+/*         uint8_t dist = 0; */
+/*         if(len_a < len_b){ */
+/*                 int tmp_len = 0; */
+/*                 uint8_t* tmp = NULL; */
+
+/*                 tmp = seq_a; */
+/*                 seq_a = seq_b; */
+/*                 seq_b = tmp; */
+
+/*                 tmp_len = len_a; */
+/*                 len_a = len_b; */
+/*                 len_b = tmp_len; */
+/*         } */
+
+        return (float)dist;
+/* #endif */
 }
 
 

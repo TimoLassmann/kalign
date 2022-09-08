@@ -677,7 +677,6 @@ struct node* upgma(float **dm,int* samples, int numseq)
                 for (j = numseq;j--;){
                         if (j != node_b){
                                 dm[node_a][j] = (dm[node_a][j] + dm[node_b][j])*0.5F + 0.001F;
-
                         }
                         //fprintf(stdout,"\n");
                 }

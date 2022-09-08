@@ -10,6 +10,9 @@
 //#include "esl_config.h"
 
 //#include "easel.h"
+
+#include "tldevel.h"
+#define ESL_STOPWATCH_IMPORT
 #include "esl_stopwatch.h"
 
 #define TRUE 1
@@ -217,6 +220,7 @@ ERROR:
         return FAIL;
 }
 
+
 int tl_stopwatch_Display(ESL_STOPWATCH *w)
 {
         char buf[128];	/* (safely holds up to 10^14 years; even I'll be dead by then) */
@@ -246,6 +250,11 @@ int tl_stopwatch_Display(ESL_STOPWATCH *w)
 double esl_stopwatch_GetElapsed(ESL_STOPWATCH *w)
 {
         return w->elapsed;
+}
+
+double tl_stopwatch_utime(ESL_STOPWATCH *w)
+{
+        return w->user;
 }
 
 

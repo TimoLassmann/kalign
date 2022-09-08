@@ -38,13 +38,17 @@
 #endif
 #endif
 
+#define SIGMA 13
+#define DIV_CEIL(a,b) (a == 0 ? 1 : a/b+(a%b == 0 ? 0 : 1))
+
+
 /* Must be called before bpm_256!!!!  */
 EXTERN  void set_broadcast_mask(void);
 
 EXTERN uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m);
 EXTERN uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m);
 
-
+EXTERN int bpm_block(const uint8_t *t, const uint8_t *p, int n, int m);
 EXTERN uint8_t dyn_256(const uint8_t* t,const uint8_t* p,int n,int m);
 #undef BPM_IMPORT
 #undef EXTERN

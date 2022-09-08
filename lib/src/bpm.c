@@ -19,11 +19,17 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 */
-#define BPM_IMPORT
+
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+
 #include "tldevel.h"
+#define BPM_IMPORT
 #include "bpm.h"
 #include  <stdalign.h>
 
+#include <string.h>
 #include "tlrng.h"
 
 
@@ -38,303 +44,6 @@ __m256i bitShiftRight256ymm (__m256i *data, int count);
 
 /* taken from Alexander Yee: http://www.numberworld.org/y-cruncher/internals/addition.html#ks_add */
  __m256i add256(uint32_t carry, __m256i A, __m256i B);
-#endif
-
-/* Below are test functions  */
-#ifdef BPM_UTEST
-
-#include <string.h>
-#include "alphabet.h"
-#include "esl_stopwatch.h"
-
-/* Functions needed for the unit test*/
-
-uint8_t dyn_256_print(const uint8_t* t,const uint8_t* p,int n,int m);
-int  mutate_seq(uint8_t* s, int len,int k,int L, struct rng_state* rng);
-
-#ifdef HAVE_AVX2
-/* For debugging */
-void print_256(__m256i X);
-void print_256_all(__m256i X);
-#endif
-
-/* The actual test.  */
-int bpm_test(void);
-
-int main(void)
-{
-
-        /* Important set_broadcast_mask has to be called before using bpm_256!!! */
-#ifdef HAVE_AVX2
-        set_broadcast_mask();
-#endif
-        RUN(bpm_test());
-        return EXIT_SUCCESS;
-ERROR:
-        return EXIT_FAILURE;
-}
-
-int bpm_test(void)
-{
-
-        /* idea: start with identical sequences add errors run bpm */
-        struct alphabet* alphabet = NULL;
-        struct rng_state* rng;
-        //long int r;
-        int len = 0;
-        int i,j,c;
-        uint8_t* a = NULL;
-        uint8_t* b = NULL;
-
-        int test_iter = 100;
-
-        int calc_errors = 0;
-        int total_calc = 0;
-        int dyn_score,bpm_score;
-
-        RUNP(rng = init_rng(0));
-
-        RUNP(alphabet = create_alphabet(ALPHA_redPROTEIN));
-
-        char seq[] = "MLLRNSFISQDENDDQLSPTQLGRAAIASSLPPEASLAIFEDLNSASRAIALDTELHMLYLVYFYKNSRAQIIQKIFKIYSIFILKKFKNLEPKFKKKISENITVHITNSIRKKQHFWHVTPINVSVWQECDWHHLFSIFSKLPSDHKRIAKLVGVSEKFILDQLQGRRNDKLLQIHIRFFSALALFDLISEMSIYEVSHKYRIPRGCLQTLQSQSATYAAMIVAFCLRLGWTYLKALLDGFATRLLFGVRSELSELVAIEGIDGQRARILHERGVTCLSHLSACDSSKLAHFLTLAVPYSSSNSNDGLGEWLFGEPRMRVDVAARTLKERARKVLIRRVQELGISVELPKFEENEENIQESCDSGLPDSCEGMEDELEEKENIVKMEEMTKSVTEMSLTDNTISFKSEDDLFKKEIKVEEDEVFIKKEIDEDEEEIVEETVIECLETSLLKLKASTDEVFLRRLSQTFSPIGRSRSILNNSLLEDSFDRPVPRSSIPILNFITPKRESPTPYFEDSFDRPIPGSLPISSSRRKSVLTNIANLDSSRRESINSNASDNNSFDVFVTPPTKSAKEEKRRIAVKHPRVGNIIYSPLTSSPVIKHPKLEINHFYLKDVCHDHNAWNLWTKSSTSTSSCSIRVSDDYTGIAIRTDAGNTFIPLLETFGGENSVPQFFKNISNFYVLKMPLKIFWKQPSPASKYFESFSKCIIPLNTRLEFLKTLAVTVEMYISSMEDAFLIFEKFGIKIFRLKVVRIAAYLNNVIDVEQEENSNFLPILMDRYSILDPEIRKTCSSSLHKAAVEVYSLKPIFEKMCCSGASLQLEMESCQTVLNIFYSGIVFDQALCNSFIYKIRKQIENLEENIWRLAYGKFNIHSSNEVANVLFYRLGLIYPETSGCKPKLRHLPTNKLILEQMNTQHPIVGKILEYRQIQHTLTQCLMPLAKFIGRIHCWFEMCTSTGRILTSVPNLQNVPKRISSDGMSARQLFIANSENLLIGADYKQLELRVLAHLSNDSNLVNLITSDRDLFEELSIQWNFPRDAVKQLCYGLIYGMGAKSLSELTRMSIEDAEKMLKAFFAMFPGVRSYINETKEKVCKEEPISTIIGRRTIIKASGIGEERARIERVAVNYTIQGSASEIFKTAIVDIESKIKEFGAQIVLTIHDEVLVECPEIHVAAASESIENCMQNALSHLLRVPMRVSMKTGRSWADLK";
-        len = strlen(seq);
-        if(len > 256){
-                len = 256;
-        }
-
-        MMALLOC(a , sizeof(uint8_t) * len) ;
-        MMALLOC(b , sizeof(uint8_t) * len) ;
-
-        for(i = 0;i < len;i++){
-                a[i] = alphabet->to_internal[(int)seq[i]];
-                b[i] =a[i];
-                //fprintf(stdout,"%d %d\n", a[i],b[i]);
-        }
-        //fprintf(stdout,"LEN: %d\n", len);
-
-
-        //LOG_MSG("Testing correctness of serial bpm.");
-//        len = 63;
-        calc_errors = 0;
-        total_calc = 0;
-        len =63; //could fix;
-        for(i = 0; i < 10;i++){
-                for (j =0 ; j < test_iter; j++){
-                        RUN(mutate_seq(b,len,i,alphabet->L,rng));
-                        dyn_score = dyn_256(a,b,len,len);
-                        bpm_score = bpm(a,b,len,len);
-
-                        if( abs( dyn_score - bpm_score) != 0){
-                                fprintf(stdout,"Scores differ: %d (dyn) %d (bpm) (%d out of %d)\n", dyn_score,bpm_score, calc_errors , total_calc);
-                                calc_errors++;
-                        }
-                        /* restore sequence b */
-                        for(c = 0;c < len;c++){
-                                b[c] = a[c];
-                        }
-
-                        total_calc++;
-                }
-
-        }
-        //fprintf(stdout,"%d errors out of %d\n", calc_errors , total_calc);
-        //LOG_MSG("Testing correctness of AVX bpm.");
-        len = strlen(seq);
-        if(len > 255){
-                len = 255;
-        }
-//        len = 63;
-        calc_errors = 0;
-        total_calc = 0;
-        for(i = 0; i < 10;i++){
-                for (j =0 ; j < test_iter; j++){
-                        RUN(mutate_seq(b,len,i,alphabet->L,rng));
-                        dyn_score = dyn_256(a,b,len,len);
-#ifdef HAVE_AVX2
-                        bpm_score = bpm_256(a,b,len,len);
-#else
-                        bpm_score = dyn_score;
-#endif
-                        if( abs( dyn_score - bpm_score) != 0){
-                                fprintf(stdout,"Scores differ: %d (dyn) %d (bpm) (%d out of %d)\n", dyn_score,bpm_score, calc_errors , total_calc);
-                                calc_errors++;
-                        }
-                        /* restore sequence b */
-                        for(c = 0;c < len;c++){
-                                b[c] = a[c];
-                        }
-
-                        total_calc++;
-                }
-
-        }
-        //fprintf(stdout,"%d errors out of %d\n", calc_errors , total_calc);
-
-
-        len = strlen(seq);
-        if(len > 255){
-                len = 255;
-        }
-
-
-
-
-        /* double dyn_timing; */
-        /* double bpm_timing; */
-        int timing_iter = 100;
-        //fprintf(stdout,"Dyn\tAVX\tDYN/AVX\n");
-        DECLARE_TIMER(t);
-
-        START_TIMER(t);
-        for(i = 0; i < 100;i+=10){
-                RUN(mutate_seq(b,len,i,alphabet->L,rng));
-
-                for(j = 0; j < timing_iter;j++){
-                        dyn_score = dyn_256(a,b,len,len);
-                }
-                //dyn_timing = GET_TIMING(t);
-        }
-        STOP_TIMER(t);
-        GET_TIMING(t);
-
-        START_TIMER(t);
-        for(i = 0; i < 100;i+=10){
-                RUN(mutate_seq(b,len,i,alphabet->L,rng));
-
-#ifdef HAVE_AVX2
-                for(j = 0; j < timing_iter;j++){
-                        bpm_score = bpm_256(a,b,len,len);
-                }
-#else
-                bpm_score = dyn_score;
-#endif
-
-
-                //ASSERT(dyn_score == bpm_score, "Scores differ: %d %d.",dyn_score, bpm_score);
-                //fprintf(stdout,"%f\t%f\t%f\n",dyn_timing,bpm_timing,  dyn_timing / bpm_timing);
-
-                /* restore seq */
-                for(j = 0;j < len;j++){
-                        b[j] = a[j];
-                }
-        }
-        STOP_TIMER(t);
-        GET_TIMING(t);
-        DESTROY_TIMER(t);
-        MFREE(alphabet);
-        MFREE(a);
-        MFREE(b);
-        MFREE(rng);
-        return OK;
-ERROR:
-        return FAIL;
-}
-
-int mutate_seq(uint8_t* s, int len,int k,int L, struct rng_state* rng)
-{
-        int i,j;
-        int r;
-
-        for(i = 0; i < k;i++){
-                r = tl_random_int(rng,len);
-
-                j = r;
-                r = tl_random_int(rng,L);
-                s[j] = r;
-        }
-        return OK;
-
-}
-
-
-
-uint8_t dyn_256_print(const uint8_t* t,const uint8_t* p,int n,int m)
-{
-        uint8_t* prev = NULL;
-        uint8_t* cur = NULL;
-
-        uint8_t* tmp = NULL;
-        int i,j,c;
-
-        MMALLOC(prev, sizeof(uint8_t)* 257);
-        MMALLOC(cur, sizeof(uint8_t)* 257);
-        cur[0] = 0;
-        fprintf(stdout,"%d ", cur[0]);
-        for(j = 1; j <= m;j++){
-                cur[j] = cur[j-1] +1;
-                fprintf(stdout,"%d ", cur[j]);
-        }
-        fprintf(stdout,"\n");
-        tmp  = cur;
-        cur = prev;
-        prev = tmp;
-
-        for(i = 1; i <= n;i++){
-                cur[0] = prev[0];
-                fprintf(stdout,"%d ", cur[0]);
-                for(j = 1; j < m;j++){
-                        c = 1;
-                        if(t[i-1] == p[j-1]){
-                                c = 0;
-
-                        }
-                        cur[j] = prev[j-1] +c ;
-
-                        cur[j] = MACRO_MIN(cur[j], prev[j]+1);
-                        cur[j] = MACRO_MIN(cur[j], cur[j-1]+1);
-                        fprintf(stdout,"%d ", cur[j]);
-                }
-                j =m;
-                c = 1;
-                if(t[i-1] == p[j-1]){
-                        c = 0;
-
-                }
-                cur[j] = prev[j-1] +c ;
-
-                cur[j] = MACRO_MIN(cur[j], prev[j]);
-                cur[j] = MACRO_MIN(cur[j], cur[j-1]+1);
-
-
-
-                fprintf(stdout,"%d ", cur[j]);
-
-                fprintf(stdout,"\n");
-                tmp  = cur;
-                cur = prev;
-                prev = tmp;
-
-        }
-        c = prev[m];
-        MFREE(prev);
-        MFREE(cur);
-        return c;
-ERROR:
-        return 255;
-
-}
-
-#ifdef HAVE_AVX2
-void print_256(__m256i X)
-{
-        alignas(32) uint64_t debug[4];
-        _mm256_store_si256( (__m256i*)& debug,X);
-        fprintf(stdout,"%lu ", debug[0]);
-}
-
-
-void print_256_all(__m256i X)
-{
-        alignas(32) uint64_t debug[4];
-        _mm256_store_si256( (__m256i*)& debug,X);
-        int i;
-        for(i = 0; i < 4;i++){
-                fprintf(stdout,"%lu ", debug[i]);
-        }
-        fprintf(stdout,"\n");
-}
-
-#endif
 #endif
 
 
@@ -402,7 +111,6 @@ ERROR:
         return 255;
 
 }
-
 
 uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m)
 {
@@ -664,3 +372,236 @@ __m256i bitShiftRight256ymm (__m256i *data, int count)
         return carryOut;
 }
 #endif
+
+
+
+int bpm_block(const uint8_t *t, const uint8_t *p, int n, int m)
+{
+        int32_t w;
+        int32_t w_bytes;
+        int32_t b_max;
+        int32_t maxd;
+        int32_t k;
+        int32_t W;
+        uint64_t HIGH_BIT;
+        uint64_t ONE = 1;
+
+        if(m > 1024){
+                m = 1024;
+        }
+
+        w_bytes = sizeof(uint64_t);
+        w =  w_bytes * 8;
+        b_max = DIV_CEIL(m,w);
+        HIGH_BIT = ONE << (w - 1);
+
+        W = w * b_max - m;
+        
+
+        k = m;
+        maxd = m;
+
+        /* Precompute  */
+
+        uint64_t Peq[13][16] = {
+                {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0},
+                {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0},
+                {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0},
+                {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0},
+                {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0},
+                {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0},
+                {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0},
+                {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0},
+                {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0},
+                {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0},
+                {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0},
+                {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0},
+                {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0}
+        };
+
+
+        uint64_t P[16] = {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0};
+        uint64_t M[16] = {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0};
+
+        int32_t score[16] = {0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0};
+
+
+
+        /* m = 1024; *- > 16 */
+        /* w_bytes = sizeof(uint64_t); */
+        /* w =  w_bytes * 8; */
+
+        /* b_max = DIV_CEIL(m,w); */
+        /* LOG_MSG("%d -> %d",m,b_max); */
+        /* W = w * b_max - m; */
+        HIGH_BIT = ONE << (w - 1);
+        /* MMALLOC(score,b_max * sizeof(int32_t)); */
+        /* MMALLOC(P ,b_max * w_bytes); */
+        /* MMALLOC(M ,b_max * w_bytes); */
+
+        /* MMALLOC(Peq,SIGMA * sizeof(uint64_t *)); */
+
+        for (int c = 0; c < SIGMA; c++) {
+                /* Peq[c] = NULL; */
+                /* MMALLOC(Peq[c], b_max*w_bytes); */
+                /* Peq[c] = (uint64_t *) malloc(b_max*w_bytes); */
+
+                /* memset(Peq[c], 0, b_max*w_bytes); */
+                for (int32_t block = 0; block < b_max; block++) {
+                        uint64_t bitPos = (uint64_t) 1;
+                        for (int32_t i = block * w; i < (block + 1) * w; ++i) {
+                                // fill the remainder after the last block with 1 (>m matches anything)
+                                if (i >= m || p[i] == c) {
+                                        Peq[c][block] |= bitPos;
+                                }
+                                /* if (i >= m ){ */
+                                /*         LOG_MSG("Am filling %d",i); */
+                                /* } */
+                                bitPos <<= 1;
+                        }
+                }
+        }
+
+        int y = DIV_CEIL(maxd, w) - 1; /* 256 is max edit distance  */
+        /* init blocks  */
+        for (int b = 0; b <= y; b++) {
+                /* bpm_init_block(s,b); */
+                P[b] = (uint64_t) -1;//Ones
+                M[b] = 0;
+                score[b] = (uint32_t)(b + 1) * w;
+        }
+
+        for (int i = 0; i < n+W; i++) {
+                /* LOG_MSG(" (%d)",i); */
+                uint8_t c = 0;
+                if(i >= n){
+                        /* seq padding  */
+                        c = 0;
+                }else{
+                        c = (uint8_t)t[i];
+                }
+                /* LOG_MSG(" c: %d  (%d)", c,i); */
+                int carry = 0;
+
+                for (int b = 0; b <= y; b++) {
+                        /* LOG_MSG("y: %d c: %d b: %d n: %d m:%d",y, c,b,n,m); */
+                        uint64_t Pv = P[b];
+                        uint64_t Mv = M[b];
+                        uint64_t Eq = Peq[c][b];
+
+                        uint64_t Xv, Xh;
+                        uint64_t Ph, Mh;
+                        int hIn = carry;
+                        int h_out = 0;
+
+                        Xv = Eq | Mv;
+                        if (hIn < 0) {
+                                Eq |= ONE;
+                        }
+                        Xh = (((Eq & Pv) + Pv) ^ Pv) | Eq;
+
+                        Ph = Mv | (~(Xh | Pv));
+                        Mh = Pv & Xh;
+
+                        if (Ph & HIGH_BIT) {
+                                h_out += 1;
+                        }
+                        if (Mh & HIGH_BIT) {
+                                h_out -= 1;
+                        }
+
+                        Ph <<= 1;
+                        Mh <<= 1;
+
+                        if (hIn < 0) {
+                                Mh |= ONE;
+                        } else if (hIn > 0) {
+                                Ph |= ONE;
+                        }
+
+                        Pv = Mh | (~(Xv | Ph));
+                        Mv = Ph & Xv;
+
+                        P[b] = Pv;
+                        M[b] = Mv;
+
+                        carry = h_out;
+                        score[b] += carry;
+                }
+
+                if ((score[y] - carry <= maxd) && (y < (b_max - 1)) && ((Peq[c][y + 1] & ONE) || (carry < 0))) {
+                        y += 1;
+                        /* bpm_init_block(s,y); */
+                        P[y] = (uint64_t) -1;//Ones
+                        M[y] = 0;
+
+                        int b = y;
+
+                        uint64_t Pv = P[b];
+                        uint64_t Mv = M[b];
+                        uint64_t Eq = Peq[c][b];
+
+                        uint64_t Xv, Xh;
+                        uint64_t Ph, Mh;
+                        int hIn = carry;
+                        int h_out = 0;
+
+                        Xv = Eq | Mv;
+                        if (hIn < 0) {
+                                Eq |= ONE;
+                        }
+                        Xh = (((Eq & Pv) + Pv) ^ Pv) | Eq;
+
+                        Ph = Mv | (~(Xh | Pv));
+                        Mh = Pv & Xh;
+
+                        if (Ph & HIGH_BIT) {
+                                h_out += 1;
+                        }
+                        if (Mh & HIGH_BIT) {
+                                h_out -= 1;
+                        }
+
+                        Ph <<= 1;
+                        Mh <<= 1;
+
+                        if (hIn < 0) {
+                                Mh |= ONE;
+                        } else if (hIn > 0) {
+                                Ph |= ONE;
+                        }
+
+                        Pv = Mh | (~(Xv | Ph));
+                        Mv = Ph & Xv;
+
+                        P[b] = Pv;
+                        M[b] = Mv;
+
+                        /* carry = h_out; */
+
+
+
+
+                        score[y] = score[y - 1] + w - carry + h_out;//advanceBlock(s,y, c, carry);
+                } else {
+                        while (score[y] >= (maxd + w)) {
+                                if (y == 0) break;
+                                y -= 1;
+                                /* LOG_MSG("y in loop: %d", y); */
+                        }
+                }
+                if(score[y] < k){
+                        /* LOG_MSG("%d", s->score[y]); */
+                        k = score[y];
+                }
+
+
+                /* if (y == (b_max - 1) && s->score[y] <= maxd) { */
+                /*         assert(i - s->W >= 0); */
+                /*         /\* result->push_front(SearchResult(score[y], (uint32_t)(i - W))); *\/ */
+                /* } */
+        }
+        return k;
+}
+
+

@@ -27,6 +27,7 @@
 #endif
 
 #include "float.h"
+#include "tldevel.h"
 #include "tlrng.h"
 #include "esl_stopwatch.h"
 #define EUCLIDEAN_DIST_IMPORT

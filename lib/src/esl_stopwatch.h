@@ -7,17 +7,18 @@
 #ifndef eslSTOPWATCH_INCLUDED
 #define eslSTOPWATCH_INCLUDED
 
-#include "tldevel.h"
-//#include "esl_config.h"
-#ifndef kalign_extern
-#ifdef __cplusplus
-#define kalign_extern extern "C"
+#include <stdio.h>
+#ifdef ESL_STOPWATCH_IMPORT
+   #define EXTERN
 #else
-#define kalign_extern extern
+   #ifndef EXTERN
+      #ifdef __cplusplus
+         #define EXTERN extern "C"
+      #else
+         #define EXTERN extern
+      #endif
+   #endif
 #endif
-#endif
-
-
 
 #include <time.h>
 #ifdef HAVE_TIMES
@@ -51,16 +52,16 @@ typedef struct {
 } ESL_STOPWATCH;
 
 
-kalign_extern ESL_STOPWATCH *esl_stopwatch_Create(void);
-kalign_extern void           esl_stopwatch_Destroy(ESL_STOPWATCH *w);
+EXTERN ESL_STOPWATCH *esl_stopwatch_Create(void);
+EXTERN void           esl_stopwatch_Destroy(ESL_STOPWATCH *w);
 
-kalign_extern int esl_stopwatch_Start(ESL_STOPWATCH *w);
-kalign_extern int esl_stopwatch_Stop(ESL_STOPWATCH *w);
-kalign_extern int esl_stopwatch_Display(FILE *fp, ESL_STOPWATCH *w, char *prefix);
-kalign_extern int tl_stopwatch_Display(ESL_STOPWATCH *w);
-kalign_extern double esl_stopwatch_GetElapsed(ESL_STOPWATCH *w);
-
-kalign_extern int esl_stopwatch_Include(ESL_STOPWATCH *master, ESL_STOPWATCH *w);
+EXTERN int esl_stopwatch_Start(ESL_STOPWATCH *w);
+EXTERN int esl_stopwatch_Stop(ESL_STOPWATCH *w);
+EXTERN int esl_stopwatch_Display(FILE *fp, ESL_STOPWATCH *w, char *prefix);
+EXTERN int tl_stopwatch_Display(ESL_STOPWATCH *w);
+EXTERN double esl_stopwatch_GetElapsed(ESL_STOPWATCH *w);
+EXTERN double  tl_stopwatch_utime(ESL_STOPWATCH *w);
+EXTERN int esl_stopwatch_Include(ESL_STOPWATCH *master, ESL_STOPWATCH *w);
 
 
 #define DECLARE_TIMER(n)  ESL_STOPWATCH* timer_##n = esl_stopwatch_Create();
@@ -69,6 +70,12 @@ kalign_extern int esl_stopwatch_Include(ESL_STOPWATCH *master, ESL_STOPWATCH *w)
 #define STOP_TIMER(n)  esl_stopwatch_Stop(timer_##n);
 #define GET_TIMING(n) tl_stopwatch_Display(timer_##n);
 
+#define GET_ELAPSED(n) esl_stopwatch_GetElapsed(timer_##n);
+#define GET_USERTIME(n) tl_stopwatch_utime(timer_##n);
+
 #define DESTROY_TIMER(n)  esl_stopwatch_Destroy(timer_##n);
+
+#undef ESL_STOPWATCH_IMPORT
+#undef EXTERN
 
 #endif /*eslSTOPWATCH_INCLUDED*/

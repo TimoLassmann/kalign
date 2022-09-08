@@ -22,15 +22,18 @@
 
 #include "tldevel.h"
 #include "alphabet.h"
+#include <stdint.h>
 
 int create_default_protein(struct alphabet* a);
 int create_protein_BZX(struct alphabet* a);
 int create_default_DNA(struct alphabet* a);
-int create_reduced_protein(struct alphabet* a);
+int create_reduced_protein(struct alphabet *a);
+int create_reduced_protein2(struct alphabet* a);
 
 int clean_and_set_to_extern(struct alphabet* a);
 
-int merge_codes(struct alphabet*a,const int X, const int Y);
+static int merge_multiple(struct alphabet*a,char* p,int n);
+static int merge_codes(struct alphabet*a,const int X, const int Y);
 
 #ifdef UTEST_ALPHABET
 int print_alphabet(struct alphabet* a);
@@ -51,6 +54,11 @@ int main(void)
         MFREE(a);
 
         RUNP(a = create_alphabet(ALPHA_defDNA));
+
+        print_alphabet(a);
+        MFREE(a);
+
+        RUNP(a = create_alphabet(ALPHA_redPROTEIN2));
 
         print_alphabet(a);
         MFREE(a);
@@ -103,6 +111,10 @@ struct alphabet* create_alphabet(int type)
         }
         case ALPHA_redPROTEIN : {
                 create_reduced_protein(a);
+                break;
+        }
+        case ALPHA_redPROTEIN2 : {
+                create_reduced_protein2(a);
                 break;
         }
         default:
@@ -304,6 +316,80 @@ Martin Steinegger 1, 2, 3 and Johannes Söding 1 */
         return OK;
 
 }
+
+
+int create_reduced_protein2(struct alphabet* a)
+{
+        char aacode[20] = "ACDEFGHIKLMNPQRSTVWY";
+
+        int code;
+        int i;
+        code = 0;
+        for(i = 0; i < 20;i++){
+                a->to_internal[(int) aacode[i]] = code;
+                code++;
+        }
+        /* ambiguity codes  */
+        /* BZX  */
+
+        a->to_internal[(int) 'B'] = code;
+        code++;
+
+        a->to_internal[(int) 'Z'] = code;
+        code++;
+
+        a->to_internal[(int) 'X'] = code;
+        code++;
+
+        /* From  Clustering huge protein sequence sets in linear time
+Martin Steinegger 1, 2, 3 and Johannes Söding 1 */
+        /* The default alphabet with A = 13 merges (L,M), (I,V), (K,R), (E, Q), (A,S,T), (N, D) and (F,Y).*/
+
+        /*
+          AM
+          DEKNQRT
+          CFIV
+          GHTS
+          WLY
+        */
+
+        /* reduced codes */
+
+        merge_codes(a,'A','M');
+        /* DEKNQRP */
+        merge_multiple(a,"DEKNQRP",7);
+        /*CFIV*/
+        merge_multiple(a,"CFIV",4);
+        /*GHTS*/
+        merge_multiple(a,"GHTS",4);
+        /* WLY */
+        merge_multiple(a,"WLY",3);
+
+        merge_multiple(a,"BZX",3);
+
+        return OK;
+
+}
+
+
+int merge_multiple(struct alphabet*a,char* p,int n)
+{
+
+ 
+        // Declaring pointer to the
+        // argument list
+        int min = INT32_MAX;
+
+        for(int i = 0; i < n;i++){
+                min = MACRO_MIN(min,a->to_internal[(int)p[i]]);
+        }
+
+        for(int i = 0; i < n;i++){
+                a->to_internal[(int)p[i]] = min;
+        }
+        return OK;
+}
+
 
 int merge_codes(struct alphabet*a,const int X, const int Y)
 {
