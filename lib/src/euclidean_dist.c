@@ -55,6 +55,7 @@ int main(void)
         float** mat = NULL;
         double r;
         float d1;
+        float d2;
         int i,j,c;
         int max_iter = 10;
         int num_element = 128;
@@ -86,6 +87,7 @@ int main(void)
                 for(j = 0; j <= i;j++){
                         edist_serial(mat[i], mat[j], num_element, &d1);
                         edist_256(mat[i], mat[j], num_element, &d2);
+
                         if(fabsf(d1-d2) > 10e-6){
                                 ERROR_MSG("DIFFER: %d\t%d\t%f\t%f  (%e %e)\n", i,j,d1,d2, fabsf(d1-d2), FLT_EPSILON);
 

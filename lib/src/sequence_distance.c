@@ -179,34 +179,7 @@ float calc_distance(uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b)
         }else{
                 dist = bpm_block(seq_b, seq_a, len_b, len_a);
         }
-
-        /* return  (float) dist / (float) MACRO_MIN( len_a, len_b); */
-
-/* #ifdef HAVE_AVX2 */
-        /* uint8_t dist; */
-        /* if(len_a > len_b){ */
-        /*         dist = bpm_256(seq_a, seq_b, len_a, len_b); */
-        /* }else{ */
-        /*         dist = bpm_256(seq_b, seq_a, len_b, len_a); */
-        /* } */
         return (float)dist;
-/* #else */
-/*         uint8_t dist = 0; */
-/*         if(len_a < len_b){ */
-/*                 int tmp_len = 0; */
-/*                 uint8_t* tmp = NULL; */
-
-/*                 tmp = seq_a; */
-/*                 seq_a = seq_b; */
-/*                 seq_b = tmp; */
-
-/*                 tmp_len = len_a; */
-/*                 len_a = len_b; */
-/*                 len_b = tmp_len; */
-/*         } */
-
-        return (float)dist;
-/* #endif */
 }
 
 

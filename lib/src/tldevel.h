@@ -9,13 +9,19 @@
 #include <float.h>
 
 
-#ifndef kalign_extern
-#ifdef __cplusplus
-#define kalign_extern extern "C"
+#ifdef TLDEVEL_IMPORT
+#define EXTERN
 #else
-#define kalign_extern extern
+#ifdef __cplusplus
+#define EXTERN extern "C"
+#else
+#define EXTERN extern
 #endif
 #endif
+
+
+
+
 
 
 #define TLDEVEL_VERSION "1.0"
@@ -80,8 +86,8 @@
         }while (0)
 
 
-kalign_extern int nearly_equal_float(float a, float b);
-kalign_extern int nearly_equal_double(double a, double b);
+EXTERN int nearly_equal_float(float a, float b);
+EXTERN int nearly_equal_double(double a, double b);
 
 
 #define TLSAFE_EQ(X,Y) _Generic((X),                        \
@@ -145,8 +151,8 @@ kalign_extern int nearly_equal_double(double a, double b);
 
 /* g memory functions */
 
-kalign_extern int get_dim1(void* ptr, int* d);
-kalign_extern int get_dim2(void* ptr, int* d);
+EXTERN int get_dim1(void* ptr, int* d);
+EXTERN int get_dim2(void* ptr, int* d);
 
 /*
 #define VA_NUM_ARGS(...) VA_NUM_ARGS_IMPL(__VA_ARGS__, 5,4,3,2,1)
@@ -160,11 +166,11 @@ kalign_extern int get_dim2(void* ptr, int* d);
 
 
 #define FUNC_DEF(type)                                    \
-        kalign_extern int alloc_1D_array_size_ ##type (type **array, int dim1); \
-        kalign_extern int alloc_2D_array_size_ ##type (type ***array, int dim1,int dim2); \
-        kalign_extern void gfree_void_ ##type(type *a);          \
-        kalign_extern void free_1d_array_ ##type(type **array);  \
-        kalign_extern void free_2d_array_ ##type(type ***array);
+        EXTERN int alloc_1D_array_size_ ##type (type **array, int dim1); \
+        EXTERN int alloc_2D_array_size_ ##type (type ***array, int dim1,int dim2); \
+        EXTERN void gfree_void_ ##type(type *a);          \
+        EXTERN void free_1d_array_ ##type(type **array);  \
+        EXTERN void free_2d_array_ ##type(type ***array);
 
 FUNC_DEF(char)
 FUNC_DEF(int8_t)
@@ -180,8 +186,8 @@ FUNC_DEF(double)
 
 #undef FUNC_DEF
 
-kalign_extern int galloc_unknown_type_error (void* p, ...);
-kalign_extern int galloc_too_few_arg_error (void* p);
+EXTERN int galloc_unknown_type_error (void* p, ...);
+EXTERN int galloc_too_few_arg_error (void* p);
 
 #define p1(X) _Generic((X),                               \
                        default: galloc_too_few_arg_error  \
@@ -270,13 +276,16 @@ kalign_extern int galloc_too_few_arg_error (void* p);
 
 /* functions  */
 
-kalign_extern void error(const char *location, const char *format, ...);
-kalign_extern void warning(const char *location, const char *format, ...);
-kalign_extern void log_message( const char *format, ...);
+EXTERN void error(const char *location, const char *format, ...);
+EXTERN void warning(const char *location, const char *format, ...);
+EXTERN void log_message( const char *format, ...);
 
 
 
-kalign_extern const char* tldevel_version(void);
+EXTERN const char* tldevel_version(void);
+
+#undef TLDEVEL_IMPORT
+#undef EXTERN
 
 
 #endif

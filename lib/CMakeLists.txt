@@ -190,3 +190,17 @@ add_test(
   COMMAND alphabet_utest
   )
    
+add_executable(edist_utest
+  src/tldevel.c
+  src/tlrng.c
+  src/esl_stopwatch.c
+  src/euclidean_dist.c
+  )
+
+
+target_link_libraries(edist_utest PRIVATE m)
+set_target_properties(edist_utest PROPERTIES COMPILE_FLAGS "-DUTEST_EDIST")
+add_test(
+  NAME edist_utest
+  COMMAND edist_utest
+  )

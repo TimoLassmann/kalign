@@ -23,17 +23,19 @@
 #ifndef ALPHABET_H
 #define ALPHABET_H
 
-#ifndef kalign_extern
-#ifdef __cplusplus
-#define kalign_extern extern "C"
-#else
-#define kalign_extern extern
-#endif
-#endif
-
-/* #include "global.h" */
-
 #include <inttypes.h>
+
+#ifdef ALPHABET_IMPORT
+   #define EXTERN
+#else
+   #ifndef EXTERN
+      #ifdef __cplusplus
+         #define EXTERN extern "C"
+      #else
+         #define EXTERN extern
+      #endif
+   #endif
+#endif
 
 #define ALPHA_defPROTEIN 21
 #define ALPHA_ambigiousPROTEIN 23
@@ -51,8 +53,11 @@ struct alphabet{
         int L;
 };
 
+EXTERN struct alphabet* create_alphabet(int type);
+EXTERN int switch_alphabet(struct alphabet* a, int type);
 
-kalign_extern struct alphabet* create_alphabet(int type);
-kalign_extern int switch_alphabet(struct alphabet* a, int type);
+
+#undef ALPHABET_IMPORT
+#undef EXTERN
 
 #endif

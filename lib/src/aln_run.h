@@ -18,7 +18,6 @@ struct aln_tasks;
 struct msa;
 /* EXTERN int create_msa(struct msa* msa, struct aln_param* ap,struct aln_tasks* t); */
 
-/* kalign_extern int create_msa_serial_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t); */
 EXTERN int create_msa_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t);
 EXTERN int create_chaos_msa_serial(struct msa* msa, struct aln_param* ap,struct aln_tasks* t);
 EXTERN int create_msa_serial(struct msa* msa, struct aln_param* ap,struct aln_tasks* t);

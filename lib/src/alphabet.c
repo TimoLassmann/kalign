@@ -21,8 +21,11 @@
 */
 
 #include "tldevel.h"
-#include "alphabet.h"
 #include <stdint.h>
+
+#define ALPHABET_IMPORT
+#include "alphabet.h"
+
 
 int create_default_protein(struct alphabet* a);
 int create_protein_BZX(struct alphabet* a);
