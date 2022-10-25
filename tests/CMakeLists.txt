@@ -5,6 +5,7 @@ if (NOT TARGET kalign::kalign)
   add_subdirectory(${PROJECT_SOURCE_DIR}/lib build EXCLUDE_FROM_ALL)
 endif()
 
+
 # link to installed library 
 if (NOT TARGET kalign::kalign)
   find_package(kalign)

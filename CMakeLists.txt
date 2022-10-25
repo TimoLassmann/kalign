@@ -65,7 +65,7 @@ if(USE_OPENMP)
   find_package(OpenMP)
   if(OPENMP_FOUND OR OpenMP_FOUND)
      message(STATUS "OpenMP is enabled.")
-    add_definitions (-DHAVE_OPENMP)
+     add_definitions (-DHAVE_OPENMP)
   else(OPENMP_FOUND OR OpenMP_FOUND)
     message(STATUS "OpenMP not supported")
   endif(OPENMP_FOUND OR OpenMP_FOUND)
@@ -198,23 +198,24 @@ message(STATUS "OpenMP flags              : " ${OpenMP_C_FLAGS})
 #install(TARGETS kalign DESTINATION bin)
 
 # Package Generator  #######################################################
-# set(CPACK_PACKAGE_VENDOR "Timo Lassmann")
-# set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "AGP")
-# set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
-# set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
-# set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
-# set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYING")
-# # set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.org")
-# set(CPACK_SOURCE_GENERATOR "TGZ;ZIP")
-# set(CPACK_SOURCE_IGNORE_FILES
-#     /.git
-#     /GPATH
-#     /GTAGS
-#     /GRTAGS
-#     /.*build.*
-#     /.dir-locals.el
-#     /\\\\.DS_Store
-# )
-# include (CPack)
+set(CPACK_PACKAGE_VENDOR "Timo Lassmann")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Kalign")
+set(CPACK_PACKAGE_VERSION_MAJOR ${KALIGN_LIBRARY_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${KALIGN_LIBRARY_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH ${KALIGN_LIBRARY_VERSION_PATCH})
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYING")
+# set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.org")
+set(CPACK_SOURCE_GENERATOR "TGZ;ZIP")
+set(CPACK_SOURCE_IGNORE_FILES
+  /.cache
+  /.git
+  /GPATH
+  /GTAGS
+  /GRTAGS
+  /.*build.*
+  /.dir-locals.el
+  /\\\\.DS_Store
+  )
+include (CPack)
 
 
