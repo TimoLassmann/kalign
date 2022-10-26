@@ -11,8 +11,7 @@ endif()
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 
 
-configure_file ("${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in"
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/version.h" )
+configure_file ("${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in" "version.h")
 
 
 set(source_files
@@ -51,13 +50,16 @@ set(source_files
   # src/test.h
   )
 
-
-
-add_library(${PROJECT_NAME}_OBJ  OBJECT ${source_files})
+add_library(${PROJECT_NAME}_OBJ OBJECT ${source_files})
 
 if(OpenMP_C_FOUND)
-    target_link_libraries(${PROJECT_NAME}_OBJ PRIVATE OpenMP::OpenMP_C)
-endif()
+  target_link_libraries(${PROJECT_NAME}_OBJ PRIVATE OpenMP::OpenMP_C)
+endif(OpenMP_C_FOUND)
+
+target_include_directories(${PROJECT_NAME}_OBJ
+  PRIVATE
+  ${CMAKE_CURRENT_BINARY_DIR}
+  )
 
 add_library(${PROJECT_NAME})
 add_library(${NAMESPACE_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
@@ -105,6 +107,7 @@ target_include_directories(${PROJECT_NAME}
 target_include_directories(${PROJECT_NAME}
   PRIVATE
   src
+  
   )
 
 
@@ -113,13 +116,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE m)
 if(OpenMP_C_FOUND)
     target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_C)
 endif()
-
-
-
-
-
-
-
 
 
 add_library(${PROJECT_NAME}_static STATIC
@@ -139,10 +135,6 @@ set_target_properties(${PROJECT_NAME}_static PROPERTIES
     VISIBILITY_INLINES_HIDDEN 1
     )
 
-
-# Define headers for this library. PUBLIC headers are used for
-# compiling the library, and will be added to consumers' build
-# paths.
 target_include_directories(${PROJECT_NAME}_static
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -155,15 +147,11 @@ target_include_directories(${PROJECT_NAME}_static
   src
   )
 
-
 target_link_libraries(${PROJECT_NAME}_static PRIVATE m)
 
 if(OpenMP_C_FOUND)
     target_link_libraries(${PROJECT_NAME}_static PRIVATE OpenMP::OpenMP_C)
 endif()
-
-
-
 
 add_library(tldevel STATIC
   src/tldevel.c
@@ -237,15 +225,11 @@ add_executable(bpm_utest
   
   )
 target_link_libraries(bpm_utest PRIVATE m)
-# set_target_properties(bpm_utest PROPERTIES COMPILE_FLAGS "-DBPM_UTEST")
-
 
 add_test(
   NAME bpm_utest
   COMMAND bpm_utest
   )
-
-
 
 add_executable(alphabet_utest
   src/tldevel.c
@@ -272,5 +256,3 @@ add_test(
   NAME edist_utest
   COMMAND edist_utest
   )
-
-
