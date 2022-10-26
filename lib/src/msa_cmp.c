@@ -10,7 +10,7 @@
 
 static int compare_pair(char* seq1A, char* seq2A, char* seq1B, char* seq2B, int len_a, int len_b,float* score);
 
-int kalign_msa_compare(struct msa *r, struct msa *t, int cmp_type, float *score)
+int kalign_msa_compare(struct msa *r, struct msa *t,  float *score)
 {
         ASSERT(r != NULL, "No reference alignment");
         ASSERT(t != NULL, "No test alignment");

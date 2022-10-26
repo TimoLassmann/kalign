@@ -24,10 +24,10 @@
 #include <omp.h>
 #endif
 
-#ifdef HAVE_AVX2
-#include <xmmintrin.h>
-#include <mm_malloc.h>
-#endif
+/* #ifdef HAVE_AVX2 */
+/* #include <xmmintrin.h> */
+/* #include <mm_malloc.h> */
+/* #endif */
 
 
 
@@ -152,11 +152,11 @@ int build_tree_kmeans(struct msa* msa, int n_threads, struct aln_tasks** tasks)
                 }*/
         MFREE(root);
         for(i =0 ; i < msa->numseq;i++){
-#ifdef HAVE_AVX2
-                _mm_free(dm[i]);
-#else
+/* #ifdef HAVE_AVX2 */
+/*                 _mm_free(dm[i]); */
+/* #else */
                 MFREE(dm[i]);
-#endif
+/* #endif */
         }
         MFREE(dm);
         DESTROY_TIMER(timer);
@@ -405,19 +405,19 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
 
 
 
-#ifdef HAVE_AVX2
-        wr = _mm_malloc(sizeof(float) * num_var,32);
-        wl = _mm_malloc(sizeof(float) * num_var,32);
-        cr = _mm_malloc(sizeof(float) * num_var,32);
-        cl = _mm_malloc(sizeof(float) * num_var,32);
-        w = _mm_malloc(sizeof(float) * num_var,32);
-#else
+/* #ifdef HAVE_AVX2 */
+/*         wr = _mm_malloc(sizeof(float) * num_var,32); */
+/*         wl = _mm_malloc(sizeof(float) * num_var,32); */
+/*         cr = _mm_malloc(sizeof(float) * num_var,32); */
+/*         cl = _mm_malloc(sizeof(float) * num_var,32); */
+/*         w = _mm_malloc(sizeof(float) * num_var,32); */
+/* #else */
         MMALLOC(wr,sizeof(float) * num_var);
         MMALLOC(wl,sizeof(float) * num_var);
         MMALLOC(cr,sizeof(float) * num_var);
         MMALLOC(cl,sizeof(float) * num_var);
         MMALLOC(w,sizeof(float) * num_var);
-#endif
+/* #endif */
 
         if(*ret){
                 res = *ret;
@@ -462,11 +462,11 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                 //      fprintf(stdout,"%f %f  %f\n", cl[j],cr[j],w[j]);
         }
 
-#ifdef HAVE_AVX2
-        _mm_free(w);
-#else
+/* #ifdef HAVE_AVX2 */
+/*         _mm_free(w); */
+/* #else */
         MFREE(w);
-#endif
+/* #endif */
 
         /* check if cr == cl - we have identical sequences  */
         s = 0;
@@ -514,13 +514,13 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                         score = 0.0f;
                         for(i = 0; i < num_samples;i++){
                                 s = samples[i];
-#ifdef HAVE_AVX2
-                                edist_256(dm[s], cl, num_anchors, &dl);
-                                edist_256(dm[s], cr, num_anchors, &dr);
-#else
+/* #ifdef HAVE_AVX2 */
+/*                                 edist_256(dm[s], cl, num_anchors, &dl); */
+/*                                 edist_256(dm[s], cr, num_anchors, &dr); */
+/* #else */
                                 edist_serial(dm[s], cl, num_anchors, &dl);
                                 edist_serial(dm[s], cr, num_anchors, &dr);
-#endif
+/* #endif */
                                 score += MACRO_MIN(dl,dr);
 
                                 if(dr < dl){
@@ -589,17 +589,17 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                 }
         }
 
-#ifdef HAVE_AVX2
-        _mm_free(wr);
-        _mm_free(wl);
-        _mm_free(cr);
-        _mm_free(cl);
-#else
+/* #ifdef HAVE_AVX2 */
+/*         _mm_free(wr); */
+/*         _mm_free(wl); */
+/*         _mm_free(cr); */
+/*         _mm_free(cl); */
+/* #else */
         MFREE(wr);
         MFREE(wl);
         MFREE(cr);
         MFREE(cl);
-#endif
+/* #endif */
 
         res->nl =  num_l;
         res->nr =  num_r;

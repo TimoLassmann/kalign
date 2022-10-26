@@ -23,10 +23,10 @@
 
 #include "tldevel.h"
 #include <stdint.h>
-#ifdef HAVE_AVX2
-#include <xmmintrin.h>
-#include <mm_malloc.h>
-#endif
+/* #ifdef HAVE_AVX2 */
+/* #include <xmmintrin.h> */
+/* #include <mm_malloc.h> */
+/* #endif */
 
 #include "msa_struct.h"
 
@@ -69,9 +69,9 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
         int len_b;
 
         int i,j;
-#if HAVE_AVX2
-        set_broadcast_mask();
-#endif
+/* #if HAVE_AVX2 */
+/*         set_broadcast_mask(); */
+/* #endif */
 
         if(pair){
 
@@ -115,11 +115,11 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
 
                 for(i = 0; i < numseq;i++){
                         dm[i] = NULL;
-#ifdef HAVE_AVX2
-                        dm[i] = _mm_malloc(sizeof(float) * a,32);
-#else
+/* #ifdef HAVE_AVX2 */
+/*                         dm[i] = _mm_malloc(sizeof(float) * a,32); */
+/* #else */
                         MMALLOC(dm[i], sizeof(float) *a);
-#endif
+/* #endif */
 
                         for(j = 0; j < a;j++){
                                 dm[i][j] = 0.0F;

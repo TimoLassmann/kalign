@@ -11,7 +11,8 @@
 #endif
 #endif
 
-EXTERN int kalign_msa_compare(struct msa* r, struct msa* t, int cmp_type, float* score);
+struct msa;
+EXTERN int kalign_msa_compare(struct msa *r, struct msa *t,  float *score);
 
 #undef MSA_CMP_IMPORT
 #undef EXTERN

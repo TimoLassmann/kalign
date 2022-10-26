@@ -34,8 +34,6 @@
 
 
 #define OPT_SET 1
-
-
 #define OPT_SHOWW 5
 #define OPT_GPO 6
 #define OPT_GPE 7
@@ -52,7 +50,7 @@ static int run_kalign(struct parameters* param);
 static int print_kalign_header(void);
 static int print_kalign_help(char * argv[]);
 static int print_kalign_warranty(void);
-static int print_AVX_warning(void);
+/* static int print_AVX_warning(void); */
 
 
 
@@ -146,14 +144,14 @@ Bioinformatics, btz795, https://doi.org/10.1093/bioinformatics/btz795
         return OK;
 }
 
-int print_AVX_warning(void)
-{
-        fprintf(stdout,"\n");
-        fprintf(stdout,"WARNING: AVX2 instruction set not found!\n");
-        fprintf(stdout,"         Kalign will not run optimally.\n");
-        fprintf(stdout,"\n");
-        return OK;
-}
+/* int print_AVX_warning(void) */
+/* { */
+/*         fprintf(stdout,"\n"); */
+/*         fprintf(stdout,"WARNING: AVX2 instruction set not found!\n"); */
+/*         fprintf(stdout,"         Kalign will not run optimally.\n"); */
+/*         fprintf(stdout,"\n"); */
+/*         return OK; */
+/* } */
 
 
 int main(int argc, char *argv[])
@@ -258,9 +256,9 @@ int main(int argc, char *argv[])
                 print_kalign_header();
         }
 
-#ifndef HAVE_AVX2
-        RUN(print_AVX_warning());
-#endif
+/* #ifndef HAVE_AVX2 */
+/*         RUN(print_AVX_warning()); */
+/* #endif */
 
         if(showw){
                 print_kalign_warranty();
