@@ -22,13 +22,13 @@ configure_file ("${CMAKE_CURRENT_SOURCE_DIR}/version.h.in"
   "${CMAKE_CURRENT_SOURCE_DIR}/version.h" )
 
 
-add_executable(kalign-bin
-  
+add_executable(kalign-bin  
   run_kalign.c
   parameters.c
+  
   )
-
-target_link_libraries(kalign-bin PRIVATE tldevel kalign::kalign)
+# Link with static library.... 
+target_link_libraries(kalign-bin PRIVATE tldevel ${PROJECT_NAME}_static )
 
 set_target_properties(kalign-bin
   PROPERTIES OUTPUT_NAME kalign)
@@ -38,6 +38,8 @@ add_executable(kalignfmt
   run_reformat.c
   parameters.c
   )
+
+install(TARGETS kalign-bin DESTINATION bin)
 
 target_link_libraries(kalignfmt PRIVATE tldevel kalign::kalign)
 

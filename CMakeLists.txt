@@ -178,7 +178,6 @@ add_subdirectory(src)
 add_subdirectory(tests)
 
 MESSAGE(STATUS "Build type                : " ${CMAKE_BUILD_TYPE})
-MESSAGE(STATUS "Library Type              : " ${LIB_TYPE})
 MESSAGE(STATUS "Compiler flags            : " ${CMAKE_C_COMPILE_FLAGS})
 MESSAGE(STATUS "Compiler c debug flags    : " ${CMAKE_C_FLAGS_DEBUG})
 MESSAGE(STATUS "Compiler c release flags  : " ${CMAKE_C_FLAGS_RELEASE})
