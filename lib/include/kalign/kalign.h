@@ -44,7 +44,7 @@ EXTERN int reformat_settings_msa(struct msa *msa, int rename, int unalign);
 
 EXTERN int kalign_check_msa(struct msa* msa, int exit_on_error);
 
-EXTERN int kalign_msa_compare(struct msa *r, struct msa *t, int cmp_type, float *score);
+EXTERN int kalign_msa_compare(struct msa *r, struct msa *t, float *score);
 #undef KALIGN_IMPORT
 #undef EXTERN
 

@@ -39,7 +39,7 @@ make install
 
 The command line interface of Kalign accepts the following options:
 
-``` bash
+```bash
 Usage: kalign  -i <seq file> -o <out aln> 
 
 Options:
@@ -63,11 +63,11 @@ The `--type` option gives users more direct control over the alignment parameter
 
 - `protein`  : uses a the CorBLOSUM66_13plus substituion matrix (default for protein sequence)
 - `dna`      : default DNA parameters
-               - 5 match score 
-               - -4 mismatch score
-               - -8 gap open penalty
-               - -6 gap extension penalty 
-               - 0  terminal gap extension penalty
+  +  5 match score 
+  + -4 mismatch score
+  + -8 gap open penalty
+  + -6 gap extension penalty 
+  +  0 terminal gap extension penalty
 - `internal` : same as above but terminal gaps set to 8 to encourage gaps within the sequences. 
 - `rna`      : parameters optimised for RNA alignments.
 
@@ -77,51 +77,52 @@ The `--gpo`, `--gpe` and `--tgpe` options can be used to further fine tune the p
 
 Passing sequences via stdin:
 
-```
+```bash
 cat input.fa | kalign -f fasta > out.afa
 ```
 
 Combining multiple input files:
 
-```
+```bash
 kalign seqsA.fa seqsB.fa seqsC.fa -f fasta > combined.afa
 ```
 
 Align sequences and output the alignment in MSF format:
 
-```
+```bash
 kalign -i BB11001.tfa -f msf  -o out.msf
 ```
 
 Align sequences and output the alignment in clustal format:
 
-```
+```bash
 kalign -i BB11001.tfa -f clu -o out.clu
 ```
 
 Re-align sequences in an existing alignment:
 
-```
+```bash
 kalign -i BB11001.msf  -o out.afa
 ```
 
 Reformat existing alignment:
 
-```
+```bash
 kalign -i BB11001.msf -r afa -o out.afa
 ```
 
 # Kalign library 
 
-To incorporate Kalign into your projects you can link to the library like this: 
+To incorporate Kalign into your own projects you can link to the library like this: 
 
-```
+```cmake 
 find_package(kalign)
 target_link_libraries(<target> kalign::kalign)
 ```
 
 Alternatively, you can include the kalign code directly in your project and link with:
-```
+
+```cmake
 if (NOT TARGET kalign)
   add_subdirectory(<path_to_kalign>/kalign EXCLUDE_FROM_ALL)
 endif ()

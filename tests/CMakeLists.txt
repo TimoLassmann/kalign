@@ -10,11 +10,20 @@ if (NOT TARGET kalign::kalign)
   find_package(kalign)
 endif()
 
+add_executable(largebench
+  large_benchmark.c
+  )
+target_link_libraries(largebench tldevel  kalign::kalign)
+
 add_executable(kalign_io_test
   kalign_io_test.c
   )
 
 target_link_libraries(kalign_io_test kalign::kalign)
+
+
+
+
 
 add_executable(kalign_lib_test
   kalign_lib_test.c
@@ -29,6 +38,13 @@ target_link_libraries(kalign_cmp_test kalign::kalign)
 add_executable(kaligncpp
    kalign_lib_testCXX.cpp)
 target_link_libraries(kaligncpp kalign::kalign)
+
+add_test(
+  NAME C++Lib
+  COMMAND kaligncpp
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+
 
 #BB11001.tfa     
 add_test(

@@ -1,35 +1,27 @@
-#include "stdio.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "kalign/kalign.h"
 
 int main(int argc, char *argv[])
 {
         struct msa* msa = NULL;
+        if(argc <= 1){
+                fprintf(stdout,"no inputs\n");
+                return EXIT_SUCCESS;
+        }
 
-        fprintf(stdout,"inputs: %d\n", argc);
         for(int i = 1; i < argc;i++){
                 fprintf(stdout,"reading from %s\n", argv[i]);
                 kalign_read_input(argv[i], &msa,1);
         }
-
-        kalign_run(msa,1 , 0, -1, -1 , -1);
-
+        /* Align seqences */
+        kalign_run(msa,1 , -1, -1, -1 , -1);
+        /* write alignment in clustal format */
         kalign_write_msa(msa, "test.clu", "clu");
-
+        /* write alignment in aligned fasta format */
         kalign_write_msa(msa, "test.fa", "fasta");
-        /* struct msa* ref = NULL; */
-        /* for(int i = 1; i < argc;i++){ */
-        /*         /\* fprintf(stdout,"reading from %s\n", argv[i]); *\/ */
-        /*         kalign_read_input(argv[i], &ref,1); */
-        /* } */
-
-
-        /* float score = 0.0; */
-        /* kalign_msa_compare(ref, msa, 0 , &score); */
-
-        /* kalign_write_msa(msa, "test.clu", "clu"); */
-        /* kalign_write_msa(ref, "ref.clu", "clu"); */
-
+        /* cleaning up */
         kalign_free_msa(msa);
-        return 0;
+        return EXIT_SUCCESS;
 }

@@ -28,6 +28,7 @@ int kalign_msa_compare(struct msa *r, struct msa *t,  float *score)
         kalign_sort_msa(r);
         kalign_sort_msa(t);
 
+
         float s = 0.0;
         float c = 0.0;
 
@@ -38,8 +39,8 @@ int kalign_msa_compare(struct msa *r, struct msa *t,  float *score)
                                      r->sequences[j]->seq,
                                      t->sequences[i]->seq,
                                      t->sequences[j]->seq,
-                                     r->sequences[i]->len,
-                                     t->sequences[i]->len,
+                                     r->alnlen,
+                                     t->alnlen,
                                      &ps
                                 );
                         s += ps;
@@ -47,7 +48,6 @@ int kalign_msa_compare(struct msa *r, struct msa *t,  float *score)
                 }
         }
         s = s / c;
-
         *score = s;
 
         return OK;
@@ -125,8 +125,10 @@ int compare_pair(char* seq1A, char* seq2A, char* seq1B, char* seq2B, int len_a, 
                         codes2_B[p2] = -1;
                 }
         }
+        /* LOG_MSG("P1: %d P2: %d len b: %d", p1, p2,len_b); */
         /* fprintf(stdout,"%s\n%s\n",seq1A,seq2A); */
         /* fprintf(stdout,"%s\n%s\n",seq1B, seq2B); */
+        /* fprintf(stdout,"\n"); */
         d = 0.0;
         for(int i = 0; i <= p1;i++){
                 if(codes1_A[i] != codes1_B[i]){

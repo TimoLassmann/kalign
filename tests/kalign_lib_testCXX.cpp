@@ -22,25 +22,19 @@ int main() {
         
         char** aln = NULL;
         int aln_len = 0;
-
                 
-        kalign(inseq,L, numseq,4 , KALIGN_TYPE_DNA_INTERNAL, -1, -1 , -1, &aln, &aln_len);
-        // foo(22);
-
-        // fprintf(stdout,"Aligned:\n");
+        kalign(inseq,L, numseq,4 , KALIGN_TYPE_PROTEIN, -1, -1 , -1, &aln, &aln_len);
+        
         std::cout << "Aligned:\n";
         for(int i = 0; i < numseq;i++){
                 std::cout << aln[i] << "\n";
-                // fprintf(stdout,"%s\n", aln[i]);
+        
         }
         /* Free alignment  */
         for(int i = 0; i < numseq;i++){
                 // delete[] aln[i];
                 free(aln[i]);
         }
-        free(aln);
-
-        
-
+        free(aln);        
         delete[] L;
 }
