@@ -22,23 +22,6 @@ make test
 make install
 ```
 
-## Homebrew
-``` bash
-brew install brewsci/bio/kalign
-```
-
-## Developer version
-``` bash
-git clone https://github.com/TimoLassmann/kalign.git
-cd kalign
-mkdir build 
-cd build 
-cmake ..
-make 
-make test 
-make install
-```
-
 on macOS, install [brew](https://brew.sh/) then:
 
 ``` bash
@@ -54,20 +37,41 @@ make install
 
 # Usage
 
+The command line interface of Kalign accepts the following options:
 
 ``` bash
-Usage: kalign  -i <seq file> -o <out aln>
+Usage: kalign  -i <seq file> -o <out aln> 
 
 Options:
 
    --format           : Output format. [Fasta]
    --reformat         : Reformat existing alignment. [NA]
-   --version          : Print version and exit
+   --type             : Alignment type (rna, dna, internal). [rna]
+   --gpo              : Gap open penalty. [5.5]
+   --gpe              : Gap extension penalty. [2.0]
+   --tgpe             : Terminal gap extension penalty. [1.0]
+   --version (-V/-v)  : Prints version. [NA]
+
 ```
 
-Kalign expects the input to be a set of unaligned sequences in fasta format or aligned sequences in aligned fasta, MSF or clustal format. Kalign automatically detects whether the input sequences are protein, RNA or DNA.
 
-Since version 3.2.0 kalign supports passing sequence in via stdin and support alignment of sequences from multiple files.
+Kalign expects the input to be a set of unaligned sequences in fasta format or aligned sequences in aligned fasta, MSF or clustal format. If the sequences are already aligned, kalign will remove all gap characters and re-align the sequences. 
+
+By default, Kalign automatically detects whether the input sequences are protein or DNA and selects appropriate alignment parameters. 
+
+The `--type` option gives users more direct control over the alignment parameters. Currently there are four core options:
+
+- `protein`  : uses a the CorBLOSUM66_13plus substituion matrix (default for protein sequence)
+- `dna`      : default DNA parameters
+               - 5 match score 
+               - -4 mismatch score
+               - -8 gap open penalty
+               - -6 gap extension penalty 
+               - 0  terminal gap extension penalty
+- `internal` : same as above but terminal gaps set to 8 to encourage gaps within the sequences. 
+- `rna`      : parameters optimised for RNA alignments.
+
+The `--gpo`, `--gpe` and `--tgpe` options can be used to further fine tune the parameters.
 
 # Examples
 
@@ -107,6 +111,22 @@ Reformat existing alignment:
 kalign -i BB11001.msf -r afa -o out.afa
 ```
 
+# Kalign library 
+
+To incorporate Kalign into your projects you can link to the library like this: 
+
+```
+find_package(kalign)
+target_link_libraries(<target> kalign::kalign)
+```
+
+Alternatively, you can include the kalign code directly in your project and link with:
+```
+if (NOT TARGET kalign)
+  add_subdirectory(<path_to_kalign>/kalign EXCLUDE_FROM_ALL)
+endif ()
+target_link_libraries(<target> kalign::kalign)
+```
 # Benchmark results
 
 Here are some benchmark results. The code to reproduce these figures can be found at [here](scripts/benchmark.org).

@@ -281,8 +281,6 @@ int main(int argc, char *argv[])
                 }
         }
 
-
-
         RUN(check_msa_format_string(param->format));
 
         if(param->num_infiles == 0){
@@ -299,7 +297,6 @@ int main(int argc, char *argv[])
         }
 
         RUN(run_reformat(param));
-
 
         free_parameters(param);
         return EXIT_SUCCESS;

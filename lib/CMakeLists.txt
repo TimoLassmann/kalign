@@ -59,6 +59,7 @@ endif(OpenMP_C_FOUND)
 target_include_directories(${PROJECT_NAME}_OBJ
   PRIVATE
   ${CMAKE_CURRENT_BINARY_DIR}
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
   )
 
 add_library(${PROJECT_NAME})
@@ -109,7 +110,6 @@ target_include_directories(${PROJECT_NAME}
   src
   
   )
-
 
 target_link_libraries(${PROJECT_NAME} PRIVATE m)
 

@@ -1,5 +1,6 @@
 #include "tldevel.h"
 
+#include "kalign/kalign.h"
 #include "msa_struct.h"
 
 #define ALN_PARAM_IMPORT
@@ -30,19 +31,41 @@ int aln_param_init(struct aln_param **aln_param,int biotype , int n_threads, int
         }
         if(biotype == ALN_BIOTYPE_DNA){
                 /* include/kalign/ */
-                if(type == KALIGN_DNA){
+                switch (type) {
+                case KALIGN_TYPE_DNA:
                         set_subm_gaps_DNA(ap);
-                }else if(type == KALIGN_DNA_INTERNAL){
+                        break;
+                case KALIGN_TYPE_DNA_INTERNAL:
                         set_subm_gaps_DNA_internal(ap);
-                }else if(type == KALIGN_RNA){
+                        break;
+                case KALIGN_TYPE_RNA:
                         set_subm_gaps_RNA(ap);
-                }else{
-                        ERROR_MSG("DNA alignment type (%d) not recognised.");
+                        break;
+                case KALIGN_TYPE_PROTEIN:
+                        ERROR_MSG("Detected DNA sequences but --type protein option was selected.");
+                        break;
+                default:
+                        set_subm_gaps_RNA(ap);
+                        break;
                 }
-
         }else if(biotype == ALN_BIOTYPE_PROTEIN){
-                set_subm_gaps_CorBLOSUM66_13plus(ap);
-                /* set_subm_gaps(ap); */
+                switch (type) {
+                case KALIGN_TYPE_PROTEIN:
+                        set_subm_gaps_CorBLOSUM66_13plus(ap);
+                        break;
+                case KALIGN_TYPE_DNA:
+                        ERROR_MSG("Detected protein sequences but --type dna option was selected.");
+                        break;
+                case KALIGN_TYPE_DNA_INTERNAL:
+                        ERROR_MSG("Detected protein sequences but --type internal  option was selected.");
+                        break;
+                case KALIGN_TYPE_RNA:
+                        ERROR_MSG("Detected protein sequences but --type rna option was selected.");
+                        break;
+                default:
+                        set_subm_gaps_CorBLOSUM66_13plus(ap);
+                        break;
+                }
         }else{
                 ERROR_MSG("Unable to determine what alphabet to use.");
         }

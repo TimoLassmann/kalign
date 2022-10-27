@@ -31,8 +31,6 @@
 #include <unistd.h>
 #include <getopt.h>
 
-
-
 #define OPT_SET 1
 #define OPT_SHOWW 5
 #define OPT_GPO 6
@@ -50,9 +48,6 @@ static int run_kalign(struct parameters* param);
 static int print_kalign_header(void);
 static int print_kalign_help(char * argv[]);
 static int print_kalign_warranty(void);
-/* static int print_AVX_warning(void); */
-
-
 
 int print_kalign_help(char * argv[])
 {
@@ -66,11 +61,12 @@ int print_kalign_help(char * argv[])
         fprintf(stdout,"Options:\n\n");
 
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--format","Output format." ,"[Fasta]"  );
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--reformat","Reformat existing alignment." ,"[NA]"  );
+
+        /* fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--reformat","Reformat existing alignment." ,"[NA]"  ); */
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--type","Alignment type (rna, dna, internal)." ,"[rna]"  );
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpo","Gap open penalty." ,"[5.5]"  );
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpe","Gap extension penalty." ,"[2.0]"  );
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--tgpe","Terminal gap extension penalty." ,"[1.0]"  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpo","Gap open penalty." ,"[]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpe","Gap extension penalty." ,"[]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--tgpe","Terminal gap extension penalty." ,"[]");
 
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--version (-V/-v)","Prints version." ,"[NA]"  );
 
@@ -122,37 +118,13 @@ int print_kalign_header(void)
         fprintf(stdout,"\n");
         fprintf(stdout,"Please cite:\n");
 
-        /*        fprintf(stdout,"  Kalign 3: multiple sequence alignment of large data sets
-Timo Lassmann
-Bioinformatics, btz795, https://doi.org/10.1093/bioinformatics/btz795
-        */
         fprintf(stdout,"  Lassmann, Timo.\n");
         fprintf(stdout,"  \"Kalign 3: multiple sequence alignment of large data sets.\"\n");
         fprintf(stdout,"  Bioinformatics (2019) \n");
         fprintf(stdout,"  https://doi.org/10.1093/bioinformatics/btz795\n");
         fprintf(stdout,"\n");
-
-        /*fprintf(stdout,"  Lassmann, Timo, Oliver Frings, and Erik LL Sonnhammer.\n");
-        fprintf(stdout,"  \"Kalign2: high-performance multiple alignment of protein and\n");
-        fprintf(stdout,"  nucleotide sequences allowing external features.\"\n");
-        fprintf(stdout,"  Nucleic acids research 37.3 (2008): 858-865.\n");
-        fprintf(stdout,"\n");
-        fprintf(stdout,"  Lassmann, Timo, and Erik LL Sonnhammer. \"Kalign–an accurate and\n");
-        fprintf(stdout,"  fast multiple sequence alignment algorithm.\"\n  BMC bioinformatics 6.1 (2005): 298.\n");
-        fprintf(stdout,"\n");*/
-
         return OK;
 }
-
-/* int print_AVX_warning(void) */
-/* { */
-/*         fprintf(stdout,"\n"); */
-/*         fprintf(stdout,"WARNING: AVX2 instruction set not found!\n"); */
-/*         fprintf(stdout,"         Kalign will not run optimally.\n"); */
-/*         fprintf(stdout,"\n"); */
-/*         return OK; */
-/* } */
-
 
 int main(int argc, char *argv[])
 {
@@ -221,7 +193,7 @@ int main(int argc, char *argv[])
                 case OPT_GPE:
                         param->gpe = atof(optarg);
                         break;
-                case OPT_TGPE :
+                case OPT_TGPE:
                         param->tgpe = atof(optarg);
                         break;
                 case 'h':
@@ -255,10 +227,6 @@ int main(int argc, char *argv[])
         if(!param->dump_internal){
                 print_kalign_header();
         }
-
-/* #ifndef HAVE_AVX2 */
-/*         RUN(print_AVX_warning()); */
-/* #endif */
 
         if(showw){
                 print_kalign_warranty();
@@ -397,17 +365,18 @@ int set_aln_type(char* in, int* type )
         int t = 0;
         if(in){
                 if(strstr(in,"rna")){
-                        t = KALIGN_RNA;
+                        t = KALIGN_TYPE_RNA;
                 }else if(strstr(in,"dna")){
-                        t = KALIGN_DNA;
+                        t = KALIGN_TYPE_DNA;
                 }else if(strstr(in,"internal")){
-                        t = KALIGN_DNA_INTERNAL;
+                        t = KALIGN_TYPE_DNA_INTERNAL;
+                }else if(strstr(in,"protein")){
+                        t = KALIGN_TYPE_PROTEIN;
                 }else{
                         ERROR_MSG("In %s not recognized.",in);
                 }
-
         }else{
-                t = KALIGN_RNA;
+                t = KALIGN_TYPE_UNDEFINED;
         }
         *type = t;
         return OK;

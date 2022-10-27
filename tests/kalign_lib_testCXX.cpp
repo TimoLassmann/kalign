@@ -24,7 +24,7 @@ int main() {
         int aln_len = 0;
 
                 
-        kalign(inseq,L, numseq,4 , KALIGN_DNA_INTERNAL, -1, -1 , -1, &aln, &aln_len);
+        kalign(inseq,L, numseq,4 , KALIGN_TYPE_DNA_INTERNAL, -1, -1 , -1, &aln, &aln_len);
         // foo(22);
 
         // fprintf(stdout,"Aligned:\n");

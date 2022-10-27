@@ -6,9 +6,9 @@ if (NOT TARGET kalign::kalign)
 endif()
 
 # link to installed library 
-if (NOT TARGET kalign::kalign)
-  find_package(kalign)
-endif()
+# if (NOT TARGET kalign::kalign)
+#   find_package(kalign)
+# endif()
 
 if(NOT KALIGN_PACKAGE_NAME)
   set(KALIGN_PACKAGE_NAME ${CMAKE_PROJECT_NAME})
