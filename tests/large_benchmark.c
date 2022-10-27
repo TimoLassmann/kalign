@@ -29,6 +29,7 @@ struct aln_case {
         char* name;
         float score;
         int alloc_len;
+        int valid;
 };
 
 struct bench_collection {
@@ -37,6 +38,8 @@ struct bench_collection {
         int n_alloc;
 };
 
+
+static int run_test_aln(struct aln_case *tcase);
 static int bench_collection_add_case(struct bench_collection* b, char* dir, char* name);
 static int bench_collection_alloc(struct bench_collection **bench_collection, int n);
 static int bench_collection_resize(struct bench_collection *b);
@@ -134,14 +137,68 @@ int run_bench(struct parameters *p)
         RUN(process_dir(p, p->target_dir,b));
 
         for(int i = 0; i < b->n;i++){
-                LOG_MSG("Case %d: %s",i, b->l[i]->name);
+                struct aln_case *c = NULL;
+                c = b->l[i];
+                if(p->dryrun){
+                        LOG_MSG("DryRun: would run kalign on: %s",c->name );
+                }else{
+                        RUN(run_test_aln(c));
+
+                        if(p->verbose){
+                                LOG_MSG("Case %d:\t%-*s\t%d\t%f ",i, 20,c->name,c->valid, c->score);
+                        }
+                }
         }
-
-
+        fprintf(stdout,"Alignment,Score\n");
+        for(int i = 0; i < b->n;i++){
+                struct aln_case *c = NULL;
+                c = b->l[i];
+                if(c->valid){
+                        fprintf(stdout,"%s,%f\n",c->name,c->score);
+                }
+        }
         bench_collection_free(b);
         return OK;
 ERROR:
         bench_collection_free(b);
+        return FAIL;
+}
+
+int run_test_aln(struct aln_case *tcase)
+{
+        char path[MAX_PATH_LEN];
+        struct msa* r = NULL;
+        struct msa* t = NULL;
+
+        snprintf(path, MAX_PATH_LEN, "%s/%s",tcase->dir,tcase->name);
+
+        RUN(kalign_read_input(path, &t,1));
+
+        if(!t){
+                kalign_free_msa(t);
+                tcase->valid = 0;
+                return OK;
+        }
+        /* reference  */
+        RUN(kalign_read_input(path, &r,1));
+        kalign_run(t,16 , -1, -1, -1 , -1);
+
+
+
+        kalign_msa_compare(r, t, &tcase->score);
+        /* if(tcase->score >= 0.5){ */
+        /*         LOG_MSG("Ref:"); */
+        /*          kalign_write_msa(r, NULL , "clu"); */
+        /*          LOG_MSG("test:"); */
+        /*          kalign_write_msa(t, NULL , "clu"); */
+        /* } */
+        kalign_free_msa(r);
+        kalign_free_msa(t);
+
+        return OK;
+ERROR:
+        kalign_free_msa(r);
+        kalign_free_msa(t);
         return FAIL;
 }
 
@@ -207,17 +264,15 @@ int detect_likely_alignment(char *name, int *is_aln)
         int len = strnlen(name,MAX_PATH_LEN);
         int ret = 0;
         if(strncmp(name + len - 4, ".msf", 4) == 0){
-                LOG_MSG("%s is aln", name);
+                /* LOG_MSG("%s is aln", name); */
                 ret = 1;
         }else if(strncmp(name + len - 4, ".vie", 4) == 0){
-                LOG_MSG("%s is aln", name);
+                /* LOG_MSG("%s is aln", name); */
                 ret = 1;
         }
 
         *is_aln = ret;
         return OK;
-ERROR:
-        return FAIL;
 }
 
 
@@ -251,10 +306,10 @@ ERROR:
 
 int param_print(struct parameters *p)
 {
-        LOG_MSG("Running with:");
-        fprintf(stdout,"%*s%-*s: %s\n",3,"",MESSAGE_MARGIN-3,"-d", p->target_dir);
-        fprintf(stdout,"%*s%-*s: %d\n",3,"",MESSAGE_MARGIN-3,"-verbose", p->verbose);
-        fprintf(stdout,"%*s%-*s: %d\n",3,"",MESSAGE_MARGIN-3,"-dry-run", p->dryrun);
+
+        fprintf(stderr,"%*s%-*s: %s\n",3,"",MESSAGE_MARGIN-3,"-d", p->target_dir);
+        fprintf(stderr,"%*s%-*s: %d\n",3,"",MESSAGE_MARGIN-3,"-verbose", p->verbose);
+        fprintf(stderr,"%*s%-*s: %d\n",3,"",MESSAGE_MARGIN-3,"-dry-run", p->dryrun);
         return OK;
 
 }
@@ -395,6 +450,7 @@ int aln_case_alloc(struct aln_case **aln_case)
         a->name = NULL;
         a->dir = NULL;
         a->alloc_len = MAX_PATH_LEN;
+        a->valid  = 1;
         MMALLOC(a->dir, sizeof(char) * a->alloc_len);
         MMALLOC(a->name, sizeof(char) * a->alloc_len);
         a->score = -1.0;

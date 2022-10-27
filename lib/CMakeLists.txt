@@ -52,7 +52,7 @@ set(source_files
 
 add_library(${PROJECT_NAME}_OBJ OBJECT ${source_files})
 
-if(OpenMP_C_FOUND)
+if(OpenMP_C_FOUND)  
   target_link_libraries(${PROJECT_NAME}_OBJ PRIVATE OpenMP::OpenMP_C)
 endif(OpenMP_C_FOUND)
 

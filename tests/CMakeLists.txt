@@ -13,7 +13,7 @@ endif()
 add_executable(largebench
   large_benchmark.c
   )
-target_link_libraries(largebench tldevel  kalign::kalign)
+target_link_libraries(largebench tldevel   ${PROJECT_NAME}_static)
 
 add_executable(kalign_io_test
   kalign_io_test.c

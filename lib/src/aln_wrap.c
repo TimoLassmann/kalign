@@ -62,8 +62,13 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
         /* -LOG_MSG("L: %d  threads: %d",msa->L, n_threads); */
         /* Start the heavy lifting  */
         RUN(alloc_tasks(&tasks, msa->numseq));
+
+#ifdef HAVE_OPENMP
+        omp_set_num_threads(n_threads);
+#endif
         /* Build guide tree */
         RUN(build_tree_kmeans(msa,n_threads,&tasks));
+
 
         /* Convert to full alphabet after having converted to reduced alphabet for tree building above  */
         if(msa->biotype == ALN_BIOTYPE_PROTEIN){
@@ -79,13 +84,6 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
                            gpo,
                            gpe,
                            tgpe));
-        /* LOG_MSG("%f %f %f", ap->gpo, ap->gpe, ap->tgpe); */
-#ifdef HAVE_OPENMP
-        omp_set_num_threads(ap->nthreads);
-        int i = floor(log((double) ap->nthreads) / log(2.0)) + 2;
-        i = MACRO_MIN(i, 10);
-        omp_set_max_active_levels(i);
-#endif
 
         DECLARE_TIMER(t1);
         if(!msa->quiet){

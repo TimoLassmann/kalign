@@ -225,7 +225,9 @@ int main(int argc, char *argv[])
         }
 
         if(!param->dump_internal){
+                if(!param->quiet){
                 print_kalign_header();
+                }
         }
 
         if(showw){

@@ -417,7 +417,8 @@ static int aln_unknown_warning_message_gaps_but_len_diff(struct msa* msa)
                 }
         }
 
-        WARNING_MSG("BUT the presumably aligned sequences do not have the length.");
+        WARNING_MSG("BUT the presumably aligned sequences do not ");
+        WARNING_MSG("have the same length.                       ");
         WARNING_MSG("                                            ");
         WARNING_MSG("Kalign will remove the gap characters and   ");
         WARNING_MSG("align the sequences.                        ");

@@ -8,12 +8,29 @@
 #define MSA_CMP_IMPORT
 #include "msa_cmp.h"
 
-static int compare_pair(char* seq1A, char* seq2A, char* seq1B, char* seq2B, int len_a, int len_b,float* score);
+struct cmp_stats {
+        uint64_t ref_total_aligned_pairs;
+        uint64_t ref_total_gap_pairs;
+        uint64_t identical_aligned;
+        uint64_t identical_gaps;
+
+
+        uint64_t test_total_aligned_pairs;
+        uint64_t test_total_gap_pairs;
+};
+
+
+
+static int compare_pair(char *seq1A, char *seq2A, char *seq1B, char *seq2B,
+                        int len_a, int len_b, struct cmp_stats *stat);
 
 int kalign_msa_compare(struct msa *r, struct msa *t,  float *score)
 {
+        struct cmp_stats* stat = NULL;
         ASSERT(r != NULL, "No reference alignment");
         ASSERT(t != NULL, "No test alignment");
+
+
 
         if(r->aligned == ALN_STATUS_ALIGNED){
                 finalise_alignment(r);
@@ -28,34 +45,81 @@ int kalign_msa_compare(struct msa *r, struct msa *t,  float *score)
         kalign_sort_msa(r);
         kalign_sort_msa(t);
 
+        MMALLOC(stat, sizeof(struct cmp_stats));
+        stat->identical_gaps = 0;
 
-        float s = 0.0;
-        float c = 0.0;
+        stat->identical_aligned = 0;
+        stat->ref_total_gap_pairs = 0;
+        stat->ref_total_aligned_pairs = 0;
+
+        stat->test_total_gap_pairs = 0;
+        stat->test_total_aligned_pairs = 0;
+        /* float s = 0.0; */
+        /* float c = 0.0; */
 
         for(int i = 0; i < r->numseq;i++){
                 for(int j = i + 1; j < r->numseq;j++){
-                        float ps = 0.0;
                         compare_pair(r->sequences[i]->seq,
                                      r->sequences[j]->seq,
                                      t->sequences[i]->seq,
                                      t->sequences[j]->seq,
                                      r->alnlen,
                                      t->alnlen,
-                                     &ps
+                                     stat
                                 );
-                        s += ps;
-                        c += 1.0;
                 }
         }
-        s = s / c;
-        *score = s;
 
+
+        /* LOG_MSG("%ld %ld %ld %ld %ld %ld", */
+        /*         stat->ref_total_aligned_pairs, */
+        /*         stat->ref_total_gap_pairs, */
+        /*         stat->test_total_aligned_pairs, */
+        /*         stat->test_total_gap_pairs, */
+        /*         stat->identical_aligned, */
+        /*         stat->identical_gaps); */
+        double a;
+        double b;
+
+        /* Pairs of aligned (and unaligned) residues in common with reference
+         divided by number of pairs in reference */
+        a = (double) (stat->identical_aligned+ stat->identical_gaps );
+        b = (double) (stat->ref_total_aligned_pairs + stat->ref_total_gap_pairs);
+        /* LOG_MSG("Score: %f (%f / %f)", 100.0 * a  / b, a,b); */
+
+        /* Pairs of aligned residues in common with reference
+         divided by number of pairs in reference */
+        a = (double) (stat->identical_aligned);
+        b = (double) (stat->ref_total_aligned_pairs);
+        /* LOG_MSG("Score: %f (%f / %f)", 100.0 * a  / b, a,b); */
+
+        /* Pairs of aligned (and unaligned) residues in common with reference ,
+           divided by average number if pairs  */
+        a = (double) (stat->identical_aligned+ stat->identical_gaps );
+        b = (double)(stat->ref_total_aligned_pairs + stat->ref_total_gap_pairs + stat->test_total_aligned_pairs + stat->test_total_gap_pairs)/ 2.0;
+        /* LOG_MSG("Score: %f (%f / %f)", 100.0 * a  / b, a,b); */
+
+        /* Pairs of aligned residues in common with reference ,
+           divided by average number if pairs  */
+        a = (double) (stat->identical_aligned );
+        b = (double)(stat->ref_total_aligned_pairs   + stat->test_total_aligned_pairs) / 2.0;
+        /* LOG_MSG("Score: %f (%f / %f)", 100.0 * a  / b, a,b); */
+
+
+
+
+        /* LOG_MSG("ORG Score: %f", s); */
+        a = (double) (stat->identical_aligned+ stat->identical_gaps );
+        b = (double) (stat->ref_total_aligned_pairs + stat->ref_total_gap_pairs);
+        *score = 100.0 * a  / b;
+        /* exit(0); */
+        MFREE(stat);
         return OK;
 ERROR:
         return FAIL;
 }
 
-int compare_pair(char* seq1A, char* seq2A, char* seq1B, char* seq2B, int len_a, int len_b,float* score)
+int compare_pair(char* seq1A, char* seq2A, char* seq1B, char* seq2B, int len_a, int len_b,struct cmp_stats* stat)
 {
         int* codes1_A = NULL;
         int* codes2_A = NULL;
@@ -63,8 +127,6 @@ int compare_pair(char* seq1A, char* seq2A, char* seq1B, char* seq2B, int len_a, 
         int* codes1_B = NULL;
         int* codes2_B = NULL;
 
-        float s = 0.0;
-        float d = 0.0;
         int p1;
         int p2;
         int g1;
@@ -91,11 +153,15 @@ int compare_pair(char* seq1A, char* seq2A, char* seq1B, char* seq2B, int len_a, 
                         g2 = 1;
                 }
                 if(!g1 && ! g2){
+                        stat->ref_total_aligned_pairs++;
                         codes1_A[p1] = p2;
+                        stat->ref_total_aligned_pairs++;
                         codes2_A[p2] = p1;
                 }else if(!g1 && g2){
+                        stat->ref_total_gap_pairs++;
                         codes1_A[p1] = -1;
                 }else if(g1 && !g2){
+                        stat->ref_total_gap_pairs++;
                         codes2_A[p2] = -1;
                 }
         }
@@ -117,11 +183,15 @@ int compare_pair(char* seq1A, char* seq2A, char* seq1B, char* seq2B, int len_a, 
                         g2 = 1;
                 }
                 if(!g1 && ! g2){
+                        stat->test_total_aligned_pairs++;
                         codes1_B[p1] = p2;
+                        stat->test_total_aligned_pairs++;
                         codes2_B[p2] = p1;
                 }else if(!g1 && g2){
+                         stat->test_total_gap_pairs++;
                         codes1_B[p1] = -1;
                 }else if(g1 && !g2){
+                        stat->test_total_gap_pairs++;
                         codes2_B[p2] = -1;
                 }
         }
@@ -129,23 +199,43 @@ int compare_pair(char* seq1A, char* seq2A, char* seq1B, char* seq2B, int len_a, 
         /* fprintf(stdout,"%s\n%s\n",seq1A,seq2A); */
         /* fprintf(stdout,"%s\n%s\n",seq1B, seq2B); */
         /* fprintf(stdout,"\n"); */
-        d = 0.0;
+
         for(int i = 0; i <= p1;i++){
-                if(codes1_A[i] != codes1_B[i]){
-                        d += 1.0;
-                        /* LOG_MSG("%d %d %d", i, codes1_A[i], codes1_B[i]); */
+                if(codes1_A[i] != -1){
+                        if(codes1_A[i] == codes1_B[i]){
+                                stat->identical_aligned++;
+                        }
+                }else{
+                        if(codes1_A[i] == codes1_B[i]){
+                                stat->identical_gaps++;
+                        }
                 }
+                /* if(codes1_A[i] != codes1_B[i]){ */
+                /*         d += 1.0; */
+                /*         /\* LOG_MSG("%d %d %d", i, codes1_A[i], codes1_B[i]); *\/ */
+                /* } */
         }
         for(int i = 0; i <= p2;i++){
-                if(codes2_A[i] != codes2_B[i]){
-                        d += 1.0;
-                        /* LOG_MSG("%d %d %d (second seq)", i, codes1_A[i], codes1_B[i]); */
+                if(codes2_A[i] != -1){
+                        if(codes2_A[i] == codes2_B[i]){
+                                stat->identical_aligned++;
+                        }
+                }else{
+                        if(codes2_A[i] == codes2_B[i]){
+                                stat->identical_gaps++;
+                        }
                 }
+
+
+                /* if(codes2_A[i] != codes2_B[i]){ */
+                /*         d += 1.0; */
+                /*         /\* LOG_MSG("%d %d %d (second seq)", i, codes1_A[i], codes1_B[i]); *\/ */
+                /* } */
         }
 
-        s = d /(float)( p1 + p2);
+        /* s = d /(float)( p1 + p2); */
         /* LOG_MSG("score: %f", s); */
-        *score = s;
+        /* *score = s; */
         MFREE(codes1_A);
         MFREE(codes1_B);
         MFREE(codes2_A);

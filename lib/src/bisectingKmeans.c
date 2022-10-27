@@ -24,10 +24,10 @@
 #include <omp.h>
 #endif
 
-/* #ifdef HAVE_AVX2 */
-/* #include <xmmintrin.h> */
-/* #include <mm_malloc.h> */
-/* #endif */
+#ifdef HAVE_AVX2
+#include <xmmintrin.h>
+#include <mm_malloc.h>
+#endif
 
 
 
@@ -129,10 +129,15 @@ int build_tree_kmeans(struct msa* msa, int n_threads, struct aln_tasks** tasks)
         if(!msa->quiet){
                 LOG_MSG("Building guide tree.");
         }
+
         if(n_threads == 1){
                 RUN(bisecting_kmeans_serial(msa,&root, dm, samples, numseq));
         }else{
-                RUN(bisecting_kmeans_parallel(msa,&root, dm, samples, numseq));
+#ifdef HAVE_OPENMP
+#pragma omp parallel
+#pragma omp single nowait
+#endif
+                bisecting_kmeans_parallel(msa,&root, dm, samples, numseq);
         }
 
         STOP_TIMER(timer);
@@ -144,12 +149,12 @@ int build_tree_kmeans(struct msa* msa, int n_threads, struct aln_tasks** tasks)
         create_tasks(root, t);
 
 
-        /*exit(0);
-        ap->tree[0] = 1;
-        ap->tree = readbitree(root, ap->tree);
-        for (i = 0; i < (numseq*3);i++){
-                tree[i] = tree[i+1];
-                }*/
+        /* exit(0); */
+        /*ap->tree[0] = 1;
+          ap->tree = readbitree(root, ap->tree);
+          for (i = 0; i < (numseq*3);i++){
+          tree[i] = tree[i+1];
+          }*/
         MFREE(root);
         for(i =0 ; i < msa->numseq;i++){
 /* #ifdef HAVE_AVX2 */
@@ -169,7 +174,7 @@ int bisecting_kmeans_parallel(struct msa* msa, struct node** ret_n, float** dm,i
 {
         struct kmeans_result* res_tmp = NULL;
         struct kmeans_result* best = NULL;
-        struct kmeans_result** res_ptr = NULL;
+        /* struct kmeans_result** res = NULL; */
         struct node* n = NULL;
         int num_anchors = 0;
 
@@ -181,6 +186,7 @@ int bisecting_kmeans_parallel(struct msa* msa, struct node** ret_n, float** dm,i
         int* sr = NULL;
         int num_l,num_r;
 
+        /* LOG_MSG("num_samples: %d", num_samples); */
         num_anchors = MACRO_MIN(32, msa->numseq);
 
         if(num_samples < 100){
@@ -201,33 +207,63 @@ int bisecting_kmeans_parallel(struct msa* msa, struct node** ret_n, float** dm,i
 
         best = NULL;
         res_tmp = NULL;
+        struct kmeans_result* res[4];
 
-        MMALLOC(res_ptr, sizeof(struct kmeans_result*) * 4);
+        /* MMALLOC(res, sizeof(struct kmeans_result*) * 4); */
         for(i = 0; i < 4;i++){
-                res_ptr[i] = NULL;
+                res[i] = NULL;
         }
         tries = MACRO_MIN(tries, num_samples);
         int step = num_samples / tries;
         int change = 0;
         for(i = 0;i < tries;i += 4){
                 change = 0;
-#ifdef HAVE_OPENMP
-#pragma omp parallel for num_threads(4)
-#endif
-                for(j = 0; j < 4;j++){
-                        split(dm,samples,num_anchors, num_samples, (i+ j)*step, &res_ptr[j]);
-                }
 
+#ifdef HAVE_OPENMP
+#pragma omp task shared(dm,samples,num_anchors, num_samples,i,step,res)
+#endif
+                split(dm,samples,num_anchors, num_samples, (i)*step, &res[0]);
+#ifdef HAVE_OPENMP
+#pragma omp task shared(dm,samples,num_anchors, num_samples,i,step,res)
+#endif
+                split(dm,samples,num_anchors, num_samples, (i+ 1)*step, &res[1]);
+#ifdef HAVE_OPENMP
+#pragma omp task shared(dm,samples,num_anchors, num_samples,i,step,res)
+#endif
+                split(dm,samples,num_anchors, num_samples, (i+ 2)*step, &res[2]);
+#ifdef HAVE_OPENMP
+#pragma omp task shared(dm,samples,num_anchors, num_samples,i,step,res)
+#endif
+                split(dm,samples,num_anchors, num_samples, (i+ 3)*step, &res[3]);
+#ifdef HAVE_OPENMP
+#pragma omp taskwait
+#endif
+
+
+
+
+/* #ifdef HAVE_OPENMP */
+
+/* #pragma omp parallel for //num_threads(4) */
+/* /\* #endif *\/ */
+/*                 for(j = 0; j < 4;j++){ */
+/*                         split(dm,samples,num_anchors, num_samples, (i+ j)*step, &res[j]); */
+/*                 } */
+
+                /* for(j = 0; j < 4;j++){ */
+                /*         LOG_MSG("%d  %f %d %d",j, res[j]->score,res[j]->nl,res[j]->nr); */
+                /* } */
+                /* exit(0); */
                 for(j = 0; j < 4;j++){
                         if(!best){
                                 change++;
-                                best = res_ptr[j];
-                                res_ptr[j] = NULL;
+                                best = res[j];
+                                res[j] = NULL;
                         }else{
-                                if(best->score > res_ptr[j]->score){
+                                if(best->score > res[j]->score){
                                         res_tmp = best;
-                                        best = res_ptr[j];
-                                        res_ptr[j] = res_tmp;
+                                        best = res[j];
+                                        res[j] = res_tmp;
                                         /* LOG_MSG("Better!!! %f %f", res_tmp->score,best->score); */
 
                                         change++;
@@ -246,39 +282,35 @@ int bisecting_kmeans_parallel(struct msa* msa, struct node** ret_n, float** dm,i
 
         num_r = best->nr;
 
+        /* free_kmeans_results(res[0]); */
+        /* free_kmeans_results(res[1]); */
+        /* free_kmeans_results(res[2]); */
+        /* free_kmeans_results(res[3]); */
+
         for(i = 0; i < 4;i++){
-                free_kmeans_results(res_ptr[i]);
+                free_kmeans_results(res[i]);
         }
-        MFREE(res_ptr);
+        /* MFREE(res); */
         MFREE(best);
 
         MFREE(samples);
         n = alloc_node();
 
+/* #ifdef HAVE_OPENMP */
+/* #pragma omp parallel //num_threads(2) */
+/* #pragma omp single nowait */
 #ifdef HAVE_OPENMP
-#pragma omp parallel num_threads(2)
-        {
-#pragma omp single nowait
-                {
-                        //LOG_MSG("Done");
-
-#pragma omp task shared(msa,n,dm,num_anchors)
+#pragma omp task shared(msa,n,dm)
 #endif
-                        {
-                                bisecting_kmeans_parallel(msa,&n->left, dm, sl, num_l);
-                        }
+        bisecting_kmeans_parallel(msa,&n->left, dm, sl, num_l);
 
 #ifdef HAVE_OPENMP
 #pragma omp task shared(msa,n,dm,num_anchors)
 #endif
-                        {
-                                bisecting_kmeans_parallel(msa,&n->right, dm, sr, num_r);
-                        }
+        bisecting_kmeans_parallel(msa,&n->right, dm, sr, num_r);
 
 #ifdef HAVE_OPENMP
 #pragma omp taskwait
-                }
-        }
 #endif
 
         *ret_n =n;
@@ -405,19 +437,19 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
 
 
 
-/* #ifdef HAVE_AVX2 */
-/*         wr = _mm_malloc(sizeof(float) * num_var,32); */
-/*         wl = _mm_malloc(sizeof(float) * num_var,32); */
-/*         cr = _mm_malloc(sizeof(float) * num_var,32); */
-/*         cl = _mm_malloc(sizeof(float) * num_var,32); */
-/*         w = _mm_malloc(sizeof(float) * num_var,32); */
-/* #else */
+#ifdef HAVE_AVX2
+        wr = _mm_malloc(sizeof(float) * num_var,32);
+        wl = _mm_malloc(sizeof(float) * num_var,32);
+        cr = _mm_malloc(sizeof(float) * num_var,32);
+        cl = _mm_malloc(sizeof(float) * num_var,32);
+        w = _mm_malloc(sizeof(float) * num_var,32);
+#else
         MMALLOC(wr,sizeof(float) * num_var);
         MMALLOC(wl,sizeof(float) * num_var);
         MMALLOC(cr,sizeof(float) * num_var);
         MMALLOC(cl,sizeof(float) * num_var);
         MMALLOC(w,sizeof(float) * num_var);
-/* #endif */
+#endif
 
         if(*ret){
                 res = *ret;
@@ -462,11 +494,11 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                 //      fprintf(stdout,"%f %f  %f\n", cl[j],cr[j],w[j]);
         }
 
-/* #ifdef HAVE_AVX2 */
-/*         _mm_free(w); */
-/* #else */
+#ifdef HAVE_AVX2
+        _mm_free(w);
+#else
         MFREE(w);
-/* #endif */
+#endif
 
         /* check if cr == cl - we have identical sequences  */
         s = 0;
@@ -514,13 +546,13 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                         score = 0.0f;
                         for(i = 0; i < num_samples;i++){
                                 s = samples[i];
-/* #ifdef HAVE_AVX2 */
-/*                                 edist_256(dm[s], cl, num_anchors, &dl); */
-/*                                 edist_256(dm[s], cr, num_anchors, &dr); */
-/* #else */
+#ifdef HAVE_AVX2
+                                edist_256(dm[s], cl, num_anchors, &dl);
+                                edist_256(dm[s], cr, num_anchors, &dr);
+#else
                                 edist_serial(dm[s], cl, num_anchors, &dl);
                                 edist_serial(dm[s], cr, num_anchors, &dr);
-/* #endif */
+#endif
                                 score += MACRO_MIN(dl,dr);
 
                                 if(dr < dl){
@@ -589,17 +621,17 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                 }
         }
 
-/* #ifdef HAVE_AVX2 */
-/*         _mm_free(wr); */
-/*         _mm_free(wl); */
-/*         _mm_free(cr); */
-/*         _mm_free(cl); */
-/* #else */
+#ifdef HAVE_AVX2
+        _mm_free(wr);
+        _mm_free(wl);
+        _mm_free(cr);
+        _mm_free(cl);
+#else
         MFREE(wr);
         MFREE(wl);
         MFREE(cr);
         MFREE(cl);
-/* #endif */
+#endif
 
         res->nl =  num_l;
         res->nr =  num_r;

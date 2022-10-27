@@ -50,6 +50,8 @@ int create_msa_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
         if(ap->nthreads == 1){
                 recursive_aln_serial(msa, t, ap, active, t->n_tasks-1);
         }else{
+#pragma omp parallel
+#pragma omp single nowait
                 recursive_aln_openMP(msa, t, ap, active, t->n_tasks-1);
         }
 #else
@@ -65,70 +67,70 @@ ERROR:
 }
 
 
-int create_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
-{
+/* int create_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tasks* t) */
+/* { */
 
-        int i,j,g,s;
-        struct aln_mem** m = NULL;
+/*         int i,j,g,s; */
+/*         struct aln_mem** m = NULL; */
 
-        #ifdef HAVE_OPENMP
-        int n_threads =  omp_get_max_threads();
-        #else
-        int n_threads = 1;
-        #endif
+/* #ifdef HAVE_OPENMP */
+/*         int n_threads =  omp_get_max_threads(); */
+/* #else */
+/*         int n_threads = 1; */
+/* #endif */
 
-        MMALLOC(m, sizeof(struct aln_mem*) * n_threads);
-        for(i = 0; i < n_threads;i++){
-                m[i] = NULL;
-                RUN(alloc_aln_mem(&m[i], 2048));
-                m[i]->ap = ap;
-                m[i]->mode = ALN_MODE_FULL;
-        }
-        //LOG_MSG(" Allocated %d threads", n_threads);
-        s = 0;
+/*         MMALLOC(m, sizeof(struct aln_mem*) * n_threads); */
+/*         for(i = 0; i < n_threads;i++){ */
+/*                 m[i] = NULL; */
+/*                 RUN(alloc_aln_mem(&m[i], 2048)); */
+/*                 m[i]->ap = ap; */
+/*                 m[i]->mode = ALN_MODE_FULL; */
+/*         } */
+/*         //LOG_MSG(" Allocated %d threads", n_threads); */
+/*         s = 0; */
 
-        g = t->list[0]->p;
+/*         g = t->list[0]->p; */
 
-        RUN(sort_tasks(t, TASK_ORDER_PRIORITY));
+/*         RUN(sort_tasks(t, TASK_ORDER_PRIORITY)); */
 
-        for(i = 0; i < t->n_tasks;i++){
-                if(t->list[i]->p != g){
-                        #ifdef HAVE_OPENMP
-#pragma omp parallel for shared(msa,t,m,s,i) private(j)
-                        #endif
-                        for(j = s; j < i;j++){
-                                #ifdef HAVE_OPENMP
-                                int tid = omp_get_thread_num();
-                                #else
-                                int tid = 1;
-                                #endif
-                                do_align(msa,t,m[tid],j);
-                        }
-                        //fprintf(stdout,"\n");
-                        g = t->list[i]->p;
-                        s = i;
-                }
-        }
-        for(j = s; j < i;j++){
-                //fprintf(stdout,"%3d %3d -> %3d (p: %d)\n", t->list[j]->a, t->list[j]->b, t->list[j]->c, t->list[j]->p);
-                do_align(msa,t,m[0],j);
-        }
+/*         for(i = 0; i < t->n_tasks;i++){ */
+/*                 if(t->list[i]->p != g){ */
+/*                         #ifdef HAVE_OPENMP */
+/* #pragma omp parallel for shared(msa,t,m,s,i) private(j) */
+/*                         #endif */
+/*                         for(j = s; j < i;j++){ */
+/*                                 #ifdef HAVE_OPENMP */
+/*                                 int tid = omp_get_thread_num(); */
+/*                                 #else */
+/*                                 int tid = 1; */
+/*                                 #endif */
+/*                                 do_align(msa,t,m[tid],j); */
+/*                         } */
+/*                         //fprintf(stdout,"\n"); */
+/*                         g = t->list[i]->p; */
+/*                         s = i; */
+/*                 } */
+/*         } */
+/*         for(j = s; j < i;j++){ */
+/*                 //fprintf(stdout,"%3d %3d -> %3d (p: %d)\n", t->list[j]->a, t->list[j]->b, t->list[j]->c, t->list[j]->p); */
+/*                 do_align(msa,t,m[0],j); */
+/*         } */
 
-        for(i = 0; i < n_threads;i++){
-                free_aln_mem(m[i]);
-        }
-        MFREE(m);
-        return OK;
-ERROR:
-        if(m){
-                for(i = 0; i < n_threads;i++){
-                        free_aln_mem(m[i]);
-                }
-                MFREE(m);
+/*         for(i = 0; i < n_threads;i++){ */
+/*                 free_aln_mem(m[i]); */
+/*         } */
+/*         MFREE(m); */
+/*         return OK; */
+/* ERROR: */
+/*         if(m){ */
+/*                 for(i = 0; i < n_threads;i++){ */
+/*                         free_aln_mem(m[i]); */
+/*                 } */
+/*                 MFREE(m); */
 
-        }
-        return FAIL;
-}
+/*         } */
+/*         return FAIL; */
+/* } */
 
 /* int create_chaos_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tasks* t) */
 /* { */
@@ -405,32 +407,27 @@ void recursive_aln_openMP(struct msa* msa, struct aln_tasks*t, struct aln_param*
 
         a = local_t->a - msa->numseq;
         b = local_t->b - msa->numseq;
-#ifdef HAVE_OPENMP
-#pragma omp parallel num_threads(2)
-        {
-#pragma omp single nowait
-                {
-#endif
-                        if(!active[local_t->a]){
+/* #ifdef HAVE_OPENMP */
+/* #pragma omp parallel num_threads(2) */
+/*         { */
+/* #pragma omp single nowait */
+/*                 { */
+/* #endif */
+        if(!active[local_t->a]){
 #ifdef HAVE_OPENMP
 #pragma omp task shared(msa,t,ap,active) firstprivate(a)
 #endif
-                                {
-                                        recursive_aln_openMP(msa, t, ap, active, a);
-                                }
-                        }
-                        if(!active[local_t->b]){
+                recursive_aln_openMP(msa, t, ap, active, a);
+        }
+        if(!active[local_t->b]){
 #ifdef HAVE_OPENMP
 #pragma omp task shared(msa,t,ap,active) firstprivate(b)
 #endif
-                                {
-                                        recursive_aln_openMP(msa, t, ap, active,b);
-                                }
-
-                        }
-#ifdef HAVE_OPENMP
-                }
+                recursive_aln_openMP(msa, t, ap, active,b);
         }
+#ifdef HAVE_OPENMP
+        /* } */
+        /* } */
 #pragma omp taskwait
 #endif
 

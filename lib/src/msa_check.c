@@ -83,22 +83,26 @@ int kalign_check_msa(struct msa* msa, int exit_on_error)
                 if(strncmp(*a[i-1]->name, *a[i]->name,MSA_NAME_LEN) == 0){
                         /* WARNING_MSG("Name: %s is duplicated", a[i]->name); */
                         if(a[i-1]->chksum == a[i]->chksum){
+                                if(!msa->quiet){
                                 LOG_MSG("Found duplicated sequence:\n%s checksum: %d\n%s checksum: %d\n",
                                         *a[i-1]->name,
                                         a[i-1]->chksum,
                                         *a[i]->name,
                                         a[i]->chksum);
+                                }
                                 a[i-1]->action = 1;
                                 a[i]->action = 1;
                                 if(exit_on_error){
                                         ERROR_MSG("Same seq with same name!");
                                 }
                         }else{
+                                if(!msa->quiet){
                                 WARNING_MSG("Found sequence pair with same name but different sequence:\n%s checksum: %d\n%s checksum: %d\n",
                                             *a[i-1]->name,
                                             a[i-1]->chksum,
                                             *a[i]->name,
                                             a[i]->chksum);
+                                }
 
                                 a[i-1]->action = 1;
                                 a[i]->action = 1;
@@ -132,11 +136,13 @@ int kalign_check_msa(struct msa* msa, int exit_on_error)
         qsort(a, msa->numseq, sizeof(struct sort_struct*),sort_by_chksum);
         for(i = 1; i < msa->numseq;i++){
                 if(a[i-1]->chksum == a[i]->chksum){
+                        if(!msa->quiet){
                         WARNING_MSG("Found identical sequences:\n%s checksum: %d\n%s checksum: %d\n",
                                     *a[i-1]->name,
                                     a[i-1]->chksum,
                                     *a[i]->name,
                                     a[i]->chksum);
+                        }
                 }
         }
         for(i = 0; i < msa->numseq;i++){
