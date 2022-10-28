@@ -15,13 +15,16 @@
 uint8_t dyn_256_print(const uint8_t* t,const uint8_t* p,int n,int m);
 int  mutate_seq(uint8_t* s, int len,int k,int L, struct rng_state* rng);
 
-/* #ifdef HAVE_AVX2 */
-/* #include <immintrin.h> */
+#ifdef HAVE_AVX2
+#include <immintrin.h>
 
-/* /\* For debugging *\/ */
-/* void print_256(__m256i X); */
-/* void print_256_all(__m256i X); */
-/* #endif */
+/* For debugging */
+void print_256(__m256i X);
+void print_256_all(__m256i X);
+#endif
+
+#define SIGMA 13
+#define DIV_CEIL(a,b) (a == 0 ? 1 : a/b+(a%b == 0 ? 0 : 1))
 
 
 struct bpm_struct {
@@ -240,9 +243,9 @@ int main(void)
 {
 
         /* Important set_broadcast_mask has to be called before using bpm_256!!! */
-/* #ifdef HAVE_AVX2 */
-/*         set_broadcast_mask(); */
-/* #endif */
+#ifdef HAVE_AVX2
+        set_broadcast_mask();
+#endif
         RUN(bpm_test());
         return EXIT_SUCCESS;
 ERROR:
@@ -303,7 +306,7 @@ int bpm_test(void)
         LOG_MSG("Testing correctness of serial bpm.");
 //        len = 63;
 
-        len =63; //could fix;
+        len = 63; //could fix;
         for(i = 0; i < len;i++){
                 for (j =0 ; j < test_iter; j++){
                         RUN(mutate_seq(b,len,i,alphabet->L,rng));
@@ -313,9 +316,9 @@ int bpm_test(void)
                         bb_score = bpm_block2(a,b,len,len, len);
                         bb_score2 = bpm_block(a,b,len,len);
 
-                        if(j == 0){
-                                LOG_MSG("k:%d %d %d %d %d",i,dyn_score,bpm_score, bb_score , bb_score2);
-                        }
+                        /* if(j == 0){ */
+                                /* LOG_MSG("k:%d %d %d %d %d",i,dyn_score,bpm_score, bb_score , bb_score2); */
+                        /* } */
                         if(dyn_score != bpm_score){
                                 diff[0][1]++;
                         }
@@ -367,19 +370,19 @@ int bpm_test(void)
                 for (j =0 ; j < test_iter; j++){
                         RUN(mutate_seq(b,len,i,alphabet->L,rng));
                         dyn_score = dyn_256(a,b,len,len);
-/* #ifdef HAVE_AVX2 */
-/*                         bpm_score = bpm_256(a,b,len,len); */
-/* #else */
+#ifdef HAVE_AVX2
+                        bpm_score = bpm_256(a,b,len,len);
+#else
                         bpm_score = dyn_score;
-/* #endif */
+#endif
 
 
                         bb_score = bpm_block2(a,b,len,len, len);
                         bb_score2 = bpm_block(a,b,len,len);
 
-                        if(j == 0){
-                                LOG_MSG("k:%d %d %d %d %d",i,dyn_score,bpm_score, bb_score , bb_score2);
-                        }
+                        /* if(j == 0){ */
+                                /* LOG_MSG("k:%d %d %d %d %d",i,dyn_score,bpm_score, bb_score , bb_score2); */
+                        /* } */
 
                         if(dyn_score != bpm_score){
                                 diff[0][1]++;
@@ -447,16 +450,16 @@ int bpm_test(void)
                 /* GET_TIMING(t); */
                 dyn_timing += GET_USERTIME(t);
 
-                /* #ifdef HAVE_AVX2 */
-                /* START_TIMER(t); */
-                /* for(j = 0; j < timing_iter;j++){ */
-                /*         bpm_score = bpm_256(a,b,len,len); */
-                /* } */
+                #ifdef HAVE_AVX2
+                START_TIMER(t);
+                for(j = 0; j < timing_iter;j++){
+                        bpm_score = bpm_256(a,b,len,len);
+                }
 
-                /* STOP_TIMER(t); */
-                /* /\* GET_TIMING(t); *\/ */
-                /* bpm_timing +=GET_USERTIME(t); */
-                /* #endif */
+                STOP_TIMER(t);
+                /* GET_TIMING(t); */
+                bpm_timing +=GET_USERTIME(t);
+                #endif
 
                 START_TIMER(t);
                 for(j = 0; j < timing_iter;j++){
@@ -581,23 +584,23 @@ ERROR:
 
 }
 
-/* #ifdef HAVE_AVX2 */
-/* void print_256(__m256i X) */
-/* { */
-/*         alignas(32) uint64_t debug[4]; */
-/*         _mm256_store_si256( (__m256i*)& debug,X); */
-/*         fprintf(stdout,"%lu ", debug[0]); */
-/* } */
+#ifdef HAVE_AVX2
+void print_256(__m256i X)
+{
+        alignas(32) uint64_t debug[4];
+        _mm256_store_si256( (__m256i*)& debug,X);
+        fprintf(stdout,"%lu ", debug[0]);
+}
 
 
-/* void print_256_all(__m256i X) */
-/* { */
-/*         alignas(32) uint64_t debug[4]; */
-/*         _mm256_store_si256( (__m256i*)& debug,X); */
-/*         int i; */
-/*         for(i = 0; i < 4;i++){ */
-/*                 fprintf(stdout,"%lu ", debug[i]); */
-/*         } */
-/*         fprintf(stdout,"\n"); */
-/* } */
-/* #endif */
+void print_256_all(__m256i X)
+{
+        alignas(32) uint64_t debug[4];
+        _mm256_store_si256( (__m256i*)& debug,X);
+        int i;
+        for(i = 0; i < 4;i++){
+                fprintf(stdout,"%lu ", debug[i]);
+        }
+        fprintf(stdout,"\n");
+}
+#endif

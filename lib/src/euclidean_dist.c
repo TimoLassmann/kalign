@@ -55,7 +55,7 @@ int main(void)
         float** mat = NULL;
         double r;
         float d1;
-        /* float d2; */
+        float d2;
         int i,j,c;
         int max_iter = 10;
         int num_element = 128;
@@ -64,11 +64,11 @@ int main(void)
 
         MMALLOC(mat, sizeof(float*)* 100);
         for(i = 0; i < 100;i++){
-/* #ifdef HAVE_AVX2 */
-/*                 mat[i] = _mm_malloc(sizeof(float)*num_element, 32); */
-/* #else */
+#ifdef HAVE_AVX2
+                mat[i] = _mm_malloc(sizeof(float)*num_element, 32);
+#else
                 MMALLOC(mat[i],sizeof(float)*num_element);
-/* #endif */
+#endif
         }
 
         RUNP( rng =init_rng(0));
@@ -82,19 +82,19 @@ int main(void)
                 }
         }
         LOG_MSG("Check for correctness.");
-/* #ifdef HAVE_AVX2 */
-/*         for(i = 0; i < 100;i++){ */
-/*                 for(j = 0; j <= i;j++){ */
-/*                         edist_serial(mat[i], mat[j], num_element, &d1); */
-/*                         edist_256(mat[i], mat[j], num_element, &d2); */
+#ifdef HAVE_AVX2
+        for(i = 0; i < 100;i++){
+                for(j = 0; j <= i;j++){
+                        edist_serial(mat[i], mat[j], num_element, &d1);
+                        edist_256(mat[i], mat[j], num_element, &d2);
 
-/*                         if(fabsf(d1-d2) > 10e-6){ */
-/*                                 ERROR_MSG("DIFFER: %d\t%d\t%f\t%f  (%e %e)\n", i,j,d1,d2, fabsf(d1-d2), FLT_EPSILON); */
+                        if(fabsf(d1-d2) > 10e-6){
+                                ERROR_MSG("DIFFER: %d\t%d\t%f\t%f  (%e %e)\n", i,j,d1,d2, fabsf(d1-d2), FLT_EPSILON);
 
-/*                         } */
-/*                 } */
-/*         } */
-/* #endif */
+                        }
+                }
+        }
+#endif
         DECLARE_TIMER(t);
 
         LOG_MSG("Timing serial");
@@ -110,29 +110,29 @@ int main(void)
         GET_TIMING(t);
         //LOG_MSG("%f\tsec.",GET_TIMING(t));
 
-/* #ifdef HAVE_AVX2 */
-/*         LOG_MSG("Timing AVX"); */
-/*         START_TIMER(t); */
-/*         for(c = 0; c < max_iter; c++){ */
-/*         for(i = 0; i < 100;i++){ */
-/*                 for(j = 0; j <= i;j++){ */
-
-/*                         edist_256(mat[i], mat[j], num_element, &d2); */
-
-/*                 } */
-/*         } */
-/*         } */
-/*         STOP_TIMER(t); */
-/*         GET_TIMING(t); */
-/*         //LOG_MSG("%f\tsec.",GET_TIMING(t)); */
-
-/* #endif */
+#ifdef HAVE_AVX2
+        LOG_MSG("Timing AVX");
+        START_TIMER(t);
+        for(c = 0; c < max_iter; c++){
         for(i = 0; i < 100;i++){
-/* #ifdef HAVE_AVX2 */
-/*                 _mm_free(mat[i]); */
-/* #else */
+                for(j = 0; j <= i;j++){
+
+                        edist_256(mat[i], mat[j], num_element, &d2);
+
+                }
+        }
+        }
+        STOP_TIMER(t);
+        GET_TIMING(t);
+        //LOG_MSG("%f\tsec.",GET_TIMING(t));
+
+#endif
+        for(i = 0; i < 100;i++){
+#ifdef HAVE_AVX2
+                _mm_free(mat[i]);
+#else
                 MFREE(mat[i]);
-/* #endif */
+#endif
         }
         MFREE(mat);
 

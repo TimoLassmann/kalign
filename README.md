@@ -45,12 +45,15 @@ Usage: kalign  -i <seq file> -o <out aln>
 Options:
 
    --format           : Output format. [Fasta]
-   --reformat         : Reformat existing alignment. [NA]
    --type             : Alignment type (rna, dna, internal). [rna]
-   --gpo              : Gap open penalty. [5.5]
-   --gpe              : Gap extension penalty. [2.0]
-   --tgpe             : Terminal gap extension penalty. [1.0]
+                        Options: protein, divergent (protein) 
+                                 rna, dna, internal (nuc). 
+   --gpo              : Gap open penalty. []
+   --gpe              : Gap extension penalty. []
+   --tgpe             : Terminal gap extension penalty. []
+   -n/--nthreads      : Number of threads. [4]
    --version (-V/-v)  : Prints version. [NA]
+
 
 ```
 
@@ -59,9 +62,10 @@ Kalign expects the input to be a set of unaligned sequences in fasta format or a
 
 By default, Kalign automatically detects whether the input sequences are protein or DNA and selects appropriate alignment parameters. 
 
-The `--type` option gives users more direct control over the alignment parameters. Currently there are four core options:
+The `--type` option gives users more direct control over the alignment parameters. Currently there are five core options:
 
 - `protein`  : uses a the CorBLOSUM66_13plus substituion matrix (default for protein sequence)
+- `divergent`: uses the gonnet 250 substituion matrix 
 - `dna`      : default DNA parameters
   +  5 match score 
   + -4 mismatch score

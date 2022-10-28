@@ -30,9 +30,7 @@
 #endif
 
 
-
 #include "tlrng.h"
-
 
 #include "bisectingKmeans.h"
 
@@ -157,11 +155,11 @@ int build_tree_kmeans(struct msa* msa, int n_threads, struct aln_tasks** tasks)
           }*/
         MFREE(root);
         for(i =0 ; i < msa->numseq;i++){
-/* #ifdef HAVE_AVX2 */
-/*                 _mm_free(dm[i]); */
-/* #else */
+#ifdef HAVE_AVX2
+                _mm_free(dm[i]);
+#else
                 MFREE(dm[i]);
-/* #endif */
+#endif
         }
         MFREE(dm);
         DESTROY_TIMER(timer);
@@ -239,21 +237,6 @@ int bisecting_kmeans_parallel(struct msa* msa, struct node** ret_n, float** dm,i
 #pragma omp taskwait
 #endif
 
-
-
-
-/* #ifdef HAVE_OPENMP */
-
-/* #pragma omp parallel for //num_threads(4) */
-/* /\* #endif *\/ */
-/*                 for(j = 0; j < 4;j++){ */
-/*                         split(dm,samples,num_anchors, num_samples, (i+ j)*step, &res[j]); */
-/*                 } */
-
-                /* for(j = 0; j < 4;j++){ */
-                /*         LOG_MSG("%d  %f %d %d",j, res[j]->score,res[j]->nl,res[j]->nr); */
-                /* } */
-                /* exit(0); */
                 for(j = 0; j < 4;j++){
                         if(!best){
                                 change++;
@@ -361,7 +344,6 @@ int bisecting_kmeans_serial(struct msa* msa, struct node** ret_n, float** dm,int
                 for(j = 0; j < 4;j++){
                         split(dm,samples,num_anchors, num_samples, (i+ j)*step, &res_ptr[j]);
                 }
-
 
                 for(j = 0; j < 4;j++){
                         if(!best){
@@ -636,13 +618,11 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
         res->nl =  num_l;
         res->nr =  num_r;
         res->score = score;
-
         *ret = res;
         return OK;
 ERROR:
         return FAIL;
 }
-
 
 struct node* upgma(float **dm,int* samples, int numseq)
 {

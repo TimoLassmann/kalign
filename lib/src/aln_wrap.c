@@ -74,6 +74,8 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
         if(msa->biotype == ALN_BIOTYPE_PROTEIN){
                 RUN(convert_msa_to_internal(msa, ALPHA_ambigiousPROTEIN));
         }
+
+
         /* LOG_MSG("L: %d",msa->L); */
         /* align  */
         /* if gap penalties are not negative they are set below */
@@ -84,6 +86,8 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
                            gpo,
                            gpe,
                            tgpe));
+
+
 
         DECLARE_TIMER(t1);
         if(!msa->quiet){

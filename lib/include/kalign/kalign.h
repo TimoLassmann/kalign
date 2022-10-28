@@ -17,7 +17,8 @@
 #define KALIGN_TYPE_DNA_INTERNAL 1
 #define KALIGN_TYPE_RNA 2
 #define KALIGN_TYPE_PROTEIN 3
-#define KALIGN_TYPE_UNDEFINED 4
+#define KALIGN_TYPE_PROTEIN_DIVERGENT 4
+#define KALIGN_TYPE_UNDEFINED 5
 
 struct msa;
 /* input output routines  */

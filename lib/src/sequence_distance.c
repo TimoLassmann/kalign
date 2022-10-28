@@ -126,7 +126,6 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                         }
                 }
 
-
                 struct msa_seq** s = msa->sequences;
 #ifdef HAVE_OPENMP
 #pragma omp parallel for shared(dm, s) private(i, j) collapse(2) schedule(static)
@@ -175,36 +174,15 @@ float calc_distance(uint8_t* seq_a, uint8_t* seq_b, int len_a,int len_b)
 {
         uint32_t dist;
         if(len_a > len_b){
-                /* uint32_t a; */
-                /* uint32_t b; */
-                /* a = bpm_256(seq_a, seq_b, len_a, len_b); */
-                /* b = bpm_block(seq_a, seq_b, len_a, len_b); */
-                /* if(a != b){ */
-                /*         LOG_MSG("DIFF: %d %d", a,b); */
-                /* } */
-                /* dist = bpm_256(seq_a, seq_b, len_a, len_b); */
-                /* fprintf(stdout,"%d ", dist); */
-                dist = bpm_block(seq_a, seq_b, len_a, len_b);
-                /* fprintf(stdout,"%d\n", dist); */
+                dist = BPM(seq_a, seq_b, len_a, len_b);
         }else{
-                /* uint32_t a; */
-                /* uint32_t b; */
-                /* a = bpm_256(seq_b, seq_a, len_b, len_a); */
-                /* b = bpm_block(seq_b, seq_a, len_b, len_a); */
-                /* if(a != b){ */
-                /*         LOG_MSG("DIFF: %d %d", a,b); */
-                /* } */
-                /* dist =bpm_256(seq_b, seq_a, len_b, len_a); */
-                dist = bpm_block(seq_b, seq_a, len_b, len_a);
+                dist = BPM(seq_b, seq_a, len_b, len_a);
         }
         return (float)dist;
 }
 
-
-
 float protein_wu_distance_calculation(struct bignode* hash[],const uint8_t* seq,const int seqlen,const int diagonals,const float mode)
 {
-
         struct bignode* node_p;
         unsigned int* d = NULL;
         unsigned int* tmp = NULL;

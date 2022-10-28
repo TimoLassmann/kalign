@@ -28,10 +28,10 @@
 #define BPM_IMPORT
 #include "bpm.h"
 #include  <stdalign.h>
-
 #include <string.h>
-#include "tlrng.h"
 
+#define SIGMA 13
+#define DIV_CEIL(a,b) (a == 0 ? 1 : a/b+(a%b == 0 ? 0 : 1))
 
 
 #ifdef HAVE_AVX2

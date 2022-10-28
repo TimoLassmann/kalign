@@ -64,9 +64,13 @@ int print_kalign_help(char * argv[])
 
         /* fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--reformat","Reformat existing alignment." ,"[NA]"  ); */
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--type","Alignment type (rna, dna, internal)." ,"[rna]"  );
+        fprintf(stdout,"%*s%-*s  %s %s\n",3,"",MESSAGE_MARGIN-3,"","Options: protein, divergent (protein)" ,""  );
+        fprintf(stdout,"%*s%-*s  %s %s\n",3,"",MESSAGE_MARGIN-3,"","         rna, dna, internal (nuc)." ,""  );
+
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpo","Gap open penalty." ,"[]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpe","Gap extension penalty." ,"[]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--tgpe","Terminal gap extension penalty." ,"[]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"-n/--nthreads","Number of threads." ,"[4]");
 
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--version (-V/-v)","Prints version." ,"[NA]"  );
 
@@ -374,6 +378,8 @@ int set_aln_type(char* in, int* type )
                         t = KALIGN_TYPE_DNA_INTERNAL;
                 }else if(strstr(in,"protein")){
                         t = KALIGN_TYPE_PROTEIN;
+                }else if(strstr(in,"divergent")){
+                        t = KALIGN_TYPE_PROTEIN_DIVERGENT;
                 }else{
                         ERROR_MSG("In %s not recognized.",in);
                 }

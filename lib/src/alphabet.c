@@ -123,7 +123,6 @@ struct alphabet* create_alphabet(int type)
         default:
                 break;
         }
-
         RUN(clean_and_set_to_extern(a));
         return a;
 ERROR:
@@ -138,8 +137,6 @@ int switch_alphabet(struct alphabet* a, int type)
         int i;
         for(i = 0; i < 128;i++){
                 a->to_internal[i] = -1;
-
-
         }
         for(i = 0; i < 32;i++){
                 a->to_external[i] = -1;
@@ -168,7 +165,7 @@ ERROR:
 int create_default_protein(struct alphabet* a)
 {
         char aacode[20] = "ACDEFGHIKLMNPQRSTVWY";
-
+        /* char aacode[20] = "ARNDCQEGHILKMFPSTWYV";//BZX"; */
         int code;
         int i;
         code = 0;
@@ -194,6 +191,9 @@ int create_default_protein(struct alphabet* a)
 
         */
         a->to_internal[(int) 'U'] = code;
+
+
+
         code++;
         return OK;
 }
