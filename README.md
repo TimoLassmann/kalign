@@ -139,19 +139,11 @@ Here are some benchmark results. The code to reproduce these figures can be foun
 
 ## Balibase
 
-![Balibase_scores](https://user-images.githubusercontent.com/8110320/66697423-7ea3d000-eca3-11e9-919a-995ca8e9f7c1.jpeg)
+![Balibase_scores](https://user-images.githubusercontent.com/8110320/198513840-0e08a634-bb41-4826-bd58-7fc66eae1054.jpeg)
 
 ## Bralibase
 
-![Bralibase_scores](https://user-images.githubusercontent.com/8110320/66697424-86637480-eca3-11e9-90ea-238f82b0ac6b.jpeg)
-
-## Homfam
-
-![Homfam_scores](https://user-images.githubusercontent.com/8110320/66697425-895e6500-eca3-11e9-97e7-63f3a79133cf.jpeg)
-
-## Quantest2
-
-![Quantest2_scores](https://user-images.githubusercontent.com/8110320/66698153-6c2c9500-eca9-11e9-904c-3d6ea9a1c44d.jpeg)
+![Bralibase_scores](https://user-images.githubusercontent.com/8110320/198513850-00e5037f-355f-45ec-828f-ed8d47497272.jpeg)
 
 # Please cite:
 1. Lassmann, Timo. _Kalign 3: multiple sequence alignment of large data sets._ **Bioinformatics** (2019). [pdf](https://academic.oup.com/bioinformatics/advance-article-pdf/doi/10.1093/bioinformatics/btz795/30314127/btz795.pdf)
