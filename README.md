@@ -29,6 +29,7 @@ on macOS, install [brew](https://brew.sh/) then:
 brew install cmake 
 git clone https://github.com/TimoLassmann/kalign.git
 cd kalign
+mkdir build
 cd build 
 cmake ..
 make 
