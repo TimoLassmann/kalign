@@ -1,4 +1,4 @@
-![C/C++ CI](https://github.com/TimoLassmann/kalign/workflows/C/C++%20CI/badge.svg)
+<!-- ![C/C++ CI](https://github.com/TimoLassmann/kalign/workflows/C/C++%20CI/badge.svg) -->
 [![CMake](https://github.com/TimoLassmann/kalign/actions/workflows/cmake.yml/badge.svg)](https://github.com/TimoLassmann/kalign/actions/workflows/cmake.yml)
 ![CodeQL](https://github.com/TimoLassmann/kalign/workflows/CodeQL/badge.svg)
 
