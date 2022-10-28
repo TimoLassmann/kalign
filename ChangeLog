@@ -1,3 +1,17 @@
+2022-10-28  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+
+	* version 3.3.4 - Cmake and more
+	- switched to cmake
+	Added: 
+	1) a Kalign library to make it easier to use Kalign from another projects
+	2) a block version of Gene Myers bit parallel string matching code (described
+	here: Myers, Gene. "A fast bit-vector algorithm for approximate string matching
+	based on dynamic programming." Journal of the ACM (JACM) 46.3 (1999): 395-415).
+	This means Kalign will now run equivalently on processors with and without AVX2
+	instructions (e.g. apple M1 / M2 and ARM chips).
+	3) alignment types giving users more control over alignment parameters.
+	4) multi-threading
+
 2022-03-21  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
 
 	* version 3.3.2 - Bug Fix
