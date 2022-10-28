@@ -13,7 +13,7 @@ include(GenerateExportHeader)
 
 set(KALIGN_LIBRARY_VERSION_MAJOR 3)
 set(KALIGN_LIBRARY_VERSION_MINOR 3)
-set(KALIGN_LIBRARY_VERSION_PATCH 3)
+set(KALIGN_LIBRARY_VERSION_PATCH 4)
 set(KALIGN_LIBRARY_VERSION_STRING ${KALIGN_LIBRARY_VERSION_MAJOR}.${KALIGN_LIBRARY_VERSION_MINOR}.${KALIGN_LIBRARY_VERSION_PATCH})
 
 
@@ -27,11 +27,8 @@ set (CMAKE_C_STANDARD 11)
 # to compile without open mp:
 # cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DUSE_OPENMP=OFF ..
 
-
 add_compile_options("$<$<CONFIG:RELEASE>:-W;-Wall;-O3;-pedantic>")
 add_compile_options("$<$<CONFIG:DEBUG>:-W;-Wall;-O0;-g;-pedantic>")
-# set(CMAKE_CXX_CLANG_TIDY "clang-tidy;-checks=*")
-
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
   if (MSVC)
@@ -43,15 +40,9 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
   endif()
 endif()
 
-# SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
-# SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
-# SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
-
-
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
-
 
 include(GNUInstallDirs)
 
@@ -183,6 +174,10 @@ add_subdirectory(lib)
 add_subdirectory(src)
 add_subdirectory(tests)
 
+
+MESSAGE(STATUS "")
+MESSAGE(STATUS "Configuration:")
+MESSAGE(STATUS "--------------------------------------")
 MESSAGE(STATUS "Build type                : " ${CMAKE_BUILD_TYPE})
 MESSAGE(STATUS "Compiler flags            : " ${CMAKE_C_COMPILE_FLAGS})
 MESSAGE(STATUS "Compiler c debug flags    : " ${CMAKE_C_FLAGS_DEBUG})
@@ -191,17 +186,6 @@ MESSAGE(STATUS "Compiler c min size flags : " ${CMAKE_C_FLAGS_MINSIZEREL})
 MESSAGE(STATUS "Compiler c flags          : " ${CMAKE_C_FLAGS})
 message(STATUS "OpenMP version            : " ${OpenMP_C_VERSION})
 message(STATUS "OpenMP flags              : " ${OpenMP_C_FLAGS})
-
-# cmake_minimum_required(VERSION 3.1)
-
-# project(kalign LANGUAGES C CXX VERSION "3.3.3")
-
-
-  
-#add_subdirectory(src)
-
-
-#install(TARGETS kalign DESTINATION bin)
 
 # Package Generator  #######################################################
 set(CPACK_PACKAGE_VENDOR "Timo Lassmann")
