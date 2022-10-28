@@ -2,13 +2,16 @@ name: C/C++ CI
 
 on: [push]
 
+env:  
+  BUILD_TYPE: Release
+
 jobs:
   build:
 
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
 
     - name: autogen
       run: ./autogen.sh
@@ -29,7 +32,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
     - name: install build tools
       run: brew install automake
     - name: autogen
