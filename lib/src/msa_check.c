@@ -67,7 +67,9 @@ int kalign_essential_input_check(struct msa *msa, int exit_on_error)
         ASSERT(msa->numseq > 1,"only %d sequences found.", msa->numseq);
         for(int i = 0; i < msa->numseq;i++){
                 if(msa->sequences[i]->len == 0){
-                        WARNING_MSG("No sequence found for sequence %s ",msa->sequences[i]->name);
+                        if(!msa->quiet){
+                                WARNING_MSG("No sequence found for sequence %s ",msa->sequences[i]->name);
+                        }
                         problem_len0++;
                 }
         }
@@ -78,9 +80,13 @@ int kalign_essential_input_check(struct msa *msa, int exit_on_error)
 
 
                         if(problem_len0 == 1){
-                                LOG_MSG("Removing %d sequence with a length of 0.", problem_len0);
+                                if(!msa->quiet){
+                                        LOG_MSG("Removing %d sequence with a length of 0.", problem_len0);
+                                }
                         }else{
-                                LOG_MSG("Removing %d sequences with a length of 0.",problem_len0);
+                                if(!msa->quiet){
+                                        LOG_MSG("Removing %d sequences with a length of 0.",problem_len0);
+                                }
                         }
 
                         struct msa_seq** tmp = NULL;
@@ -96,6 +102,9 @@ int kalign_essential_input_check(struct msa *msa, int exit_on_error)
                                         tmp[e] = msa->sequences[i];
                                         e--;
                                 }
+                        }
+                        for(int i = msa->numseq; i < msa->alloc_numseq;i++){
+                                 tmp[i] = NULL;
                         }
 
                         MFREE(msa->sequences);

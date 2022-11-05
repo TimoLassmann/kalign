@@ -66,7 +66,9 @@ void kalign_free_msa(struct msa* msa)
         int i;
         if(msa){
                 for(i = 0; i < msa->alloc_numseq;i++){
-                        free_msa_seq(msa->sequences[i]);
+                        if(msa->sequences[i]){
+                                free_msa_seq(msa->sequences[i]);
+                        }
                 }
 
                 for (i = msa->num_profiles;i--;){
