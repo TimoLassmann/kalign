@@ -1,3 +1,8 @@
+2022-11-05  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+
+	* version 3.3.5
+	- Added a check to find and remove sequences of length 0. 
+
 2022-10-28  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
 
 	* version 3.3.4 - Cmake and more
