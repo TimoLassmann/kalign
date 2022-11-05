@@ -20,6 +20,8 @@ static int sort_by_name(const void *a, const void *b);
 static int sort_by_chksum(const void *a, const void *b);
 static int sort_by_both(const void *a, const void *b);
 
+int sort_seq_by_len(const void *a, const void *b);
+
 int kalign_sort_msa(struct msa *msa)
 {
         struct sort_struct_name_chksum** a = NULL;
@@ -53,6 +55,74 @@ ERROR:
                 }
                 MFREE(a);
         }
+        return FAIL;
+}
+
+
+int kalign_essential_input_check(struct msa *msa, int exit_on_error)
+{
+        int problem_len0 = 0;
+        ASSERT(msa != NULL, "No alignment");
+
+        ASSERT(msa->numseq > 1,"only %d sequences found.", msa->numseq);
+        for(int i = 0; i < msa->numseq;i++){
+                if(msa->sequences[i]->len == 0){
+                        WARNING_MSG("No sequence found for sequence %s ",msa->sequences[i]->name);
+                        problem_len0++;
+                }
+        }
+
+        if(!exit_on_error){
+                /* Here we attempt to fix the zero length problem  */
+                if(problem_len0){
+
+
+                        if(problem_len0 == 1){
+                                LOG_MSG("Removing %d sequence with a length of 0.", problem_len0);
+                        }else{
+                                LOG_MSG("Removing %d sequences with a length of 0.",problem_len0);
+                        }
+
+                        struct msa_seq** tmp = NULL;
+                        MMALLOC(tmp, sizeof(struct msa_seq* )  * msa->alloc_numseq);
+                        int c = 0;
+                        int e = msa->numseq-1;
+
+                        for(int i = 0 ; i < msa->numseq;i++){
+                                if(msa->sequences[i]->len){
+                                        tmp[c] = msa->sequences[i];
+                                        c++;
+                                }else{
+                                        tmp[e] = msa->sequences[i];
+                                        e--;
+                                }
+                        }
+
+                        MFREE(msa->sequences);
+                        msa->sequences = tmp;
+                        /* for(int i = msa->numseq-500; i < msa->numseq;i++){ */
+                                  /* LOG_MSG("%d\t%s", msa->sequences[i]->len,msa->sequences[i]->name); */
+                        /* } */
+                        /* LOG_MSG("%d %d %d ", msa->numseq, msa->numseq -c , problem_len0); */
+                        /* qsort(msa->sequences, msa->numseq, sizeof(struct msa_seq*),sort_seq_by_len); */
+                        /* int c = 0; */
+                        /* for(int i = msa->numseq-1;i >= 0;i--){ */
+                        /*         if(msa->sequences[i]->len != 0){ */
+                        /*                 c = i; */
+                        /*                 break; */
+                        /*         } */
+                        /* } */
+                        /* c++; */
+                        msa->numseq = c;
+                        ASSERT(msa->numseq > 1,"only %d sequences found.", msa->numseq);
+                        /* exit(0); */
+                }
+        }else{
+                ERROR_MSG("%d sequences found with length 0.", problem_len0);
+        }
+
+        return OK;
+ERROR:
         return FAIL;
 }
 
@@ -189,6 +259,7 @@ int sort_by_name(const void *a, const void *b)
         }
 }
 
+
 int sort_by_chksum(const void *a, const void *b)
 {
         struct sort_struct_name_chksum* const *one = a;
@@ -201,6 +272,16 @@ int sort_by_chksum(const void *a, const void *b)
         }
 }
 
+int sort_seq_by_len(const void *a, const void *b)
+{
+        struct msa_seq* const *one = a;
+        struct msa_seq* const *two = b;
+        if((*one)->len > (*two)->len){
+                return -1;
+        }else{
+                return 1;
+        }
+}
 
 /* Taken from squid library by Sean Eddy  */
 int GCGchecksum(char *seq, int len)

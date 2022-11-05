@@ -1,9 +1,11 @@
 #include "tldevel.h"
+#include "tlmisc.h"
 #include "esl_stopwatch.h"
 #include "task.h"
 #include "msa_struct.h"
 #include "msa_op.h"
 #include "msa_alloc.h"
+#include "msa_check.h"
 #include "alphabet.h"
 #include "bisectingKmeans.h"
 
@@ -44,6 +46,7 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
         struct aln_tasks* tasks = NULL;
         struct aln_param* ap = NULL;
 
+        RUN(kalign_essential_input_check(msa, 0));
         /* If already aligned unalign ! */
         if(msa->aligned != ALN_STATUS_UNALIGNED){
                 RUN(dealign_msa(msa));
@@ -61,6 +64,12 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
         }
         /* -LOG_MSG("L: %d  threads: %d",msa->L, n_threads); */
         /* Start the heavy lifting  */
+
+        /* if(my_file_exists("tasklist.txt")){ */
+        /*         LOG_MSG("Found task list"); */
+        /*         read_tasks(&tasks , "tasklist.txt"); */
+        /* }else{ */
+
         RUN(alloc_tasks(&tasks, msa->numseq));
 
 #ifdef HAVE_OPENMP
@@ -75,6 +84,8 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
                 RUN(convert_msa_to_internal(msa, ALPHA_ambigiousPROTEIN));
         }
 
+/* write_tasks(tasks, "tasklist.txt"); */
+/*         } */
 
         /* LOG_MSG("L: %d",msa->L); */
         /* align  */

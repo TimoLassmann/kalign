@@ -36,6 +36,10 @@ EXTERN  int sort_tasks(struct aln_tasks* t , int order);
 EXTERN  int alloc_tasks(struct aln_tasks** tasks,int numseq);
 EXTERN void free_tasks(struct aln_tasks* tasks);
 
+EXTERN int write_tasks(struct aln_tasks *t, char *filename);
+EXTERN int read_tasks(struct aln_tasks **tasks,char* filename);
+
+
 #undef TASK_IMPORT
 #undef EXTERN
 

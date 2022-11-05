@@ -12,6 +12,8 @@
 #endif
 
 struct msa;
+
+EXTERN int kalign_essential_input_check(struct msa *msa, int exit_on_error);
 EXTERN int kalign_check_msa(struct msa* msa, int exit_on_error);
 EXTERN int kalign_sort_msa(struct msa *msa);
 #undef MSA_CHECK_IMPORT

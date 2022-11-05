@@ -256,3 +256,19 @@ add_test(
   NAME edist_utest
   COMMAND edist_utest
   )
+
+
+add_executable(task_utest
+  src/tldevel.c
+  src/tlrng.c
+  src/task.c  
+  )
+
+
+target_link_libraries(task_utest PRIVATE m)
+set_target_properties(task_utest PROPERTIES COMPILE_FLAGS "-DTASKWRITETEST")
+add_test(
+  NAME task_utest
+  COMMAND task_utest
+  )
+ 

@@ -350,6 +350,8 @@ int run_kalign(struct parameters* param)
                 }
         }
 
+
+
         RUN(kalign_run(msa,
                        param->nthreads,
                        param->type,

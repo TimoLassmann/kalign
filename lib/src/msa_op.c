@@ -178,8 +178,10 @@ int detect_aligned(struct msa* msa)
                 l += msa->sequences[i]->len;
                 min_len = MACRO_MIN(min_len, l);
                 max_len = MACRO_MAX(max_len, l);
-                /* LOG_MSG("%d %d", max_len, min_len); */
+
         }
+        /* LOG_MSG("%d %d", max_len, min_len); */
+        /* exit(0); */
         if(gaps){
                 if(min_len == max_len){ /* sequences have gaps and total length is identical - clearly aligned  */
                         msa->aligned = ALN_STATUS_ALIGNED;

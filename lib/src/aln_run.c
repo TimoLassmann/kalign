@@ -46,6 +46,9 @@ int create_msa_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
         for(i = msa->numseq; i < msa->num_profiles;i++){
                 active[i] = 0;
         }
+        /* LOG_MSG("Setting threads to 1 for debugging!"); */
+        /* ap->nthreads = 1; */
+
 #ifdef HAVE_OPENMP
         if(ap->nthreads == 1){
                 recursive_aln_serial(msa, t, ap, active, t->n_tasks-1);
@@ -407,6 +410,8 @@ void recursive_aln_openMP(struct msa* msa, struct aln_tasks*t, struct aln_param*
 
         a = local_t->a - msa->numseq;
         b = local_t->b - msa->numseq;
+
+        /* LOG_MSG("Aligning %d %d", a,b); */
 /* #ifdef HAVE_OPENMP */
 /* #pragma omp parallel num_threads(2) */
 /*         { */
@@ -439,8 +444,19 @@ void recursive_aln_openMP(struct msa* msa, struct aln_tasks*t, struct aln_param*
         ml->mode = ALN_MODE_FULL;
 
         /* if(active[local_t->a] && active[local_t->b]){ */
-        /* fprintf(stdout,"THREAD: %d %3d %3d -> %3d (p: %d)\n",tid, t->list[c]->a, t->list[c]->b, t->list[c]->c, t->list[c]->p); */
+        /* fprintf(stdout,"THREAD:  %3d %3d -> %3d (p: %d)\n", t->list[c]->a, t->list[c]->b, t->list[c]->c, t->list[c]->p); */
+
+/* #ifdef HAVE_OPENMP */
+/* #pragma omp critical */
+/*         { */
+/*                 int thread_num = omp_get_thread_num(); */
+/*                 LOG_MSG("Thread %d working on %d %d",thread_num,local_t->a, local_t->b); */
+/*         } */
+/* #endif */
         do_align(msa,t,ml,c);
+/* #ifdef HAVE_OPENMP */
+/* #pragma omp critical */
+/* #endif */
         active[local_t->b] = 0;
 
         free_aln_mem(ml);
@@ -658,6 +674,20 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
         }else{
                 m->len_b = msa->plen[b];
                 RUN(set_gap_penalties_n(t->profile[b],m->len_b,msa->nsip[a]));
+        }
+
+
+        if(m->len_a == 0 || m->len_b == 0){
+                LOG_MSG("Doalign :  LEN: %d %d     Targets are: %d %d -> %d nsip: %d %d ",m->len_a,m->len_b,a,b,c,msa->nsip[a],msa->nsip[b]  );
+                if(msa->nsip[a] == 1){
+                        LOG_MSG("%s",msa->sequences[a]->name);
+                }
+                if(msa->nsip[b] == 1){
+                        LOG_MSG("%s",msa->sequences[b]->name);
+                }
+
+
+                ERROR_MSG("Oh no!");
         }
 
         RUN(init_alnmem(m));
@@ -882,7 +912,7 @@ int do_align_serial(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int t
         }
 
         RUN(add_gap_info_to_path_n(m)) ;
-
+        LOG_MSG("Aligned %d and %d (len %d %d) -> path is of length: %d",a,b, m->len_a,m->len_b, 64*(m->path[0]+2));
         MMALLOC(tmp,sizeof(float)*64*(m->path[0]+2));
 
         /* LOG_MSG("%d TASK ID", task_id); */

@@ -86,8 +86,6 @@ int build_tree_kmeans(struct msa* msa, int n_threads, struct aln_tasks** tasks)
         int i;
 
         ASSERT(msa != NULL, "No alignment.");
-        //ASSERT(param != NULL, "No input parameters.");
-        /* ASSERT(ap != NULL, "No alignment parameters."); */
 
         t = *tasks;
         if(!t){
@@ -109,19 +107,12 @@ int build_tree_kmeans(struct msa* msa, int n_threads, struct aln_tasks** tasks)
         if(!msa->quiet){
                 GET_TIMING(timer);
         }
-
-        //LOG_MSG("Done in %f sec.", GET_TIMING(timer));
-
         MFREE(anchors);
 
         MMALLOC(samples, sizeof(int)* numseq);
         for(i = 0; i < numseq;i++){
                 samples[i] = i;
         }
-        /* if(!msa->quiet){ */
-        /*         LOG_MSG("%d anchors ", num_anchors); */
-        /* } */
-        //RUNP(root = alloc_node());
 
         START_TIMER(timer);
         if(!msa->quiet){
@@ -146,13 +137,6 @@ int build_tree_kmeans(struct msa* msa, int n_threads, struct aln_tasks** tasks)
 
         create_tasks(root, t);
 
-
-        /* exit(0); */
-        /*ap->tree[0] = 1;
-          ap->tree = readbitree(root, ap->tree);
-          for (i = 0; i < (numseq*3);i++){
-          tree[i] = tree[i+1];
-          }*/
         MFREE(root);
         for(i =0 ; i < msa->numseq;i++){
 #ifdef HAVE_AVX2
