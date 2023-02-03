@@ -677,18 +677,18 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
         }
 
 
-        if(m->len_a == 0 || m->len_b == 0){
-                LOG_MSG("Doalign :  LEN: %d %d     Targets are: %d %d -> %d nsip: %d %d ",m->len_a,m->len_b,a,b,c,msa->nsip[a],msa->nsip[b]  );
-                if(msa->nsip[a] == 1){
-                        LOG_MSG("%s",msa->sequences[a]->name);
-                }
-                if(msa->nsip[b] == 1){
-                        LOG_MSG("%s",msa->sequences[b]->name);
-                }
+        /* if(m->len_a == 0 || m->len_b == 0){ */
+        /*         LOG_MSG("Doalign :  LEN: %d %d     Targets are: %d %d -> %d nsip: %d %d ",m->len_a,m->len_b,a,b,c,msa->nsip[a],msa->nsip[b]  ); */
+        /*         if(msa->nsip[a] == 1){ */
+        /*                 LOG_MSG("%s",msa->sequences[a]->name); */
+        /*         } */
+        /*         if(msa->nsip[b] == 1){ */
+        /*                 LOG_MSG("%s",msa->sequences[b]->name); */
+        /*         } */
 
 
-                ERROR_MSG("Oh no!");
-        }
+        /*         ERROR_MSG("Oh no!"); */
+        /* } */
 
         RUN(init_alnmem(m));
 
@@ -912,7 +912,8 @@ int do_align_serial(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int t
         }
 
         RUN(add_gap_info_to_path_n(m)) ;
-        LOG_MSG("Aligned %d and %d (len %d %d) -> path is of length: %d",a,b, m->len_a,m->len_b, 64*(m->path[0]+2));
+
+        /* LOG_MSG("Aligned %d and %d (len %d %d) -> path is of length: %d",a,b, m->len_a,m->len_b, 64*(m->path[0]+2)); */
         MMALLOC(tmp,sizeof(float)*64*(m->path[0]+2));
 
         /* LOG_MSG("%d TASK ID", task_id); */
