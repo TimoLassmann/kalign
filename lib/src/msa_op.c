@@ -307,35 +307,58 @@ ERROR:
 
 int kalign_msa_to_arr(struct msa* msa, char ***aligned, int *out_aln_len)
 {
-        int aln_len = 0;
+        ASSERT(msa != NULL,"No MSA!");
+        ASSERT(msa->aligned == ALN_STATUS_FINAL,"Sequences are not finalized");
+
         char** out = NULL;
-
         int numseq = msa->numseq;
-        for (int j = 0; j <= msa->sequences[0]->len;j++){
-                aln_len += msa->sequences[0]->gaps[j];
-        }
-        aln_len += msa->sequences[0]->len;
-        aln_len += 1;
-
+        int aln_len = msa->alnlen;
         MMALLOC(out, sizeof(char*) * numseq);
-        for(int i = 0; i < numseq; i++){
-                out[i] = 0;
-                MMALLOC(out[i], sizeof(char) * (uint64_t)aln_len);
-                int pos = 0;
-                for(int j = 0;j < msa->sequences[i]->len;j++){
-                        for(int c = 0;c < msa->sequences[i]->gaps[j];c++){
-                                out[i][pos] = '-';
-                                pos++;
-                        }
-                        out[i][pos] = msa->sequences[i]->seq[j];
-                        pos++;
-                }
-                for(int c = 0;c < msa->sequences[i]->gaps[ msa->sequences[i]->len];c++){
-                        out[i][pos] = '-';
-                        pos++;
-                }
-                out[i][pos] = 0;
+        for(int i = 0 ; i < numseq;i++){
+                out[i] = NULL;
+                MMALLOC(out[i], sizeof(char) * (aln_len +1));
         }
+
+        /* galloc(&out, numseq,aln_len+1); */
+        for(int i = 0 ; i < numseq;i++){
+                for(int j = 0; j < aln_len;j++){
+                        out[i][j] = msa->sequences[i]->seq[j];
+                }
+                out[i][aln_len] = 0;
+                /* fprintf(stdout,"IN msa to ALIGNED: %s    %d\n", out[i], msa->alnlen); */
+        }
+
+        /* /\* msa->alnlen = aln_len; *\/ */
+        /* /\* msa->aligned = ALN_STATUS_FINAL; *\/ */
+        /* /\* int aln_len = 0; *\/ */
+
+
+
+        /* for (int j = 0; j <= msa->sequences[0]->len;j++){ */
+        /*         aln_len += msa->sequences[0]->gaps[j]; */
+        /* } */
+        /* aln_len += msa->sequences[0]->len; */
+        /* aln_len += 1; */
+
+        /* MMALLOC(out, sizeof(char*) * numseq); */
+        /* for(int i = 0; i < numseq; i++){ */
+        /*         out[i] = 0; */
+        /*         MMALLOC(out[i], sizeof(char) * (uint64_t)aln_len); */
+        /*         int pos = 0; */
+        /*         for(int j = 0;j < msa->sequences[i]->len;j++){ */
+        /*                 for(int c = 0;c < msa->sequences[i]->gaps[j];c++){ */
+        /*                         out[i][pos] = '-'; */
+        /*                         pos++; */
+        /*                 } */
+        /*                 out[i][pos] = msa->sequences[i]->seq[j]; */
+        /*                 pos++; */
+        /*         } */
+        /*         for(int c = 0;c < msa->sequences[i]->gaps[ msa->sequences[i]->len];c++){ */
+        /*                 out[i][pos] = '-'; */
+        /*                 pos++; */
+        /*         } */
+        /*         out[i][pos] = 0; */
+        /* } */
 
         *aligned = out;
         *out_aln_len = aln_len;

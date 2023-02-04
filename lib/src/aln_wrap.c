@@ -23,14 +23,17 @@
 
 int kalign(char **seq, int *len, int numseq,int n_threads, int type, float gpo, float gpe, float tgpe, char ***aligned, int *out_aln_len)
 {
-        struct msa *msa;
+        struct msa *msa = NULL;
         RUN(kalign_arr_to_msa(seq, len,numseq, &msa));
+
         msa->quiet = 1;
         if(n_threads < 1){
                 n_threads = 1;
         }
         RUN(kalign_run(msa,n_threads, type,  gpo, gpe, tgpe));
+
         RUN(kalign_msa_to_arr(msa, aligned, out_aln_len));
+
         kalign_free_msa(msa);
 
         return OK;
