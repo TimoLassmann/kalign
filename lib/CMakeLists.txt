@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.18)
 
 if(NOT KALIGN_PACKAGE_NAME)
   set(KALIGN_PACKAGE_NAME ${CMAKE_PROJECT_NAME})

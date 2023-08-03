@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.18)
 
 # Build library in sub-directories
 if (NOT TARGET kalign::kalign)
