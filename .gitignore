@@ -2,6 +2,7 @@
 .cache
 build
 doc/ 
-
+dev/
+old_src/
 
 
