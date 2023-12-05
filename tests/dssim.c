@@ -45,14 +45,8 @@ int main(int argc, char *argv[])
         /* LOG_MSG("Hmm init"); */
         struct hmm* hmm = NULL;
         char* seq = NULL;
-        RUN(hmm_init(&hmm, 100, 0));
-
-        /* hmm_print(hmm); */
-
-
-
-
-        for(int i = 0; i < 10;i++){
+        RUN(hmm_init(&hmm, 350, 0));
+        for(int i = 0; i < 20;i++){
                 hmm_emit_simple(hmm, &seq);
                 fprintf(stdout,">Seq_%d\n%s\n",i, seq);
                 MFREE(seq);
@@ -226,7 +220,7 @@ int hmm_init(struct hmm **hmm, int len, int seed)
                 /* pick =tl_random_int(n->rng, 20); */
 
                 sample_pick(prior_e, 20, n->rng, &pick);
-                for(int j = 0; j < 100;j++){
+                for(int j = 0; j < 10;j++){
                         r = tl_random_double(n->rng);
                         if(r < 0.05){
                                 int c = tl_random_int(n->rng, 20);
@@ -239,7 +233,7 @@ int hmm_init(struct hmm **hmm, int len, int seed)
                 /* pick =tl_random_int(n->rng, 20); */
                 sample_pick(prior_e, 20, n->rng, &pick);
 
-                for(int j = 0; j < 100;j++){
+                for(int j = 0; j < 10;j++){
                         r = tl_random_double(n->rng);
                         if(r < 0.25){
                                 int c = tl_random_int(n->rng, 20);
