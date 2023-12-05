@@ -359,6 +359,7 @@ int run_kalign(struct parameters* param)
                        param->gpe,
                        param->tgpe));
 
+
         RUN(kalign_write_msa(msa, param->outfile, param->format));
         kalign_free_msa(msa);
         return OK;

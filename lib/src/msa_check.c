@@ -72,6 +72,7 @@ int kalign_essential_input_check(struct msa *msa, int exit_on_error)
                         }
                         problem_len0++;
                 }
+                msa->sequences[i]->rank = i;
         }
 
         if(!exit_on_error){

@@ -16,7 +16,7 @@ int aln_seqseq_foward(struct aln_mem* m)
         struct states* s = m->f;
         const uint8_t* seq1 = m->seq1;
         const uint8_t* seq2 = m->seq2;
-        float *subp = 0;
+        float *subp = NULL;
         const int starta = m->starta;
         const int enda = m->enda;
         const int startb =m->startb;
@@ -112,7 +112,6 @@ int aln_seqseq_foward(struct aln_mem* m)
 
 int aln_seqseq_backward(struct aln_mem* m)
 {
-
         struct states* s = m->b;
         const uint8_t* seq1 = m->seq1;
         const uint8_t* seq2 = m->seq2;
@@ -334,6 +333,7 @@ int aln_seqseq_meetup(struct aln_mem* m,int old_cor[],int* meet,int* t,float* sc
                         c = i;
                 }
         }
+        /* LOG_MSG("MAX: %f",max); */
         *meet = c;
         *t = transition;
         *score = max;

@@ -25,6 +25,7 @@ struct msa_seq{
         char* seq;
         uint8_t* s;
         int* gaps;
+        int rank;
         int len;
         int alloc_len;
 };
@@ -34,6 +35,7 @@ struct msa{
         int** sip;
         int* nsip;
         int* plen;
+        uint8_t run_parallel;
         int numseq;
         int num_profiles;
         int alloc_numseq;

@@ -64,8 +64,9 @@ static void free_kmeans_results(struct kmeans_result* k);
 struct node* upgma(float **dm,int* samples, int numseq);
 static struct node* alloc_node(void);
 
-static int label_internal(struct node*n, int label);
+static int label_internal(struct node *n, int label);
 static void create_tasks(struct node*n, struct aln_tasks* t);
+/* static void create_tasks(struct node*n, struct aln_tasks* t); */
 
 
 static int bisecting_kmeans_serial(struct msa* msa, struct node** ret_n, float** dm,int* samples, int num_samples);
@@ -136,7 +137,7 @@ int build_tree_kmeans(struct msa* msa, int n_threads, struct aln_tasks** tasks)
         label_internal(root, numseq);
 
         create_tasks(root, t);
-
+        /* exit(0); */
         MFREE(root);
         for(i =0 ; i < msa->numseq;i++){
 #ifdef HAVE_AVX2
@@ -729,9 +730,10 @@ void create_tasks(struct node*n, struct aln_tasks* t)
                 task->a = n->left->id;
                 task->b = n->right->id;
                 task->c = n->id;
+                /* task->p = depth; */
                 /* task->p = n->d; */
                 /* task->n = n->n; */
-                /* fprintf(stdout,"Node %d   depends on %d %d \n", n->id , n->left->id, n->right->id); */
+                /* fprintf(stdout,"Node %d   depends on %d %d\n", n->id , n->left->id, n->right->id); */
 
                 t->n_tasks++;
         }

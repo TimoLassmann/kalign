@@ -168,8 +168,6 @@ else(HAVE_AVX2)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNOHAVE_AVX2")
 endif(HAVE_AVX2)
 
-
-
 add_subdirectory(lib)
 add_subdirectory(src)
 add_subdirectory(tests)

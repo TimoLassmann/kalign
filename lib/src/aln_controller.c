@@ -33,7 +33,7 @@ int aln_runner(struct aln_mem* m)
         int transition;
 
         /* switch to serial if too little work. */
-        if(m->enda - m->starta < 500){
+        if(m->enda - m->starta < 500 && m->run_parallel){
                 aln_runner_serial(m);
         }
 
@@ -60,7 +60,6 @@ int aln_runner(struct aln_mem* m)
         old_cor[3] = m->endb;
         old_cor[4] = mid;
 
-
         /* fprintf(stderr,"Forward:%d-%d	%d-%d\n",m->starta,m->enda,m->startb,m->endb); */
         m->enda = mid;
         m->starta_2 = mid;
@@ -72,64 +71,50 @@ int aln_runner(struct aln_mem* m)
 #pragma omp single nowait
         {
 #endif
-                        if(m->seq1){
+                if(m->seq1){
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m) //if(m->enda - m->starta > 10000)
+#pragma omp task shared(m) if(m->run_parallel)
 #endif
-                                aln_seqseq_foward(m);
+                        aln_seqseq_foward(m);
 
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m) //if(m->enda_2 - m->starta_2 > 10000)
+#pragma omp task shared(m) if(m->run_parallel)
 #endif
-                                aln_seqseq_backward(m);
+                        aln_seqseq_backward(m);
 #ifdef HAVE_OPENMP
 #pragma omp taskwait
 #endif
-                                aln_seqseq_meetup(m,old_cor,&meet,&transition,&score);
-                        }else if(m->prof2){
+                        aln_seqseq_meetup(m,old_cor,&meet,&transition,&score);
+                }else if(m->prof2){
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m)//if(m->enda - m->starta > 10000)
+#pragma omp task shared(m) if(m->run_parallel)
 #endif
-                                aln_profileprofile_foward(m);
+                        aln_profileprofile_foward(m);
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m)//if(m->enda_2 - m->starta_2 > 10000)
+#pragma omp task shared(m) if(m->run_parallel)
 #endif
-                                aln_profileprofile_backward(m);
+                        aln_profileprofile_backward(m);
 #ifdef HAVE_OPENMP
 #pragma omp taskwait
 #endif
-                                aln_profileprofile_meetup(m,old_cor,&meet,&transition,&score);
-                        }else{
+                        aln_profileprofile_meetup(m,old_cor,&meet,&transition,&score);
+                }else{
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m)//if(m->enda - m->starta > 10000)
+#pragma omp task shared(m) if(m->run_parallel)
 #endif
-                                aln_seqprofile_foward(m);
+                        aln_seqprofile_foward(m);
 #ifdef HAVE_OPENMP
-#pragma omp task shared(m)//if(m->enda_2 - m->starta_2 > 10000)
+#pragma omp task shared(m) if(m->run_parallel)
 #endif
-                                aln_seqprofile_backward(m);
+                        aln_seqprofile_backward(m);
 #ifdef HAVE_OPENMP
 #pragma omp taskwait
 #endif
-                                aln_seqprofile_meetup(m,old_cor,&meet,&transition,&score);
-                        }
+                        aln_seqprofile_meetup(m,old_cor,&meet,&transition,&score);
+                }
 #ifdef HAVE_OPENMP
-                /* } */
         }
 #endif
-        /* CRITICAL  */
-        //m->starta = mid;
-        //m->enda = old_cor[1];
-
-//fprintf(stderr,"Backward:%d-%d	%d-%d\n",m->starta,m->enda,m->startb,m->endb);
-
-
-        /* if(m->seq1){ */
-        /* }else if(m->prof2){ */
-
-        /* }else{ */
-
-        /* } */
 
         if(m->mode == ALN_MODE_SCORE_ONLY){
                 m->score = score;
@@ -213,8 +198,8 @@ int aln_runner_serial(struct aln_mem* m)
 
 int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int meet,int transition, uint8_t serial)
 {
-        //fprintf(stderr,"Transition:%d	at:%d\n",transition,c);
-        //LOG_MSG("MAX: %f",max);
+        /* fprintf(stderr,"Transition:%d\n",transition); */
+        //log_MSG("MAX: %f",max);
         //j = hirsch_path[0];
         int* path = m->path;
 

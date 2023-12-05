@@ -117,7 +117,6 @@ int main(int argc, char *argv[])
         RUN(param_sanity_check(param));
         RUN(param_print(param));
 
-
         RUN(run_bench(param));
         param_free(param);
 
@@ -129,10 +128,8 @@ ERROR:
 
 int run_bench(struct parameters *p)
 {
-        ASSERT(p != NULL,"No parameters");
-
         struct bench_collection* b = NULL;
-
+        ASSERT(p != NULL,"No parameters");
         RUN(bench_collection_alloc(&b, 1024));
         RUN(process_dir(p, p->target_dir,b));
 

@@ -6,6 +6,9 @@
 #include "msa_op.h"
 #include "msa_alloc.h"
 #include "msa_check.h"
+#include "msa_sort.h"
+#include "msa_io.h"
+
 #include "alphabet.h"
 #include "bisectingKmeans.h"
 
@@ -48,12 +51,15 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
 {
         struct aln_tasks* tasks = NULL;
         struct aln_param* ap = NULL;
-
+        /* This also adds the ranks of the sequences !  */
         RUN(kalign_essential_input_check(msa, 0));
+
         /* If already aligned unalign ! */
         if(msa->aligned != ALN_STATUS_UNALIGNED){
                 RUN(dealign_msa(msa));
         }
+        /* Make sure sequences are in order  */
+        RUN(msa_sort_len_name(msa));
 
         /* Convert into internal representation  */
         if(msa->biotype == ALN_BIOTYPE_DNA){
@@ -65,7 +71,7 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
         }else{
                 ERROR_MSG("Unable to determine what alphabet to use.");
         }
-        /* -LOG_MSG("L: %d  threads: %d",msa->L, n_threads); */
+        /* LOG_MSG("L: %d  threads: %d",msa->L, n_threads); */
         /* Start the heavy lifting  */
 
         /* if(my_file_exists("tasklist.txt")){ */
@@ -81,13 +87,12 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
         /* Build guide tree */
         RUN(build_tree_kmeans(msa,n_threads,&tasks));
 
-
         /* Convert to full alphabet after having converted to reduced alphabet for tree building above  */
         if(msa->biotype == ALN_BIOTYPE_PROTEIN){
                 RUN(convert_msa_to_internal(msa, ALPHA_ambigiousPROTEIN));
         }
 
-/* write_tasks(tasks, "tasklist.txt"); */
+        /* write_tasks(tasks, "tasklist.txt"); */
 /*         } */
 
         /* LOG_MSG("L: %d",msa->L); */
@@ -102,7 +107,6 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
                            tgpe));
 
 
-
         DECLARE_TIMER(t1);
         if(!msa->quiet){
                 LOG_MSG("Aligning");
@@ -114,6 +118,15 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
         msa->aligned = ALN_STATUS_ALIGNED;
 
         RUN(finalise_alignment(msa));
+
+
+
+
+        /* LOG_MSG("Internal "); */
+        /* kalign_write_msa(msa, NULL,"fasta"); */
+        RUN(msa_sort_rank(msa));
+        /* LOG_MSG("Rank"); */
+        /* kalign_write_msa(msa, NULL,"fasta"); */
 
         STOP_TIMER(t1);
         if(!msa->quiet){

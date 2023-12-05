@@ -17,6 +17,7 @@ int alloc_msa(struct msa** msa)
         m->num_profiles = 0;
         m->L = ALPHA_UNDEFINED;
         m->biotype = ALN_BIOTYPE_UNDEF;
+        m->run_parallel = 0;
         m->aligned = 0;
         m->alnlen = 0;
         m->quiet = 0;
@@ -102,6 +103,7 @@ int alloc_msa_seq(struct msa_seq** s)
         seq->s = NULL;
         seq->gaps = NULL;
         seq->len = 0;
+        seq->rank = 0;
         /* seq->name_len = 128; */
         seq->alloc_len = 512;
 
