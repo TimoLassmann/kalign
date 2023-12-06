@@ -22,6 +22,11 @@ add_executable(kalign_io_test
 target_link_libraries(kalign_io_test kalign::kalign)
 
 
+add_executable(dssim
+  dssim.c
+  )
+target_link_libraries(dssim tldevel )
+
 
 
 
