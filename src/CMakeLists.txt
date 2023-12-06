@@ -33,6 +33,8 @@ target_link_libraries(kalign-bin PRIVATE tldevel ${PROJECT_NAME}_static )
 set_target_properties(kalign-bin
   PROPERTIES OUTPUT_NAME kalign)
 
+
+
 add_executable(kalignfmt
   
   run_reformat.c

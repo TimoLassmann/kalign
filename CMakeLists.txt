@@ -62,7 +62,7 @@ if(USE_OPENMP)
   if(OPENMP_FOUND OR OpenMP_FOUND)
     message(STATUS "OpenMP is enabled.")
      
-     add_definitions (-DHAVE_OPENMP)
+    add_definitions (-DHAVE_OPENMP)
   else(OPENMP_FOUND OR OpenMP_FOUND)
     message(STATUS "OpenMP not supported")
   endif(OPENMP_FOUND OR OpenMP_FOUND)

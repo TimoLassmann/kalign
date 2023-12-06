@@ -72,10 +72,10 @@ int create_msa_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
 #endif
         recursive_aln(msa, t, ap, active, t->n_tasks-1);
 
-        for(i = 0; i < msa->num_profiles;i++){
-                fprintf(stdout,"%d",active[i]);
-        }
-        fprintf(stdout,"\n");
+        /* for(i = 0; i < msa->num_profiles;i++){ */
+        /*         fprintf(stdout,"%d",active[i]); */
+        /* } */
+        /* fprintf(stdout,"\n"); */
         MFREE(active);
         return OK;
 ERROR:
@@ -438,13 +438,13 @@ void recursive_aln(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, ui
 #ifdef HAVE_OPENMP
 #pragma omp task shared(msa,t,ap,active) firstprivate(a)
 #endif
-                recursive_aln(msa, t, ap, active, local_t->a - msa->numseq);
+                recursive_aln(msa, t, ap, active, a);
         }
         if(!active[local_t->b] && local_t->b >= msa->numseq){
 #ifdef HAVE_OPENMP
 #pragma omp task shared(msa,t,ap,active) firstprivate(b)
 #endif
-                recursive_aln(msa, t, ap, active,local_t->b - msa->numseq);
+                recursive_aln(msa, t, ap, active, b);
         }
 #ifdef HAVE_OPENMP
         /* } */
