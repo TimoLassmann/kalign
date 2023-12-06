@@ -266,7 +266,6 @@ int bpm_test(void)
 
         int test_iter = 100;
 
-
         int dyn_score;
         int bpm_score;
         int bb_score;
@@ -353,6 +352,8 @@ int bpm_test(void)
                 fprintf(stdout, "\n");
         }
         fprintf(stdout, "\n");
+
+
         LOG_MSG("Testing correctness of AVX bpm.");
         len = strlen(seq);
         if(len > 255){

@@ -57,6 +57,7 @@ if(OpenMP_C_FOUND)
   target_link_libraries(${PROJECT_NAME}_OBJ PRIVATE OpenMP::OpenMP_C)
 endif(OpenMP_C_FOUND)
 
+
 target_include_directories(${PROJECT_NAME}_OBJ
   PRIVATE
   ${CMAKE_CURRENT_BINARY_DIR}
@@ -79,32 +80,32 @@ set(public_header_files
   )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES
-    LANGUAGES C
-    CXX_STANDARD 11
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
-    VERSION ${KALIGN_LIBRARY_VERSION_STRING}
-    SOVERSION ${KALIGN_LIBRARY_VERSION_MAJOR}
-    PUBLIC_HEADER "${public_header_files}"
-    CXX_VISIBILITY_PRESET hidden
-    VISIBILITY_INLINES_HIDDEN 1
-    )
+  LANGUAGES C
+  CXX_STANDARD 11
+  CXX_STANDARD_REQUIRED ON
+  CXX_EXTENSIONS OFF
+  VERSION ${KALIGN_LIBRARY_VERSION_STRING}
+  SOVERSION ${KALIGN_LIBRARY_VERSION_MAJOR}
+  PUBLIC_HEADER "${public_header_files}"
+  CXX_VISIBILITY_PRESET hidden
+  VISIBILITY_INLINES_HIDDEN 1
+  )
 
 target_sources(${PROJECT_NAME}
-    PRIVATE
-    ${public_header_files}
-    $<TARGET_OBJECTS:${PROJECT_NAME}_OBJ>        
-    )
+  PRIVATE
+  ${public_header_files}
+  $<TARGET_OBJECTS:${PROJECT_NAME}_OBJ>        
+  )
 
 # Define headers for this library. PUBLIC headers are used for
 # compiling the library, and will be added to consumers' build
 # paths.
 target_include_directories(${PROJECT_NAME}
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>  
-    )
+  PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>  
+  )
 
 target_include_directories(${PROJECT_NAME}
   PRIVATE
@@ -115,33 +116,34 @@ target_include_directories(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME} PRIVATE m)
 
 if(OpenMP_C_FOUND)
-    target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_C)
+  target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_C)
 endif()
+
 
 
 add_library(${PROJECT_NAME}_static STATIC
   ${public_header_files}
-    $<TARGET_OBJECTS:${PROJECT_NAME}_OBJ>        
-    )
-  
+  $<TARGET_OBJECTS:${PROJECT_NAME}_OBJ>        
+  )
+
 set_target_properties(${PROJECT_NAME}_static PROPERTIES
-    LANGUAGES C
-    CXX_STANDARD 11
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
-    VERSION ${KALIGN_LIBRARY_VERSION_STRING}
-    SOVERSION ${KALIGN_LIBRARY_VERSION_MAJOR}
-    PUBLIC_HEADER "${public_header_files}"
-    CXX_VISIBILITY_PRESET hidden
-    VISIBILITY_INLINES_HIDDEN 1
-    )
+  LANGUAGES C
+  CXX_STANDARD 11
+  CXX_STANDARD_REQUIRED ON
+  CXX_EXTENSIONS OFF
+  VERSION ${KALIGN_LIBRARY_VERSION_STRING}
+  SOVERSION ${KALIGN_LIBRARY_VERSION_MAJOR}
+  PUBLIC_HEADER "${public_header_files}"
+  CXX_VISIBILITY_PRESET hidden
+  VISIBILITY_INLINES_HIDDEN 1
+  )
 
 target_include_directories(${PROJECT_NAME}_static
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>  
-    )
+  PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>  
+  )
 
 target_include_directories(${PROJECT_NAME}_static
   PRIVATE
@@ -151,8 +153,9 @@ target_include_directories(${PROJECT_NAME}_static
 target_link_libraries(${PROJECT_NAME}_static PRIVATE m)
 
 if(OpenMP_C_FOUND)
-    target_link_libraries(${PROJECT_NAME}_static PRIVATE OpenMP::OpenMP_C)
+  target_link_libraries(${PROJECT_NAME}_static PRIVATE OpenMP::OpenMP_C)
 endif()
+
 
 add_library(tldevel STATIC
   src/tldevel.c

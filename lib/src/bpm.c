@@ -74,7 +74,7 @@ uint8_t dyn_256(const uint8_t* t,const uint8_t* p,int n,int m)
         prev = tmp;
 
         for(i = 1; i <= n;i++){
-                cur[0] = prev[0];
+                cur[0] = prev[0] ;
                 //fprintf(stdout,"%d ", cur[0]);
                 for(j = 1; j < m;j++){
                         c = 1;
@@ -578,9 +578,6 @@ int bpm_block(const uint8_t *t, const uint8_t *p, int n, int m)
                         M[b] = Mv;
 
                         /* carry = h_out; */
-
-
-
 
                         score[y] = score[y - 1] + w - carry + h_out;//advanceBlock(s,y, c, carry);
                 } else {

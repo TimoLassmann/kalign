@@ -35,11 +35,11 @@
 #endif
 
 
-#ifdef HAVE_AVX2
-#define BPM(a,b,len_a,len_b) bpm_256(a,b,len_a,len_b)
-#else
+/* #ifdef HAVE_AVX2 */
+/* #define BPM(a,b,len_a,len_b) bpm_256(a,b,len_a,len_b) */
+/* #else */
 #define BPM(a,b,len_a,len_b) bpm_block(a,b,len_a,len_b)
-#endif
+/* #endif */
 
 /* #define LOG_MSG(...) do {                       \ */
 /*                 log_message( __VA_ARGS__ );     \ */
