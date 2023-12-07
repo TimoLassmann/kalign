@@ -12,7 +12,6 @@
 #include <unistd.h>
 #include <getopt.h>
 
-
 #include "kalign/kalign.h"
 
 #define MAX_PATH_LEN 4096

@@ -28,6 +28,8 @@ int alloc_msa(struct msa** msa)
 
         MMALLOC(m->sequences, sizeof(struct msa_seq*) * m->alloc_numseq);
 
+
+
         for(i = 0; i < m->alloc_numseq;i++){
                 m->sequences[i] = NULL;
                 RUN(alloc_msa_seq(&m->sequences[i]));
