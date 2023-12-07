@@ -1,4 +1,6 @@
 #include "tldevel.h"
+#include "tlrng.h"
+
 #include "msa_struct.h"
 
 #include <string.h>
@@ -31,6 +33,21 @@ ERROR:
         return FAIL;
 }
 
+int msa_shuffle_seq(struct msa *m, struct rng_state* rng)
+{
+        int r;
+        int i,j;
+        struct msa_seq* tmp;
+        int n = m->numseq;
+        for (i = 0; i < n - 1; i++) {
+                r = tl_random_int(rng,n);
+                j = i +  r % (n-i);
+                tmp =  m->sequences[j];
+                m->sequences[j] =  m->sequences[i];
+                m->sequences[i] = tmp;
+        }
+        return OK;
+}
 
 int sort_by_len_name(const void *a, const void *b)
 {
