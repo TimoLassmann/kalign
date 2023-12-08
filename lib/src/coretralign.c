@@ -4,24 +4,108 @@
 #include "coretralign.h"
 
 
-typedef struct aln_scheduler {
-        aln_elem_queue* task_alloc;
-        aln_elem_queue* task_queue;
-        pthread_t* threads;
-        int64_t* thread_id_map;
-        int thread_id_idx;
-        pthread_mutex_t lock;
-        int n_threads;
-} aln_scheduler;
-
-
-
-int aln_scheduler_alloc(aln_scheduler **scheduler)
+int aln_scheduler_get_tid(aln_scheduler *s)
 {
-        aln_scheduler* n = NULL;
+        int i;
+        int64_t tid = (int64_t) pthread_self();
+        int ID = -1;
+
+        aln_scheduler_lock(s);
+        for(i = 0; i < s->thread_id_idx;i++){
+                if(s->thread_id_map[i] == tid){
+                        ID = i;
+                        break;
+                }
+        }
+        if(ID == -1){
+                ID = s->thread_id_idx;
+                s->thread_id_map[s->thread_id_idx] = tid;
+                s->thread_id_idx++;
+        }
+        aln_scheduler_unlock(s);
+        return ID;
+}
+
+int  aln_scheduler_lock(aln_scheduler* s)
+{
+        ASSERT(s != NULL, "No thread controll");
+        /* pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL); */
+        if(pthread_mutex_lock(&s->lock) != 0){
+                ERROR_MSG("Can't get lock");
+        }
         return OK;
 ERROR:
         return FAIL;
+}
+
+int  aln_scheduler_trylock(aln_scheduler* s)
+{
+        return pthread_mutex_trylock(&s->lock);
+}
+
+int  aln_scheduler_unlock(aln_scheduler* s)
+{
+        ASSERT(s != NULL, "No thread controll");
+        if(pthread_mutex_unlock(&s->lock) != 0){
+                ERROR_MSG("Can't get lock");
+        }
+        /* pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL); */
+        /* pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL); */
+        /* pthread_testcancel(); */
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+
+int aln_scheduler_alloc(aln_scheduler **scheduler, int n_threads)
+{
+        aln_scheduler* n = NULL;
+
+        MMALLOC(n, sizeof(aln_scheduler));
+        n->task_alloc = NULL;
+        n->task_queue = NULL;
+        n->threads = NULL;
+        n->thread_id_map = NULL;
+
+        n->thread_id_idx = 0;
+        pthread_mutex_init(&n->lock, NULL);
+        n->n_threads = n_threads;
+
+        MMALLOC(n->threads, sizeof(pthread_t) * n->n_threads);
+
+        MMALLOC(n->thread_id_map, sizeof(int64_t) * n->n_threads);
+
+
+        queue_alloc(&n->task_alloc, 1);
+        queue_alloc(&n->task_queue, 0);
+
+
+
+        *scheduler = n;
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+void aln_scheduler_free(aln_scheduler *n)
+{
+        if(n){
+                if(n->task_alloc){
+                        queue_free(n->task_alloc);
+                }
+                if(n->task_queue){
+                        queue_free(n->task_queue);
+                }
+                if(n->threads){
+                        MFREE(n->threads);
+                }
+                if(n->thread_id_map){
+                        MFREE(n->thread_id_map);
+                }
+                MFREE(n);
+        }
+
 }
 
 

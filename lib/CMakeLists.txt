@@ -48,6 +48,8 @@ set(source_files
   src/aln_seqprofile.c
   src/aln_profileprofile.c
   src/weave_alignment.c
+
+  src/coretralign.c
   # src/test.h
   )
 

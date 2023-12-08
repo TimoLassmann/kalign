@@ -42,7 +42,6 @@ typedef struct aln_elem_queue {
         uint8_t is_allocator;
 } aln_elem_queue;
 
-
 typedef struct aln_scheduler {
         aln_elem_queue* task_alloc;
         aln_elem_queue* task_queue;
@@ -51,8 +50,15 @@ typedef struct aln_scheduler {
         int thread_id_idx;
         pthread_mutex_t lock;
         int n_threads;
+        struct msa* msa;
 } aln_scheduler;
 
+EXTERN int  aln_scheduler_lock(aln_scheduler* s);
+EXTERN int  aln_scheduler_trylock(aln_scheduler* s);
+EXTERN int  aln_scheduler_unlock(aln_scheduler* s);
+
+EXTERN  int aln_scheduler_alloc(aln_scheduler **scheduler, int n_threads);
+EXTERN void aln_scheduler_free(aln_scheduler *n);
 
 EXTERN  int queue_alloc(aln_elem_queue **queue, uint8_t is_allocator);
 EXTERN void queue_free(aln_elem_queue *l);
