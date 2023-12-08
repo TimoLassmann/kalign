@@ -241,13 +241,12 @@ int bisecting_kmeans_parallel(struct msa* msa, struct node** ret_n, float** dm,i
                 if(!change){
                         break;
                 }
-
         }
+
         sl = best->sl;
         sr = best->sr;
 
         num_l = best->nl;
-
         num_r = best->nr;
 
         /* free_kmeans_results(res[0]); */
