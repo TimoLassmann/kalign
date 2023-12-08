@@ -3,13 +3,11 @@
 #define  CORETRALIGN_IMPORT
 #include "coretralign.h"
 
-
 int aln_scheduler_get_tid(aln_scheduler *s)
 {
         int i;
         int64_t tid = (int64_t) pthread_self();
         int ID = -1;
-
         aln_scheduler_lock(s);
         for(i = 0; i < s->thread_id_idx;i++){
                 if(s->thread_id_map[i] == tid){
@@ -65,9 +63,9 @@ int aln_scheduler_alloc(aln_scheduler **scheduler, int n_threads)
         MMALLOC(n, sizeof(aln_scheduler));
         n->task_alloc = NULL;
         n->task_queue = NULL;
+        n->root = NULL;
         n->threads = NULL;
         n->thread_id_map = NULL;
-
         n->thread_id_idx = 0;
         pthread_mutex_init(&n->lock, NULL);
         n->n_threads = n_threads;
