@@ -6,13 +6,13 @@
 #define MSA_ALLOC_IMPORT
 #include "msa_alloc.h"
 
-int alloc_msa(struct msa** msa)
+int alloc_msa(struct msa** msa, int numseq)
 {
         struct msa* m = NULL;
         int i;
         MMALLOC(m, sizeof(struct msa));
         m->sequences = NULL;
-        m->alloc_numseq = 512;
+        m->alloc_numseq = numseq;
         m->numseq = 0;
         m->num_profiles = 0;
         m->L = ALPHA_UNDEFINED;

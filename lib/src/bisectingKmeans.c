@@ -69,12 +69,13 @@ static void create_tasks(struct node*n, struct aln_tasks* t);
 /* static void create_tasks(struct node*n, struct aln_tasks* t); */
 
 
-static int bisecting_kmeans_serial(struct msa* msa, struct node** ret_n, float** dm,int* samples, int num_samples);
-static int bisecting_kmeans_parallel(struct msa* msa, struct node** ret_n, float** dm,int* samples, int num_samples);
+/* static int bisecting_kmeans_serial(struct msa *msa, struct node **ret_n, float **dm, int *samples, int num_samples); */
+static int bisecting_kmeans(struct msa* msa, struct node** ret_n, float** dm,int* samples, int num_samples);
+/* static int bisecting_kmeans_parallel(struct msa* msa, struct node** ret_n, float** dm,int* samples, int num_samples); */
 
 static int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick,struct kmeans_result** ret);
 
-int build_tree_kmeans(struct msa* msa, int n_threads, struct aln_tasks** tasks)
+int build_tree_kmeans(struct msa* msa, struct aln_tasks** tasks)
 {
         struct aln_tasks* t = NULL;
         struct node* root = NULL;
@@ -120,15 +121,16 @@ int build_tree_kmeans(struct msa* msa, int n_threads, struct aln_tasks** tasks)
                 LOG_MSG("Building guide tree.");
         }
 
-        if(n_threads == 1){
-                RUN(bisecting_kmeans_serial(msa,&root, dm, samples, numseq));
-        }else{
+        /* if(n_threads == 1){ */
+        /*         RUN(bisecting_kmeans_serial(msa,&root, dm, samples, numseq)); */
+        /* }else{ */
 #ifdef HAVE_OPENMP
 #pragma omp parallel
 #pragma omp single nowait
 #endif
-                bisecting_kmeans_parallel(msa,&root, dm, samples, numseq);
-        }
+        bisecting_kmeans(msa,&root, dm, samples, numseq);
+        /* } */
+
 
         STOP_TIMER(timer);
         if(!msa->quiet){
@@ -153,7 +155,7 @@ ERROR:
         return FAIL;
 }
 
-int bisecting_kmeans_parallel(struct msa* msa, struct node** ret_n, float** dm,int* samples, int num_samples)
+int bisecting_kmeans(struct msa* msa, struct node** ret_n, float** dm,int* samples, int num_samples)
 {
         struct kmeans_result* res_tmp = NULL;
         struct kmeans_result* best = NULL;
@@ -181,11 +183,13 @@ int bisecting_kmeans_parallel(struct msa* msa, struct node** ret_n, float** dm,i
                 MFREE(samples);
                 return OK;
                 //return n;
-        }else if(num_samples < 1000){
-                RUN(bisecting_kmeans_serial(msa, &n, dm, samples, num_samples));
-                *ret_n = n;
-                return OK;
         }
+
+        /* else if(num_samples < 1000){ */
+        /*         RUN(bisecting_kmeans_serial(msa, &n, dm, samples, num_samples)); */
+        /*         *ret_n = n; */
+        /*         return OK; */
+        /* } */
 
 
         best = NULL;
@@ -269,12 +273,12 @@ int bisecting_kmeans_parallel(struct msa* msa, struct node** ret_n, float** dm,i
 #ifdef HAVE_OPENMP
 #pragma omp task shared(msa,n,dm)
 #endif
-        bisecting_kmeans_parallel(msa,&n->left, dm, sl, num_l);
+        bisecting_kmeans(msa,&n->left, dm, sl, num_l);
 
 #ifdef HAVE_OPENMP
 #pragma omp task shared(msa,n,dm,num_anchors)
 #endif
-        bisecting_kmeans_parallel(msa,&n->right, dm, sr, num_r);
+        bisecting_kmeans(msa,&n->right, dm, sr, num_r);
 
 #ifdef HAVE_OPENMP
 #pragma omp taskwait
@@ -286,93 +290,92 @@ ERROR:
         return FAIL;
 }
 
-int bisecting_kmeans_serial(struct msa* msa, struct node** ret_n, float** dm,int* samples, int num_samples)
-{
-        struct kmeans_result* res_tmp = NULL;
-        struct kmeans_result* best = NULL;
-        struct kmeans_result** res_ptr = NULL;
-        int num_anchors = 0;
-        struct node* n = NULL;
-        int i,j;
-        int tries = 40;
-        /* int t_iter; */
-        /* int r; */
-        int* sl = NULL;
-        int* sr = NULL;
-        int num_l,num_r;
+/* int bisecting_kmeans_serial(struct msa* msa, struct node** ret_n, float** dm,int* samples, int num_samples) */
+/* { */
+/*         struct kmeans_result* res_tmp = NULL; */
+/*         struct kmeans_result* best = NULL; */
+/*         struct kmeans_result** res_ptr = NULL; */
+/*         int num_anchors = 0; */
+/*         struct node* n = NULL; */
+/*         int i,j; */
+/*         int tries = 40; */
+/*         /\* int t_iter; *\/ */
+/*         /\* int r; *\/ */
+/*         int* sl = NULL; */
+/*         int* sr = NULL; */
+/*         int num_l,num_r; */
 
-        num_anchors = MACRO_MIN(32, msa->numseq);
+/*         num_anchors = MACRO_MIN(32, msa->numseq); */
 
-        if(num_samples < 100){
-                float** dm = NULL;
-                RUNP(dm = d_estimation(msa, samples, num_samples,1));// anchors, num_anchors,1));
-                n = upgma(dm,samples, num_samples);
-                *ret_n = n;
-                gfree(dm);
-                MFREE(samples);
-                return OK;
-        }
+/*         if(num_samples < 100){ */
+/*                 float** dm = NULL; */
+/*                 RUNP(dm = d_estimation(msa, samples, num_samples,1));// anchors, num_anchors,1)); */
+/*                 n = upgma(dm,samples, num_samples); */
+/*                 *ret_n = n; */
+/*                 gfree(dm); */
+/*                 MFREE(samples); */
+/*                 return OK; */
+/*         } */
 
-        best = NULL;
-        res_tmp = NULL;
+/*         best = NULL; */
+/*         res_tmp = NULL; */
 
-        MMALLOC(res_ptr, sizeof(struct kmeans_result*) * 4);
-        for(i = 0; i < 4;i++){
-                res_ptr[i] = NULL;
-        }
-        tries = MACRO_MIN(tries, num_samples);
-        int step = num_samples / tries;
-        int change = 0;
-        for(i = 0;i < tries;i += 4){
-                change = 0;
-                for(j = 0; j < 4;j++){
-                        split(dm,samples,num_anchors, num_samples, (i+ j)*step, &res_ptr[j]);
-                }
+/*         MMALLOC(res_ptr, sizeof(struct kmeans_result*) * 4); */
+/*         for(i = 0; i < 4;i++){ */
+/*                 res_ptr[i] = NULL; */
+/*         } */
+/*         tries = MACRO_MIN(tries, num_samples); */
+/*         int step = num_samples / tries; */
+/*         int change = 0; */
+/*         for(i = 0;i < tries;i += 4){ */
+/*                 change = 0; */
+/*                 for(j = 0; j < 4;j++){ */
+/*                         split(dm,samples,num_anchors, num_samples, (i+ j)*step, &res_ptr[j]); */
+/*                 } */
 
-                for(j = 0; j < 4;j++){
-                        if(!best){
-                                change++;
-                                best = res_ptr[j];
-                                res_ptr[j] = NULL;
-                        }else{
-                                if(best->score > res_ptr[j]->score){
-                                        res_tmp = best;
-                                        best = res_ptr[j];
-                                        res_ptr[j] = res_tmp;
-                                        /* LOG_MSG("Better!!! %f %f", res_tmp->score,best->score); */
+/*                 for(j = 0; j < 4;j++){ */
+/*                         if(!best){ */
+/*                                 change++; */
+/*                                 best = res_ptr[j]; */
+/*                                 res_ptr[j] = NULL; */
+/*                         }else{ */
+/*                                 if(best->score > res_ptr[j]->score){ */
+/*                                         res_tmp = best; */
+/*                                         best = res_ptr[j]; */
+/*                                         res_ptr[j] = res_tmp; */
+/*                                         /\* LOG_MSG("Better!!! %f %f", res_tmp->score,best->score); *\/ */
 
-                                        change++;
-                                }
-                        }
-                }
-                if(!change){
-                        break;
-                }
+/*                                         change++; */
+/*                                 } */
+/*                         } */
+/*                 } */
+/*                 if(!change){ */
+/*                         break; */
+/*                 } */
 
-        }
-        sl = best->sl;
-        sr = best->sr;
+/*         } */
+/*         sl = best->sl; */
+/*         sr = best->sr; */
 
-        num_l = best->nl;
+/*         num_l = best->nl; */
+/*         num_r = best->nr; */
 
-        num_r = best->nr;
+/*         for(i = 0; i < 4;i++){ */
+/*                 free_kmeans_results(res_ptr[i]); */
+/*         } */
+/*         MFREE(res_ptr); */
+/*         MFREE(best); */
 
-        for(i = 0; i < 4;i++){
-                free_kmeans_results(res_ptr[i]);
-        }
-        MFREE(res_ptr);
-        MFREE(best);
+/*         MFREE(samples); */
+/*         n = alloc_node(); */
 
-        MFREE(samples);
-        n = alloc_node();
-
-        bisecting_kmeans_serial(msa,&n->left , dm, sl, num_l);
-        bisecting_kmeans_serial(msa,&n->right, dm, sr, num_r);
-        *ret_n = n;
-        return OK;
-ERROR:
-        return FAIL;
-}
+/*         bisecting_kmeans_serial(msa,&n->left , dm, sl, num_l); */
+/*         bisecting_kmeans_serial(msa,&n->right, dm, sr, num_r); */
+/*         *ret_n = n; */
+/*         return OK; */
+/* ERROR: */
+/*         return FAIL; */
+/* } */
 
 int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick,struct kmeans_result** ret)
 {

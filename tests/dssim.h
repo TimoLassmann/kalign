@@ -9,7 +9,8 @@
 #define EXTERN extern
 #endif
 
-EXTERN int dssim_get_fasta(struct msa** msa, int n_seq, int n_obs,int len,int seed);
+EXTERN int dssim_get_fasta(struct msa **msa, int n_seq, int n_obs, int dna,int len, int seed);
+/* EXTERN int dssim_get_fasta(struct msa** msa, int n_seq, int n_obs,int len,int seed); */
 
 #undef DSSIM_IMPORT
 #undef EXTERN

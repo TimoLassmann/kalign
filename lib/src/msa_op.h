@@ -10,6 +10,8 @@
 struct msa;
 struct msa_seq;
 
+EXTERN int msa_seq_cpy(struct msa_seq *d, struct msa_seq *src);
+EXTERN int msa_cpy(struct msa** dest, struct msa* src);
 EXTERN int merge_msa(struct msa** dest, struct msa* src);
 
 EXTERN int dealign_msa(struct msa *msa);

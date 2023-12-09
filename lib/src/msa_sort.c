@@ -25,9 +25,19 @@ ERROR:
 int msa_sort_rank(struct msa *m)
 {
         ASSERT(m != NULL, "No alignment");
-
+        /* for(int i = 0; i < m->numseq;i++){ */
+        /*         fprintf(stdout,"%d %s\n", */
+        /*                 m->sequences[i]->rank, */
+        /*                 m->sequences[i]->name */
+        /*                 ); */
+        /* } */
         qsort(m->sequences, m->numseq, sizeof(struct msa_seq*),sort_by_rank);
-
+        /* for(int i = 0; i < m->numseq;i++){ */
+        /*         fprintf(stdout,"%d %s - sorted\n", */
+        /*                 m->sequences[i]->rank, */
+        /*                 m->sequences[i]->name */
+        /*                 ); */
+        /* } */
         return OK;
 ERROR:
         return FAIL;

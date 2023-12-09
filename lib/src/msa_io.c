@@ -414,7 +414,7 @@ int read_fasta( struct in_buffer* b,struct msa** m)
         int nl;
 
         if(msa == NULL){
-                RUN(alloc_msa(&msa));
+                RUN(alloc_msa(&msa,512));
                 /* msa = alloc_msa(); */
         }
 
@@ -488,7 +488,7 @@ int read_clu(struct in_buffer* b , struct msa** m)
         int nl,ni;
 
         if(msa == NULL){
-                RUN(alloc_msa(&msa));
+                RUN(alloc_msa(&msa,512));
                 /* msa = alloc_msa(); */
         }
 
@@ -566,7 +566,7 @@ int read_msf(struct in_buffer* b,struct msa** m)
         char* p;
         int active_seq = 0;
         if(msa == NULL){
-                RUN(alloc_msa(&msa));
+                RUN(alloc_msa(&msa,512));
                 /* msa = alloc_msa(); */
         }
         li = 0;

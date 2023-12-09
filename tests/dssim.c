@@ -29,10 +29,12 @@ typedef enum {
 struct hmm_param {
         double match_err_p;
         double insert_err_p;
+        double indel_p;
         int n_observed_seq;
         int n_sim_seq;
         int len;
         int seed;
+        int dna;
 };
 
 struct hmm {
@@ -47,20 +49,23 @@ struct hmm {
 int hmm_emit_simple(struct hmm *hmm, char **out,int *len);
 int sample_pick(double *p, int len, struct rng_state* rng, int *pick);
 char emit_letter(int c);
+char emit_letter_dna(int c);
 /* int hmm_init(struct hmm **hmm, int len, int seed); */
-int hmm_init(struct hmm **hmm, struct hmm_param* p);
+int hmm_init(struct hmm **hmm, struct hmm_param *p);
+
 int get_prior_emit(double **prior);
+int get_prior_emit_dna(double** prior);
 int get_prior_trans(double** prior);
 
 int pick(double *p, int len, struct rng_state *rng, int *pick);
 int hmm_print(struct hmm *m);
-int hmm_alloc(struct hmm **hmm, int len, int seed);
+int hmm_alloc(struct hmm **hmm, int len, int seed, int dna);
 void hmm_free(struct hmm *n);
 
 int hmm_param_init(struct hmm_param **param);
 void hmm_param_free(struct hmm_param *p);
 
-int dssim_get_fasta(struct msa **msa, int n_seq, int n_obs, int len, int seed)
+int dssim_get_fasta(struct msa **msa, int n_seq, int n_obs, int dna,int len, int seed)
 {
         struct msa* m = NULL;
         struct hmm* hmm = NULL;
@@ -73,9 +78,15 @@ int dssim_get_fasta(struct msa **msa, int n_seq, int n_obs, int len, int seed)
         p->n_observed_seq = n_obs;
         p->len = len;
         p->seed = seed;
-
+        p->dna = dna;
+        if(n_seq > 100){
+                p->indel_p = 0.02;
+        }else{
+                p->indel_p = 0.04;
+        }
+        
         RUN(hmm_init(&hmm, p));
-
+        /* hmm_print(hmm); */
         MMALLOC(m, sizeof(struct msa));
         m->sequences = NULL;
         m->alloc_numseq = n_seq;
@@ -97,6 +108,7 @@ int dssim_get_fasta(struct msa **msa, int n_seq, int n_obs, int len, int seed)
         m->numseq = 0;
         for(int i = 0; i < p->n_sim_seq;i++){
                 hmm_emit_simple(hmm, &tmp_seq, &r_len);
+                /* LOG_MSG("%s", tmp_seq); */
                 m->sequences[i] = NULL;
                 struct msa_seq* seq = NULL;
 
@@ -106,10 +118,11 @@ int dssim_get_fasta(struct msa **msa, int n_seq, int n_obs, int len, int seed)
                 seq->s = NULL;
                 seq->gaps = NULL;
                 seq->len = r_len;
-                seq->alloc_len = r_len;
+                seq->alloc_len = r_len+1;
+                seq->rank = i;
 
                 MMALLOC(seq->name, sizeof(char)* MSA_NAME_LEN);
-                snprintf(seq->name, MSA_NAME_LEN,"Seq_%d",i+1);
+                snprintf(seq->name, MSA_NAME_LEN,"%d",i+1);
                 MMALLOC(seq->seq, sizeof(char) * seq->alloc_len);
                 MMALLOC(seq->s, sizeof(uint8_t) * seq->alloc_len);
                 MMALLOC(seq->gaps, sizeof(int) * (seq->alloc_len+1));
@@ -133,8 +146,13 @@ int dssim_get_fasta(struct msa **msa, int n_seq, int n_obs, int len, int seed)
         hmm_free(hmm);
 
         RUN(detect_alphabet(m));
+        /* LOG_MSG("%d biotype",m->biotype); */
         RUN(detect_aligned(m));
+        /* LOG_MSG("%d aligned ",m->aligned); */
         RUN(set_sip_nsip(m));
+        /* LOG_MSG("%d aligned ",m->aligned); */
+
+
         *msa = m;
         return OK;
 ERROR:
@@ -170,6 +188,8 @@ int hmm_emit_simple(struct hmm *hmm, char **out,int *len)
         state_type state = HMM_INSERT;
         double r;
         double sum;
+
+        state = tl_random_int(hmm->rng, 3);
         MMALLOC(seq, sizeof(char) * n_alloc);
         seq[0] = 0;
         while(pos+1 < hmm->len){
@@ -220,7 +240,11 @@ int hmm_emit_simple(struct hmm *hmm, char **out,int *len)
                 switch (state) {
                 case HMM_MATCH:
                         sample_pick(hmm->match_emit[pos], 20, hmm->rng,&pick);
-                        seq[n] = emit_letter(pick);
+                        if(hmm->L == 20){
+                                seq[n] = emit_letter(pick);
+                        }else{
+                                seq[n] = emit_letter_dna(pick);
+                        }
                         n++;
                         if(n == n_alloc){
                                 n_alloc = n_alloc + n_alloc / 2;
@@ -230,7 +254,11 @@ int hmm_emit_simple(struct hmm *hmm, char **out,int *len)
                         break;
                 case HMM_INSERT:
                         sample_pick(hmm->insert_emit[pos], 20, hmm->rng,&pick);
-                        seq[n] = emit_letter(pick);
+                        if(hmm->L == 20){
+                                seq[n] = emit_letter(pick);
+                        }else{
+                                seq[n] = emit_letter_dna(pick);
+                        }
                         n++;
                         if(n == n_alloc){
                                 n_alloc = n_alloc + n_alloc / 2;
@@ -274,7 +302,10 @@ int sample_pick(double *p, int len, struct rng_state* rng, int *pick)
                 }
 
         }
-        /* LOG_MSG("Selected: %d (%d)", sel, len); */
+        /* LOG_MSG("Selected: %d (%d) r:%f %f", sel, len, r, sum); */
+        /* if(sel == -1){ */
+
+        /* } */
         *pick = sel;
         return OK;
 }
@@ -282,6 +313,12 @@ int sample_pick(double *p, int len, struct rng_state* rng, int *pick)
 char emit_letter(int c)
 {
         char alphabet[20] = "ACDEFGHIKLMNPQRSTVWY";
+        return alphabet[c];
+}
+
+char emit_letter_dna(int c)
+{
+        char alphabet[4] = "ACGT";
         return alphabet[c];
 }
 
@@ -294,35 +331,43 @@ int hmm_init(struct hmm **hmm, struct hmm_param* p)
         double r = 0.0;
         int pick;
 
-        RUN(get_prior_emit(&prior_e));
-        RUN(get_prior_trans(&prior_t));
+        if(p->dna == 0){
+                RUN(get_prior_emit(&prior_e));
+                RUN(get_prior_trans(&prior_t));
+        }else{
+                RUN(get_prior_emit_dna(&prior_e));
+                RUN(get_prior_trans(&prior_t));
+        }
 
+        prior_t[TMM] = 1.0 - p->indel_p;
+        prior_t[TMI] = p->indel_p / 2.0;
+        prior_t[TMD] = p->indel_p / 2.0;
 
-        RUN(hmm_alloc(&n, p->len,p->seed));
+        prior_t[TMM] = prior_t[TMM] / (prior_t[TMM] + prior_t[TMI] + prior_t[TMD]);
+        prior_t[TMI] = prior_t[TMI] / (prior_t[TMM] + prior_t[TMI] + prior_t[TMD]);
+        prior_t[TMD] = prior_t[TMD] / (prior_t[TMM] + prior_t[TMI] + prior_t[TMD]);
+
+        RUN(hmm_alloc(&n, p->len,p->seed,p->dna));
 
         /* Start state...  */
         /* n->transition[0][TMM] = 0.5; */
         /* n->transition[0][TMI] = 0.5; */
         /* n->transition[0][TMD] = 0.0; */
 
-        for(int j = 0;j < 20;j++){
-                n->match_emit[0][j] = 0.0;
-                n->insert_emit[0][j] = 0.0;
-        }
-
-        for(int i = 1; i < p->len;i++){
-                for(int j = 0; j < 20;j++){
-                        n->match_emit[0][j] = 0.0;
-                        n->insert_emit[0][j] = 0.0;
+        for(int i = 0; i < p->len;i++){
+                for(int j = 0; j < n->L;j++){
+                        n->match_emit[i][j] = 0.0;
+                        n->insert_emit[i][j] = 0.0;
                 }
 
                 /* match  */
                 /* pick =tl_random_int(n->rng, 20); */
-                sample_pick(prior_e, 20, n->rng, &pick);
+
+                sample_pick(prior_e, n->L, n->rng, &pick);
                 for(int j = 0; j < p->n_observed_seq;j++){
                         r = tl_random_double(n->rng);
                         if(r < p->match_err_p){
-                                int c = tl_random_int(n->rng, 20);
+                                int c = tl_random_int(n->rng, n->L);
                                 n->match_emit[i][c] += 1.0;
                         }else{
                                 n->match_emit[i][pick] += 1.0;
@@ -330,36 +375,37 @@ int hmm_init(struct hmm **hmm, struct hmm_param* p)
                 }
                 /* insert  */
                 /* pick =tl_random_int(n->rng, 20); */
-                sample_pick(prior_e, 20, n->rng, &pick);
+                sample_pick(prior_e, n->L, n->rng, &pick);
 
                 for(int j = 0; j < p->n_observed_seq;j++){
                         r = tl_random_double(n->rng);
                         if(r < p->insert_err_p){
-                                int c = tl_random_int(n->rng, 20);
+                                int c = tl_random_int(n->rng, n->L);
                                 n->insert_emit[i][c] += 1.0;
                         }else{
                                 n->insert_emit[i][pick] += 1.0;
                         }
                 }
-                for(int j = 0; j < 20;j++){
+                for(int j = 0; j < n->L;j++){
                         n->match_emit[i][j] += prior_e[j];
                         n->insert_emit[i][j] += prior_e[j];
                 }
 
                 sum = 0.0;
-                for(int j = 0; j < 20;j++){
+                for(int j = 0; j < n->L;j++){
                         sum += n->match_emit[i][j];
                 }
-                for(int j = 0; j < 20;j++){
+                for(int j = 0; j < n->L;j++){
                         n->match_emit[i][j]/=sum;
                 }
 
                 sum = 0.0;
-                for(int j = 0; j < 20;j++){
+                for(int j = 0; j < n->L;j++){
                         sum += n->insert_emit[i][j];
                 }
-                for(int j = 0; j < 20;j++){
+                for(int j = 0; j < n->L;j++){
                         n->insert_emit[i][j]/=sum;
+
                 }
 
                 /* transitions  */
@@ -380,7 +426,7 @@ int get_prior_emit(double** prior)
 {
         double* p = NULL;
         double sum = 0.0;
-        galloc(&p , 20);
+        RUN(galloc(&p , 20));
         p[0]  = 0.075520;                     /* A */
         p[1]  = 0.016973;                     /* C */
         p[2]  = 0.053029;                     /* D */
@@ -415,10 +461,34 @@ ERROR:
         return FAIL;
 }
 
+int get_prior_emit_dna(double** prior)
+{
+        double* p = NULL;
+        double sum = 0.0;
+        RUN(galloc(&p , 4));
+        p[0]  = 0.2;                     /* A */
+        p[1]  = 0.3;                     /* C */
+        p[2]  = 0.3;                     /* G */
+        p[3]  = 0.2;                     /* T */
+
+        sum = 0.0;
+        for(int i = 0; i < 4;i++){
+                sum += p[i];
+        }
+        for(int i = 0; i < 4;i++){
+                p[i]/= sum;
+        }
+        *prior = p;
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+
 int get_prior_trans(double** prior)
 {
         double* p = NULL;
-        galloc(&p , 7);
+        RUN(galloc(&p , 7));
 
         p[TMM] = 0.96;
         p[TMI] = 0.02;
@@ -437,7 +507,7 @@ ERROR:
 
 int hmm_print(struct hmm *m)
 {
-
+        ASSERT(m == NULL,"No hmm");
         LOG_MSG("Emission: MATCH ");
         for(int i = 0; i < m->len;i++){
                 fprintf(stdout,"   %4d ", i);
@@ -472,7 +542,7 @@ ERROR:
 }
 
 
-int hmm_alloc(struct hmm **hmm, int len, int seed)
+int hmm_alloc(struct hmm **hmm, int len, int seed, int dna)
 {
         struct hmm* n = NULL;
 
@@ -482,7 +552,11 @@ int hmm_alloc(struct hmm **hmm, int len, int seed)
         n->insert_emit = NULL;
         n->transition = NULL;
         n->rng = init_rng(seed);
-        n->L = 20;
+        if(!dna){
+                n->L = 20;
+        }else{
+                n->L = 4;
+        }
         n->len = len;
 
         galloc(&n->match_emit,n->len, n->L);
@@ -514,10 +588,12 @@ int hmm_param_init(struct hmm_param **param)
         MMALLOC(p, sizeof(struct hmm_param));
         p->insert_err_p = 0.25;
         p->match_err_p = 0.05;
+        p->indel_p = 0.04;
         p->n_sim_seq = 20;
         p->n_observed_seq = 10;
         p->len = 250;
         p->seed = 42;
+        p->dna = 0;
         *param = p;
         return OK;
 ERROR:

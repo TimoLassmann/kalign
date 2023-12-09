@@ -85,7 +85,7 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
         omp_set_num_threads(n_threads);
 #endif
         /* Build guide tree */
-        RUN(build_tree_kmeans(msa,n_threads,&tasks));
+        RUN(build_tree_kmeans(msa,&tasks));
 
         /* Convert to full alphabet after having converted to reduced alphabet for tree building above  */
         if(msa->biotype == ALN_BIOTYPE_PROTEIN){

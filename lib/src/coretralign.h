@@ -20,8 +20,8 @@ typedef enum {
         AE_TYPE_UNDEF,
         AE_TYPE_ALN_BACK,
         AE_TYPE_ALN_FORWARD,
+        AE_TYPE_SPLIT
         /* tree stuff here  */
-
 }aln_elem_type;
 
 typedef struct aln_elem aln_elem;
@@ -51,6 +51,7 @@ typedef struct aln_scheduler {
         int thread_id_idx;
         pthread_mutex_t lock;
         int n_threads;
+        double** dm;
         struct msa* msa;
 } aln_scheduler;
 
@@ -66,6 +67,5 @@ EXTERN void queue_free(aln_elem_queue *l);
 
 #undef CORETRALIGN_IMPORT
 #undef EXTERN
-
 
 #endif

@@ -11,6 +11,71 @@
 static int aln_unknown_warning_message_gaps_but_len_diff(struct msa *msa);
 static int aln_unknown_warning_message_same_len_no_gaps(void);
 
+int msa_cpy(struct msa** dest, struct msa* src)
+{
+        int i;
+        struct msa* d = NULL;
+        d = *dest;
+        if(d == NULL){
+                RUN(alloc_msa(&d,src->alloc_numseq));
+                /* d = alloc_msa(); */
+        }
+        if(d->biotype != ALN_BIOTYPE_UNDEF){
+        /* if(d->L != ALPHA_UNDEFINED){ */
+                if(d->biotype != src->biotype){
+                        ERROR_MSG("Input alignments have different alphabets");
+                }
+        }
+        if(d->aligned != 0 && d->aligned != ALN_STATUS_UNKNOWN){
+                if(d->aligned != src->aligned){
+                        d->aligned = ALN_STATUS_UNKNOWN;
+                }
+        }
+
+        for(i = 0; i < 128;i++){
+                d->letter_freq[i] += src->letter_freq[i];
+        }
+
+        d->numseq = 0;
+        for(i = 0; i < src->numseq;i++){
+
+                msa_seq_cpy(d->sequences[i], src->sequences[i]);
+        }
+        d->numseq = src->numseq;
+        d->quiet = src->quiet;
+        RUN(detect_alphabet(d));
+        RUN(detect_aligned(d));
+        RUN(set_sip_nsip(d));
+
+        *dest = d;
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+int msa_seq_cpy(struct msa_seq *d, struct msa_seq *src)
+{
+        ASSERT(d != NULL,"No sequence");
+        ASSERT(src != NULL,"No sequence");
+        while(src->alloc_len > d->alloc_len){
+                resize_msa_seq(d);
+        }
+        snprintf(d->name, MSA_NAME_LEN, "%s", src->name);
+
+        for(int j = 0; j < src->len;j++){
+                d->seq[j] = src->seq[j];
+                d->s[j] = src->s[j];
+                d->gaps[j] = src->gaps[j];
+        }
+        d->gaps[src->alloc_len] = src->gaps[src->alloc_len];
+        d->seq[src->len] = 0;
+        d->len = src->len;
+        d->rank = src->rank;
+
+        return OK;
+ERROR:
+        return FAIL;
+}
 
 
 int merge_msa(struct msa** dest, struct msa* src)
@@ -19,7 +84,7 @@ int merge_msa(struct msa** dest, struct msa* src)
         struct msa* d = NULL;
         d = *dest;
         if(d == NULL){
-                RUN(alloc_msa(&d));
+                RUN(alloc_msa(&d,src->alloc_numseq));
                 /* d = alloc_msa(); */
         }
         if(d->biotype != ALN_BIOTYPE_UNDEF){

@@ -10,7 +10,8 @@
 struct msa;
 struct msa_seq;
 
-EXTERN int alloc_msa(struct msa** msa);
+EXTERN int alloc_msa(struct msa** msa, int numseq);
+
 EXTERN int resize_msa(struct msa* msa);
 EXTERN void kalign_free_msa(struct msa* msa);
 
