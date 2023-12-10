@@ -113,7 +113,7 @@ int print_kalign_header(void)
         fprintf(stdout,"\n");
         fprintf(stdout,"Kalign (%s)\n", KALIGN_PACKAGE_VERSION);
         fprintf(stdout,"\n");
-        fprintf(stdout,"Copyright (C) 2006,2019,2020,2021 Timo Lassmann\n");
+        fprintf(stdout,"Copyright (C) 2006,2019,2020,2021,2023 Timo Lassmann\n");
         fprintf(stdout,"\n");
         fprintf(stdout,"This program comes with ABSOLUTELY NO WARRANTY; for details type:\n");
         fprintf(stdout,"`kalign -showw'.\n");

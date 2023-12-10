@@ -141,6 +141,9 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                 s2 = s[samples[j]]->s;
                                 l2 = s[samples[j]]->len;
                                 dm[i][j] = calc_distance(s1,s2,l1,l2);
+                                int s = (l1 + l2) / 2;
+                                float add = MACRO_MIN(10000.0, s) / 10000.0;
+                                dm[i][j] += add;
                                 /* fprintf(stdout,"%f ",dm[i][j]); */
                                 /* dm[i][j] += (float)MACRO_MIN(l1, l2) / (float)MACRO_MAX(l1, l2); */
                                 /* dm[i][j] = dm[i][j] / (float) MACRO_MIN(l1, l2); */
