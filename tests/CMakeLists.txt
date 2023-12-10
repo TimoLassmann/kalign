@@ -95,3 +95,9 @@ add_test(
 ${CMAKE_CURRENT_SOURCE_DIR}
   )
 
+
+add_test(
+  NAME DSSIM_takes_a_min
+  COMMAND dssim
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )

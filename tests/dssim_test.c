@@ -17,22 +17,21 @@ void progress_bar(int c, int t, int w);
 
 int main(void)
 {
-        int num_tests = 1000;
-
+        LOG_MSG("DSSim - a simplistic sequence simulator.");
 
         LOG_MSG("Protein alignments - 20 seq");
-        test_consistency(1000,20,0,42);
+        RUN(test_consistency(1000,20,0,42));
         LOG_MSG("Protein alignments - 1000 seq");
-        test_consistency(10,1000,0,42);
+        RUN(test_consistency(10,1000,0,42));
         LOG_MSG("Protein alignments - 10000 seq");
-        test_consistency(2,2000,0,42);
+        RUN(test_consistency(2,2000,0,42));
 
         LOG_MSG("DNA     alignments - 20 seq");
-        test_consistency(1000,20,1,42);
+        RUN(test_consistency(1000,20,1,42));
         LOG_MSG("DNA     alignments - 1000 seq");
-        test_consistency(10,1000,1,42);
+        RUN(test_consistency(10,1000,1,42));
         LOG_MSG("DNA     alignments - 10000 seq");
-        test_consistency(2,2000,1,42);
+        RUN(test_consistency(2,2000,1,42));
 
         return EXIT_SUCCESS;
 ERROR:
@@ -41,14 +40,12 @@ ERROR:
 
 int test_consistency(int num_tests, int numseq,int dna,int seed)
 {
-        char buffer[BUFSIZ];
-
         struct msa* m = NULL;
         struct msa* m2 = NULL;
         struct rng_state* rng = NULL;
 
 
-        rng = init_rng(seed);
+        RUNP(rng = init_rng(seed));
 
         for(int i = 0; i < num_tests;i++){
                 int local_seed = tl_random_int(rng, 1000000);
@@ -115,11 +112,11 @@ int msa_restore_ord_seq_order(struct msa* m)
                 m->sequences[i]->rank = atoi(m->sequences[i]->name);
 
         }
-        msa_sort_rank(m);
+        RUN(msa_sort_rank(m));
         return OK;
 ERROR:
         return FAIL;
-        }
+}
 
 void progress_bar(int c, int t, int w)
 
