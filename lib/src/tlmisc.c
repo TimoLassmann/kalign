@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "strnlen_compat.h"
+/* #include "strnlen_compat.h" */
 
 #define TLMISC_IMPORT
 #include "tlmisc.h"

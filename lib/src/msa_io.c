@@ -4,7 +4,7 @@
 #include <ctype.h>
 #include <time.h>
 
-#include "strnlen_compat.h"
+/* #include "strnlen_compat.h" */
 #include "tldevel.h"
 #include "tlmisc.h"
 #include "esl_stopwatch.h"

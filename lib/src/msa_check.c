@@ -3,7 +3,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "strnlen_compat.h"
+/* #include "strnlen_compat.h" */
 
 #include "msa_struct.h"
 

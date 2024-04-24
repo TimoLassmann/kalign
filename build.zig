@@ -73,7 +73,7 @@ pub fn build(b: *std.Build) !void {
 }
 
 const kalign_lib_sources = [_][]const u8{
-    "lib/src/strnlen_compat.c",
+    // "lib/src/strnlen_compat.c",
     "lib/src/test.c",
     "lib/src/tldevel.c",
     "lib/src/tlmisc.c",
