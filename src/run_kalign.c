@@ -23,13 +23,16 @@
 #include "tldevel.h"
 #include "tlmisc.h"
 #include "kalign/kalign.h"
-#include "version.h"
+/* #include "version.h" */
 #include "parameters.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <getopt.h>
+
+
+
 
 #define OPT_SET 1
 #define OPT_SHOWW 5

@@ -157,7 +157,6 @@ int edist_serial(const float* a,const float* b,const int len, float* ret)
                 t = (a[i] - b[i]);
                 d += t *t;
         }
-
         *ret = sqrtf(d);
         return OK;
 }

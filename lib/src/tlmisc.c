@@ -2,7 +2,10 @@
 
 #include <sys/stat.h>
 
+#include <stdio.h>
 #include <string.h>
+
+#include "strnlen_compat.h"
 
 #define TLMISC_IMPORT
 #include "tlmisc.h"
@@ -10,6 +13,9 @@
 #include "tldevel.h"
 
 #define MAX_CMD_LEN 16384
+
+
+
 
 int my_str_cpy(char* target, char* source, int t_size,int s_size)
 {

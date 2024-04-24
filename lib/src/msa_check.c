@@ -3,7 +3,11 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "strnlen_compat.h"
+
 #include "msa_struct.h"
+
+
 
 #define  MSA_CHECK_IMPORT
 #include "msa_check.h"

@@ -70,10 +70,29 @@ static void create_tasks(struct node*n, struct aln_tasks* t);
 
 
 /* static int bisecting_kmeans_serial(struct msa *msa, struct node **ret_n, float **dm, int *samples, int num_samples); */
-static int bisecting_kmeans(struct msa* msa, struct node** ret_n, float** dm,int* samples, int num_samples);
+static int bisecting_kmeans(struct msa* msa, struct node** ret_n,
+                            const float * const * dm,
+                            int* samples, int num_samples);
 /* static int bisecting_kmeans_parallel(struct msa* msa, struct node** ret_n, float** dm,int* samples, int num_samples); */
 
-static int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick,struct kmeans_result** ret);
+static int split(const float * const * dm, int *samples, int num_anchors, int num_samples,
+                 int seed_pick, struct kmeans_result **ret);
+static int split2(const float * const * dm,const int* samples, const int num_anchors,const int num_samples,const int seed_pick,struct kmeans_result** ret);
+
+static inline int cmp_floats(const float a, const float b);
+
+inline int cmp_floats(const float a, const float b)
+{
+        const float epsilon = 1e-6; // Set a small epsilon value for tolerance
+        if (fabsf(a - b) < epsilon) {
+                return 0; // Numbers are equal
+        } else if (a > b) {
+                return 1; // First number is bigger
+        } else {
+                return -1; // Second number is bigger
+        }
+}
+
 
 int build_tree_kmeans(struct msa* msa, struct aln_tasks** tasks)
 {
@@ -105,6 +124,7 @@ int build_tree_kmeans(struct msa* msa, struct aln_tasks** tasks)
 
         RUNP(dm = d_estimation(msa, anchors, num_anchors,0));//les,int pair)
 
+
         STOP_TIMER(timer);
         if(!msa->quiet){
                 GET_TIMING(timer);
@@ -128,9 +148,8 @@ int build_tree_kmeans(struct msa* msa, struct aln_tasks** tasks)
 #pragma omp parallel
 #pragma omp single nowait
 #endif
-        bisecting_kmeans(msa,&root, dm, samples, numseq);
+        bisecting_kmeans(msa,&root, (const float * const *)dm, samples, numseq);
         /* } */
-
 
         STOP_TIMER(timer);
         if(!msa->quiet){
@@ -155,7 +174,7 @@ ERROR:
         return FAIL;
 }
 
-int bisecting_kmeans(struct msa* msa, struct node** ret_n, float** dm,int* samples, int num_samples)
+int bisecting_kmeans(struct msa* msa, struct node** ret_n, const float * const * dm,int* samples, int num_samples)
 {
         struct kmeans_result* res_tmp = NULL;
         struct kmeans_result* best = NULL;
@@ -209,19 +228,19 @@ int bisecting_kmeans(struct msa* msa, struct node** ret_n, float** dm,int* sampl
 #ifdef HAVE_OPENMP
 #pragma omp task shared(dm,samples,num_anchors, num_samples,i,step,res)
 #endif
-                split(dm,samples,num_anchors, num_samples, (i)*step, &res[0]);
+                split2(dm,samples,num_anchors, num_samples, (i)*step, &res[0]);
 #ifdef HAVE_OPENMP
 #pragma omp task shared(dm,samples,num_anchors, num_samples,i,step,res)
 #endif
-                split(dm,samples,num_anchors, num_samples, (i+ 1)*step, &res[1]);
+                split2(dm,samples,num_anchors, num_samples, (i+ 1)*step, &res[1]);
 #ifdef HAVE_OPENMP
 #pragma omp task shared(dm,samples,num_anchors, num_samples,i,step,res)
 #endif
-                split(dm,samples,num_anchors, num_samples, (i+ 2)*step, &res[2]);
+                split2(dm,samples,num_anchors, num_samples, (i+ 2)*step, &res[2]);
 #ifdef HAVE_OPENMP
 #pragma omp task shared(dm,samples,num_anchors, num_samples,i,step,res)
 #endif
-                split(dm,samples,num_anchors, num_samples, (i+ 3)*step, &res[3]);
+                split2(dm,samples,num_anchors, num_samples, (i+ 3)*step, &res[3]);
 #ifdef HAVE_OPENMP
 #pragma omp taskwait
 #endif
@@ -377,7 +396,7 @@ ERROR:
 /*         return FAIL; */
 /* } */
 
-int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick,struct kmeans_result** ret)
+int split(const float * const * dm,int* samples, int num_anchors,int num_samples,int seed_pick,struct kmeans_result** ret)
 {
         struct kmeans_result* res = NULL;
         int* sl = NULL;
@@ -460,7 +479,8 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
 
         for(j = 0; j < num_anchors;j++){
                 cr[j] = w[j] - (cl[j] - w[j]);
-                //      fprintf(stdout,"%f %f  %f\n", cl[j],cr[j],w[j]);
+                fprintf(stdout,"BEGIN:   %e %e diff::: %f  %f\n", cl[j],cr[j], cl[j]-cr[j],w[j]);
+
         }
 
 #ifdef HAVE_AVX2
@@ -472,12 +492,40 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
         /* check if cr == cl - we have identical sequences  */
         s = 0;
         for(j = 0; j < num_anchors;j++){
-                if(fabsf(cl[j]-cr[j]) >  1.0E-6){
-                        s = 1;
-                        break;
+                int res = cmp_floats(cl[j],cr[j]);
+                /* if(fabsf(cl[j]-cr[j]) >  1.0E-6){ */
+                /*         s = 1; */
+                /*         break; */
+                /* } */
+                if(res != 0){
+                        s++;
                 }
         }
 
+        fprintf(stdout,"S: %d\n",s);
+        s = 0;
+        for(j = 0; j < num_anchors;j++){
+                /* int res = cmp_floats(dr,dl); */
+                if(fabsf(cl[j]-cr[j]) >  1.0E-6){
+                        s++;
+                        //break;
+                }
+                /* if(res != 0){ */
+                /*         s++; */
+                /* } */
+        }
+
+        fprintf(stdout,"S: %d\n",s);
+#ifdef HAVE_AVX2
+        edist_256(cl,cr, num_anchors, &dr);
+#else
+        edist_serial(cl, cr, num_anchors, &dr);
+#endif
+
+
+
+        fprintf(stdout,"R/L Dist: %e  %e %d\n",dr,1e-6, dr < 1e-6);
+        cmp_floats(cl[j],cr[j]);
         if(!s){
                 score = 0.0F;
                 num_l = 0;
@@ -524,11 +572,13 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
 #endif
                                 score += MACRO_MIN(dl,dr);
 
-                                if(dr < dl){
+
+                                int res = cmp_floats(dr,dl);
+                                if(res == -1){
                                         w = wr;
                                         sr[num_r] = s;
                                         num_r++;
-                                }else if (dr > dl){
+                                }else if (res == 1){
                                         w = wl;
                                         sl[num_l] = s;
                                         num_l++;
@@ -553,6 +603,7 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                                                 num_l++;
                                         }
                                 }
+                                fprintf(stdout,"%e %e nl: %d nr:%d\n", dl,dr, num_l, num_r);
                                 for(j = 0; j < num_anchors;j++){
                                         w[j] += dm[s][j];
                                 }
@@ -561,6 +612,10 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                         for(j = 0; j < num_anchors;j++){
                                 wl[j] /= (float)num_l;
                                 wr[j] /= (float)num_r;
+                                fprintf(stdout,"ANCH: %f %f %d %d \n",wl[j],wr[j], num_l, num_r);
+                                if(isnan(wl[j]) || isnan(wr[j])){
+                                        exit(0);
+                                }
                         }
 
                         s = 0;
@@ -568,13 +623,14 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
                         for(j = 0; j < num_anchors;j++){
                                 if(wl[j] != cl[j]){
                                         s = 1;
-                                        break;
+                                         break;
                                 }
                                 if(wr[j] != cr[j]){
                                         s = 1;
                                         break;
                                 }
                         }
+
 
                         if(s){
                                 w = cl;
@@ -610,6 +666,214 @@ int split(float** dm,int* samples, int num_anchors,int num_samples,int seed_pick
 ERROR:
         return FAIL;
 }
+
+int split2(const float * const * dm,const int* samples, const int num_anchors,const int num_samples,const int seed_pick,struct kmeans_result** ret)
+{
+        struct kmeans_result* res = NULL;
+        int* sl = NULL;
+        int* sr = NULL;
+        int num_l,num_r;
+        float* w = NULL;
+        float* wl = NULL;
+        float* wr = NULL;
+        float* cl = NULL;
+        float* cr = NULL;
+        float dl = 0.0F;
+        float dr = 0.0F;
+        float score;
+        int num_var;
+        int i;
+        int s;
+        int j;
+
+        num_var = num_anchors / 8;
+        if( num_anchors%8){
+                num_var++;
+        }
+        num_var = num_var << 3;
+
+
+
+
+#ifdef HAVE_AVX2
+        wr = _mm_malloc(sizeof(float) * num_var,32);
+        wl = _mm_malloc(sizeof(float) * num_var,32);
+        cr = _mm_malloc(sizeof(float) * num_var,32);
+        cl = _mm_malloc(sizeof(float) * num_var,32);
+        w = _mm_malloc(sizeof(float) * num_var,32);
+#else
+        MMALLOC(wr,sizeof(float) * num_var);
+        MMALLOC(wl,sizeof(float) * num_var);
+        MMALLOC(cr,sizeof(float) * num_var);
+        MMALLOC(cl,sizeof(float) * num_var);
+        MMALLOC(w,sizeof(float) * num_var);
+#endif
+
+        if(*ret){
+                res = *ret;
+        }else{
+                RUNP(res = alloc_kmeans_result(num_samples));
+        }
+
+        res->score = FLT_MAX;
+
+        sl = res->sl;
+        sr = res->sr;
+
+
+        for(i = 0; i < num_var;i++){
+                w[i] = 0.0F;
+                wr[i] = 0.0F;
+                wl[i] = 0.0F;
+                cr[i] = 0.0F;
+                cl[i] = 0.0F;
+        }
+        for(i = 0; i < num_samples;i++){
+                s = samples[i];
+                for(j = 0; j < num_anchors;j++){
+                        w[j] += dm[s][j];
+                }
+        }
+
+        for(j = 0; j < num_anchors;j++){
+                w[j] /= (float)num_samples;
+        }
+        //r = tl_random_int(rng  , num_samples);
+        //r = sel[t_iter];
+
+        s = samples[seed_pick];
+        /* LOG_MSG("Selected %d\n",s); */
+        for(j = 0; j < num_anchors;j++){
+                cl[j] = dm[s][j];
+        }
+
+        for(j = 0; j < num_anchors;j++){
+                cr[j] = w[j] - (cl[j] - w[j]);
+
+        }
+
+#ifdef HAVE_AVX2
+        _mm_free(w);
+#else
+        MFREE(w);
+#endif
+
+        w = NULL;
+        for(int stop = 0; stop < 500; stop++){
+                num_l = 0;
+                num_r = 0;
+
+                for(i = 0; i < num_anchors;i++){
+                        wr[i] = 0.0F;
+                        wl[i] = 0.0F;
+                }
+                score = 0.0f;
+                for(i = 0; i < num_samples;i++){
+                        s = samples[i];
+#ifdef HAVE_AVX2
+                        edist_256(dm[s], cl, num_anchors, &dl);
+                        edist_256(dm[s], cr, num_anchors, &dr);
+#else
+                        edist_serial(dm[s], cl, num_anchors, &dl);
+                        edist_serial(dm[s], cr, num_anchors, &dr);
+#endif
+                        score += MACRO_MIN(dl,dr);
+
+
+                        int res = cmp_floats(dr,dl);
+                        if(res == -1){
+                                w = wr;
+                                sr[num_r] = s;
+                                num_r++;
+                        }else if (res == 1){
+                                w = wl;
+                                sl[num_l] = s;
+                                num_l++;
+                        }else{
+                                if(i & 1){
+                                        w = wr;
+                                        sr[num_r] = s;
+                                        num_r++;
+                                }else{
+                                        w = wl;
+                                        sl[num_l] = s;
+                                        num_l++;
+                                }
+                        }
+                        for(j = 0; j < num_anchors;j++){
+                                w[j] += dm[s][j];
+                        }
+                }
+                if(num_l == 0 || num_r == 0){
+                        score = 0.0F;
+                        num_l = 0;
+                        num_r = 0;
+
+                        for(i = 0; i < num_samples/2;i++){
+                                sl[num_l] = samples[i];
+                                num_l++;
+                        }
+                        for(i = num_samples/2; i < num_samples;i++){
+                                sr[num_r] = samples[i];
+                                num_r++;
+                        }
+                        break;
+                }
+
+                for(j = 0; j < num_anchors;j++){
+                        wl[j] /= (float)num_l;
+                        wr[j] /= (float)num_r;
+                }
+
+                s = 0;
+
+                for(j = 0; j < num_anchors;j++){
+                        int res = cmp_floats(wl[j],cl[j]);
+                        if(res != 0){
+                                s = 1;
+                                break;
+                        }
+                        res = cmp_floats(wr[j],cr[j]);
+                        if(res != 0){
+                                s = 1;
+                                break;
+                        }
+                }
+
+                if(s){
+                        w = cl;
+                        cl = wl;
+                        wl = w;
+
+                        w = cr;
+                        cr = wr;
+                        wr = w;
+                }else{
+                        break;
+                }
+        }
+
+#ifdef HAVE_AVX2
+        _mm_free(wr);
+        _mm_free(wl);
+        _mm_free(cr);
+        _mm_free(cl);
+#else
+        MFREE(wr);
+        MFREE(wl);
+        MFREE(cr);
+        MFREE(cl);
+#endif
+
+        res->nl =  num_l;
+        res->nr =  num_r;
+        res->score = score;
+        *ret = res;
+        return OK;
+ERROR:
+        return FAIL;
+}
+
 
 struct node* upgma(float **dm,int* samples, int numseq)
 {

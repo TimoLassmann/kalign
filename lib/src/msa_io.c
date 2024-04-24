@@ -1,8 +1,15 @@
+
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+#include <time.h>
+
+#include "strnlen_compat.h"
 #include "tldevel.h"
 #include "tlmisc.h"
 #include "esl_stopwatch.h"
 
-#include "version.h"
+/* #include "version.h" */
 
 #include "msa_struct.h"
 #include "msa_alloc.h"
@@ -12,9 +19,6 @@
 #include "msa_op.h"
 
 #include "alphabet.h"
-
-#include <string.h>
-#include <ctype.h>
 
 #define  MSA_IO_IMPORT
 #include "msa_io.h"
@@ -348,7 +352,7 @@ int read_file_stdin(struct in_buffer** buffer,char* infile)
         char* line = NULL;
         char* tmp = NULL;
         size_t b_len = 0;
-        ssize_t nread;
+        size_t nread;
         int i;
         //char line[BUFFER_LEN];
         int line_len;

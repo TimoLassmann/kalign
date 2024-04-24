@@ -18,8 +18,8 @@ if(NOT KALIGN_PACKAGE_VERSION)
   set(KALIGN_PACKAGE_VERSION ${KALIGN_LIBRARY_VERSION_STRING})
 endif()
 
-configure_file ("${CMAKE_CURRENT_SOURCE_DIR}/version.h.in"
-  "version.h" )
+#configure_file ("${CMAKE_CURRENT_SOURCE_DIR}/version.h.in"
+  #"version.h" )
 
 
 add_executable(kalign-bin  
@@ -29,6 +29,8 @@ add_executable(kalign-bin
   )
 # Link with static library.... 
 target_link_libraries(kalign-bin PRIVATE tldevel ${PROJECT_NAME}_static )
+
+target_compile_definitions(kalign-bin PRIVATE KALIGN_PACKAGE_NAME=\"${KALIGN_PACKAGE_NAME}\"  KALIGN_PACKAGE_VERSION=\"${KALIGN_PACKAGE_VERSION}\")
 
 set_target_properties(kalign-bin
   PROPERTIES OUTPUT_NAME kalign)

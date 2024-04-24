@@ -66,6 +66,8 @@ target_include_directories(${PROJECT_NAME}_OBJ
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   )
 
+target_compile_definitions(${PROJECT_NAME}_OBJ PRIVATE KALIGN_PACKAGE_VERSION=\"${KALIGN_PACKAGE_VERSION}\")
+
 add_library(${PROJECT_NAME})
 add_library(${NAMESPACE_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 

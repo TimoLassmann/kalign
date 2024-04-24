@@ -1,9 +1,15 @@
+2024-04-24  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+
+	* version 3.4.1
+	- Fixed an issue when kalign is given hundreds of identical sequences.
+	- added build.zig
+
 2023-12-10  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
 
 	* version 3.4.0
 	- Added a simple sequence simulator for testing
 	- Fixed an issue where alignments would be slighly different
-	depending on the number of threads used. 
+	depending on the number of threads used.
 
 2022-11-05  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
 
@@ -14,7 +20,7 @@
 
 	* version 3.3.4 - Cmake and more
 	- switched to cmake
-	Added: 
+	Added:
 	1) a Kalign library to make it easier to use Kalign from another projects
 	2) a block version of Gene Myers bit parallel string matching code (described
 	here: Myers, Gene. "A fast bit-vector algorithm for approximate string matching

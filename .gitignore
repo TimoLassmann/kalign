@@ -4,5 +4,6 @@ build
 doc/ 
 dev/
 old_src/
-
+zig-out/
+zig-cache/
 

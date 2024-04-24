@@ -4,10 +4,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include <time.h>
 #include <math.h>
 #include <float.h>
-
 
 #ifdef TLDEVEL_IMPORT
 #define EXTERN
