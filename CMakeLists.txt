@@ -178,6 +178,53 @@ add_subdirectory(lib)
 add_subdirectory(src)
 add_subdirectory(tests)
 
+# Python module build (optional) ##########################################
+option(BUILD_PYTHON_MODULE "Build Python extension module" OFF)
+
+if(BUILD_PYTHON_MODULE)
+    # Find pybind11 - scikit-build-core will provide this
+    find_package(pybind11 CONFIG)
+    
+    if(pybind11_FOUND)
+        message(STATUS "Building Python extension module")
+        
+        # Create the Python extension module
+        pybind11_add_module(_core 
+            python/kalign/_core.cpp
+            tests/dssim.c
+        )
+        
+        # Link against the kalign library  
+        target_link_libraries(_core PRIVATE kalign::kalign)
+        
+        # Add include directories for DSSim and lib headers
+        target_include_directories(_core PRIVATE 
+            tests
+            lib/src
+            lib/include
+        )
+        
+        # Set properties for the Python module
+        set_target_properties(_core PROPERTIES
+            CXX_STANDARD 11
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF
+            INSTALL_RPATH "@loader_path"
+            BUILD_WITH_INSTALL_RPATH TRUE
+        )
+        
+        # Install the Python module and required library - scikit-build-core handles the destination
+        install(TARGETS _core kalign
+                LIBRARY DESTINATION kalign
+                COMPONENT python)
+        
+        message(STATUS "Python extension module configured")
+    else()
+        message(WARNING "pybind11 not found - Python module will not be built")
+    endif()
+else()
+    message(STATUS "Python module build disabled (use -DBUILD_PYTHON_MODULE=ON to enable)")
+endif()
 
 MESSAGE(STATUS "")
 MESSAGE(STATUS "Configuration:")

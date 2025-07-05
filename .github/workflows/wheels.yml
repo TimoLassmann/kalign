@@ -1,0 +1,210 @@
+name: Build Python Wheels
+
+on:
+  push:
+    branches: [ main, python ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'python/**'
+      - 'lib/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/wheels.yml'
+  workflow_dispatch:
+
+jobs:
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-13, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install cibuildwheel build
+
+    - name: Build wheels
+      env:
+        CIBW_BUILD: cp39-* cp310-* cp311-* cp312-* cp313-*
+        CIBW_SKIP: "*-win32 *-manylinux_i686 pp*"
+        CIBW_ARCHS_MACOS: "x86_64 arm64"
+        CIBW_ARCHS_LINUX: "x86_64 aarch64"
+        CIBW_ARCHS_WINDOWS: "AMD64"
+        
+        # Linux specific settings
+        CIBW_BEFORE_ALL_LINUX: >
+          yum install -y cmake3 openmp-devel ||
+          (apt-get update && apt-get install -y cmake libomp-dev)
+        CIBW_REPAIR_WHEEL_COMMAND_LINUX: auditwheel repair -w {dest_dir} {wheel}
+        
+        # macOS specific settings  
+        CIBW_BEFORE_ALL_MACOS: |
+          brew install cmake libomp || echo "Dependencies may already be installed"
+        CIBW_REPAIR_WHEEL_COMMAND_MACOS: >
+          delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}
+        
+        # Windows specific settings
+        CIBW_BEFORE_ALL_WINDOWS: |
+          choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' || echo "cmake may already be installed"
+        
+        # Environment variables for builds
+        CIBW_ENVIRONMENT: >
+          CMAKE_BUILD_PARALLEL_LEVEL=2
+          OMP_NUM_THREADS=1
+          
+        # Test the built wheels
+        CIBW_TEST_COMMAND: >
+          python -c "import kalign; 
+          print('kalign version:', kalign.__version__);
+          seqs = ['ATCG', 'ATCGG', 'ATCG']; 
+          aligned = kalign.align(seqs, seq_type='dna'); 
+          print('Test alignment successful:', len(aligned) == 3)"
+          
+      run: |
+        cd python
+        python -m cibuildwheel --output-dir wheelhouse
+
+    - name: Upload wheels
+      uses: actions/upload-artifact@v4
+      with:
+        name: cibw-wheels-${{ matrix.os }}-${{ strategy.job-index }}
+        path: python/wheelhouse/*.whl
+
+  build_sdist:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install build
+
+    - name: Build sdist
+      run: |
+        cd python
+        python -m build --sdist --outdir dist/
+
+    - name: Upload sdist
+      uses: actions/upload-artifact@v4
+      with:
+        name: cibw-sdist
+        path: python/dist/*.tar.gz
+
+  test_install:
+    name: Test wheel installation
+    needs: [build_wheels]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+
+    steps:
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Download wheels
+      uses: actions/download-artifact@v4
+      with:
+        pattern: cibw-wheels-*
+        merge-multiple: true
+        path: wheelhouse/
+
+    - name: Test installation and import
+      run: |
+        pip install numpy
+        # Find and install the appropriate wheel for this platform
+        python -c "
+        import os, glob, platform, sys
+        wheels = glob.glob('wheelhouse/*.whl')
+        system = platform.system().lower()
+        machine = platform.machine().lower()
+        python_version = f'{sys.version_info.major}{sys.version_info.minor}'
+        
+        # Simple wheel selection logic
+        for wheel in wheels:
+            wheel_name = os.path.basename(wheel).lower()
+            if python_version in wheel_name:
+                if system == 'linux' and 'linux' in wheel_name:
+                    print(f'Installing: {wheel}')
+                    os.system(f'pip install {wheel}')
+                    break
+                elif system == 'darwin' and 'macos' in wheel_name:
+                    print(f'Installing: {wheel}')
+                    os.system(f'pip install {wheel}')
+                    break  
+                elif system == 'windows' and 'win' in wheel_name:
+                    print(f'Installing: {wheel}')
+                    os.system(f'pip install {wheel}')
+                    break
+        "
+        
+        # Test the installation
+        python -c "
+        import kalign
+        print('kalign version:', kalign.__version__)
+        
+        # Test basic functionality
+        sequences = ['ATCGATCG', 'ATCGTCG', 'ATCGATCG']
+        aligned = kalign.align(sequences, seq_type='dna')
+        print('Number of aligned sequences:', len(aligned))
+        print('Alignment lengths:', [len(seq) for seq in aligned])
+        assert len(aligned) == 3
+        assert all(len(seq) == len(aligned[0]) for seq in aligned)
+        print('✓ Basic alignment test passed')
+        
+        # Test with different sequence types
+        protein_seqs = ['MKTAYIAKQRQ', 'MKTAYIAKQ', 'MKTAYIAK'] 
+        aligned_proteins = kalign.align(protein_seqs, seq_type='protein')
+        print('✓ Protein alignment test passed')
+        
+        print('All tests passed successfully!')
+        "
+
+  upload_pypi:
+    name: Upload to PyPI
+    needs: [build_wheels, build_sdist, test_install]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: cibw-*
+        merge-multiple: true
+        path: dist/
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_API_TOKEN }}
+        packages_dir: dist/

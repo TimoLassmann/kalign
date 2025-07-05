@@ -134,6 +134,59 @@ if (NOT TARGET kalign)
 endif ()
 target_link_libraries(<target> kalign::kalign)
 ```
+
+# Python Package
+
+Kalign is also available as a Python package for easy integration into Python workflows:
+
+## Installation
+
+```bash
+pip install kalign
+```
+
+## Usage
+
+```python
+import kalign
+
+# Align DNA sequences
+sequences = [
+    "ATCGATCGATCG",
+    "ATCGTCGATCG", 
+    "ATCGATCATCG"
+]
+
+aligned = kalign.align(sequences, seq_type="dna")
+for seq in aligned:
+    print(seq)
+```
+
+Output:
+```
+ATCGATCGATCG
+ATCG-TCGATCG
+ATCGATC-ATCG
+```
+
+### Advanced Usage
+
+```python
+# Protein alignment with custom parameters
+aligned = kalign.align(
+    protein_sequences,
+    seq_type="protein",
+    gap_open=-10.0,
+    gap_extend=-1.0,
+    n_threads=4
+)
+
+# Align from file
+aligned = kalign.align_from_file("sequences.fasta", seq_type="auto")
+```
+
+For detailed Python documentation, see [python/README.md](python/README.md).
+
 # Benchmark results
 
 Here are some benchmark results. The code to reproduce these figures can be found at [here](scripts/benchmark.org).

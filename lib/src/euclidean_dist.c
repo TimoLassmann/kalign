@@ -64,6 +64,7 @@ int main(void)
 
         MMALLOC(mat, sizeof(float*)* 100);
         for(i = 0; i < 100;i++){
+                mat[i] = NULL;
 #ifdef HAVE_AVX2
                 mat[i] = _mm_malloc(sizeof(float)*num_element, 32);
 #else

@@ -434,4 +434,3 @@ int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int meet,i
         }
         return OK;
 }
-

@@ -11,7 +11,6 @@
 #endif
 #endif
 
-
 /* #define KALIGN_DNA 0 */
 /* #define KALIGN_DNA_INTERNAL 1 */
 /* #define KALIGN_RNA 2 */
