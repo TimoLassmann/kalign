@@ -28,7 +28,7 @@ int aln_runner(struct aln_mem* m)
         int transition;
 
         /* switch to serial if too little work. */
-        if(m->enda - m->starta < 500){
+        if(m->enda - m->starta < KALIGN_ALN_SERIAL_THRESHOLD){
                 aln_runner_serial(m);
         }
 

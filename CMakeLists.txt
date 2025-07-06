@@ -59,15 +59,31 @@ option(USE_OPENMP    "Use OpenMP for parallelization" ON)
 option(ENABLE_SSE    "Enable compile-time SSE4.1 support." ON)
 option(ENABLE_AVX    "Enable compile-time AVX support."    ON)
 option(ENABLE_AVX2   "Enable compile-time AVX2 support."   ON)
+
+# Performance tuning parameters
+set(KALIGN_ALN_SERIAL_THRESHOLD "250" CACHE STRING "Alignment positions threshold below which to use serial instead of parallel processing")
+set(KALIGN_KMEANS_UPGMA_THRESHOLD "50" CACHE STRING "Number of sequences threshold below which to use UPGMA instead of parallel k-means")
+
 # option(ENABLE_FMA    "Enable compile-time FMA support."    ON)
 # option(ENABLE_AVX512 "Enable compile-time AVX512 support." ON)
 
 
 if(USE_OPENMP)
+  # Configure OpenMP for macOS with Homebrew
+  if(APPLE)
+    list(APPEND CMAKE_PREFIX_PATH /opt/homebrew)
+    # Set OpenMP flags for Apple Clang + Homebrew libomp
+    set(OpenMP_C_FLAGS "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
+    set(OpenMP_C_LIB_NAMES "omp")
+    set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
+    set(OpenMP_CXX_LIB_NAMES "omp")
+    set(OpenMP_omp_LIBRARY /opt/homebrew/opt/libomp/lib/libomp.dylib)
+  endif()
+
   find_package(OpenMP)
   if(OPENMP_FOUND OR OpenMP_FOUND)
     message(STATUS "OpenMP is enabled.")
-     
+
     add_definitions (-DHAVE_OPENMP)
   else(OPENMP_FOUND OR OpenMP_FOUND)
     message(STATUS "OpenMP not supported")
@@ -93,10 +109,10 @@ if (ENABLE_SSE)
       HAVE_SSE)
   endif()
 
-  if (HAVE_SSE)        
+  if (HAVE_SSE)
     message(STATUS "SSE4.1 is enabled - target CPU must support it")
   endif()
-  
+
   if (ENABLE_AVX)
 
     #
@@ -130,7 +146,7 @@ if (ENABLE_SSE)
       message(STATUS "AVX is enabled - target CPU must support it")
     endif()
   endif()
-  
+
   if (ENABLE_AVX2)
 
     #
@@ -174,6 +190,10 @@ else(HAVE_AVX2)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNOHAVE_AVX2")
 endif(HAVE_AVX2)
 
+# Add performance tuning parameters as compile definitions
+add_definitions(-DKALIGN_ALN_SERIAL_THRESHOLD=${KALIGN_ALN_SERIAL_THRESHOLD})
+add_definitions(-DKALIGN_KMEANS_UPGMA_THRESHOLD=${KALIGN_KMEANS_UPGMA_THRESHOLD})
+
 add_subdirectory(lib)
 add_subdirectory(src)
 add_subdirectory(tests)
@@ -184,26 +204,26 @@ option(BUILD_PYTHON_MODULE "Build Python extension module" OFF)
 if(BUILD_PYTHON_MODULE)
     # Find pybind11 - scikit-build-core will provide this
     find_package(pybind11 CONFIG)
-    
+
     if(pybind11_FOUND)
         message(STATUS "Building Python extension module")
-        
+
         # Create the Python extension module
-        pybind11_add_module(_core 
+        pybind11_add_module(_core
             python/kalign/_core.cpp
             tests/dssim.c
         )
-        
-        # Link against the kalign library  
+
+        # Link against the kalign library
         target_link_libraries(_core PRIVATE kalign::kalign)
-        
+
         # Add include directories for DSSim and lib headers
-        target_include_directories(_core PRIVATE 
+        target_include_directories(_core PRIVATE
             tests
             lib/src
             lib/include
         )
-        
+
         # Set properties for the Python module
         set_target_properties(_core PROPERTIES
             CXX_STANDARD 11
@@ -212,12 +232,12 @@ if(BUILD_PYTHON_MODULE)
             INSTALL_RPATH "@loader_path"
             BUILD_WITH_INSTALL_RPATH TRUE
         )
-        
+
         # Install the Python module and required library - scikit-build-core handles the destination
         install(TARGETS _core kalign
                 LIBRARY DESTINATION kalign
                 COMPONENT python)
-        
+
         message(STATUS "Python extension module configured")
     else()
         message(WARNING "pybind11 not found - Python module will not be built")
@@ -258,5 +278,3 @@ set(CPACK_SOURCE_IGNORE_FILES
   /\\\\.DS_Store
   )
 include (CPack)
-
-

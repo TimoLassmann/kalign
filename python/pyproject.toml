@@ -46,10 +46,25 @@ classifiers = [
 ]
 requires-python = ">=3.9"
 dependencies = [
+    "biopython>=1.85",
+    "matplotlib>=3.9.4",
     "numpy>=1.19.0",
+    "pandas>=2.3.0",
+    "rich>=14.0.0",
+    "scikit-bio>=0.6.3",
 ]
 
+[project.scripts]
+kalign = "kalign.cli:main"
+
 [project.optional-dependencies]
+# Bioinformatics ecosystem integrations
+biopython = ["biopython>=1.85"]
+skbio = ["scikit-bio>=0.6.3"]
+io = ["biopython>=1.85"]  # For I/O helper functions
+all = ["biopython>=1.85", "scikit-bio>=0.6.3"]
+
+# Development dependencies
 dev = [
     "pytest>=6.0",
     "pytest-cov",
@@ -60,7 +75,9 @@ dev = [
     "flake8", 
     "mypy",
     "build",
-    "twine"
+    "twine",
+    "biopython>=1.85",  # For testing ecosystem features
+    "scikit-bio>=0.6.3"
 ]
 test = [
     "pytest>=6.0",

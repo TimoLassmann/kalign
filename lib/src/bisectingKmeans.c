@@ -193,7 +193,7 @@ int bisecting_kmeans(struct msa* msa, struct node** ret_n, const float * const *
         /* LOG_MSG("num_samples: %d", num_samples); */
         num_anchors = MACRO_MIN(32, msa->numseq);
 
-        if(num_samples < 100){
+        if(num_samples < KALIGN_KMEANS_UPGMA_THRESHOLD){
                 float** dm = NULL;
                 RUNP(dm = d_estimation(msa, samples, num_samples,1));// anchors, num_anchors,1));
                 n = upgma(dm,samples, num_samples);
@@ -326,7 +326,7 @@ ERROR:
 
 /*         num_anchors = MACRO_MIN(32, msa->numseq); */
 
-/*         if(num_samples < 100){ */
+/*         if(num_samples < KALIGN_KMEANS_UPGMA_THRESHOLD){ */
 /*                 float** dm = NULL; */
 /*                 RUNP(dm = d_estimation(msa, samples, num_samples,1));// anchors, num_anchors,1)); */
 /*                 n = upgma(dm,samples, num_samples); */

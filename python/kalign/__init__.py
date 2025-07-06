@@ -5,9 +5,13 @@ This package provides Python bindings for the Kalign multiple sequence alignment
 Kalign is a fast and accurate multiple sequence alignment tool for biological sequences.
 """
 
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Literal, Any
+from importlib import import_module
 import os
+import threading
 from . import _core
+from . import io
+from . import utils
 
 __version__ = "3.4.1"
 __author__ = "Timo Lassmann"
@@ -21,6 +25,10 @@ PROTEIN = _core.PROTEIN
 PROTEIN_DIVERGENT = _core.PROTEIN_DIVERGENT
 AUTO = _core.AUTO
 
+# Global thread control
+_thread_local = threading.local()
+_default_threads = 1
+
 
 def align(
     sequences: List[str],
@@ -28,11 +36,13 @@ def align(
     gap_open: Optional[float] = None,
     gap_extend: Optional[float] = None,
     terminal_gap_extend: Optional[float] = None,
-    n_threads: int = 1
-) -> List[str]:
+    n_threads: Optional[int] = None,
+    fmt: Literal["plain", "biopython", "skbio"] = "plain",
+    ids: Optional[List[str]] = None
+) -> Union[List[str], Any]:
     """
-    Align a list of sequences using Kalign.
-    
+    Multiple sequence alignment via Kalign.
+
     Parameters
     ----------
     sequences : list of str
@@ -54,13 +64,20 @@ def align(
     terminal_gap_extend : float, optional
         Terminal gap extension penalty. If None, uses Kalign defaults based on sequence type.
     n_threads : int, optional
-        Number of threads to use for alignment (default: 1)
+        Number of threads to use for alignment. If None, uses global default.
+    fmt : {'plain', 'biopython', 'skbio'}, default 'plain'
+        Choose return-object flavour:
+        - 'plain': list of aligned sequences (fastest)
+        - 'biopython': Bio.Align.MultipleSeqAlignment object
+        - 'skbio': skbio.TabularMSA object
+    ids : list of str, optional
+        Sequence IDs (used only for Biopython / scikit-bio objects).
+        If None, generates 'seq0', 'seq1', etc.
         
     Returns
     -------
-    list of str
-        List of aligned sequences in the same order as input sequences.
-        All sequences will have the same length after alignment.
+    list of str | Bio.Align.MultipleSeqAlignment | skbio.TabularMSA
+        Aligned sequences. Return type depends on `fmt` parameter.
         
     Raises
     ------
@@ -68,28 +85,28 @@ def align(
         If input sequences are empty or invalid
     RuntimeError
         If alignment fails
+    ImportError
+        If Biopython or scikit-bio are requested but not installed
         
     Examples
     --------
     >>> import kalign
-    >>> sequences = [
-    ...     "ATCGATCGATCG",
-    ...     "ATCGTCGATCG", 
-    ...     "ATCGATCATCG"
-    ... ]
-    >>> aligned = kalign.align(sequences, seq_type="dna")
-    >>> for seq in aligned:
-    ...     print(seq)
-    ATCGATCGATCG
-    ATCG-TCGATCG
-    ATCGATC-ATCG
+    >>> sequences = ["ATCGATCGATCG", "ATCGTCGATCG", "ATCGATCATCG"]
     
-    >>> # Protein alignment with custom parameters
-    >>> protein_seqs = [
-    ...     "MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPILSRVGDGTQDNLSGAEKAVQVKVKALPDAQFEVVHSLAKWKRQTLGQHDFSAGEGLYTHMKALRPDEDRLSPLHSVYVDQWDWERVMGDGERQFSTLKSTVEAIWAGIKATEAAVSEEFGLAPFLPDQIHFVHSQELLSRYPDLDAKGRERAIAKDLGAVFLVGIGGKLSDGHRHDVRAPDYDDWUAIFRRVVSAEFQRQPVHQSYLNTVLGSQGKL",
-    ...     "MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPILSRVGDGTQDNLSGAEKAVQVKVKALPDAQFEVVHSLAKWKRQTLGQHDFSAGEGLYTHMKALRPDEDRLSPLHSVYVDQWDWERVMGDGERQFSTLKSTVEAIWAGIKATEAAVSEEFGLAPFLPDQIHFVHSQELLSRYPDLDAKGRERAIAKDLGAVFLVGIGGKLSDGHRHDVRAPDYDDWUAIFRRVVSAEFQRQPVHQSYLNTVLGSQGKL"
-    ... ]
-    >>> aligned = kalign.align(protein_seqs, seq_type="protein", gap_open=-10.0, gap_extend=-1.0)
+    # 1) Plain list (default)
+    >>> aligned = kalign.align(sequences)
+    >>> print(aligned)
+    ['ATCGATCGATCG', 'ATCG-TCGATCG', 'ATCGATC-ATCG']
+    
+    # 2) Biopython object
+    >>> aln_bp = kalign.align(sequences, fmt="biopython", ids=["s1","s2","s3"])
+    >>> print(type(aln_bp))
+    <class 'Bio.Align.MultipleSeqAlignment'>
+    
+    # 3) scikit-bio object  
+    >>> aln_sk = kalign.align(sequences, fmt="skbio")
+    >>> print(type(aln_sk))
+    <class 'skbio.alignment._tabular_msa.TabularMSA'>
     """
     
     if not sequences:
@@ -127,11 +144,15 @@ def align(
     if terminal_gap_extend is None:
         terminal_gap_extend = -1.0
     
+    # Handle thread count
+    if n_threads is None:
+        n_threads = get_num_threads()
+    
     # Validate thread count
     if n_threads < 1:
         raise ValueError("n_threads must be at least 1")
     
-    # Call the C++ binding
+    # Call the C++ binding for core alignment
     try:
         aligned_seqs = _core.align(
             sequences,
@@ -141,9 +162,101 @@ def align(
             terminal_gap_extend,
             n_threads
         )
-        return aligned_seqs
     except Exception as e:
         raise RuntimeError(f"Alignment failed: {str(e)}")
+    
+    # Validate IDs if provided (applies to all formats)
+    if ids is not None and len(ids) != len(aligned_seqs):
+        raise ValueError(f"Number of IDs ({len(ids)}) must match number of sequences ({len(aligned_seqs)})")
+
+    # Handle different return formats
+    if fmt == "plain":
+        return aligned_seqs
+
+    # Generate IDs if not provided (only for ecosystem formats)
+    if ids is None:
+        ids = [f"seq{i}" for i in range(len(aligned_seqs))]
+
+    if fmt == "biopython":
+        try:
+            MultipleSeqAlignment = import_module("Bio.Align").MultipleSeqAlignment
+            SeqRecord = import_module("Bio.SeqRecord").SeqRecord
+            Seq = import_module("Bio.Seq").Seq
+        except ModuleNotFoundError as e:
+            raise ImportError(
+                "Biopython not installed. Run: pip install kalign[biopython]"
+            ) from e
+        return MultipleSeqAlignment([
+            SeqRecord(Seq(s), id=i) for s, i in zip(aligned_seqs, ids)
+        ])
+
+    if fmt == "skbio":
+        try:
+            TabularMSA = import_module("skbio").TabularMSA
+            SkbioDNA = import_module("skbio.sequence").DNA
+        except ModuleNotFoundError as e:
+            raise ImportError(
+                "scikit-bio not installed. Run: pip install kalign[skbio]"
+            ) from e
+        return TabularMSA([
+            SkbioDNA(s, metadata={"id": i}) for s, i in zip(aligned_seqs, ids)
+        ])
+
+    raise ValueError(f"Unknown fmt='{fmt}' (expected 'plain', 'biopython', 'skbio')")
+
+
+def set_num_threads(n: int) -> None:
+    """
+    Set the default number of threads for alignment operations.
+    
+    This affects all future calls to align() that don't explicitly specify n_threads.
+    The setting is thread-local, so different threads can have different defaults.
+    
+    Parameters
+    ----------
+    n : int
+        Number of threads to use. Must be at least 1.
+        
+    Raises
+    ------
+    ValueError
+        If n is less than 1
+        
+    Examples
+    --------
+    >>> import kalign
+    >>> kalign.set_num_threads(4)
+    >>> aligned = kalign.align(sequences)  # Uses 4 threads
+    """
+    global _default_threads
+    if n < 1:
+        raise ValueError("Number of threads must be at least 1")
+    
+    # Use thread-local storage for thread safety
+    _thread_local.num_threads = n
+    # Also update global default for new threads
+    _default_threads = n
+
+
+def get_num_threads() -> int:
+    """
+    Get the current default number of threads for alignment operations.
+    
+    Returns
+    -------
+    int
+        Current default number of threads
+        
+    Examples
+    --------
+    >>> import kalign
+    >>> kalign.get_num_threads()
+    1
+    >>> kalign.set_num_threads(8)
+    >>> kalign.get_num_threads()
+    8
+    """
+    return getattr(_thread_local, 'num_threads', _default_threads)
 
 
 def align_from_file(
@@ -237,7 +350,8 @@ def align_from_file(
 def write_alignment(
     sequences: List[str],
     output_file: str,
-    format: str = "fasta"
+    format: str = "fasta",
+    ids: Optional[List[str]] = None
 ) -> None:
     """
     Write aligned sequences to a file.
@@ -249,25 +363,55 @@ def write_alignment(
     output_file : str
         Path to output file
     format : str, optional
-        Output format: "fasta", "msf", or "clustal" (default: "fasta")
+        Output format: "fasta", "clustal", "stockholm", "phylip" (default: "fasta")
+    ids : list of str, optional
+        Sequence IDs. If None, generates seq0, seq1, etc.
         
     Raises
     ------
-    RuntimeError
-        If writing fails
+    ValueError
+        If invalid format or empty sequence list
+    ImportError
+        If Biopython is not installed for non-FASTA formats
+        
+    Examples
+    --------
+    >>> aligned = kalign.align(sequences)
+    >>> kalign.write_alignment(aligned, "output.fasta")
+    >>> kalign.write_alignment(aligned, "output.aln", format="clustal", ids=["seq1", "seq2"])
     """
     
     if not sequences:
         raise ValueError("Empty sequence list provided")
     
-    valid_formats = ["fasta", "msf", "clustal"]
-    if format.lower() not in valid_formats:
-        raise ValueError(f"Invalid format: {format}. Must be one of: {valid_formats}")
+    format_lower = format.lower()
     
-    try:
-        _core.write_alignment(sequences, output_file, format.lower())
-    except Exception as e:
-        raise RuntimeError(f"Writing alignment failed: {str(e)}")
+    # Map format aliases
+    format_map = {
+        "fasta": "fasta",
+        "fa": "fasta",
+        "clustal": "clustal",
+        "aln": "clustal",
+        "stockholm": "stockholm", 
+        "sto": "stockholm",
+        "phylip": "phylip",
+        "phy": "phylip"
+    }
+    
+    if format_lower not in format_map:
+        raise ValueError(f"Invalid format: {format}. Must be one of: fasta, clustal, stockholm, phylip")
+    
+    mapped_format = format_map[format_lower]
+    
+    # Use appropriate writer from io module
+    if mapped_format == "fasta":
+        io.write_fasta(sequences, output_file, ids=ids)
+    elif mapped_format == "clustal":
+        io.write_clustal(sequences, output_file, ids=ids)
+    elif mapped_format == "stockholm":
+        io.write_stockholm(sequences, output_file, ids=ids)
+    elif mapped_format == "phylip":
+        io.write_phylip(sequences, output_file, ids=ids)
 
 
 def generate_test_sequences(
@@ -346,7 +490,11 @@ __all__ = [
     "align_from_file", 
     "write_alignment",
     "generate_test_sequences",
+    "set_num_threads",
+    "get_num_threads",
     "kalign",
+    "io",
+    "utils",
     "DNA",
     "DNA_INTERNAL", 
     "RNA",

@@ -15,6 +15,8 @@ const targets: []const std.Target.Query = &.{
 const cflags = [_][]const u8{
     "-DKALIGN_PACKAGE_VERSION=\"3.4.1\"",
     "-DKALIGN_PACKAGE_NAME=\"kalign\"",
+    "-DKALIGN_ALN_SERIAL_THRESHOLD=250",
+    "-DKALIGN_KMEANS_UPGMA_THRESHOLD=50",
 };
 
 pub fn build(b: *std.Build) !void {
