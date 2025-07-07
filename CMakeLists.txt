@@ -214,8 +214,8 @@ if(BUILD_PYTHON_MODULE)
             tests/dssim.c
         )
 
-        # Link against the kalign library
-        target_link_libraries(_core PRIVATE kalign::kalign)
+        # Link against the static kalign library
+        target_link_libraries(_core PRIVATE kalign_static)
 
         # Link OpenMP if found
         if(OpenMP_CXX_FOUND)
@@ -234,12 +234,10 @@ if(BUILD_PYTHON_MODULE)
             CXX_STANDARD 11
             CXX_STANDARD_REQUIRED ON
             CXX_EXTENSIONS OFF
-            INSTALL_RPATH "@loader_path"
-            BUILD_WITH_INSTALL_RPATH TRUE
         )
 
-        # Install the Python module and required library - scikit-build-core handles the destination
-        install(TARGETS _core kalign
+        # Install only the Python module (no shared library needed with static linking)
+        install(TARGETS _core
                 LIBRARY DESTINATION kalign
                 COMPONENT python)
         
