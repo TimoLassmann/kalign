@@ -11,6 +11,8 @@ from importlib import import_module
 from typing import Any, List, Literal, Optional, Union
 
 from . import _core
+from . import io
+from . import utils
 
 __version__ = "3.4.5"
 __author__ = "Timo Lassmann"
@@ -507,4 +509,6 @@ __all__ = [
     "__version__",
     "__author__",
     "__email__",
+    "io",
+    "utils",
 ]

@@ -210,7 +210,7 @@ if(BUILD_PYTHON_MODULE)
 
         # Create the Python extension module
         pybind11_add_module(_core
-            python/kalign/_core.cpp
+            python-kalign/_core.cpp
             tests/dssim.c
         )
 
@@ -242,6 +242,12 @@ if(BUILD_PYTHON_MODULE)
         install(TARGETS _core kalign
                 LIBRARY DESTINATION kalign
                 COMPONENT python)
+        
+        # Install Python source files
+        install(DIRECTORY python-kalign/
+                DESTINATION kalign
+                COMPONENT python
+                FILES_MATCHING PATTERN "*.py" PATTERN "*.typed")
 
         message(STATUS "Python extension module configured")
     else()

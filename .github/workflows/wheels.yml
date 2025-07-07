@@ -8,9 +8,10 @@ on:
   pull_request:
     branches: [ main ]
     paths:
-      - 'python/**'
+      - 'kalign/**'
       - 'lib/**'
       - 'CMakeLists.txt'
+      - 'pyproject.toml'
       - '.github/workflows/wheels.yml'
   workflow_dispatch:
 
@@ -82,14 +83,13 @@ jobs:
           print('Test alignment successful:', len(aligned) == 3)"
           
       run: |
-        cd python
         python -m cibuildwheel --output-dir wheelhouse
 
     - name: Upload wheels
       uses: actions/upload-artifact@v4
       with:
         name: cibw-wheels-${{ matrix.os }}-${{ strategy.job-index }}
-        path: python/wheelhouse/*.whl
+        path: wheelhouse/*.whl
 
   build_sdist:
     name: Build source distribution
@@ -109,34 +109,15 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install build
 
-    - name: Prepare source files for sdist
-      run: |
-        # Copy required files into python directory to work around scikit-build-core sdist limitations
-        cd python
-        cp ../CMakeLists.txt .
-        cp -r ../lib .
-        mkdir -p tests
-        cp ../tests/dssim.c ../tests/dssim.h tests/
-
     - name: Build sdist
-      env:
-        SKBUILD_CMAKE_SOURCE_DIR: "."  # Override cmake.source-dir for sdist build
       run: |
-        cd python
         python -m build --sdist --outdir dist/
-
-    - name: Clean up copied files
-      run: |
-        cd python
-        rm -f CMakeLists.txt
-        rm -rf lib
-        rm -rf tests
 
     - name: Upload sdist
       uses: actions/upload-artifact@v4
       with:
         name: cibw-sdist
-        path: python/dist/*.tar.gz
+        path: dist/*.tar.gz
 
   test_install:
     name: Test wheel installation

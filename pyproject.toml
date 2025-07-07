@@ -101,12 +101,12 @@ Changelog = "https://github.com/TimoLassmann/kalign/blob/main/ChangeLog"
 
 [tool.scikit-build]
 # Wheel settings
-wheel.packages = ["kalign"]
+wheel.packages = ["python-kalign"]
 wheel.py-api = "cp39"
 
 # CMake settings
 cmake.build-type = "Release"
-cmake.source-dir = ".."  # Point to the parent directory containing CMakeLists.txt
+cmake.source-dir = "."  # CMakeLists.txt is now in the same directory as pyproject.toml
 cmake.args = [
     "-DBUILD_PYTHON_MODULE=ON",
     "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
@@ -117,13 +117,19 @@ build.targets = ["_core"]
 install.components = ["python"]
 
 # Source distribution settings
-# For now, disable external file inclusion - the build will need external files
-# but we'll handle this by making sure the CMake source-dir points to parent
+# Now that all files are in the same directory tree, sdist should work correctly
 sdist.exclude = [
     "build*/",
     ".venv/",
     "__pycache__/",
-    "**/*.pyc"
+    "**/*.pyc",
+    "wheelhouse/",
+    "dist/"
+]
+
+# Explicitly include critical directories that might be excluded by default
+sdist.include = [
+    "lib/include/"
 ]
 
 # Logging
