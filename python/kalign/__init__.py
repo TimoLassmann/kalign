@@ -412,6 +412,7 @@ def write_alignment(
 
     # Use appropriate writer from io module (lazy import to avoid circular imports)
     from . import io
+
     if mapped_format == "fasta":
         io.write_fasta(sequences, output_file, ids=ids)
     elif mapped_format == "clustal":

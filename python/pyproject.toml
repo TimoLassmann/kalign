@@ -111,7 +111,7 @@ cmake.args = [
     "-DBUILD_PYTHON_MODULE=ON",
     "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
 ]
-cmake.targets = ["_core"]
+build.targets = ["_core"]
 
 # Install settings
 install.components = ["python"]
