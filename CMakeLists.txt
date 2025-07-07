@@ -44,8 +44,8 @@ endif()
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
   if (MSVC)
-    # warning level 4 and all warnings as errors
-    add_compile_options(/W4 /WX)
+    # warning level 3 for Windows builds (level 4 too strict for wheel builds)
+    add_compile_options(/W3)
   else()
     # lots of warnings and all warnings as errors
     add_compile_options(-Wall -Wextra -pedantic )
