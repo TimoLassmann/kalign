@@ -25,11 +25,9 @@ jobs:
         include:
           - os: ubuntu-latest
             cibw_archs: "x86_64"
-          - os: windows-latest  
-            cibw_archs: "AMD64"
           - os: macos-13
             cibw_archs: "x86_64" 
-          - os: macos-14
+          - os: macos-latest
             cibw_archs: "arm64"
 
     steps:
@@ -71,13 +69,6 @@ jobs:
           brew install cmake libomp || echo "Dependencies may already be installed"
         CIBW_REPAIR_WHEEL_COMMAND_MACOS: >
           delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}
-        
-        # Windows specific settings - disable OpenMP due to MSVC compatibility issues
-        CIBW_BEFORE_ALL_WINDOWS: |
-          choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' || echo "cmake may already be installed"
-        CIBW_ENVIRONMENT_WINDOWS: >
-          CMAKE_BUILD_PARALLEL_LEVEL=2
-          USE_OPENMP=OFF
         
         # Environment variables for builds
         CIBW_ENVIRONMENT: >
@@ -131,7 +122,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-13, macos-14]
+        os: [ubuntu-latest, macos-13, macos-latest]
         python-version: ['3.9', '3.10', '3.11', '3.12']
 
     steps:
@@ -167,10 +158,6 @@ jobs:
                     os.system(f'pip install {wheel}')
                     break
                 elif system == 'darwin' and 'macos' in wheel_name:
-                    print(f'Installing: {wheel}')
-                    os.system(f'pip install {wheel}')
-                    break  
-                elif system == 'windows' and 'win' in wheel_name:
                     print(f'Installing: {wheel}')
                     os.system(f'pip install {wheel}')
                     break
