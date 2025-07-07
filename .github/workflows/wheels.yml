@@ -8,7 +8,7 @@ on:
   pull_request:
     branches: [ main ]
     paths:
-      - 'kalign/**'
+      - 'python-kalign/**'
       - 'lib/**'
       - 'CMakeLists.txt'
       - 'pyproject.toml'

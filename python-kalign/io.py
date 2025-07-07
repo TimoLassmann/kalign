@@ -5,9 +5,9 @@ This module provides convenient functions for reading sequences from files
 and writing alignments in various formats, with optional Biopython integration.
 """
 
-from typing import List, Optional, Union, TextIO, Tuple
 import os
 from pathlib import Path
+from typing import List, Optional, TextIO, Tuple, Union
 
 
 def read_fasta(path: Union[str, Path]) -> List[str]:
@@ -206,8 +206,8 @@ def write_clustal(
     try:
         from Bio import AlignIO
         from Bio.Align import MultipleSeqAlignment
-        from Bio.SeqRecord import SeqRecord
         from Bio.Seq import Seq
+        from Bio.SeqRecord import SeqRecord
     except ImportError as e:
         raise ImportError(
             "Biopython required for Clustal I/O. Run: pip install kalign[io]"
@@ -261,8 +261,8 @@ def write_stockholm(
     try:
         from Bio import AlignIO
         from Bio.Align import MultipleSeqAlignment
-        from Bio.SeqRecord import SeqRecord
         from Bio.Seq import Seq
+        from Bio.SeqRecord import SeqRecord
     except ImportError as e:
         raise ImportError(
             "Biopython required for Stockholm I/O. Run: pip install kalign[io]"
@@ -319,8 +319,8 @@ def write_phylip(
     try:
         from Bio import AlignIO
         from Bio.Align import MultipleSeqAlignment
-        from Bio.SeqRecord import SeqRecord
         from Bio.Seq import Seq
+        from Bio.SeqRecord import SeqRecord
     except ImportError as e:
         raise ImportError(
             "Biopython required for PHYLIP I/O. Run: pip install kalign[io]"

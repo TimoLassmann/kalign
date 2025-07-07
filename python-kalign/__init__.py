@@ -10,9 +10,7 @@ import threading
 from importlib import import_module
 from typing import Any, List, Literal, Optional, Union
 
-from . import _core
-from . import io
-from . import utils
+from . import _core, io, utils
 
 __version__ = "3.4.5"
 __author__ = "Timo Lassmann"

@@ -64,28 +64,28 @@ ATCGATC-ATCG
 
 ### Complete Documentation Suite
 
-- **[📖 Quick Start Guide](docs/python-quickstart.md)** - Get up and running in minutes
-- **[🔧 API Reference](docs/python-api.md)** - Complete function documentation  
-- **[🌐 Ecosystem Integration](docs/python-ecosystem.md)** - Biopython, scikit-bio, pandas integration
-- **[⚡ Performance Tuning](docs/python-performance.md)** - Optimization and benchmarking
-- **[🛠️ Troubleshooting Guide](docs/python-troubleshooting.md)** - Common issues and solutions
+- **[📖 Quick Start Guide](python-docs/python-quickstart.md)** - Get up and running in minutes
+- **[🔧 API Reference](python-docs/python-api.md)** - Complete function documentation  
+- **[🌐 Ecosystem Integration](python-docs/python-ecosystem.md)** - Biopython, scikit-bio, pandas integration
+- **[⚡ Performance Tuning](python-docs/python-performance.md)** - Optimization and benchmarking
+- **[🛠️ Troubleshooting Guide](python-docs/python-troubleshooting.md)** - Common issues and solutions
 
 ### Examples Directory
 
-- **[`examples/basic_usage.py`](examples/basic_usage.py)** - Essential functionality examples
-- **[`examples/ecosystem_integration.py`](examples/ecosystem_integration.py)** - Bioinformatics ecosystem demos
-- **[`examples/performance_benchmarks.py`](examples/performance_benchmarks.py)** - Performance testing tools
-- **[`examples/README.md`](examples/README.md)** - Examples overview and usage
+- **[`python-examples/basic_usage.py`](python-examples/basic_usage.py)** - Essential functionality examples
+- **[`python-examples/ecosystem_integration.py`](python-examples/ecosystem_integration.py)** - Bioinformatics ecosystem demos
+- **[`python-examples/performance_benchmarks.py`](python-examples/performance_benchmarks.py)** - Performance testing tools
+- **[`python-examples/README.md`](python-examples/README.md)** - Examples overview and usage
 
 ### Interactive Testing
 
 ```bash
 # Run comprehensive examples
-python examples/basic_usage.py
-python examples/ecosystem_integration.py
+python python-examples/basic_usage.py
+python python-examples/ecosystem_integration.py
 
 # Test your system performance  
-python examples/performance_benchmarks.py
+python python-examples/performance_benchmarks.py
 ```
 
 ## Usage
@@ -464,16 +464,13 @@ To build the Python package from source:
 ```bash
 # Clone the repository
 git clone https://github.com/TimoLassmann/kalign.git
-cd kalign/python
+cd kalign
 
-# Install build dependencies
-pip install build scikit-build-core pybind11
+# Install in development mode with uv
+uv pip install -e .
 
-# Build the package
-python -m build
-
-# Install in development mode
-pip install -e .
+# Or build the package
+uv run python -m build
 ```
 
 ### Requirements
@@ -502,22 +499,22 @@ print("✅ Alignment successful!")
 
 ### 3. Explore Examples
 ```bash
-python examples/basic_usage.py              # Learn the basics
-python examples/ecosystem_integration.py    # Ecosystem features  
-python examples/performance_benchmarks.py   # Optimize performance
+python python-examples/basic_usage.py              # Learn the basics
+python python-examples/ecosystem_integration.py    # Ecosystem features  
+python python-examples/performance_benchmarks.py   # Optimize performance
 ```
 
 ### 4. Read the Documentation
-- Start with [Quick Start Guide](docs/python-quickstart.md)
-- Check [API Reference](docs/python-api.md) for details
-- See [Troubleshooting](docs/python-troubleshooting.md) if needed
+- Start with [Quick Start Guide](python-docs/python-quickstart.md)
+- Check [API Reference](python-docs/python-api.md) for details
+- See [Troubleshooting](python-docs/python-troubleshooting.md) if needed
 
 ## 🤝 Community & Support
 
 ### Getting Help
 
-- **📖 Documentation**: Complete guides in [`docs/`](docs/)
-- **💡 Examples**: Working code in [`examples/`](examples/)
+- **📖 Documentation**: Complete guides in [`python-docs/`](python-docs/)
+- **💡 Examples**: Working code in [`python-examples/`](python-examples/)
 - **🐛 Issues**: [GitHub Issues](https://github.com/TimoLassmann/kalign/issues)
 - **💬 Discussions**: [GitHub Discussions](https://github.com/TimoLassmann/kalign/discussions)
 
@@ -526,7 +523,7 @@ python examples/performance_benchmarks.py   # Optimize performance
 We welcome contributions! Please see:
 - [Contributing Guidelines](../CONTRIBUTING.md)
 - [Code of Conduct](../CODE_OF_CONDUCT.md)
-- [Development Setup](docs/python-development.md)
+- [Development Setup](python-docs/python-development.md)
 
 ### Ecosystem Partners
 
@@ -576,7 +573,7 @@ See the [LICENSE](../COPYING) file for details.
 
 - **🏠 Homepage**: [GitHub Repository](https://github.com/TimoLassmann/kalign)
 - **📦 PyPI**: [kalign](https://pypi.org/project/kalign/)
-- **📚 Documentation**: [Complete Docs](docs/)
+- **📚 Documentation**: [Complete Docs](python-docs/)
 - **🐛 Issues**: [Issue Tracker](https://github.com/TimoLassmann/kalign/issues)
 - **💬 Discussions**: [GitHub Discussions](https://github.com/TimoLassmann/kalign/discussions)
 - **📈 Changelog**: [Release Notes](../CHANGELOG.md)

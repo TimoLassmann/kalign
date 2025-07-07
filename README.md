@@ -164,7 +164,7 @@ for seq in aligned:
     print(seq)
 ```
 
-For comprehensive Python documentation, see [python/README.md](python/README.md) and the [docs directory](python/docs/).
+For comprehensive Python documentation, see [README-python.md](README-python.md) and the [python-docs directory](python-docs/).
 
 ## Examples
 
@@ -230,8 +230,7 @@ target_link_libraries(<target> kalign::kalign)
 
 **Local development**:
 ```bash
-cd python
-pip install -e .
+uv pip install -e .
 ```
 
 **Build Python module with CMake**:
@@ -309,7 +308,7 @@ kalign --help  # Shows current thread default
 kalign -i test.fa -n 1 -o out.fa  # Force single-threaded for testing
 ```
 
-For more troubleshooting, see [python/docs/python-troubleshooting.md](python/docs/python-troubleshooting.md).
+For more troubleshooting, see [python-docs/python-troubleshooting.md](python-docs/python-troubleshooting.md).
 
 ## Citation
 

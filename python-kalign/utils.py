@@ -5,9 +5,10 @@ This module provides helpful utilities for analyzing and manipulating
 alignments produced by Kalign.
 """
 
-from typing import List, Optional, Dict, Tuple
-import numpy as np
 from collections import Counter
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
 
 
 def to_array(alignment: List[str]) -> np.ndarray:

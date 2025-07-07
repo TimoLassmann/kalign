@@ -5,9 +5,9 @@ This module provides a CLI entry point that wraps the native Kalign binary,
 ensuring the command-line interface remains available after pip installation.
 """
 
-import sys
-import subprocess
 import os
+import subprocess
+import sys
 from pathlib import Path
 from typing import List, Optional
 

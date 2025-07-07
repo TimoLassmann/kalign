@@ -131,24 +131,21 @@ The library provides a C API (`kalign.h`) with C++ compatibility. Key functions:
 
 ## Python Module
 
-The repository includes a Python package (`python/`) that provides Python bindings for the Kalign library.
+The repository includes a Python package that provides Python bindings for the Kalign library. The Python package is configured at the root level using modern Python packaging standards.
 
 ### Python Development Commands
 
+#### Install in Development Mode (Recommended)
+```bash
+uv pip install -e .
+```
+
 #### Build Python Package Locally
 ```bash
-cd python
-pip install build scikit-build-core pybind11
-python -m build
+uv run python -m build
 ```
 
-#### Install in Development Mode
-```bash
-cd python
-pip install -e .
-```
-
-#### Build with CMake (for debugging)
+#### Build with CMake (for debugging C extensions)
 ```bash
 mkdir build
 cd build
@@ -158,22 +155,25 @@ make
 
 #### Test Python Package
 ```bash
-cd python
-python -c "import kalign; print(kalign.__version__); seqs=['ATCG','ATCGG']; print(kalign.align(seqs))"
+uv run python -c "import kalign; print(kalign.__version__); seqs=['ATCG','ATCGG']; print(kalign.align(seqs))"
+```
+
+#### Run Python Tests
+```bash
+uv run pytest tests/python/ -v
 ```
 
 #### Build Wheels for Distribution
 ```bash
-cd python
-pip install cibuildwheel
-python -m cibuildwheel --output-dir wheelhouse
+uv run python -m cibuildwheel --output-dir wheelhouse
 ```
 
 ### Python Package Structure
-- `python/kalign/__init__.py` - High-level Python API
-- `python/kalign/_core.cpp` - pybind11 C++ bindings
-- `python/pyproject.toml` - Modern Python build configuration
-- `python/README.md` - Python-specific documentation
+- `python-kalign/__init__.py` - High-level Python API
+- `python-kalign/_core.cpp` - pybind11 C++ bindings
+- `pyproject.toml` - Modern Python build configuration (at root level)
+- `README-python.md` - Python-specific documentation
+- `tests/python/` - Python test suite
 
 ### Python API Features
 - **Simple interface**: `kalign.align(sequences, seq_type="auto")`

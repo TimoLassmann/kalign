@@ -4,16 +4,18 @@ on:
   push:
     branches: [ main, python ]
     paths:
-      - 'python/**'
+      - 'python-kalign/**'
       - 'lib/**'
       - 'CMakeLists.txt'
+      - 'pyproject.toml'
       - '.github/workflows/python.yml'
   pull_request:
     branches: [ main ]
     paths:
-      - 'python/**'
+      - 'python-kalign/**'
       - 'lib/**'
       - 'CMakeLists.txt'
+      - 'pyproject.toml'
       - '.github/workflows/python.yml'
 
 jobs:
@@ -34,19 +36,16 @@ jobs:
         
     - name: Lint with flake8
       run: |
-        cd python
-        flake8 kalign --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 kalign --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        flake8 python-kalign --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 python-kalign --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
         
     - name: Check formatting with black
       run: |
-        cd python
-        black --check --diff kalign/
+        black --check --diff python-kalign/
         
     - name: Check import sorting with isort
       run: |
-        cd python
-        isort --check-only --diff kalign/
+        isort --check-only --diff python-kalign/
 
   test:
     runs-on: ${{ matrix.os }}
@@ -87,19 +86,17 @@ jobs:
         
     - name: Build and install package
       run: |
-        cd python
         python -m pip install -e .
         
     - name: Test with pytest
       run: |
-        cd python
-        pytest tests/ -v --cov=kalign --cov-report=xml --cov-report=term-missing
+        pytest tests/python/ -v --cov=kalign --cov-report=xml --cov-report=term-missing
         
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
       uses: codecov/codecov-action@v4
       with:
-        file: python/coverage.xml
+        file: coverage.xml
         flags: python
         name: codecov-umbrella
 
@@ -142,17 +139,14 @@ jobs:
         
     - name: Build package
       run: |
-        cd python
         python -m build
         
     - name: Check package
       run: |
-        cd python
         twine check dist/*
         
     - name: Test installation from wheel
       run: |
-        cd python
         python -m pip install dist/*.whl
         python -c "import kalign; print(f'kalign {kalign.__version__} installed successfully')"
         

@@ -86,17 +86,17 @@ pip install psutil  # For performance monitoring
 
 2. **Run the basic usage example:**
 ```bash
-python examples/basic_usage.py
+python python-examples/basic_usage.py
 ```
 
 3. **Try ecosystem integration:**
 ```bash
-python examples/ecosystem_integration.py
+python python-examples/ecosystem_integration.py
 ```
 
 4. **Benchmark your system:**
 ```bash
-python examples/performance_benchmarks.py
+python python-examples/performance_benchmarks.py
 ```
 
 ## Example Outputs
@@ -224,7 +224,7 @@ def chunked_alignment(sequences, chunk_size=1000):
 
 ### Getting Help
 
-- Check the main documentation: `docs/`
+- Check the main documentation: `python-docs/`
 - Run the diagnostic script: `python -c "import kalign; help(kalign)"`
 - Report issues: [GitHub Issues](https://github.com/TimoLassmann/kalign/issues)
 
