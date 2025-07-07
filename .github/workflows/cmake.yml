@@ -3,52 +3,94 @@ name: CMake
 on:
   push:
     branches: [ "main" ]
-  
-env:
-  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
-  BUILD_TYPE: Release
+    paths:
+      - 'lib/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/cmake.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'lib/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/cmake.yml'
 
 jobs:
   build:
-    # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
-    # You can convert this to a matrix build if you need cross-platform coverage.
-    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+    name: Build C/C++ on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        build_type: [Release, Debug]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies (Ubuntu)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libomp-dev cmake
+
+    - name: Install dependencies (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        brew install libomp cmake
+
+    - name: Configure CMake
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{ matrix.build_type }} --parallel 2
+
+    - name: Test
+      working-directory: ${{github.workspace}}/build
+      run: ctest -C ${{ matrix.build_type }} --output-on-failure
+
+    - name: Test kalign executable
+      run: |
+        # Create test input
+        echo ">seq1" > test.fasta
+        echo "ATCGATCGATCG" >> test.fasta
+        echo ">seq2" >> test.fasta  
+        echo "ATCGTCGATCG" >> test.fasta
+        echo ">seq3" >> test.fasta
+        echo "ATCGATCATCG" >> test.fasta
+        
+        # Test kalign executable
+        ./build/src/kalign -i test.fasta -o test_output.fasta
+        
+        # Verify output exists and is not empty
+        if [ -f test_output.fasta ] && [ -s test_output.fasta ]; then
+          echo "✓ kalign executable test passed"
+        else
+          echo "✗ kalign executable test failed"
+          exit 1
+        fi
+
+  address-sanitizer:
+    name: Address Sanitizer
     runs-on: ubuntu-latest
-
+    
     steps:
-    - uses: actions/checkout@v3
-
-    - name: Configure CMake
-      # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
-      # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
-
+    - uses: actions/checkout@v4
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libomp-dev cmake
+        
+    - name: Configure CMake with ASAN
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=ASAN
+      
     - name: Build
-      # Build your program with the given configuration
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
-
-    - name: Test
+      run: cmake --build ${{github.workspace}}/build --config ASAN --parallel 2
+      
+    - name: Test with ASAN
       working-directory: ${{github.workspace}}/build
-      # Execute tests defined by the CMake configuration.  
-      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
-      run: ctest -C ${{env.BUILD_TYPE}}
-
-  build-mac:
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Configure CMake
-      # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
-      # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
-
-    - name: Build
-      # Build your program with the given configuration
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
-
-    - name: Test
-      working-directory: ${{github.workspace}}/build
-      # Execute tests defined by the CMake configuration.  
-      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
-      run: ctest -C ${{env.BUILD_TYPE}}
+      run: ctest -C ASAN --output-on-failure

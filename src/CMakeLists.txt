@@ -30,6 +30,10 @@ add_executable(kalign-bin
 # Link with static library.... 
 target_link_libraries(kalign-bin PRIVATE tldevel ${PROJECT_NAME}_static )
 
+if(OpenMP_C_FOUND)  
+  target_link_libraries(kalign-bin PRIVATE OpenMP::OpenMP_C)
+endif(OpenMP_C_FOUND)
+
 target_compile_definitions(kalign-bin PRIVATE KALIGN_PACKAGE_NAME=\"${KALIGN_PACKAGE_NAME}\"  KALIGN_PACKAGE_VERSION=\"${KALIGN_PACKAGE_VERSION}\")
 
 set_target_properties(kalign-bin
@@ -42,6 +46,10 @@ add_executable(kalignfmt
   run_reformat.c
   parameters.c
   )
+
+if(OpenMP_C_FOUND)  
+  target_link_libraries(kalignfmt PRIVATE OpenMP::OpenMP_C)
+endif(OpenMP_C_FOUND)
 
 install(TARGETS kalign-bin DESTINATION bin)
 

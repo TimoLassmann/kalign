@@ -23,8 +23,38 @@
 #include "tldevel.h"
 
 #include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+#ifdef HAVE_OPENMP
+#include <omp.h>
+#endif
 #define PARAMETERS_IMPORT
 #include "parameters.h"
+
+static int get_default_thread_count(void)
+{
+        int cores = 1;
+        
+#ifdef HAVE_OPENMP
+        cores = omp_get_num_procs();
+#elif defined(_WIN32)
+        SYSTEM_INFO sysinfo;
+        GetSystemInfo(&sysinfo);
+        cores = sysinfo.dwNumberOfProcessors;
+#elif defined(_SC_NPROCESSORS_ONLN)
+        cores = sysconf(_SC_NPROCESSORS_ONLN);
+        if (cores <= 0) cores = 1;
+#endif
+        
+        if (cores > 1) cores = cores - 1;
+        if (cores > 16) cores = 16;
+        if (cores < 1) cores = 1;
+        
+        return cores;
+}
 
 struct parameters*init_param(void)
 {
@@ -50,7 +80,7 @@ struct parameters*init_param(void)
         param->tgpe = -1.0;
         param->matadd = 0.0F;
         param->chaos = 0;
-        param->nthreads = 4;
+        param->nthreads = get_default_thread_count();
         param->clean = 0;
         param->unalign = 0;
         param->quiet = 0;

@@ -42,7 +42,7 @@ int main(void)
                 fprintf(stdout,"%d %d %d %d %d\n",a->a,a->b,a->c,a->p,a->n);
         }
 
-
+        free_tasks(t);
         free_rng(rng);
         return EXIT_SUCCESS;
 ERROR:

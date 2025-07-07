@@ -1,45 +1,108 @@
-<!-- ![C/C++ CI](https://github.com/TimoLassmann/kalign/workflows/C/C++%20CI/badge.svg) -->
 [![CMake](https://github.com/TimoLassmann/kalign/actions/workflows/cmake.yml/badge.svg)](https://github.com/TimoLassmann/kalign/actions/workflows/cmake.yml)
 ![CodeQL](https://github.com/TimoLassmann/kalign/workflows/CodeQL/badge.svg)
+![GitHub stars](https://img.shields.io/github/stars/TimoLassmann/kalign)
+![GitHub issues](https://img.shields.io/github/issues/TimoLassmann/kalign)
 
 # Kalign
 
-Kalign is a fast multiple sequence alignment program for biological sequences.
+Kalign is a fast multiple sequence alignment program for biological sequences written in C with Python bindings.
 
-# Installation
+## 🚀 Key Features
 
-## Release Tarball
+- **🔥 High Performance**: Fast multiple sequence alignment with multi-threading support
+- **⚡ Smart Threading**: Auto-detects CPU cores and uses N-1 threads by default (max 16) for optimal performance
+- **🔧 Cross-Platform**: Works on Linux and macOS with multiple build systems (CMake, Zig)
+- **📊 Multiple Formats**: FASTA, MSF, Clustal, Stockholm, PHYLIP support
+- **🧬 Sequence Types**: Optimized for protein, DNA, RNA, and divergent sequences
+- **⚡ SIMD Optimizations**: Vectorized code for x86_64 systems (SSE4.1, AVX, AVX2)
+- **🐍 Python Integration**: Modern Python package with comprehensive bioinformatics ecosystem support
 
-Download tarball from [releases](https://github.com/TimoLassmann/kalign/releases). Then:
+## Installation
 
-``` bash
+### From Source (Primary)
+
+#### Prerequisites
+
+- **C compiler** (GCC, Clang, or MSVC)
+- **CMake** (3.18 or higher)
+- **OpenMP** (optional, for parallelization)
+
+#### Basic Build
+
+```bash
+# Download and extract latest release
 tar -zxvf kalign-<version>.tar.gz
 cd kalign-<version>
-mkdir build 
-cd build
-cmake .. 
-make 
-make test 
+
+# Build
+mkdir build && cd build
+cmake ..
+make
+make test
 make install
 ```
 
-on macOS, install [brew](https://brew.sh/) then:
+#### macOS with Homebrew
 
-``` bash
-brew install cmake 
+On macOS, install dependencies first:
+
+```bash
+# Install dependencies
+brew install cmake
+
+# For OpenMP support (recommended)
+brew install libomp
+
+# Clone and build
 git clone https://github.com/TimoLassmann/kalign.git
 cd kalign
-mkdir build
-cd build 
+mkdir build && cd build
 cmake ..
-make 
-make test 
+make
+make test
 make install
 ```
 
-# Usage
+**Note**: On macOS, Kalign automatically configures OpenMP with Homebrew's libomp installation at `/opt/homebrew/opt/libomp/`.
 
-The command line interface of Kalign accepts the following options:
+#### Alternative Build Systems
+
+**Zig Build** (for cross-compilation):
+```bash
+zig build
+```
+
+**Debug Build**:
+```bash
+cmake -DCMAKE_BUILD_TYPE=Debug ..
+make
+```
+
+**Without OpenMP**:
+```bash
+cmake -DUSE_OPENMP=OFF ..
+make
+```
+
+### Python Package
+
+For development or latest features, install from source:
+
+```bash
+pip install git+https://github.com/TimoLassmann/kalign.git
+```
+
+For enhanced bioinformatics ecosystem integration:
+
+```bash
+pip install "kalign[biopython] @ git+https://github.com/TimoLassmann/kalign.git"    # + Biopython integration
+pip install "kalign[skbio] @ git+https://github.com/TimoLassmann/kalign.git"        # + scikit-bio integration  
+pip install "kalign[all] @ git+https://github.com/TimoLassmann/kalign.git"          # Full ecosystem support
+```
+
+## Usage
+
+### Command Line Interface
 
 ```bash
 Usage: kalign  -i <seq file> -o <out aln> 
@@ -53,99 +116,38 @@ Options:
    --gpo              : Gap open penalty. []
    --gpe              : Gap extension penalty. []
    --tgpe             : Terminal gap extension penalty. []
-   -n/--nthreads      : Number of threads. [4]
+   -n/--nthreads      : Number of threads. [auto: N-1, max 16]
    --version (-V/-v)  : Prints version. [NA]
-
-
 ```
 
+#### Threading Behavior
 
-Kalign expects the input to be a set of unaligned sequences in fasta format or aligned sequences in aligned fasta, MSF or clustal format. If the sequences are already aligned, kalign will remove all gap characters and re-align the sequences. 
+**New in this version**: Kalign automatically detects your system's CPU cores and uses N-1 threads by default (leaving one core free), with a maximum of 16 threads. This provides good performance out-of-the-box while maintaining system responsiveness.
 
-By default, Kalign automatically detects whether the input sequences are protein or DNA and selects appropriate alignment parameters. 
+- **Auto-detection**: Uses CPU cores - 1 (e.g., 15 threads on a 16-core system)
+- **Maximum cap**: Never uses more than 16 threads
+- **Manual override**: Use `-n/--nthreads` to specify a custom thread count
+- **Single-threaded**: Use `-n 1` to disable parallelization
 
-The `--type` option gives users more direct control over the alignment parameters. Currently there are five core options:
+### Input Formats
 
-- `protein`  : uses a the CorBLOSUM66_13plus substituion matrix (default for protein sequence)
-- `divergent`: uses the gonnet 250 substituion matrix 
-- `dna`      : default DNA parameters
-  +  5 match score 
-  + -4 mismatch score
-  + -8 gap open penalty
-  + -6 gap extension penalty 
-  +  0 terminal gap extension penalty
-- `internal` : same as above but terminal gaps set to 8 to encourage gaps within the sequences. 
-- `rna`      : parameters optimised for RNA alignments.
+Kalign accepts:
+- **Unaligned sequences**: FASTA format
+- **Pre-aligned sequences**: FASTA, MSF, or Clustal format (gaps will be removed and sequences re-aligned)
 
-The `--gpo`, `--gpe` and `--tgpe` options can be used to further fine tune the parameters.
+### Sequence Types
 
-# Examples
+Kalign automatically detects sequence types but offers manual control via `--type`:
 
-Passing sequences via stdin:
+- **`protein`**: Uses CorBLOSUM66_13plus substitution matrix (default for protein)
+- **`divergent`**: Uses Gonnet 250 substitution matrix for highly divergent proteins
+- **`dna`**: DNA parameters (match: +5, mismatch: -4, gap open: -8, gap ext: -6)
+- **`rna`**: Optimized parameters for RNA alignments
+- **`internal`**: Like DNA but encourages internal gaps (terminal gap penalty: 8)
 
-```bash
-cat input.fa | kalign -f fasta > out.afa
-```
+Fine-tune with `--gpo` (gap open), `--gpe` (gap extension), and `--tgpe` (terminal gap extension).
 
-Combining multiple input files:
-
-```bash
-kalign seqsA.fa seqsB.fa seqsC.fa -f fasta > combined.afa
-```
-
-Align sequences and output the alignment in MSF format:
-
-```bash
-kalign -i BB11001.tfa -f msf  -o out.msf
-```
-
-Align sequences and output the alignment in clustal format:
-
-```bash
-kalign -i BB11001.tfa -f clu -o out.clu
-```
-
-Re-align sequences in an existing alignment:
-
-```bash
-kalign -i BB11001.msf  -o out.afa
-```
-
-Reformat existing alignment:
-
-```bash
-kalign -i BB11001.msf -r afa -o out.afa
-```
-
-# Kalign library 
-
-To incorporate Kalign into your own projects you can link to the library like this: 
-
-```cmake 
-find_package(kalign)
-target_link_libraries(<target> kalign::kalign)
-```
-
-Alternatively, you can include the kalign code directly in your project and link with:
-
-```cmake
-if (NOT TARGET kalign)
-  add_subdirectory(<path_to_kalign>/kalign EXCLUDE_FROM_ALL)
-endif ()
-target_link_libraries(<target> kalign::kalign)
-```
-
-# Python Package
-
-Kalign is also available as a Python package for easy integration into Python workflows:
-
-## Installation
-
-```bash
-pip install kalign
-```
-
-## Usage
+### Python API
 
 ```python
 import kalign
@@ -162,46 +164,165 @@ for seq in aligned:
     print(seq)
 ```
 
-Output:
-```
-ATCGATCGATCG
-ATCG-TCGATCG
-ATCGATC-ATCG
-```
+For comprehensive Python documentation, see [python/README.md](python/README.md) and the [docs directory](python/docs/).
 
-### Advanced Usage
+## Examples
 
-```python
-# Protein alignment with custom parameters
-aligned = kalign.align(
-    protein_sequences,
-    seq_type="protein",
-    gap_open=-10.0,
-    gap_extend=-1.0,
-    n_threads=4
-)
+### Basic Usage
 
-# Align from file
-aligned = kalign.align_from_file("sequences.fasta", seq_type="auto")
+**Pass sequences via stdin**:
+```bash
+cat input.fa | kalign -f fasta > out.afa
 ```
 
-For detailed Python documentation, see [python/README.md](python/README.md).
+**Combine multiple input files**:
+```bash
+kalign seqsA.fa seqsB.fa seqsC.fa -f fasta > combined.afa
+```
 
-# Benchmark results
+**Use optimal threading** (auto-detected):
+```bash
+kalign -i sequences.fa -o aligned.afa  # Uses N-1 threads automatically
+```
 
-Here are some benchmark results. The code to reproduce these figures can be found at [here](scripts/benchmark.org).
+**Custom threading**:
+```bash
+kalign -i sequences.fa -o aligned.afa -n 8  # Use exactly 8 threads
+```
 
-## Balibase
+### Format Conversion
 
+**MSF format**:
+```bash
+kalign -i BB11001.tfa -f msf -o out.msf
+```
+
+**Clustal format**:
+```bash
+kalign -i BB11001.tfa -f clu -o out.clu
+```
+
+**Re-align existing alignment**:
+```bash
+kalign -i BB11001.msf -o out.afa
+```
+
+## Library Integration
+
+### CMake Integration
+
+Link Kalign into your C/C++ projects:
+
+```cmake
+find_package(kalign)
+target_link_libraries(<target> kalign::kalign)
+```
+
+**Direct inclusion**:
+```cmake
+if (NOT TARGET kalign)
+  add_subdirectory(<path_to_kalign>/kalign EXCLUDE_FROM_ALL)
+endif ()
+target_link_libraries(<target> kalign::kalign)
+```
+
+### Python Module Development
+
+**Local development**:
+```bash
+cd python
+pip install -e .
+```
+
+**Build Python module with CMake**:
+```bash
+mkdir build && cd build
+cmake -DBUILD_PYTHON_MODULE=ON ..
+make
+```
+
+## Performance
+
+### Benchmark Results
+
+Kalign performs well for both speed and accuracy:
+
+#### Balibase
 ![Balibase_scores](https://user-images.githubusercontent.com/8110320/198513840-0e08a634-bb41-4826-bd58-7fc66eae1054.jpeg)
 
-## Bralibase
-
+#### Bralibase  
 ![Bralibase_scores](https://user-images.githubusercontent.com/8110320/198513850-00e5037f-355f-45ec-828f-ed8d47497272.jpeg)
 
-# Please cite:
-1. Lassmann, Timo. _Kalign 3: multiple sequence alignment of large data sets._ **Bioinformatics** (2019). [pdf](https://academic.oup.com/bioinformatics/advance-article-pdf/doi/10.1093/bioinformatics/btz795/30314127/btz795.pdf)
+### Performance Features
 
-# Other papers:
-1. Lassmann, Timo, Oliver Frings, and Erik LL Sonnhammer. _Kalign2: high-performance multiple alignment of protein and nucleotide sequences allowing external features._ **Nucleic acids research** 37.3 (2008): 858-865. [Pubmed](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2647288/)
-2. Lassmann, Timo, and Erik LL Sonnhammer. _Kalign: an accurate and fast multiple sequence alignment algorithm._ **BMC bioinformatics** 6.1 (2005): 298. [Pubmed](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1325270/)
+- **Multi-threading**: Automatic CPU core detection with OpenMP parallelization
+- **SIMD optimizations**: Vectorized algorithms on x86_64 systems (SSE4.1, AVX, AVX2)
+- **Bit-parallel algorithms**: Myers' algorithm for efficient alignment
+- **Memory optimization**: Custom allocation strategies for large datasets
+
+### Performance Tips
+
+- **Let auto-threading work**: The default N-1 threading usually provides good performance
+- **Large datasets**: Consider using `--type internal` for sequences with many gaps
+- **Memory**: For very large alignments, monitor memory usage and consider reducing thread count
+- **x86_64 systems**: SIMD optimizations provide additional speedup on Intel/AMD processors
+
+## Contributing
+
+We welcome contributions! See our [Contributing Guide](CONTRIBUTING.md) for details on:
+
+- Reporting bugs and requesting features
+- Development environment setup  
+- Code style guidelines
+- Pull request process
+
+## Community Standards
+
+This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you agree to uphold this code.
+
+## System Requirements
+
+- **Linux**: GCC 4.8+ or Clang 3.4+
+- **macOS**: Xcode 8+ or Homebrew GCC/Clang
+- **Memory**: ~1GB RAM per 10,000 sequences (typical)
+- **CPU**: Any modern processor (additional optimizations on x86_64)
+
+## Troubleshooting
+
+### Common Issues
+
+**macOS OpenMP**: If you see OpenMP-related errors on macOS:
+```bash
+brew install libomp
+# Kalign automatically finds Homebrew's OpenMP installation
+```
+
+**Python module**: For Python installation issues:
+```bash
+pip install --upgrade pip setuptools wheel
+pip install git+https://github.com/TimoLassmann/kalign.git
+```
+
+**Threading**: If performance seems slow, check thread detection:
+```bash
+kalign --help  # Shows current thread default
+kalign -i test.fa -n 1 -o out.fa  # Force single-threaded for testing
+```
+
+For more troubleshooting, see [python/docs/python-troubleshooting.md](python/docs/python-troubleshooting.md).
+
+## Citation
+
+Please cite Kalign in your publications:
+
+1. **Lassmann, Timo.** *Kalign 3: multiple sequence alignment of large data sets.* **Bioinformatics** (2019). [DOI](https://doi.org/10.1093/bioinformatics/btz795) | [PDF](https://academic.oup.com/bioinformatics/advance-article-pdf/doi/10.1093/bioinformatics/btz795/30314127/btz795.pdf)
+
+### Previous Versions
+
+2. **Lassmann, Timo, Oliver Frings, and Erik LL Sonnhammer.** *Kalign2: high-performance multiple alignment of protein and nucleotide sequences allowing external features.* **Nucleic acids research** 37.3 (2008): 858-865. [PubMed](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2647288/)
+
+3. **Lassmann, Timo, and Erik LL Sonnhammer.** *Kalign: an accurate and fast multiple sequence alignment algorithm.* **BMC bioinformatics** 6.1 (2005): 298. [PubMed](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1325270/)
+
+## License
+
+Kalign is licensed under the GNU General Public License v3.0. See [COPYING](COPYING) for details.
