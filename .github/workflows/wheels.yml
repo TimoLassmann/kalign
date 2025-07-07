@@ -140,8 +140,7 @@ jobs:
 
     - name: Test installation and import
       run: |
-        pip install numpy
-        # Find and install the appropriate wheel for this platform
+        # Find and install the appropriate wheel for this platform  
         python -c "
         import os, glob, platform, sys
         wheels = glob.glob('wheelhouse/*.whl')
@@ -160,21 +159,40 @@ jobs:
             
             # Check if this wheel is compatible
             if python_version in wheel_name or 'abi3' in wheel_name:
-                if system == 'linux' and 'linux' in wheel_name:
+                if system == 'linux' and 'linux' in wheel_name and 'x86_64' in wheel_name:
                     print(f'Installing Linux wheel: {wheel}')
-                    os.system(f'pip install {wheel}')
+                    # Install with all dependencies
+                    exit_code = os.system(f'pip install {wheel}')
+                    if exit_code != 0:
+                        print('Installation failed!')
+                        sys.exit(1)
                     installed = True
                     break
                 elif system == 'darwin' and 'macos' in wheel_name:
-                    print(f'Installing macOS wheel: {wheel}')
-                    os.system(f'pip install {wheel}')
-                    installed = True
-                    break
+                    # Check architecture compatibility for macOS
+                    if (machine in ['x86_64', 'amd64'] and 'x86_64' in wheel_name) or \
+                       (machine in ['arm64', 'aarch64'] and 'arm64' in wheel_name):
+                        print(f'Installing macOS wheel: {wheel}')
+                        # Use --force-reinstall to ensure clean installation
+                        exit_code = os.system(f'pip install --force-reinstall {wheel}')
+                        if exit_code != 0:
+                            print('Installation failed!')
+                            sys.exit(1)
+                        installed = True
+                        break
         
         if not installed:
             print('No compatible wheel found!')
             sys.exit(1)
         "
+        
+        # Check what got installed
+        echo "=== Checking installed packages ==="
+        pip list | grep kalign || true
+        
+        # Check the kalign module structure
+        echo "=== Checking kalign module ==="
+        python -c "import kalign; print('kalign location:', kalign.__file__); import os; print('kalign dir contents:', os.listdir(os.path.dirname(kalign.__file__)))"
         
         # Test the installation
         python -c "

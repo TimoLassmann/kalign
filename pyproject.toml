@@ -101,7 +101,6 @@ Changelog = "https://github.com/TimoLassmann/kalign/blob/main/ChangeLog"
 
 [tool.scikit-build]
 # Wheel settings
-wheel.packages = ["python-kalign"]
 wheel.py-api = "cp39"
 
 # CMake settings
