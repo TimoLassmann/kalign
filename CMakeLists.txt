@@ -217,6 +217,11 @@ if(BUILD_PYTHON_MODULE)
         # Link against the kalign library
         target_link_libraries(_core PRIVATE kalign::kalign)
 
+        # Link OpenMP if found
+        if(OpenMP_CXX_FOUND)
+            target_link_libraries(_core PRIVATE OpenMP::OpenMP_CXX)
+        endif()
+
         # Add include directories for DSSim and lib headers
         target_include_directories(_core PRIVATE
             tests
