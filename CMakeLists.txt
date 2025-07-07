@@ -27,11 +27,17 @@ set (CMAKE_C_STANDARD 11)
 # to compile without open mp:
 # cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DUSE_OPENMP=OFF ..
 
-add_compile_options("$<$<CONFIG:RELEASE>:-W;-Wall;-O3;-pedantic>")
-add_compile_options("$<$<CONFIG:DEBUG>:-W;-Wall;-O0;-g;-pedantic>")
-add_compile_options("$<$<CONFIG:ASAN>:-W;-Wall;-Wextra;-O0;-g;-DDEBUG;-pedantic;-ffunction-sections;-fdata-sections;-fstack-protector-strong;-fsanitize=address>")
+# Compiler-specific flags
+if(MSVC)
+    add_compile_options("$<$<CONFIG:RELEASE>:/W3;/O2>")
+    add_compile_options("$<$<CONFIG:DEBUG>:/W3;/Od;/Zi>")
+else()
+    add_compile_options("$<$<CONFIG:RELEASE>:-W;-Wall;-O3;-pedantic>")
+    add_compile_options("$<$<CONFIG:DEBUG>:-W;-Wall;-O0;-g;-pedantic>")
+    add_compile_options("$<$<CONFIG:ASAN>:-W;-Wall;-Wextra;-O0;-g;-DDEBUG;-pedantic;-ffunction-sections;-fdata-sections;-fstack-protector-strong;-fsanitize=address>")
+endif()
 
-if(CMAKE_BUILD_TYPE MATCHES ASAN)
+if(CMAKE_BUILD_TYPE MATCHES ASAN AND NOT MSVC)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=address")
 endif()
