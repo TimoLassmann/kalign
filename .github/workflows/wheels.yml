@@ -50,7 +50,7 @@ jobs:
     - name: Build wheels
       env:
         CIBW_BUILD: cp39-* cp310-* cp311-* cp312-* cp313-*
-        CIBW_SKIP: "*-win32 *-manylinux_i686 pp*"
+        CIBW_SKIP: "*-win32 *-manylinux_i686 *-musllinux* pp*"
         CIBW_ARCHS: ${{ matrix.cibw_archs }}
         # Set minimum macOS version to match OpenMP requirements
         CIBW_ENVIRONMENT_MACOS: >
@@ -59,10 +59,11 @@ jobs:
           MACOSX_DEPLOYMENT_TARGET=14.0
           CMAKE_OSX_DEPLOYMENT_TARGET=14.0
         
-        # Linux specific settings
+        # Linux specific settings - handle different package managers
         CIBW_BEFORE_ALL_LINUX: >
-          yum install -y cmake3 ||
-          (apt-get update && apt-get install -y cmake)
+          (yum install -y cmake3) ||
+          (apt-get update && apt-get install -y cmake) ||
+          (apk add --no-cache cmake)
         CIBW_REPAIR_WHEEL_COMMAND_LINUX: auditwheel repair -w {dest_dir} {wheel}
         
         # macOS specific settings  
