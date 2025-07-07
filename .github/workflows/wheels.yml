@@ -149,18 +149,31 @@ jobs:
         machine = platform.machine().lower()
         python_version = f'{sys.version_info.major}{sys.version_info.minor}'
         
+        print(f'System: {system}, Machine: {machine}, Python: {python_version}')
+        print(f'Available wheels: {wheels}')
+        
         # Simple wheel selection logic
+        installed = False
         for wheel in wheels:
             wheel_name = os.path.basename(wheel).lower()
-            if python_version in wheel_name:
+            print(f'Checking wheel: {wheel_name}')
+            
+            # Check if this wheel is compatible
+            if python_version in wheel_name or 'abi3' in wheel_name:
                 if system == 'linux' and 'linux' in wheel_name:
-                    print(f'Installing: {wheel}')
+                    print(f'Installing Linux wheel: {wheel}')
                     os.system(f'pip install {wheel}')
+                    installed = True
                     break
                 elif system == 'darwin' and 'macos' in wheel_name:
-                    print(f'Installing: {wheel}')
+                    print(f'Installing macOS wheel: {wheel}')
                     os.system(f'pip install {wheel}')
+                    installed = True
                     break
+        
+        if not installed:
+            print('No compatible wheel found!')
+            sys.exit(1)
         "
         
         # Test the installation
