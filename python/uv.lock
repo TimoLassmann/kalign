@@ -880,7 +880,7 @@ wheels = [
 
 [[package]]
 name = "kalign"
-version = "3.4.1"
+version = "3.4.5"
 source = { editable = "." }
 dependencies = [
     { name = "biopython" },
@@ -940,6 +940,7 @@ test = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "build" },
     { name = "pytest" },
     { name = "pytest-benchmark" },
 ]
@@ -982,6 +983,7 @@ provides-extras = ["biopython", "skbio", "io", "all", "dev", "test", "docs"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "build", specifier = ">=1.2.2.post1" },
     { name = "pytest", specifier = ">=8.4.1" },
     { name = "pytest-benchmark", specifier = ">=5.1.0" },
 ]

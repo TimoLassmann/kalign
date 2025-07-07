@@ -116,8 +116,18 @@ build.targets = ["_core"]
 # Install settings
 install.components = ["python"]
 
+# Source distribution settings
+# For now, disable external file inclusion - the build will need external files
+# but we'll handle this by making sure the CMake source-dir points to parent
+sdist.exclude = [
+    "build*/",
+    ".venv/",
+    "__pycache__/",
+    "**/*.pyc"
+]
+
 # Logging
-logging.level = "INFO"
+logging.level = "DEBUG"
 
 [tool.scikit-build.cmake.define]
 BUILD_PYTHON_MODULE = "ON"
@@ -207,6 +217,7 @@ ignore_missing_imports = true
 
 [dependency-groups]
 dev = [
+    "build>=1.2.2.post1",
     "pytest>=8.4.1",
     "pytest-benchmark>=5.1.0",
 ]
