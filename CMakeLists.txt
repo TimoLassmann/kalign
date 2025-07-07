@@ -69,8 +69,8 @@ set(KALIGN_KMEANS_UPGMA_THRESHOLD "50" CACHE STRING "Number of sequences thresho
 
 
 if(USE_OPENMP)
-  # Configure OpenMP for macOS with Homebrew
-  if(APPLE)
+  # Configure OpenMP for macOS with Homebrew (only for arm64 native builds)
+  if(APPLE AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "arm64" AND NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
     list(APPEND CMAKE_PREFIX_PATH /opt/homebrew)
     # Set OpenMP flags for Apple Clang + Homebrew libomp
     set(OpenMP_C_FLAGS "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
