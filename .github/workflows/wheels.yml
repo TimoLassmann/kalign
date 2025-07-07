@@ -54,8 +54,8 @@ jobs:
         CIBW_ENVIRONMENT_MACOS: >
           CMAKE_BUILD_PARALLEL_LEVEL=2
           OMP_NUM_THREADS=1
-          MACOSX_DEPLOYMENT_TARGET=14.0
-          CMAKE_OSX_DEPLOYMENT_TARGET=14.0
+          MACOSX_DEPLOYMENT_TARGET=11.0
+          CMAKE_OSX_DEPLOYMENT_TARGET=11.0
         
         # Linux specific settings - handle different package managers
         CIBW_BEFORE_ALL_LINUX: >
@@ -140,51 +140,12 @@ jobs:
 
     - name: Test installation and import
       run: |
-        # Find and install the appropriate wheel for this platform  
-        python -c "
-        import os, glob, platform, sys
-        wheels = glob.glob('wheelhouse/*.whl')
-        system = platform.system().lower()
-        machine = platform.machine().lower()
-        python_version = f'{sys.version_info.major}{sys.version_info.minor}'
+        # Let pip find and install the appropriate wheel
+        echo "=== Available wheels ==="
+        ls -la wheelhouse/*.whl
         
-        print(f'System: {system}, Machine: {machine}, Python: {python_version}')
-        print(f'Available wheels: {wheels}')
-        
-        # Simple wheel selection logic
-        installed = False
-        for wheel in wheels:
-            wheel_name = os.path.basename(wheel).lower()
-            print(f'Checking wheel: {wheel_name}')
-            
-            # Check if this wheel is compatible
-            if python_version in wheel_name or 'abi3' in wheel_name:
-                if system == 'linux' and 'linux' in wheel_name and 'x86_64' in wheel_name:
-                    print(f'Installing Linux wheel: {wheel}')
-                    # Install with all dependencies
-                    exit_code = os.system(f'pip install {wheel}')
-                    if exit_code != 0:
-                        print('Installation failed!')
-                        sys.exit(1)
-                    installed = True
-                    break
-                elif system == 'darwin' and 'macos' in wheel_name:
-                    # Check architecture compatibility for macOS
-                    if (machine in ['x86_64', 'amd64'] and 'x86_64' in wheel_name) or \
-                       (machine in ['arm64', 'aarch64'] and 'arm64' in wheel_name):
-                        print(f'Installing macOS wheel: {wheel}')
-                        # Use --force-reinstall to ensure clean installation
-                        exit_code = os.system(f'pip install --force-reinstall {wheel}')
-                        if exit_code != 0:
-                            print('Installation failed!')
-                            sys.exit(1)
-                        installed = True
-                        break
-        
-        if not installed:
-            print('No compatible wheel found!')
-            sys.exit(1)
-        "
+        echo "=== Installing wheel ==="
+        pip install --find-links wheelhouse/ kalign --force-reinstall --no-index
         
         # Check what got installed
         echo "=== Checking installed packages ==="
@@ -192,7 +153,34 @@ jobs:
         
         # Check the kalign module structure
         echo "=== Checking kalign module ==="
-        python -c "import kalign; print('kalign location:', kalign.__file__); import os; print('kalign dir contents:', os.listdir(os.path.dirname(kalign.__file__)))"
+        python -c "
+        import sys
+        print('Python version:', sys.version)
+        print('Attempting to import kalign...')
+        try:
+            import kalign
+            print('✓ kalign imported successfully')
+            print('kalign location:', kalign.__file__)
+            import os
+            kalign_dir = os.path.dirname(kalign.__file__)
+            print('kalign dir contents:', sorted(os.listdir(kalign_dir)))
+            
+            # Check for _core specifically
+            core_files = [f for f in os.listdir(kalign_dir) if '_core' in f]
+            print('_core files found:', core_files)
+        except ImportError as e:
+            print('✗ Import failed:', str(e))
+            import os
+            import site
+            print('Site packages:', site.getsitepackages())
+            for site_dir in site.getsitepackages():
+                kalign_path = os.path.join(site_dir, 'kalign')
+                if os.path.exists(kalign_path):
+                    print(f'Found kalign at {kalign_path}')
+                    print('Contents:', sorted(os.listdir(kalign_path)))
+                    break
+            sys.exit(1)
+        "
         
         # Test the installation
         python -c "

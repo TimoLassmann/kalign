@@ -100,8 +100,8 @@ Repository = "https://github.com/TimoLassmann/kalign"
 Changelog = "https://github.com/TimoLassmann/kalign/blob/main/ChangeLog"
 
 [tool.scikit-build]
-# Wheel settings
-wheel.py-api = "cp39"
+# Wheel settings - removed py-api to build version-specific wheels
+# wheel.py-api = "cp39"
 
 # CMake settings
 cmake.build-type = "Release"
