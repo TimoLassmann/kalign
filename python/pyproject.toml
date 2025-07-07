@@ -8,7 +8,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "kalign"
-version = "3.4.1"
+version = "3.4.5"
 description = "Python wrapper for the Kalign multiple sequence alignment engine"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
@@ -20,7 +20,7 @@ maintainers = [
 ]
 keywords = [
     "bioinformatics",
-    "sequence alignment", 
+    "sequence alignment",
     "multiple sequence alignment",
     "MSA",
     "computational biology",
@@ -33,7 +33,7 @@ classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Operating System :: OS Independent",
     "Programming Language :: C",
-    "Programming Language :: C++", 
+    "Programming Language :: C++",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -72,7 +72,7 @@ dev = [
     "pytest-xdist",
     "rich",
     "black",
-    "flake8", 
+    "flake8",
     "mypy",
     "build",
     "twine",
@@ -139,7 +139,7 @@ before-all = [
 ]
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"
 
-# macOS settings  
+# macOS settings
 [tool.cibuildwheel.macos]
 before-all = [
     "brew install cmake || echo 'cmake already installed'",
