@@ -10,9 +10,9 @@ import threading
 from importlib import import_module
 from typing import Any, List, Literal, Optional, Union
 
-from . import _core, io, utils
+from . import _core
 
-__version__ = "3.4.1"
+__version__ = "3.4.5"
 __author__ = "Timo Lassmann"
 __email__ = "timo.lassmann@telethonkids.org.au"
 
@@ -410,7 +410,8 @@ def write_alignment(
 
     mapped_format = format_map[format_lower]
 
-    # Use appropriate writer from io module
+    # Use appropriate writer from io module (lazy import to avoid circular imports)
+    from . import io
     if mapped_format == "fasta":
         io.write_fasta(sequences, output_file, ids=ids)
     elif mapped_format == "clustal":
@@ -496,8 +497,6 @@ __all__ = [
     "set_num_threads",
     "get_num_threads",
     "kalign",
-    "io",
-    "utils",
     "DNA",
     "DNA_INTERNAL",
     "RNA",

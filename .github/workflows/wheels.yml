@@ -48,8 +48,8 @@ jobs:
         
         # Linux specific settings
         CIBW_BEFORE_ALL_LINUX: >
-          yum install -y cmake3 openmp-devel ||
-          (apt-get update && apt-get install -y cmake libomp-dev)
+          yum install -y cmake3 ||
+          (apt-get update && apt-get install -y cmake)
         CIBW_REPAIR_WHEEL_COMMAND_LINUX: auditwheel repair -w {dest_dir} {wheel}
         
         # macOS specific settings  
