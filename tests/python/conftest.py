@@ -292,35 +292,43 @@ def expected_results():
     return EXPECTED_ALIGNMENTS.copy()
 
 
-def pytest_benchmark_update_json(config, benchmarks, output_json):
-    """Hook to add rich table display for benchmarks."""
-    if not RICH_AVAILABLE:
-        return
+# Check if pytest-benchmark is available
+try:
+    import pytest_benchmark
+    PYTEST_BENCHMARK_AVAILABLE = True
     
-    # Create a rich table for display
-    console = Console()
-    table = Table(title="Benchmark Results", show_header=True, header_style="bold magenta")
-    
-    # Add columns with better fitting widths
-    table.add_column("Name", style="cyan", no_wrap=True, max_width=25)
-    table.add_column("Min", justify="right", style="green", max_width=8)
-    table.add_column("Max", justify="right", style="red", max_width=8)
-    table.add_column("Mean", justify="right", style="blue", max_width=8)
-    table.add_column("Median", justify="right", style="blue", max_width=8)
-    table.add_column("OPS", justify="right", style="yellow", max_width=8)
-    table.add_column("Rounds", justify="right", style="white", max_width=8)
-    
-    # Add rows from benchmark data
-    for bench in benchmarks:
-        name = bench.name
-        # Format timing values
-        min_val = f"{bench.min*1000000:.1f}μs"
-        max_val = f"{bench.max*1000000:.1f}μs"
-        mean_val = f"{bench.mean*1000000:.1f}μs"
-        median_val = f"{bench.median*1000000:.1f}μs"
-        ops_val = f"{1/bench.mean/1000:.1f}K"
-        rounds_val = str(bench.rounds)
+    def pytest_benchmark_update_json(config, benchmarks, output_json):
+        """Hook to add rich table display for benchmarks."""
+        if not RICH_AVAILABLE:
+            return
         
-        table.add_row(name, min_val, max_val, mean_val, median_val, ops_val, rounds_val)
-    
-    console.print(table)
+        # Create a rich table for display
+        console = Console()
+        table = Table(title="Benchmark Results", show_header=True, header_style="bold magenta")
+        
+        # Add columns with better fitting widths
+        table.add_column("Name", style="cyan", no_wrap=True, max_width=25)
+        table.add_column("Min", justify="right", style="green", max_width=8)
+        table.add_column("Max", justify="right", style="red", max_width=8)
+        table.add_column("Mean", justify="right", style="blue", max_width=8)
+        table.add_column("Median", justify="right", style="blue", max_width=8)
+        table.add_column("OPS", justify="right", style="yellow", max_width=8)
+        table.add_column("Rounds", justify="right", style="white", max_width=8)
+        
+        # Add rows from benchmark data
+        for bench in benchmarks:
+            name = bench.name
+            # Format timing values
+            min_val = f"{bench.min*1000000:.1f}μs"
+            max_val = f"{bench.max*1000000:.1f}μs"
+            mean_val = f"{bench.mean*1000000:.1f}μs"
+            median_val = f"{bench.median*1000000:.1f}μs"
+            ops_val = f"{1/bench.mean/1000:.1f}K"
+            rounds_val = str(bench.rounds)
+            
+            table.add_row(name, min_val, max_val, mean_val, median_val, ops_val, rounds_val)
+        
+        console.print(table)
+
+except ImportError:
+    PYTEST_BENCHMARK_AVAILABLE = False
