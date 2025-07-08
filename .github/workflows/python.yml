@@ -52,8 +52,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ['3.9', '3.10', '3.11', '3.12']
+        os: [ubuntu-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
         
     steps:
     - uses: actions/checkout@v4
@@ -73,11 +73,6 @@ jobs:
       if: runner.os == 'macOS'
       run: |
         brew install libomp cmake
-        
-    - name: Install system dependencies (Windows)
-      if: runner.os == 'Windows'
-      run: |
-        choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
         
     - name: Install Python dependencies
       run: |
@@ -106,7 +101,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
         
     steps:
     - uses: actions/checkout@v4
@@ -126,11 +121,6 @@ jobs:
       if: runner.os == 'macOS'
       run: |
         brew install libomp cmake
-        
-    - name: Install system dependencies (Windows)
-      if: runner.os == 'Windows'
-      run: |
-        choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
         
     - name: Install build dependencies
       run: |
