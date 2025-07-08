@@ -13,41 +13,30 @@ try:
     from rich.console import Console
     from rich.table import Table
     from rich.text import Text
+
     RICH_AVAILABLE = True
 except ImportError:
     RICH_AVAILABLE = False
 
 
 # Test data constants
-DNA_SEQUENCES_SIMPLE = [
-    "ATCGATCG",
-    "ATCGTCG", 
-    "ATCGATCG"
-]
+DNA_SEQUENCES_SIMPLE = ["ATCGATCG", "ATCGTCG", "ATCGATCG"]
 
 DNA_SEQUENCES_WITH_GAPS = [
     "ATCGATCGATCG",
     "ATCGTCGATCG",
     "ATCGATCATCG",
-    "ATCGATCGAGATCG"
+    "ATCGATCGAGATCG",
 ]
 
-RNA_SEQUENCES_SIMPLE = [
-    "AUCGAUCG",
-    "AUCGUCG",
-    "AUCGAUCG"
-]
+RNA_SEQUENCES_SIMPLE = ["AUCGAUCG", "AUCGUCG", "AUCGAUCG"]
 
-PROTEIN_SEQUENCES_SIMPLE = [
-    "MKTAYIAK",
-    "MKTAYK",
-    "MKTAYIAK"
-]
+PROTEIN_SEQUENCES_SIMPLE = ["MKTAYIAK", "MKTAYK", "MKTAYIAK"]
 
 PROTEIN_SEQUENCES_COMPLEX = [
     "MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPILSRVGDGTQDNLSGAEKAVQVKVKALPDAQFEVVHSLAKWKRQTLGQHDFSAGEGLYTHMKALRPDEDRLSPLHSVYVDQWDWERVMGDGERQFSTLKSTVEAIWAGIKATEAAVSEEFGLAPFLPDQIHFVHSQELLSRYPDLDAKGRERAIAKDLGAVFLVGIGGKLSDGHRHDVRAPDYDDWUAIFRRVVSAEFQRQPVHQSYLNTVLGSQGKL",
     "MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPILSRVGDGTQDNLSGAEKAVQVKVKALPDAQFEVVHSLAKWKRQTLGQHDFSAGEGLYTHMKALRPDEDRLSPLHSVYVDQWDWERVMGDGERQFSTLKSTVEAIWAGIKATEAAVSEEFGLAPFLPDQIHFVHSQELLSRYPDLDAKGRERAIAKDLGAVFLVGIGGKLSDGHRHDVRAPDYDDWUAIFRRVVSAEFQRQPVHQSYLNTVLGSQGKL",
-    "MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPILSRVGDGTQDNLSGAEKAVQVKVKALPDAQFEVVHSLAKWKRQTLGQHDFSAGEGLYTHMKALRPDEDRLSPLHSVYVDQWDWERVMGDGERQFSTLKSTVEAIWAGIKATEAAVSEEFGLAPFLPDQIHFVHSQELLSRYPDLDAKGRERAIAKDLGAVFLVGIGGKLSDGHRHDVRAPDYDDWUAIFRRVVSAEFQRQPVHQSYLNTVLGSQGKL"
+    "MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPILSRVGDGTQDNLSGAEKAVQVKVKALPDAQFEVVHSLAKWKRQTLGQHDFSAGEGLYTHMKALRPDEDRLSPLHSVYVDQWDWERVMGDGERQFSTLKSTVEAIWAGIKATEAAVSEEFGLAPFLPDQIHFVHSQELLSRYPDLDAKGRERAIAKDLGAVFLVGIGGKLSDGHRHDVRAPDYDDWUAIFRRVVSAEFQRQPVHQSYLNTVLGSQGKL",
 ]
 
 INVALID_DNA_SEQUENCES = [
@@ -56,11 +45,7 @@ INVALID_DNA_SEQUENCES = [
     "ATCG@#$",  # Special characters
 ]
 
-MIXED_CASE_SEQUENCES = [
-    "AtCgAtCg",
-    "atcgatcg",
-    "ATCGATCG"
-]
+MIXED_CASE_SEQUENCES = ["AtCgAtCg", "atcgatcg", "ATCGATCG"]
 
 
 @pytest.fixture
@@ -167,11 +152,13 @@ def test_data_dir():
 
 
 # Parametrize fixtures for common test scenarios
-@pytest.fixture(params=[
-    ("dna", DNA_SEQUENCES_SIMPLE),
-    ("rna", RNA_SEQUENCES_SIMPLE), 
-    ("protein", PROTEIN_SEQUENCES_SIMPLE)
-])
+@pytest.fixture(
+    params=[
+        ("dna", DNA_SEQUENCES_SIMPLE),
+        ("rna", RNA_SEQUENCES_SIMPLE),
+        ("protein", PROTEIN_SEQUENCES_SIMPLE),
+    ]
+)
 def sequence_type_data(request):
     """Parametrized fixture providing different sequence types."""
     seq_type, sequences = request.param
@@ -184,14 +171,16 @@ def thread_count(request):
     return request.param
 
 
-@pytest.fixture(params=[
-    ("auto", None),
-    ("dna", "dna"),
-    ("rna", "rna"),
-    ("protein", "protein"),
-    ("divergent", "divergent"),
-    ("internal", "internal")
-])
+@pytest.fixture(
+    params=[
+        ("auto", None),
+        ("dna", "dna"),
+        ("rna", "rna"),
+        ("protein", "protein"),
+        ("divergent", "divergent"),
+        ("internal", "internal"),
+    ]
+)
 def sequence_type_spec(request):
     """Parametrized fixture for testing sequence type specifications."""
     return request.param
@@ -200,18 +189,10 @@ def sequence_type_spec(request):
 # Pytest configuration
 def pytest_configure(config):
     """Configure pytest with custom markers."""
-    config.addinivalue_line(
-        "markers", "slow: mark test as slow running"
-    )
-    config.addinivalue_line(
-        "markers", "integration: mark test as integration test"
-    )
-    config.addinivalue_line(
-        "markers", "performance: mark test as performance test"
-    )
-    config.addinivalue_line(
-        "markers", "file_io: mark test as requiring file I/O"
-    )
+    config.addinivalue_line("markers", "slow: mark test as slow running")
+    config.addinivalue_line("markers", "integration: mark test as integration test")
+    config.addinivalue_line("markers", "performance: mark test as performance test")
+    config.addinivalue_line("markers", "file_io: mark test as requiring file I/O")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -220,15 +201,15 @@ def pytest_collection_modifyitems(config, items):
         # Mark slow tests
         if "slow" in item.nodeid or "large" in item.nodeid:
             item.add_marker(pytest.mark.slow)
-        
+
         # Mark integration tests
         if "integration" in item.nodeid:
             item.add_marker(pytest.mark.integration)
-            
+
         # Mark performance tests
         if "performance" in item.nodeid or "benchmark" in item.nodeid:
             item.add_marker(pytest.mark.performance)
-            
+
         # Mark file I/O tests
         if "file" in item.nodeid:
             item.add_marker(pytest.mark.file_io)
@@ -239,24 +220,28 @@ def assert_valid_alignment(sequences: List[str], aligned: List[str]) -> None:
     """Assert that an alignment result is valid."""
     # Same number of sequences
     assert len(aligned) == len(sequences), "Number of sequences changed"
-    
+
     # All aligned sequences have same length
     if aligned:
         expected_length = len(aligned[0])
         for i, seq in enumerate(aligned):
             assert len(seq) == expected_length, f"Sequence {i} has different length"
-    
+
     # No empty sequences (unless input was empty)
     for seq in aligned:
-        if any(original for original in sequences if original):  # If any input was non-empty
+        if any(
+            original for original in sequences if original
+        ):  # If any input was non-empty
             assert seq, "Aligned sequence is empty"
 
 
-def assert_alignment_preserves_characters(original: List[str], aligned: List[str]) -> None:
+def assert_alignment_preserves_characters(
+    original: List[str], aligned: List[str]
+) -> None:
     """Assert that alignment preserves the original characters (just adds gaps)."""
     for orig, align in zip(original, aligned):
         # Remove gaps from aligned sequence
-        degapped = align.replace('-', '')
+        degapped = align.replace("-", "")
         assert degapped == orig, f"Original sequence {orig} not preserved in {align}"
 
 
@@ -264,10 +249,10 @@ def calculate_identity(seq1: str, seq2: str) -> float:
     """Calculate sequence identity percentage between two sequences."""
     if len(seq1) != len(seq2):
         raise ValueError("Sequences must have same length")
-    
-    matches = sum(1 for a, b in zip(seq1, seq2) if a == b and a != '-' and b != '-')
-    valid_positions = sum(1 for a, b in zip(seq1, seq2) if a != '-' and b != '-')
-    
+
+    matches = sum(1 for a, b in zip(seq1, seq2) if a == b and a != "-" and b != "-")
+    valid_positions = sum(1 for a, b in zip(seq1, seq2) if a != "-" and b != "-")
+
     return (matches / valid_positions * 100) if valid_positions > 0 else 0.0
 
 
@@ -276,13 +261,13 @@ EXPECTED_ALIGNMENTS = {
     "dna_simple": {
         "sequences": DNA_SEQUENCES_SIMPLE,
         "expected_length": 8,  # This might need adjustment after testing
-        "min_identity": 75.0   # Minimum expected identity percentage
+        "min_identity": 75.0,  # Minimum expected identity percentage
     },
     "protein_simple": {
         "sequences": PROTEIN_SEQUENCES_SIMPLE,
         "expected_length": 8,  # This might need adjustment after testing
-        "min_identity": 85.0   # Minimum expected identity percentage
-    }
+        "min_identity": 85.0,  # Minimum expected identity percentage
+    },
 }
 
 

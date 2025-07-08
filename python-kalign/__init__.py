@@ -111,13 +111,15 @@ def align(
     # Input validation - replicate C CLI robustness
     if not sequences:
         raise ValueError("No sequences were found in the input")
-    
+
     if len(sequences) < 2:
         if len(sequences) == 0:
             raise ValueError("No sequences were found in the input")
         elif len(sequences) == 1:
-            raise ValueError("Only 1 sequence was found in the input - at least 2 sequences are required for alignment")
-    
+            raise ValueError(
+                "Only 1 sequence was found in the input - at least 2 sequences are required for alignment"
+            )
+
     if not all(isinstance(seq, str) for seq in sequences):
         raise ValueError("All sequences must be strings")
 
@@ -126,30 +128,44 @@ def align(
     for i, seq in enumerate(sequences):
         if not seq or not seq.strip():
             empty_sequences.append(i)
-    
+
     if empty_sequences:
         if len(empty_sequences) == 1:
-            raise ValueError(f"Sequence at index {empty_sequences[0]} is empty or contains only whitespace")
+            raise ValueError(
+                f"Sequence at index {empty_sequences[0]} is empty or contains only whitespace"
+            )
         else:
-            raise ValueError(f"Sequences at indices {empty_sequences} are empty or contain only whitespace")
-    
+            raise ValueError(
+                f"Sequences at indices {empty_sequences} are empty or contain only whitespace"
+            )
+
     # Check for valid sequence characters (basic validation)
     for i, seq in enumerate(sequences):
         # Remove common whitespace and check if anything remains
-        cleaned_seq = ''.join(seq.split())
+        cleaned_seq = "".join(seq.split())
         if len(cleaned_seq) == 0:
-            raise ValueError(f"Sequence at index {i} contains only whitespace characters")
-        
+            raise ValueError(
+                f"Sequence at index {i} contains only whitespace characters"
+            )
+
         # Check for obviously invalid characters (control characters, etc)
-        if any(ord(char) < 32 for char in cleaned_seq if char not in '\t\n\r'):
-            raise ValueError(f"Sequence at index {i} contains invalid control characters")
-    
+        if any(ord(char) < 32 for char in cleaned_seq if char not in "\t\n\r"):
+            raise ValueError(
+                f"Sequence at index {i} contains invalid control characters"
+            )
+
     # Warn about very short sequences (like C CLI warnings)
-    very_short_sequences = [i for i, seq in enumerate(sequences) if len(seq.strip()) < 3]
+    very_short_sequences = [
+        i for i, seq in enumerate(sequences) if len(seq.strip()) < 3
+    ]
     if very_short_sequences and len(very_short_sequences) > len(sequences) * 0.5:
         import warnings
-        warnings.warn(f"Many sequences are very short (< 3 characters). This may affect alignment quality.", 
-                     UserWarning, stacklevel=2)
+
+        warnings.warn(
+            f"Many sequences are very short (< 3 characters). This may affect alignment quality.",
+            UserWarning,
+            stacklevel=2,
+        )
 
     # Convert string sequence types to integers
     seq_type_map = {
@@ -178,20 +194,22 @@ def align(
         raise ValueError("gap_open must be a number")
     elif gap_open > 0:
         raise ValueError("gap_open must be negative or zero (penalty values)")
-    
+
     if gap_extend is None:
         gap_extend = -1.0
     elif not isinstance(gap_extend, (int, float)):
         raise ValueError("gap_extend must be a number")
     elif gap_extend > 0:
         raise ValueError("gap_extend must be negative or zero (penalty values)")
-    
+
     if terminal_gap_extend is None:
         terminal_gap_extend = -1.0
     elif not isinstance(terminal_gap_extend, (int, float)):
         raise ValueError("terminal_gap_extend must be a number")
     elif terminal_gap_extend > 0:
-        raise ValueError("terminal_gap_extend must be negative or zero (penalty values)")
+        raise ValueError(
+            "terminal_gap_extend must be negative or zero (penalty values)"
+        )
 
     # Handle thread count
     if n_threads is None:
@@ -202,8 +220,12 @@ def align(
         raise ValueError("n_threads must be at least 1")
     elif n_threads > 1024:  # reasonable upper limit
         import warnings
-        warnings.warn(f"Very high thread count ({n_threads}) may not improve performance and could cause issues.", 
-                     UserWarning, stacklevel=2)
+
+        warnings.warn(
+            f"Very high thread count ({n_threads}) may not improve performance and could cause issues.",
+            UserWarning,
+            stacklevel=2,
+        )
 
     # Call the C++ binding for core alignment
     try:
