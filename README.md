@@ -1,4 +1,6 @@
 [![CMake](https://github.com/TimoLassmann/kalign/actions/workflows/cmake.yml/badge.svg)](https://github.com/TimoLassmann/kalign/actions/workflows/cmake.yml)
+[![Python](https://github.com/TimoLassmann/kalign/actions/workflows/python.yml/badge.svg)](https://github.com/TimoLassmann/kalign/actions/workflows/python.yml)
+[![Build Python Wheels](https://github.com/TimoLassmann/kalign/actions/workflows/wheels.yml/badge.svg)](https://github.com/TimoLassmann/kalign/actions/workflows/wheels.yml)
 ![CodeQL](https://github.com/TimoLassmann/kalign/workflows/CodeQL/badge.svg)
 ![GitHub stars](https://img.shields.io/github/stars/TimoLassmann/kalign)
 ![GitHub issues](https://img.shields.io/github/issues/TimoLassmann/kalign)

@@ -2,7 +2,7 @@ name: CMake
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "python" ]
     paths:
       - 'lib/**'
       - 'src/**'
