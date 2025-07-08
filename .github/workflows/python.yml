@@ -78,7 +78,7 @@ jobs:
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install pytest pytest-cov numpy
+        python -m pip install pytest pytest-cov pytest-benchmark numpy
         
     - name: Build and install package
       run: |
