@@ -145,7 +145,7 @@ jobs:
         ls -la wheelhouse/*.whl
         
         echo "=== Installing wheel ==="
-        pip install --find-links wheelhouse/ kalign --force-reinstall --no-index
+        pip install --find-links wheelhouse/ kalign --force-reinstall
         
         # Check what got installed
         echo "=== Checking installed packages ==="
