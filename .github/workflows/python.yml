@@ -17,6 +17,7 @@ on:
       - 'CMakeLists.txt'
       - 'pyproject.toml'
       - '.github/workflows/python.yml'
+  workflow_dispatch:
 
 jobs:
   lint:
