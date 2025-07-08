@@ -55,7 +55,15 @@ class TestEdgeCases:
 
     def test_large_sequence_count(self):
         """Test with many sequences."""
-        many_seqs = [f"ATCG{i:02d}ATCG" for i in range(20)]
+        # Use valid DNA characters only - create variation with different bases
+        base_patterns = ["ATCG", "TACG", "GATC", "CGTA", "TGCA", "ACGT", "GCTA", "CTAG"]
+        many_seqs = []
+        for i in range(20):
+            pattern = base_patterns[i % len(base_patterns)]
+            # Add length variation with valid DNA bases
+            suffix = "A" * (i % 4)  # Add 0-3 A's for length variation
+            many_seqs.append(f"{pattern}{suffix}TG")
+
         aligned = kalign.align(many_seqs, seq_type="dna")
 
         assert len(aligned) == 20

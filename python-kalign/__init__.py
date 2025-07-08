@@ -154,6 +154,14 @@ def align(
                 f"Sequence at index {i} contains invalid control characters"
             )
 
+        # Check for digits and other problematic characters that cause platform-specific segfaults
+        invalid_chars = set(char for char in cleaned_seq if char.isdigit())
+        if invalid_chars:
+            raise ValueError(
+                f"Sequence at index {i} contains invalid characters: {sorted(invalid_chars)}. "
+                f"Sequences should only contain valid biological sequence characters."
+            )
+
     # Warn about very short sequences (like C CLI warnings)
     very_short_sequences = [
         i for i, seq in enumerate(sequences) if len(seq.strip()) < 3
