@@ -25,8 +25,8 @@ jobs:
         include:
           - os: ubuntu-latest
             cibw_archs: "x86_64"
-          - os: macos-13
-            cibw_archs: "x86_64" 
+          - os: macos-latest
+            cibw_archs: "x86_64"
           - os: macos-latest
             cibw_archs: "arm64"
 
@@ -54,8 +54,8 @@ jobs:
         CIBW_ENVIRONMENT_MACOS: >
           CMAKE_BUILD_PARALLEL_LEVEL=2
           OMP_NUM_THREADS=1
-          MACOSX_DEPLOYMENT_TARGET=11.0
-          CMAKE_OSX_DEPLOYMENT_TARGET=11.0
+          MACOSX_DEPLOYMENT_TARGET=14.0
+          CMAKE_OSX_DEPLOYMENT_TARGET=14.0
         
         # Linux specific settings - handle different package managers
         CIBW_BEFORE_ALL_LINUX: >
@@ -122,7 +122,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-13, macos-latest]
+        os: [ubuntu-latest, macos-latest]
         python-version: ['3.9', '3.10', '3.11', '3.12']
 
     steps:
