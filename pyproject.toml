@@ -25,7 +25,17 @@ keywords = [
     "MSA",
     "computational biology",
     "genomics",
-    "proteomics"
+    "proteomics",
+    "phylogenetic analysis",
+    "evolutionary biology",
+    "biopython",
+    "scikit-bio",
+    "DNA alignment",
+    "protein alignment",
+    "RNA alignment",
+    "fast alignment",
+    "parallel alignment",
+    "SIMD optimization"
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",

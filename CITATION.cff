@@ -1,0 +1,39 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - given-names: "Timo"
+    family-names: "Lassmann"
+    orcid: "https://orcid.org/0000-0002-0138-2691"
+title: "Kalign 3: multiple sequence alignment of large datasets"
+version: 3.4.5
+date-released: 2020-03-20
+url: "https://github.com/TimoLassmann/kalign"
+repository-code: "https://github.com/TimoLassmann/kalign"
+license: GPL-3.0-or-later
+preferred-citation:
+  type: article
+  authors:
+    - given-names: "Timo"
+      family-names: "Lassmann"
+      orcid: "https://orcid.org/0000-0002-0138-2691"
+  title: "Kalign 3: multiple sequence alignment of large datasets"
+  journal: "Bioinformatics"
+  volume: 36
+  issue: 6
+  start: 1928
+  end: 1929
+  year: 2020
+  month: 3
+  day: 20
+  doi: "10.1093/bioinformatics/btz795"
+  url: "https://academic.oup.com/bioinformatics/article/36/6/1928/5607735"
+  publisher:
+    name: "Oxford University Press"
+abstract: "Kalign is a fast multiple sequence alignment program for biological sequences (protein, DNA, RNA) with optimized algorithms and multi-threading support."
+keywords:
+  - "multiple sequence alignment"
+  - "bioinformatics"
+  - "computational biology"
+  - "sequence analysis"
+  - "phylogenetics"
