@@ -138,7 +138,7 @@ int kalign_read_input(char* infile, struct msa** msa, int quiet)
                 free_in_buffer(b);
                 DESTROY_TIMER(timer);
                 *msa = NULL;
-                return OK;
+                return FAIL;  /* Return FAIL instead of OK when no valid format detected */
         }
         m->quiet = quiet;
 

@@ -104,6 +104,11 @@ std::vector<std::string> align_from_file(
         throw std::runtime_error("Failed to read input file: " + input_file);
     }
     
+    // Check if msa_data is NULL - this happens when the file format cannot be detected
+    if (!msa_data) {
+        throw std::runtime_error("Could not detect valid sequence format in file: " + input_file);
+    }
+    
     // Perform alignment
     result = kalign_run(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend);
     if (result != 0) {
