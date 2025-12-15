@@ -200,25 +200,23 @@ def align(
         gap_open = -1.0
     elif not isinstance(gap_open, (int, float)):
         raise ValueError("gap_open must be a number")
-    elif gap_open > 0:
-        raise ValueError("gap_open must be negative or zero (penalty values)")
+    elif gap_open < 0:
+        raise ValueError("gap_open must be positive or zero")
 
     if gap_extend is None:
         gap_extend = -1.0
     elif not isinstance(gap_extend, (int, float)):
         raise ValueError("gap_extend must be a number")
-    elif gap_extend > 0:
-        raise ValueError("gap_extend must be negative or zero (penalty values)")
+    elif gap_extend < 0:
+        raise ValueError("gap_extend must be positive or zero")
 
     if terminal_gap_extend is None:
         terminal_gap_extend = -1.0
     elif not isinstance(terminal_gap_extend, (int, float)):
         raise ValueError("terminal_gap_extend must be a number")
-    elif terminal_gap_extend > 0:
-        raise ValueError(
-            "terminal_gap_extend must be negative or zero (penalty values)"
-        )
-
+    elif terminal_gap_extend < 0:
+        raise ValueError("terminal_gap_extend must be positive or zero")
+    
     # Handle thread count
     if n_threads is None:
         n_threads = get_num_threads()
