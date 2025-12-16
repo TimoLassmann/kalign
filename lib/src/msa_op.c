@@ -348,13 +348,21 @@ int convert_msa_to_internal(struct msa* msa, int type)
 
         t = a->to_internal;
         msa->L = a->L;
+        int unknown = 0;
+        if (t[(int)'X'] != -1) {
+                unknown = t[(int)'X'];
+        } else if (t[(int)'N'] != -1) {
+                unknown = t[(int)'N'];
+        }
+
         for(i = 0; i <  msa->numseq;i++){
                 seq = msa->sequences[i];
                 for(j =0 ; j < seq->len;j++){
                         if(t[(int) seq->seq[j]] == -1){
                                 WARNING_MSG("there should be no character not matching the alphabet");
-                                WARNING_MSG("offending character: >>>%c<<<", seq->seq[j]);
+                                WARNING_MSG("offending character: >>>%c<<<, replacing internal alphabet value: %d with unknown: %d", seq->seq[j], seq->s[j], unknown);
                                 /* exit(0); */
+                                seq->s[j] = unknown;
                         }else{
                                 seq->s[j] = t[(int) seq->seq[j]];
                         }
