@@ -68,6 +68,7 @@ make install
 **Note**: On macOS, Kalign automatically configures OpenMP with Homebrew's libomp installation at `/opt/homebrew/opt/libomp/`.
 
 #### Alternative Build Systems
+When using `zig`, version `0.12` is required to build this project. 
 
 **Zig Build** (for cross-compilation):
 ```bash
