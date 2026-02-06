@@ -260,9 +260,9 @@ python -m build
 twine check dist/*
 ```
 
-3) Configure publishing (choose one)
-- **Trusted Publishing (recommended)**: on PyPI, add this GitHub repo/workflow as a trusted publisher.
-- **API token**: create a PyPI API token and add it as the GitHub secret `PYPI_API_TOKEN`.
+3) Configure trusted publishing on PyPI
+- Add this GitHub repo/workflow as a trusted publisher in the PyPI project settings.
+- Configure it to match the workflow/environment used in `.github/workflows/wheels.yml` (environment `pypi`).
 
 4) Tag and push
 ```bash
