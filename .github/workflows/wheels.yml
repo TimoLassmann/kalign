@@ -222,6 +222,8 @@ jobs:
       id-token: write
     environment:
       name: pypi
+    env:
+      PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
     
     steps:
     - name: Download all artifacts
@@ -233,15 +235,15 @@ jobs:
 
     - name: Publish to PyPI (API token)
       uses: pypa/gh-action-pypi-publish@release/v1
-      if: ${{ secrets.PYPI_API_TOKEN != '' }}
+      if: env.PYPI_API_TOKEN != ''
       with:
         user: __token__
-        password: ${{ secrets.PYPI_API_TOKEN }}
+        password: ${{ env.PYPI_API_TOKEN }}
         packages_dir: dist/
 
     - name: Publish to PyPI (trusted publishing)
       uses: pypa/gh-action-pypi-publish@release/v1
-      if: ${{ secrets.PYPI_API_TOKEN == '' }}
+      if: env.PYPI_API_TOKEN == ''
       with:
         packages_dir: dist/
 
