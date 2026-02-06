@@ -10,8 +10,25 @@ from __future__ import annotations
 import argparse
 import sys
 import tempfile
+from importlib.metadata import PackageNotFoundError, version as dist_version
 from pathlib import Path
 from typing import Iterable, Optional
+
+
+def _resolve_version() -> str:
+    # kalign-test is the name of the test distribution, which may be installed in test environments. If it's present, use its version; otherwise, fall back to the main kalign distribution. If neither is found, try to import __version__ from the package, and if that fails, return "unknown".
+    for dist_name in ("kalign", "kalign-test"):
+        try:
+            return dist_version(dist_name)
+        except PackageNotFoundError:
+            continue
+
+    try:
+        from . import __version__
+
+        return __version__
+    except Exception:
+        return "unknown"
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -71,8 +88,9 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-V",
         "--version",
-        action="store_true",
-        help="Print version and exit.",
+        action="version",
+        version=f"%(prog)s {_resolve_version()}",
+        help="Print version and exit",
     )
     return parser
 
@@ -107,10 +125,6 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     import kalign
-
-    if args.version:
-        print(kalign.__version__)
-        return 0
 
     input_path = args.input
     tmp_path: Optional[Path] = None
