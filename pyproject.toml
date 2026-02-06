@@ -11,7 +11,7 @@ name = "kalign-test"
 version = "3.4.5"
 description = "Python wrapper for the Kalign multiple sequence alignment engine"
 readme = "README-python.md"
-license = {text = "GPL-3.0-or-later"}
+license = "GPL-3.0-or-later"
 license-files = ["COPYING"]
 authors = [
     {name = "Timo Lassmann", email = "timo.lassmann@telethonkids.org.au"}
