@@ -7,7 +7,7 @@ requires = [
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "kalign-test"
+name = "kalign"
 version = "3.4.5"
 description = "Python wrapper for the Kalign multiple sequence alignment engine"
 readme = "README-python.md"

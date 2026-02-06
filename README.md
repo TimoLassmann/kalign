@@ -272,6 +272,18 @@ git push origin vX.Y.Z
 
 That tag push triggers the wheel + sdist build, install tests, and then uploads to PyPI.
 
+#### Testing publishing on TestPyPI (optional)
+
+If you want to test the publishing pipeline without uploading to the real PyPI project, this repo also supports a manual TestPyPI publish:
+
+1) Create a TestPyPI API token and add it as the GitHub secret `TEST_PYPI_API_TOKEN`.
+2) Run the GitHub Actions workflow **Build Python Wheels** manually and set `publish_target = testpypi`.
+
+To install from TestPyPI while resolving dependencies from PyPI:
+```bash
+pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple <package-name>
+```
+
 ## Performance
 
 ### Benchmark Results
