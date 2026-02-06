@@ -153,12 +153,17 @@ jobs:
         echo "=== Available wheels ==="
         ls -la wheelhouse/*.whl
         
+        # Determine the distribution name from the wheel filenames (PEP 427)
+        # e.g. kalign_test-3.4.5-...whl -> kalign-test
+        DIST_NAME="$(ls wheelhouse/*.whl | head -n 1 | xargs basename | cut -d- -f1 | tr '_' '-')"
+        echo "=== Detected dist name: ${DIST_NAME} ==="
+
         echo "=== Installing wheel ==="
-        pip install --find-links wheelhouse/ kalign --force-reinstall
+        pip install --find-links wheelhouse/ "${DIST_NAME}" --force-reinstall
         
         # Check what got installed
         echo "=== Checking installed packages ==="
-        pip list | grep kalign || true
+        pip list | grep -E 'kalign' || true
         
         # Check the kalign module structure
         echo "=== Checking kalign module ==="
