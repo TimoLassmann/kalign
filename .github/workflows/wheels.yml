@@ -14,6 +14,15 @@ on:
       - 'pyproject.toml'
       - '.github/workflows/wheels.yml'
   workflow_dispatch:
+    inputs:
+      publish_target:
+        description: "Publish target (manual runs only)"
+        required: true
+        default: "none"
+        type: choice
+        options:
+          - none
+          - testpypi
 
 jobs:
   build_wheels:
@@ -235,3 +244,25 @@ jobs:
       if: ${{ secrets.PYPI_API_TOKEN == '' }}
       with:
         packages_dir: dist/
+
+  upload_testpypi:
+    name: Upload to TestPyPI
+    needs: [build_wheels, build_sdist, test_install]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_target == 'testpypi'
+
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: cibw-*
+        merge-multiple: true
+        path: dist/
+
+    - name: Publish to TestPyPI (API token)
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        user: __token__
+        password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        packages_dir: dist/
+        repository-url: https://test.pypi.org/legacy/
