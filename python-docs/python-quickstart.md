@@ -31,7 +31,13 @@ pip install kalign[biopython]
 # For scikit-bio integration
 pip install kalign[skbio]
 
-# For everything
+# For file I/O helpers (Biopython-backed)
+pip install kalign[io]
+
+# For pandas + matplotlib analysis/visualization helpers
+pip install kalign[analysis]
+
+# For all optional ecosystem integrations
 pip install kalign[all]
 ```
 
@@ -597,7 +603,7 @@ aligned, stats, outliers = quality_control_alignment(sequences, ids)
 
 Now that you're familiar with the basics, explore these advanced topics:
 
-1. **[Ecosystem Integration Guide](python-ecosystem.md)** - Deep dive into Biopython and scikit-bio integration
+1. **[Ecosystem Integration Guide](python-ecosystem.md)** - Deep dive into Biopython, scikit-bio, pandas, and matplotlib integration
 2. **[Performance Tuning Guide](python-performance.md)** - Optimize for large-scale alignments
 3. **[API Reference](python-api.md)** - Complete function documentation
 4. **[Troubleshooting Guide](python-troubleshooting.md)** - Common issues and solutions
