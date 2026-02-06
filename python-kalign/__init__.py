@@ -12,7 +12,12 @@ from typing import Any, List, Literal, Optional, Union
 
 from . import _core, io, utils
 
-__version__ = "3.4.5"
+try:
+    from importlib.metadata import PackageNotFoundError, version as _dist_version
+
+    __version__ = _dist_version("kalign")
+except Exception:
+    __version__ = "3.4.5"
 __author__ = "Timo Lassmann"
 __email__ = "timo.lassmann@telethonkids.org.au"
 

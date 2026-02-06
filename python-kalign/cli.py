@@ -1,94 +1,153 @@
 """
-Command-line interface wrapper for Kalign.
+Command-line interface for the Python Kalign package.
 
-This module provides a CLI entry point that wraps the native Kalign binary,
-ensuring the command-line interface remains available after pip installation.
+This CLI uses the compiled Python extension module shipped with the package
+instead of shelling out to a separately-installed `kalign` binary.
 """
 
-import os
-import subprocess
+from __future__ import annotations
+
+import argparse
 import sys
+import tempfile
 from pathlib import Path
-from typing import List, Optional
+from typing import Iterable, Optional
 
 
-def find_kalign_binary() -> Optional[str]:
-    """
-    Find the Kalign binary in the system PATH or package directory.
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="kalign",
+        description="Multiple sequence alignment via the Kalign Python package",
+    )
 
-    Returns
-    -------
-    str or None
-        Path to kalign binary if found, None otherwise
-    """
-    # First, try to find in system PATH
+    parser.add_argument(
+        "-i",
+        "--input",
+        required=True,
+        help="Input sequence file path, or '-' to read from stdin.",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        default="-",
+        help="Output file path, or '-' to write to stdout (default).",
+    )
+    parser.add_argument(
+        "--format",
+        default="fasta",
+        help="Output format: fasta, clustal, stockholm, phylip (default: fasta).",
+    )
+    parser.add_argument(
+        "--type",
+        default="auto",
+        dest="seq_type",
+        help="Sequence type: auto, dna, rna, internal, protein, divergent (default: auto).",
+    )
+    parser.add_argument(
+        "--gpo",
+        type=float,
+        default=None,
+        help="Gap open penalty (negative; default: Kalign internal defaults).",
+    )
+    parser.add_argument(
+        "--gpe",
+        type=float,
+        default=None,
+        help="Gap extension penalty (negative; default: Kalign internal defaults).",
+    )
+    parser.add_argument(
+        "--tgpe",
+        type=float,
+        default=None,
+        help="Terminal gap extension penalty (negative; default: Kalign internal defaults).",
+    )
+    parser.add_argument(
+        "-n",
+        "--nthreads",
+        type=int,
+        default=1,
+        help="Number of threads to use (default: 1).",
+    )
+    parser.add_argument(
+        "-V",
+        "--version",
+        action="store_true",
+        help="Print version and exit.",
+    )
+    return parser
+
+
+def _write_stdout(alignment: Iterable[str], fmt: str) -> None:
+    import kalign
+
+    fmt_lower = fmt.lower()
+    if fmt_lower in {"fasta", "fa"}:
+        kalign.io.write_fasta(list(alignment), sys.stdout)
+        return
+
+    if fmt_lower in {"clustal", "aln"}:
+        kalign.io.write_clustal(list(alignment), sys.stdout)
+        return
+
+    if fmt_lower in {"stockholm", "sto"}:
+        kalign.io.write_stockholm(list(alignment), sys.stdout)
+        return
+
+    if fmt_lower in {"phylip", "phy"}:
+        kalign.io.write_phylip(list(alignment), sys.stdout)
+        return
+
+    raise ValueError(
+        f"Invalid format: {fmt}. Must be one of: fasta, clustal, stockholm, phylip"
+    )
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+
+    import kalign
+
+    if args.version:
+        print(kalign.__version__)
+        return 0
+
+    input_path = args.input
+    tmp_path: Optional[Path] = None
+    if input_path == "-":
+        with tempfile.NamedTemporaryFile(prefix="kalign-", suffix=".fa", delete=False) as tmp:
+            tmp.write(sys.stdin.buffer.read())
+            tmp_path = Path(tmp.name)
+        input_path = str(tmp_path)
+
     try:
-        result = subprocess.run(["which", "kalign"], capture_output=True, text=True)
-        if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip()
-    except (subprocess.SubprocessError, FileNotFoundError):
-        pass
-
-    # Try common installation locations
-    common_paths = [
-        "/usr/local/bin/kalign",
-        "/usr/bin/kalign",
-        "/opt/homebrew/bin/kalign",
-        "/opt/local/bin/kalign",
-    ]
-
-    for path in common_paths:
-        if os.path.isfile(path) and os.access(path, os.X_OK):
-            return path
-
-    return None
-
-
-def main(args: Optional[List[str]] = None) -> int:
-    """
-    Main entry point for the kalign CLI wrapper.
-
-    Parameters
-    ----------
-    args : list of str, optional
-        Command-line arguments. If None, uses sys.argv[1:]
-
-    Returns
-    -------
-    int
-        Exit code from kalign binary
-    """
-    if args is None:
-        args = sys.argv[1:]
-
-    # Find the kalign binary
-    kalign_bin = find_kalign_binary()
-
-    if kalign_bin is None:
-        print("Error: kalign binary not found in PATH", file=sys.stderr)
-        print(
-            "Please ensure Kalign is properly installed on your system", file=sys.stderr
+        aligned = kalign.align_from_file(
+            input_path,
+            seq_type=args.seq_type,
+            gap_open=args.gpo,
+            gap_extend=args.gpe,
+            terminal_gap_extend=args.tgpe,
+            n_threads=args.nthreads,
         )
-        print(
-            "You can download it from: https://github.com/TimoLassmann/kalign",
-            file=sys.stderr,
-        )
-        return 1
 
-    # Execute kalign with the provided arguments
-    try:
-        # Use subprocess.run to forward all arguments and maintain interactivity
-        result = subprocess.run([kalign_bin] + args)
-        return result.returncode
+        if args.output == "-":
+            _write_stdout(aligned, args.format)
+        else:
+            kalign.write_alignment(aligned, args.output, format=args.format)
 
+        return 0
     except KeyboardInterrupt:
-        print("\nInterrupted by user", file=sys.stderr)
         return 130
-
-    except Exception as e:
-        print(f"Error executing kalign: {e}", file=sys.stderr)
-        return 1
+    except Exception as exc:
+        print(f"kalign: error: {exc}", file=sys.stderr)
+        return 2
+    finally:
+        if tmp_path is not None:
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

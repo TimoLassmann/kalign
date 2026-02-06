@@ -10,8 +10,9 @@ build-backend = "scikit_build_core.build"
 name = "kalign"
 version = "3.4.5"
 description = "Python wrapper for the Kalign multiple sequence alignment engine"
-readme = "README.md"
+readme = "README-python.md"
 license = {text = "GPL-3.0-or-later"}
+license-files = ["COPYING"]
 authors = [
     {name = "Timo Lassmann", email = "timo.lassmann@telethonkids.org.au"}
 ]

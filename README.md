@@ -242,6 +242,36 @@ cmake -DBUILD_PYTHON_MODULE=ON ..
 make
 ```
 
+### Cutting a New Python Release (PyPI)
+
+This repo is set up to publish to PyPI from GitHub Actions on version tags (`v*`) via `.github/workflows/wheels.yml`.
+
+1) Bump versions
+- Update the Python package version in `pyproject.toml` (`[project].version`).
+- Update the C/C++ library version in `CMakeLists.txt` (`KALIGN_LIBRARY_VERSION_{MAJOR,MINOR,PATCH}`).
+- (Optional but recommended) Add an entry to `ChangeLog`.
+
+2) Sanity check locally (recommended)
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip build twine
+python -m build
+twine check dist/*
+```
+
+3) Configure publishing (choose one)
+- **Trusted Publishing (recommended)**: on PyPI, add this GitHub repo/workflow as a trusted publisher.
+- **API token**: create a PyPI API token and add it as the GitHub secret `PYPI_API_TOKEN`.
+
+4) Tag and push
+```bash
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+That tag push triggers the wheel + sdist build, install tests, and then uploads to PyPI.
+
 ## Performance
 
 ### Benchmark Results
