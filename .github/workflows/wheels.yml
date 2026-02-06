@@ -34,9 +34,9 @@ jobs:
         include:
           - os: ubuntu-latest
             cibw_archs: "x86_64"
-          - os: macos-latest
+          - os: macos-14
             cibw_archs: "x86_64"
-          - os: macos-latest
+          - os: macos-14
             cibw_archs: "arm64"
 
     steps:
@@ -131,7 +131,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-14]
         python-version: ['3.9', '3.10', '3.11', '3.12']
 
     steps:
