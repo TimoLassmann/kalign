@@ -14,6 +14,15 @@ on:
       - 'pyproject.toml'
       - '.github/workflows/wheels.yml'
   workflow_dispatch:
+    inputs:
+      publish_target:
+        description: "Publish target (manual runs only)"
+        required: true
+        default: "none"
+        type: choice
+        options:
+          - none
+          - testpypi
 
 jobs:
   build_wheels:
@@ -25,9 +34,9 @@ jobs:
         include:
           - os: ubuntu-latest
             cibw_archs: "x86_64"
-          - os: macos-latest
+          - os: macos-14
             cibw_archs: "x86_64"
-          - os: macos-latest
+          - os: macos-14
             cibw_archs: "arm64"
 
     steps:
@@ -122,7 +131,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-14]
         python-version: ['3.9', '3.10', '3.11', '3.12']
 
     steps:
@@ -144,12 +153,17 @@ jobs:
         echo "=== Available wheels ==="
         ls -la wheelhouse/*.whl
         
+        # Determine the distribution name from the wheel filenames (PEP 427)
+        # e.g. kalign_test-3.4.5-...whl -> kalign-test
+        DIST_NAME="$(ls wheelhouse/*.whl | head -n 1 | xargs basename | cut -d- -f1 | tr '_' '-')"
+        echo "=== Detected dist name: ${DIST_NAME} ==="
+
         echo "=== Installing wheel ==="
-        pip install --find-links wheelhouse/ kalign --force-reinstall
+        pip install --find-links wheelhouse/ "${DIST_NAME}" --force-reinstall
         
         # Check what got installed
         echo "=== Checking installed packages ==="
-        pip list | grep kalign || true
+        pip list | grep -E 'kalign' || true
         
         # Check the kalign module structure
         echo "=== Checking kalign module ==="
@@ -209,6 +223,10 @@ jobs:
     needs: [build_wheels, build_sdist, test_install]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      id-token: write
+    environment:
+      name: pypi
     
     steps:
     - name: Download all artifacts
@@ -218,9 +236,30 @@ jobs:
         merge-multiple: true
         path: dist/
 
-    - name: Publish to PyPI
+    - name: Publish to PyPI (trusted publishing)
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        packages_dir: dist/
+
+  upload_testpypi:
+    name: Upload to TestPyPI
+    needs: [build_wheels, build_sdist, test_install]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_target == 'testpypi'
+
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: cibw-*
+        merge-multiple: true
+        path: dist/
+
+    - name: Publish to TestPyPI (API token)
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         user: __token__
-        password: ${{ secrets.PYPI_API_TOKEN }}
+        password: ${{ secrets.TEST_PYPI_API_TOKEN }}
         packages_dir: dist/
+        repository-url: https://test.pypi.org/legacy/
+        verbose: true

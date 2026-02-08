@@ -10,8 +10,9 @@ build-backend = "scikit_build_core.build"
 name = "kalign"
 version = "3.4.5"
 description = "Python wrapper for the Kalign multiple sequence alignment engine"
-readme = "README.md"
-license = {text = "GPL-3.0-or-later"}
+readme = "README-python.md"
+license = "GPL-3.0-or-later"
+license-files = ["COPYING"]
 authors = [
     {name = "Timo Lassmann", email = "timo.lassmann@telethonkids.org.au"}
 ]
@@ -30,7 +31,6 @@ keywords = [
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Operating System :: OS Independent",
     "Programming Language :: C",
     "Programming Language :: C++",
@@ -46,12 +46,7 @@ classifiers = [
 ]
 requires-python = ">=3.9"
 dependencies = [
-    "biopython>=1.85",
-    "matplotlib>=3.9.4",
     "numpy>=1.19.0",
-    "pandas>=2.3.0",
-    "rich>=14.0.0",
-    "scikit-bio>=0.6.3",
 ]
 
 [project.scripts]
@@ -62,7 +57,8 @@ kalign = "kalign.cli:main"
 biopython = ["biopython>=1.85"]
 skbio = ["scikit-bio>=0.6.3"]
 io = ["biopython>=1.85"]  # For I/O helper functions
-all = ["biopython>=1.85", "scikit-bio>=0.6.3"]
+analysis = ["pandas>=2.3.0", "matplotlib>=3.9.4"]
+all = ["biopython>=1.85", "scikit-bio>=0.6.3", "pandas>=2.3.0", "matplotlib>=3.9.4"]
 
 # Development dependencies
 dev = [

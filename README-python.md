@@ -32,8 +32,9 @@ For bioinformatics ecosystem integration:
 ```bash
 pip install kalign[biopython]    # + Biopython integration
 pip install kalign[skbio]        # + scikit-bio integration  
-pip install kalign[all]          # Everything
 pip install kalign[io]           # I/O helpers with Biopython
+pip install kalign[analysis]     # + pandas + matplotlib analysis/visualization helpers
+pip install kalign[all]          # Biopython + scikit-bio + pandas + matplotlib
 ```
 
 ## Quick Start
@@ -66,7 +67,7 @@ ATCGATC-ATCG
 
 - **[📖 Quick Start Guide](python-docs/python-quickstart.md)** - Get up and running in minutes
 - **[🔧 API Reference](python-docs/python-api.md)** - Complete function documentation  
-- **[🌐 Ecosystem Integration](python-docs/python-ecosystem.md)** - Biopython, scikit-bio, pandas integration
+- **[🌐 Ecosystem Integration](python-docs/python-ecosystem.md)** - Biopython, scikit-bio, pandas, and matplotlib integration
 - **[⚡ Performance Tuning](python-docs/python-performance.md)** - Optimization and benchmarking
 - **[🛠️ Troubleshooting Guide](python-docs/python-troubleshooting.md)** - Common issues and solutions
 
