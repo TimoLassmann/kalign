@@ -68,6 +68,7 @@ make install
 **Note**: On macOS, Kalign automatically configures OpenMP with Homebrew's libomp installation at `/opt/homebrew/opt/libomp/`.
 
 #### Alternative Build Systems
+When using `zig`, version `0.12` is required to build this project. 
 
 **Zig Build** (for cross-compilation):
 ```bash
@@ -240,6 +241,48 @@ uv pip install -e .
 mkdir build && cd build
 cmake -DBUILD_PYTHON_MODULE=ON ..
 make
+```
+
+### Cutting a New Python Release (PyPI)
+
+This repo is set up to publish to PyPI from GitHub Actions on version tags (`v*`) via `.github/workflows/wheels.yml`.
+
+1) Bump versions
+- Update the Python package version in `pyproject.toml` (`[project].version`).
+- Update the C/C++ library version in `CMakeLists.txt` (`KALIGN_LIBRARY_VERSION_{MAJOR,MINOR,PATCH}`).
+- (Optional but recommended) Add an entry to `ChangeLog`.
+
+2) Sanity check locally (recommended)
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip build twine
+python -m build
+twine check dist/*
+```
+
+3) Configure trusted publishing on PyPI
+- Add this GitHub repo/workflow as a trusted publisher in the PyPI project settings.
+- Configure it to match the workflow/environment used in `.github/workflows/wheels.yml` (environment `pypi`).
+
+4) Tag and push
+```bash
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+That tag push triggers the wheel + sdist build, install tests, and then uploads to PyPI.
+
+#### Testing publishing on TestPyPI (optional)
+
+If you want to test the publishing pipeline without uploading to the real PyPI project, this repo also supports a manual TestPyPI publish:
+
+1) Create a TestPyPI API token and add it as the GitHub secret `TEST_PYPI_API_TOKEN`.
+2) Run the GitHub Actions workflow **Build Python Wheels** manually and set `publish_target = testpypi`.
+
+To install from TestPyPI while resolving dependencies from PyPI:
+```bash
+pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple <package-name>
 ```
 
 ## Performance
