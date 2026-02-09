@@ -277,7 +277,7 @@ class TestBackwardCompatibility:
         result1 = kalign.align(TEST_SEQUENCES)
         result2 = kalign.align(TEST_SEQUENCES, seq_type="dna")
         result3 = kalign.align(TEST_SEQUENCES, seq_type="dna", n_threads=2)
-        result4 = kalign.align(TEST_SEQUENCES, gap_open=-5.0, gap_extend=-1.0)
+        result4 = kalign.align(TEST_SEQUENCES, gap_open=5.0, gap_extend=1.0)
 
         # All should return lists of strings
         for result in [result1, result2, result3, result4]:
@@ -290,11 +290,14 @@ class TestBackwardCompatibility:
         expected_exports = {
             "align",
             "align_from_file",
+            "align_file_to_file",
+            "compare",
             "write_alignment",
             "generate_test_sequences",
             "set_num_threads",
             "get_num_threads",
             "kalign",
+            "AlignedSequences",
             "io",
             "utils",
             "DNA",

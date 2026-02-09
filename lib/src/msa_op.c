@@ -354,7 +354,7 @@ int convert_msa_to_internal(struct msa* msa, int type)
                         if(t[(int) seq->seq[j]] == -1){
                                 WARNING_MSG("there should be no character not matching the alphabet");
                                 WARNING_MSG("offending character: >>>%c<<<", seq->seq[j]);
-                                /* exit(0); */
+                                seq->s[j] = 0;
                         }else{
                                 seq->s[j] = t[(int) seq->seq[j]];
                         }

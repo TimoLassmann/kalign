@@ -87,8 +87,8 @@ std::vector<std::string> align_sequences(
     return c_strings_to_python(aligned_seqs, static_cast<int>(sequences.size()), alignment_length);
 }
 
-// File-based alignment function
-std::vector<std::string> align_from_file(
+// File-based alignment function — returns (names, sequences)
+std::pair<std::vector<std::string>, std::vector<std::string>> align_from_file(
     const std::string& input_file,
     int seq_type = KALIGN_TYPE_UNDEFINED,
     float gap_open = -1.0f,
@@ -97,74 +97,74 @@ std::vector<std::string> align_from_file(
     int n_threads = 1
 ) {
     struct msa* msa_data = nullptr;
-    
+
     // Read input file
     int result = kalign_read_input(const_cast<char*>(input_file.c_str()), &msa_data, 1);
     if (result != 0) {
         throw std::runtime_error("Failed to read input file: " + input_file);
     }
-    
+
     // Check if msa_data is NULL - this happens when the file format cannot be detected
     if (!msa_data) {
         throw std::runtime_error("Could not detect valid sequence format in file: " + input_file);
     }
-    
+
     // Perform alignment
     result = kalign_run(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend);
     if (result != 0) {
         kalign_free_msa(msa_data);
         throw std::runtime_error("Kalign alignment failed with error code: " + std::to_string(result));
     }
-    
-    // For now, we'll need to write to a temporary file and read back
-    // This is a limitation of the current C API that doesn't expose aligned sequences directly
-    std::string temp_file = "/tmp/kalign_output.fa";
+
+    // Write to a temporary file so kalign_write_msa handles gap insertion
+    const char* tmpdir = std::getenv("TMPDIR");
+    if (!tmpdir) tmpdir = std::getenv("TMP");
+    if (!tmpdir) tmpdir = std::getenv("TEMP");
+    if (!tmpdir) tmpdir = "/tmp";
+    std::string temp_file = std::string(tmpdir) + "/kalign_output.fa";
     result = kalign_write_msa(msa_data, const_cast<char*>(temp_file.c_str()), const_cast<char*>("fasta"));
-    
+
     kalign_free_msa(msa_data);
-    
+
     if (result != 0) {
         throw std::runtime_error("Failed to write alignment results");
     }
-    
-    // Read the temporary file back
-    // This is a simplified approach - in practice, you'd want to parse the FASTA file properly
+
+    // Parse the FASTA file, capturing both headers (names) and sequences
     std::ifstream file(temp_file);
+    std::vector<std::string> names;
     std::vector<std::string> aligned_sequences;
-    std::string line, current_seq;
-    
+    std::string line, current_name, current_seq;
+
     while (std::getline(file, line)) {
         if (line.empty()) continue;
-        
+
         if (line[0] == '>') {
             if (!current_seq.empty()) {
+                names.push_back(current_name);
                 aligned_sequences.push_back(current_seq);
                 current_seq.clear();
+            }
+            // Strip the '>' prefix; take everything up to the first whitespace as the name
+            current_name = line.substr(1);
+            auto ws = current_name.find_first_of(" \t");
+            if (ws != std::string::npos) {
+                current_name = current_name.substr(0, ws);
             }
         } else {
             current_seq += line;
         }
     }
-    
+
     if (!current_seq.empty()) {
+        names.push_back(current_name);
         aligned_sequences.push_back(current_seq);
     }
-    
+
     // Clean up temp file
     std::remove(temp_file.c_str());
-    
-    return aligned_sequences;
-}
 
-// Write alignment to file
-void write_alignment(
-    const std::vector<std::string>& sequences,
-    const std::string& output_file,
-    const std::string& format = "fasta"
-) {
-    // This would need to be implemented by converting sequences back to msa struct
-    // For now, we'll provide a simple implementation
-    throw std::runtime_error("write_alignment not yet implemented - use align_from_file instead");
+    return {names, aligned_sequences};
 }
 
 // Generate test sequences using DSSim
@@ -204,6 +204,66 @@ std::vector<std::string> generate_test_sequences(
     return sequences;
 }
 
+// Compare two MSA files (reference vs test), returning SP score
+float compare_msa_files(const std::string& reference_file, const std::string& test_file) {
+    struct msa* ref = nullptr;
+    struct msa* test = nullptr;
+    float score = 0.0f;
+
+    int result = kalign_read_input(const_cast<char*>(reference_file.c_str()), &ref, 1);
+    if (result != 0 || !ref) {
+        throw std::runtime_error("Failed to read reference file: " + reference_file);
+    }
+
+    result = kalign_read_input(const_cast<char*>(test_file.c_str()), &test, 1);
+    if (result != 0 || !test) {
+        kalign_free_msa(ref);
+        throw std::runtime_error("Failed to read test file: " + test_file);
+    }
+
+    result = kalign_msa_compare(ref, test, &score);
+    kalign_free_msa(ref);
+    kalign_free_msa(test);
+
+    if (result != 0) {
+        throw std::runtime_error("MSA comparison failed");
+    }
+
+    return score;
+}
+
+// Align sequences from input file and write result to output file, preserving all metadata
+void align_file_to_file(
+    const std::string& input_file,
+    const std::string& output_file,
+    const std::string& format = "fasta",
+    int seq_type = KALIGN_TYPE_UNDEFINED,
+    float gap_open = -1.0f,
+    float gap_extend = -1.0f,
+    float terminal_gap_extend = -1.0f,
+    int n_threads = 1
+) {
+    struct msa* msa_data = nullptr;
+
+    int result = kalign_read_input(const_cast<char*>(input_file.c_str()), &msa_data, 1);
+    if (result != 0 || !msa_data) {
+        throw std::runtime_error("Failed to read input file: " + input_file);
+    }
+
+    result = kalign_run(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend);
+    if (result != 0) {
+        kalign_free_msa(msa_data);
+        throw std::runtime_error("Alignment failed with error code: " + std::to_string(result));
+    }
+
+    result = kalign_write_msa(msa_data, const_cast<char*>(output_file.c_str()), const_cast<char*>(format.c_str()));
+    kalign_free_msa(msa_data);
+
+    if (result != 0) {
+        throw std::runtime_error("Failed to write output file: " + output_file);
+    }
+}
+
 PYBIND11_MODULE(_core, m) {
     m.doc() = "Python bindings for Kalign multiple sequence alignment";
     
@@ -239,7 +299,7 @@ PYBIND11_MODULE(_core, m) {
               Aligned sequences
           )pbdoc");
     
-    // File-based alignment
+    // File-based alignment — returns (names, sequences)
     m.def("align_from_file", &align_from_file,
           py::arg("input_file"),
           py::arg("seq_type") = KALIGN_TYPE_UNDEFINED,
@@ -247,14 +307,7 @@ PYBIND11_MODULE(_core, m) {
           py::arg("gap_extend") = -1.0f,
           py::arg("terminal_gap_extend") = -1.0f,
           py::arg("n_threads") = 1,
-          "Align sequences from a file");
-    
-    // Write alignment function (placeholder)
-    m.def("write_alignment", &write_alignment,
-          py::arg("sequences"),
-          py::arg("output_file"),
-          py::arg("format") = "fasta",
-          "Write aligned sequences to file");
+          "Align sequences from a file. Returns (names, sequences) tuple.");
     
     // Generate test sequences using DSSim
     m.def("generate_test_sequences", &generate_test_sequences,
@@ -285,6 +338,62 @@ PYBIND11_MODULE(_core, m) {
               Generated sequences
           )pbdoc");
     
+    // Compare two MSA files
+    m.def("compare", &compare_msa_files,
+          py::arg("reference_file"),
+          py::arg("test_file"),
+          R"pbdoc(
+          Compare two multiple sequence alignments and return SP score.
+
+          Parameters
+          ----------
+          reference_file : str
+              Path to reference alignment file
+          test_file : str
+              Path to test alignment file
+
+          Returns
+          -------
+          float
+              SP score (0-100)
+          )pbdoc");
+
+    // Align file to file (preserves sequence names/metadata)
+    m.def("align_file_to_file", &align_file_to_file,
+          py::arg("input_file"),
+          py::arg("output_file"),
+          py::arg("format") = "fasta",
+          py::arg("seq_type") = KALIGN_TYPE_UNDEFINED,
+          py::arg("gap_open") = -1.0f,
+          py::arg("gap_extend") = -1.0f,
+          py::arg("terminal_gap_extend") = -1.0f,
+          py::arg("n_threads") = 1,
+          R"pbdoc(
+          Align sequences from input file and write to output file.
+
+          Unlike align_from_file, this preserves all sequence metadata
+          (names, descriptions) which is required for MSA comparison.
+
+          Parameters
+          ----------
+          input_file : str
+              Path to input sequence file
+          output_file : str
+              Path to output alignment file
+          format : str, optional
+              Output format: "fasta", "msf", "clu" (default: "fasta")
+          seq_type : int, optional
+              Sequence type (default: auto-detect)
+          gap_open : float, optional
+              Gap opening penalty
+          gap_extend : float, optional
+              Gap extension penalty
+          terminal_gap_extend : float, optional
+              Terminal gap extension penalty
+          n_threads : int, optional
+              Number of threads (default: 1)
+          )pbdoc");
+
     // Constants for sequence types
     m.attr("DNA") = KALIGN_TYPE_DNA;
     m.attr("DNA_INTERNAL") = KALIGN_TYPE_DNA_INTERNAL;

@@ -315,6 +315,9 @@ Martin Steinegger 1, 2, 3 and Johannes Söding 1 */
         merge_codes(a,'Z','E');
         merge_codes(a,'Z','Q');
 
+        /* Selenocysteine (U) - map to cysteine (C) as it is
+           structurally nearly identical (Se replaces S) */
+        a->to_internal[(int) 'U'] = a->to_internal[(int) 'C'];
 
         return OK;
 
@@ -369,6 +372,10 @@ Martin Steinegger 1, 2, 3 and Johannes Söding 1 */
         merge_multiple(a,"WLY",3);
 
         merge_multiple(a,"BZX",3);
+
+        /* Selenocysteine (U) - map to cysteine (C) as it is
+           structurally nearly identical (Se replaces S) */
+        a->to_internal[(int) 'U'] = a->to_internal[(int) 'C'];
 
         return OK;
 

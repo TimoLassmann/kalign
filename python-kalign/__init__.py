@@ -8,7 +8,14 @@ Kalign is a fast and accurate multiple sequence alignment tool for biological se
 import os
 import threading
 from importlib import import_module
-from typing import Any, List, Literal, Optional, Union
+from typing import Any, List, Literal, NamedTuple, Optional, Union
+
+
+class AlignedSequences(NamedTuple):
+    """Result of aligning sequences from a file, preserving sequence names."""
+
+    names: List[str]
+    sequences: List[str]
 
 from . import _core, io, utils
 
@@ -62,11 +69,11 @@ def align(
         - "divergent" or PROTEIN_DIVERGENT: Divergent protein sequences
         - "internal" or DNA_INTERNAL: DNA with internal gap preference
     gap_open : float, optional
-        Gap opening penalty. If None, uses Kalign defaults based on sequence type.
+        Gap opening penalty (positive value, e.g. 5.5). If None, uses Kalign defaults.
     gap_extend : float, optional
-        Gap extension penalty. If None, uses Kalign defaults based on sequence type.
+        Gap extension penalty (positive value, e.g. 2.0). If None, uses Kalign defaults.
     terminal_gap_extend : float, optional
-        Terminal gap extension penalty. If None, uses Kalign defaults based on sequence type.
+        Terminal gap extension penalty (positive value, e.g. 1.0). If None, uses Kalign defaults.
     n_threads : int, optional
         Number of threads to use for alignment. If None, uses global default.
     fmt : {'plain', 'biopython', 'skbio'}, default 'plain'
@@ -201,27 +208,29 @@ def align(
         seq_type_int = seq_type
 
     # Parameter validation and defaults
+    # The C core expects positive penalty values (e.g., gpo=5.5, gpe=2.0).
+    # A value of -1.0 signals "use defaults".
     if gap_open is None:
         gap_open = -1.0
     elif not isinstance(gap_open, (int, float)):
         raise ValueError("gap_open must be a number")
-    elif gap_open > 0:
-        raise ValueError("gap_open must be negative or zero (penalty values)")
+    elif gap_open < 0:
+        raise ValueError("gap_open must be a positive number (penalty value)")
 
     if gap_extend is None:
         gap_extend = -1.0
     elif not isinstance(gap_extend, (int, float)):
         raise ValueError("gap_extend must be a number")
-    elif gap_extend > 0:
-        raise ValueError("gap_extend must be negative or zero (penalty values)")
+    elif gap_extend < 0:
+        raise ValueError("gap_extend must be a positive number (penalty value)")
 
     if terminal_gap_extend is None:
         terminal_gap_extend = -1.0
     elif not isinstance(terminal_gap_extend, (int, float)):
         raise ValueError("terminal_gap_extend must be a number")
-    elif terminal_gap_extend > 0:
+    elif terminal_gap_extend < 0:
         raise ValueError(
-            "terminal_gap_extend must be negative or zero (penalty values)"
+            "terminal_gap_extend must be a positive number (penalty value)"
         )
 
     # Handle thread count
@@ -355,8 +364,8 @@ def align_from_file(
     gap_open: Optional[float] = None,
     gap_extend: Optional[float] = None,
     terminal_gap_extend: Optional[float] = None,
-    n_threads: int = 1,
-) -> List[str]:
+    n_threads: Optional[int] = None,
+) -> AlignedSequences:
     """
     Align sequences from a file using Kalign.
 
@@ -378,8 +387,8 @@ def align_from_file(
 
     Returns
     -------
-    list of str
-        List of aligned sequences
+    AlignedSequences
+        Named tuple with ``names`` and ``sequences`` fields.
 
     Raises
     ------
@@ -420,13 +429,15 @@ def align_from_file(
     if terminal_gap_extend is None:
         terminal_gap_extend = -1.0
 
-    # Validate thread count
+    # Handle thread count
+    if n_threads is None:
+        n_threads = get_num_threads()
     if n_threads < 1:
         raise ValueError("n_threads must be at least 1")
 
-    # Call the C++ binding
+    # Call the C++ binding — returns (names, sequences) tuple
     try:
-        aligned_seqs = _core.align_from_file(
+        names, sequences = _core.align_from_file(
             input_file,
             seq_type_int,
             gap_open,
@@ -434,7 +445,7 @@ def align_from_file(
             terminal_gap_extend,
             n_threads,
         )
-        return aligned_seqs
+        return AlignedSequences(names=names, sequences=sequences)
     except Exception as e:
         raise RuntimeError(f"Alignment failed: {str(e)}")
 
@@ -573,6 +584,126 @@ def generate_test_sequences(
         raise RuntimeError(f"Test sequence generation failed: {str(e)}")
 
 
+def compare(reference_file: str, test_file: str) -> float:
+    """
+    Compare two multiple sequence alignments and return SP score.
+
+    Computes the sum-of-pairs (SP) score between a reference alignment
+    and a test alignment. Sequences are matched by name, so both files
+    must contain the same sequences.
+
+    Parameters
+    ----------
+    reference_file : str
+        Path to reference alignment file (FASTA, MSF, or Clustal format)
+    test_file : str
+        Path to test alignment file
+
+    Returns
+    -------
+    float
+        SP score (0-100), where 100 means identical alignments
+
+    Raises
+    ------
+    FileNotFoundError
+        If either file doesn't exist
+    RuntimeError
+        If comparison fails
+    """
+    if not os.path.exists(reference_file):
+        raise FileNotFoundError(f"Reference file not found: {reference_file}")
+    if not os.path.exists(test_file):
+        raise FileNotFoundError(f"Test file not found: {test_file}")
+
+    return _core.compare(reference_file, test_file)
+
+
+def align_file_to_file(
+    input_file: str,
+    output_file: str,
+    format: str = "fasta",
+    seq_type: Union[str, int] = "auto",
+    gap_open: Optional[float] = None,
+    gap_extend: Optional[float] = None,
+    terminal_gap_extend: Optional[float] = None,
+    n_threads: Optional[int] = None,
+) -> None:
+    """
+    Align sequences from input file and write result to output file.
+
+    Unlike align_from_file(), this preserves all sequence metadata (names,
+    descriptions), which is required for MSA comparison with compare().
+
+    Parameters
+    ----------
+    input_file : str
+        Path to input file containing unaligned sequences
+    output_file : str
+        Path to output alignment file
+    format : str, optional
+        Output format: "fasta", "msf", "clu" (default: "fasta")
+    seq_type : str or int, optional
+        Sequence type (default: "auto")
+    gap_open : float, optional
+        Gap opening penalty
+    gap_extend : float, optional
+        Gap extension penalty
+    terminal_gap_extend : float, optional
+        Terminal gap extension penalty
+    n_threads : int, optional
+        Number of threads (default: uses global setting)
+
+    Raises
+    ------
+    FileNotFoundError
+        If input file doesn't exist
+    RuntimeError
+        If alignment or writing fails
+    """
+    if not os.path.exists(input_file):
+        raise FileNotFoundError(f"Input file not found: {input_file}")
+
+    seq_type_map = {
+        "auto": AUTO,
+        "dna": DNA,
+        "rna": RNA,
+        "protein": PROTEIN,
+        "divergent": PROTEIN_DIVERGENT,
+        "internal": DNA_INTERNAL,
+    }
+
+    if isinstance(seq_type, str):
+        seq_type_lower = seq_type.lower()
+        if seq_type_lower not in seq_type_map:
+            raise ValueError(
+                f"Invalid seq_type: {seq_type}. Must be one of: {list(seq_type_map.keys())}"
+            )
+        seq_type_int = seq_type_map[seq_type_lower]
+    else:
+        seq_type_int = seq_type
+
+    if gap_open is None:
+        gap_open = -1.0
+    if gap_extend is None:
+        gap_extend = -1.0
+    if terminal_gap_extend is None:
+        terminal_gap_extend = -1.0
+    if n_threads is None:
+        n_threads = get_num_threads()
+
+    _core.align_file_to_file(
+        input_file,
+        output_file,
+        format,
+        seq_type_int,
+        gap_open,
+        gap_extend,
+        terminal_gap_extend,
+        n_threads,
+    )
+
+
 # Convenience aliases
 kalign = align  # For backward compatibility or alternative naming
 
@@ -580,11 +711,14 @@ kalign = align  # For backward compatibility or alternative naming
 __all__ = [
     "align",
     "align_from_file",
+    "align_file_to_file",
+    "compare",
     "write_alignment",
     "generate_test_sequences",
     "set_num_threads",
     "get_num_threads",
     "kalign",
+    "AlignedSequences",
     "DNA",
     "DNA_INTERNAL",
     "RNA",

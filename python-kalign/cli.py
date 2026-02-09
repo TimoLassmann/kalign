@@ -3,6 +3,8 @@ Command-line interface for the Python Kalign package.
 
 This CLI uses the compiled Python extension module shipped with the package
 instead of shelling out to a separately-installed `kalign` binary.
+
+Installed as ``kalign-py`` so it does not shadow the C binary on PATH.
 """
 
 from __future__ import annotations
@@ -12,7 +14,7 @@ import sys
 import tempfile
 from importlib.metadata import PackageNotFoundError, version as dist_version
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Optional
 
 
 def _resolve_version() -> str:
@@ -33,7 +35,7 @@ def _resolve_version() -> str:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="kalign",
+        prog="kalign-py",
         description="Multiple sequence alignment via the Kalign Python package",
     )
 
@@ -64,19 +66,19 @@ def _build_parser() -> argparse.ArgumentParser:
         "--gpo",
         type=float,
         default=None,
-        help="Gap open penalty (negative; default: Kalign internal defaults).",
+        help="Gap open penalty (default: Kalign internal defaults).",
     )
     parser.add_argument(
         "--gpe",
         type=float,
         default=None,
-        help="Gap extension penalty (negative; default: Kalign internal defaults).",
+        help="Gap extension penalty (default: Kalign internal defaults).",
     )
     parser.add_argument(
         "--tgpe",
         type=float,
         default=None,
-        help="Terminal gap extension penalty (negative; default: Kalign internal defaults).",
+        help="Terminal gap extension penalty (default: Kalign internal defaults).",
     )
     parser.add_argument(
         "-n",
@@ -95,24 +97,24 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _write_stdout(alignment: Iterable[str], fmt: str) -> None:
+def _write_stdout(names: list[str], sequences: list[str], fmt: str) -> None:
     import kalign
 
     fmt_lower = fmt.lower()
     if fmt_lower in {"fasta", "fa"}:
-        kalign.io.write_fasta(list(alignment), sys.stdout)
+        kalign.io.write_fasta(sequences, sys.stdout, ids=names)
         return
 
     if fmt_lower in {"clustal", "aln"}:
-        kalign.io.write_clustal(list(alignment), sys.stdout)
+        kalign.io.write_clustal(sequences, sys.stdout, ids=names)
         return
 
     if fmt_lower in {"stockholm", "sto"}:
-        kalign.io.write_stockholm(list(alignment), sys.stdout)
+        kalign.io.write_stockholm(sequences, sys.stdout, ids=names)
         return
 
     if fmt_lower in {"phylip", "phy"}:
-        kalign.io.write_phylip(list(alignment), sys.stdout)
+        kalign.io.write_phylip(sequences, sys.stdout, ids=names)
         return
 
     raise ValueError(
@@ -135,7 +137,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         input_path = str(tmp_path)
 
     try:
-        aligned = kalign.align_from_file(
+        result = kalign.align_from_file(
             input_path,
             seq_type=args.seq_type,
             gap_open=args.gpo,
@@ -145,15 +147,18 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
 
         if args.output == "-":
-            _write_stdout(aligned, args.format)
+            _write_stdout(result.names, result.sequences, args.format)
         else:
-            kalign.write_alignment(aligned, args.output, format=args.format)
+            kalign.write_alignment(
+                result.sequences, args.output,
+                format=args.format, ids=result.names,
+            )
 
         return 0
     except KeyboardInterrupt:
         return 130
     except Exception as exc:
-        print(f"kalign: error: {exc}", file=sys.stderr)
+        print(f"kalign-py: error: {exc}", file=sys.stderr)
         return 2
     finally:
         if tmp_path is not None:

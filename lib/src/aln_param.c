@@ -82,7 +82,7 @@ int aln_param_init(struct aln_param **aln_param,int biotype , int n_threads, int
                 ap->gpe = gpe;
         }
 
-        if(gpe >= 0.0){
+        if(tgpe >= 0.0){
                 ap->tgpe = tgpe;
         }
         /* LOG_MSG("%f %f %f", ap->gpo, ap->gpe, ap->tgpe); */

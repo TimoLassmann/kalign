@@ -261,6 +261,33 @@ else()
     message(STATUS "Python module build disabled (use -DBUILD_PYTHON_MODULE=ON to enable)")
 endif()
 
+# Benchmark target ############################################################
+# Runs BAliBASE benchmarks comparing the C binary and the Python API.
+# Requires: pip install -e .  (to make the kalign Python package available)
+#
+# Usage:
+#   make benchmark                    # full BAliBASE suite, both methods
+#   make benchmark BENCH_MAX_CASES=5  # quick smoke test with 5 cases
+#
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_FOUND)
+    set(BENCH_MAX_CASES "0" CACHE STRING "Max benchmark cases (0 = all)")
+    add_custom_target(benchmark
+        COMMAND ${CMAKE_COMMAND} -E echo "Running kalign benchmarks..."
+        COMMAND ${Python3_EXECUTABLE} -m benchmarks
+            --dataset balibase
+            --method python_api cli
+            --binary $<TARGET_FILE:kalign-bin>
+            --max-cases ${BENCH_MAX_CASES}
+            --output ${CMAKE_SOURCE_DIR}/benchmarks/results/latest.json
+            -v
+        DEPENDS kalign-bin
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Benchmarking kalign (C binary vs Python API)"
+        VERBATIM
+    )
+endif()
+
 MESSAGE(STATUS "")
 MESSAGE(STATUS "Configuration:")
 MESSAGE(STATUS "--------------------------------------")

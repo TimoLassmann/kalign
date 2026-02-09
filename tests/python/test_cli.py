@@ -40,3 +40,15 @@ def test_cli_align_fasta_to_stdout() -> None:
 
     # FASTA output should start with a header line.
     assert result.stdout.lstrip().startswith(">")
+
+
+def test_cli_entry_point() -> None:
+    """Verify kalign-py entry point is installed and runs."""
+    result = subprocess.run(
+        ["kalign-py", "--version"],
+        capture_output=True,
+        text=True,
+    )
+    # Entry point should exist and return version info
+    assert result.returncode == 0
+    assert result.stdout.strip()

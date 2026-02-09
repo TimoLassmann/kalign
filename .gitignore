@@ -404,6 +404,8 @@ test_output/
 
 # Benchmark results
 benchmark_results/
+benchmarks/data/downloads/
+benchmarks/results/
 performance_*.txt
 
 # Profiling data

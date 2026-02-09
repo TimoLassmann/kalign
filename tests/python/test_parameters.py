@@ -19,8 +19,8 @@ class TestParameters:
         aligned = kalign.align(
             dna_simple,
             seq_type="dna",
-            gap_open=-10.0,
-            gap_extend=-1.0,
+            gap_open=10.0,
+            gap_extend=1.0,
             terminal_gap_extend=0.0,
         )
         assert len(aligned) == len(dna_simple)
@@ -38,7 +38,7 @@ class TestParameters:
         )
         assert len(aligned) == len(dna_simple)
 
-    @pytest.mark.parametrize("gap_penalty", [-20.0, -5.0, -1.0, 0.0])
+    @pytest.mark.parametrize("gap_penalty", [0.0, 1.0, 5.0, 20.0])
     def test_gap_penalty_range(self, dna_simple, gap_penalty):
         """Test various gap penalty values."""
         aligned = kalign.align(

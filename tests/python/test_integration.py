@@ -32,15 +32,15 @@ class TestIntegration:
     def test_full_protein_workflow(self, sample_protein_fasta_file):
         """Test complete protein alignment workflow."""
         # Read and align from file
-        aligned = kalign.align_from_file(
+        result = kalign.align_from_file(
             sample_protein_fasta_file,
             seq_type="protein",
-            gap_open=-10.0,
-            gap_extend=-1.0,
+            gap_open=10.0,
+            gap_extend=1.0,
         )
 
-        assert len(aligned) == 3
-        assert all(isinstance(seq, str) for seq in aligned)
+        assert len(result.sequences) == 3
+        assert all(isinstance(seq, str) for seq in result.sequences)
 
     @pytest.mark.integration
     def test_mixed_parameter_workflow(self, dna_simple):
@@ -50,8 +50,8 @@ class TestIntegration:
         # Test different parameter combinations
         param_sets = [
             {"seq_type": "dna", "n_threads": 1},
-            {"seq_type": "dna", "n_threads": 2, "gap_open": -8.0},
-            {"seq_type": "auto", "gap_extend": -2.0},
+            {"seq_type": "dna", "n_threads": 2, "gap_open": 8.0},
+            {"seq_type": "auto", "gap_extend": 2.0},
         ]
 
         for params in param_sets:
@@ -93,11 +93,11 @@ class TestIntegration:
         protein_file = test_data_dir / "protein_sequences.fasta"
 
         if dna_file.exists():
-            dna_aligned = kalign.align_from_file(str(dna_file), seq_type="dna")
-            assert len(dna_aligned) >= 1
+            result = kalign.align_from_file(str(dna_file), seq_type="dna")
+            assert len(result.sequences) >= 1
 
         if protein_file.exists():
-            protein_aligned = kalign.align_from_file(
+            result = kalign.align_from_file(
                 str(protein_file), seq_type="protein"
             )
-            assert len(protein_aligned) >= 1
+            assert len(result.sequences) >= 1
