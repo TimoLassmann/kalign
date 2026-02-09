@@ -131,7 +131,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     input_path = args.input
     tmp_path: Optional[Path] = None
     if input_path == "-":
-        with tempfile.NamedTemporaryFile(prefix="kalign-", suffix=".fa", delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(
+            prefix="kalign-", suffix=".fa", delete=False
+        ) as tmp:
             tmp.write(sys.stdin.buffer.read())
             tmp_path = Path(tmp.name)
         input_path = str(tmp_path)
@@ -150,8 +152,10 @@ def main(argv: Optional[list[str]] = None) -> int:
             _write_stdout(result.names, result.sequences, args.format)
         else:
             kalign.write_alignment(
-                result.sequences, args.output,
-                format=args.format, ids=result.names,
+                result.sequences,
+                args.output,
+                format=args.format,
+                ids=result.names,
             )
 
         return 0

@@ -17,6 +17,7 @@ class AlignedSequences(NamedTuple):
     names: List[str]
     sequences: List[str]
 
+
 from . import _core, io, utils
 
 try:
