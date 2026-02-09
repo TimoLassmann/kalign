@@ -266,22 +266,22 @@ import kalign
 # Conservative alignment (fewer gaps)
 aligned = kalign.align(
     sequences,
-    gap_open=-15.0,      # Higher penalty for opening gaps
-    gap_extend=-2.0      # Higher penalty for extending gaps
+    gap_open=15.0,       # Higher penalty for opening gaps
+    gap_extend=2.0       # Higher penalty for extending gaps
 )
 
 # Aggressive alignment (more gaps)
 aligned = kalign.align(
     sequences,
-    gap_open=-5.0,       # Lower penalty for opening gaps
-    gap_extend=-0.5      # Lower penalty for extending gaps
+    gap_open=5.0,        # Lower penalty for opening gaps
+    gap_extend=0.5       # Lower penalty for extending gaps
 )
 
 # Custom terminal gap handling
 aligned = kalign.align(
     sequences,
-    gap_open=-10.0,
-    gap_extend=-1.0,
+    gap_open=10.0,
+    gap_extend=1.0,
     terminal_gap_extend=0.0  # No penalty for terminal gaps
 )
 ```

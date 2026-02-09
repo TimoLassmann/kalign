@@ -167,6 +167,12 @@ for seq in aligned:
     print(seq)
 ```
 
+The Python package also provides a `kalign-py` CLI that uses the Python bindings directly (does not require the C binary):
+
+```bash
+kalign-py -i sequences.fasta -o aligned.fasta --format fasta
+```
+
 For comprehensive Python documentation, see [README-python.md](README-python.md) and the [python-docs directory](python-docs/).
 
 ## Examples
@@ -285,9 +291,20 @@ To install from TestPyPI while resolving dependencies from PyPI:
 pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple <package-name>
 ```
 
-## Performance
+## Benchmarks
 
-### Benchmark Results
+The repository includes an automated benchmark suite that scores kalign against the BAliBASE reference alignments using both the C binary and the Python API. Results are tracked across commits via GitHub Actions.
+
+```bash
+# Run benchmarks locally (requires: pip install -e . and a CMake build)
+make benchmark                      # full BAliBASE suite
+make benchmark BENCH_MAX_CASES=5    # quick smoke test
+
+# Or via Python directly
+python -m benchmarks --dataset balibase --method python_api cli -v
+```
+
+### Historical Results
 
 Kalign performs well for both speed and accuracy:
 

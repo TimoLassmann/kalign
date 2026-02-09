@@ -104,12 +104,12 @@ aligned = kalign.align(sequences)
 # Specify sequence type explicitly
 aligned = kalign.align(sequences, seq_type="protein")
 
-# Use custom gap penalties
+# Use custom gap penalties (positive values = penalty magnitude)
 aligned = kalign.align(
     sequences,
     seq_type="dna",
-    gap_open=-10.0,
-    gap_extend=-1.0,
+    gap_open=10.0,
+    gap_extend=1.0,
     terminal_gap_extend=0.0
 )
 
@@ -312,16 +312,21 @@ Align sequences directly from files:
 ```python
 import kalign
 
-# Read sequences from file and align
-aligned = kalign.align_from_file("sequences.fasta", seq_type="protein")
+# Read sequences from file and align — returns AlignedSequences(names, sequences)
+result = kalign.align_from_file("sequences.fasta", seq_type="protein")
+for name, seq in zip(result.names, result.sequences):
+    print(f"{name}: {seq}")
 
 # With custom parameters
-aligned = kalign.align_from_file(
+result = kalign.align_from_file(
     "sequences.fasta",
     seq_type="protein",
-    gap_open=-10.0,
+    gap_open=10.0,
     n_threads=4
 )
+
+# Tuple unpacking also works
+names, sequences = kalign.align_from_file("sequences.fasta")
 ```
 
 Supported input formats:
@@ -329,6 +334,18 @@ Supported input formats:
 - MSF
 - Clustal
 - Aligned FASTA
+
+### Comparing Alignments
+
+Score a test alignment against a reference using the Sum-of-Pairs (SP) score:
+
+```python
+import kalign
+
+# Returns SP score from 0 (no match) to 100 (identical)
+score = kalign.compare("reference.msf", "test_alignment.fasta")
+print(f"SP score: {score:.1f}")
+```
 
 ### Advanced Usage
 
@@ -344,8 +361,8 @@ protein_sequences = [
 aligned = kalign.align(
     protein_sequences,
     seq_type="protein",
-    gap_open=-10.0,
-    gap_extend=-1.0,
+    gap_open=10.0,
+    gap_extend=1.0,
     terminal_gap_extend=0.0,
     n_threads=2
 )
@@ -356,31 +373,53 @@ print(f"Alignment length: {len(aligned[0])}")
 
 ## API Reference
 
-### `kalign.align(sequences, seq_type="auto", gap_open=None, gap_extend=None, terminal_gap_extend=None, n_threads=1)`
+### `kalign.align(sequences, seq_type="auto", gap_open=None, gap_extend=None, terminal_gap_extend=None, n_threads=None)`
 
 Align a list of sequences.
 
 **Parameters:**
 - `sequences` (list of str): Sequences to align
 - `seq_type` (str or int): Sequence type specification
-- `gap_open` (float, optional): Gap opening penalty
-- `gap_extend` (float, optional): Gap extension penalty  
-- `terminal_gap_extend` (float, optional): Terminal gap extension penalty
-- `n_threads` (int): Number of threads to use
+- `gap_open` (float, optional): Gap opening penalty (positive value)
+- `gap_extend` (float, optional): Gap extension penalty (positive value)
+- `terminal_gap_extend` (float, optional): Terminal gap extension penalty (positive value)
+- `n_threads` (int, optional): Number of threads (default: `get_num_threads()`)
 
 **Returns:**
 - `list of str`: Aligned sequences
 
-### `kalign.align_from_file(input_file, seq_type="auto", gap_open=None, gap_extend=None, terminal_gap_extend=None, n_threads=1)`
+### `kalign.align_from_file(input_file, seq_type="auto", gap_open=None, gap_extend=None, terminal_gap_extend=None, n_threads=None)`
 
-Align sequences from a file.
+Align sequences from a file, preserving sequence names.
 
 **Parameters:**
-- `input_file` (str): Path to input file
+- `input_file` (str): Path to input file (FASTA, MSF, Clustal)
 - Other parameters same as `align()`
 
 **Returns:**
-- `list of str`: Aligned sequences
+- `AlignedSequences`: Named tuple with `.names` (list of str) and `.sequences` (list of str)
+
+### `kalign.compare(reference_file, test_file)`
+
+Score a test alignment against a reference alignment using the Sum-of-Pairs score.
+
+**Parameters:**
+- `reference_file` (str): Path to reference alignment
+- `test_file` (str): Path to test alignment
+
+**Returns:**
+- `float`: SP score from 0.0 (no match) to 100.0 (identical)
+
+### Command-line interface
+
+Installing the Python package provides a `kalign-py` command that uses the Python bindings directly (the C binary is installed separately as `kalign`):
+
+```bash
+kalign-py -i sequences.fasta -o aligned.fasta --format fasta --type protein
+kalign-py -i sequences.fasta -o - --format clustal   # stdout
+cat input.fa | kalign-py -i - -o aligned.fasta        # stdin
+kalign-py --version
+```
 
 ## 🚀 Performance & Scalability
 
@@ -410,9 +449,9 @@ python examples/performance_benchmarks.py
 
 # Use recommended settings
 kalign.set_num_threads(8)  # Based on benchmark results
-aligned = kalign.align(sequences, 
-                      gap_open=-10.0,    # Optimized gap penalties
-                      gap_extend=-1.0)
+aligned = kalign.align(sequences,
+                      gap_open=10.0,    # Optimized gap penalties
+                      gap_extend=1.0)
 ```
 
 ## Examples

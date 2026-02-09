@@ -69,8 +69,8 @@ print(aligned)
 aligned = kalign.align(
     sequences,
     seq_type="dna",
-    gap_open=-10.0,
-    gap_extend=-1.0,
+    gap_open=10.0,
+    gap_extend=1.0,
     n_threads=4
 )
 
@@ -91,7 +91,7 @@ print(type(aln_sk))
 
 ### `kalign.align_from_file()`
 
-Align sequences directly from files.
+Align sequences from a file, preserving sequence names.
 
 ```python
 def align_from_file(
@@ -100,9 +100,11 @@ def align_from_file(
     gap_open: Optional[float] = None,
     gap_extend: Optional[float] = None,
     terminal_gap_extend: Optional[float] = None,
-    n_threads: int = 1
-) -> List[str]
+    n_threads: Optional[int] = None
+) -> AlignedSequences
 ```
+
+Returns an `AlignedSequences` named tuple with `.names` (list of str) and `.sequences` (list of str).
 
 **Supported formats:** FASTA, MSF, Clustal, aligned FASTA
 
@@ -111,12 +113,34 @@ def align_from_file(
 ```python
 import kalign
 
-# Align from FASTA file
-aligned = kalign.align_from_file(
+# Align from FASTA file — returns AlignedSequences(names, sequences)
+result = kalign.align_from_file(
     "sequences.fasta",
     seq_type="protein",
     n_threads=4
 )
+for name, seq in zip(result.names, result.sequences):
+    print(f"{name}: {seq}")
+
+# Tuple unpacking also works
+names, sequences = kalign.align_from_file("sequences.fasta")
+```
+
+### `kalign.compare()`
+
+Score a test alignment against a reference using the Sum-of-Pairs (SP) score.
+
+```python
+def compare(reference_file: str, test_file: str) -> float
+```
+
+**Returns:** SP score from 0.0 (no match) to 100.0 (identical).
+
+**Example:**
+
+```python
+score = kalign.compare("reference.msf", "test_alignment.fasta")
+print(f"SP score: {score:.1f}")
 ```
 
 ### `kalign.write_alignment()`

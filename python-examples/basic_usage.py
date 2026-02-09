@@ -62,8 +62,8 @@ def example_2_protein_alignment():
     aligned = kalign.align(
         protein_sequences,
         seq_type="protein",
-        gap_open=-10.0,
-        gap_extend=-1.0
+        gap_open=10.0,
+        gap_extend=1.0
     )
     
     print("\nAligned sequences:")

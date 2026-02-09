@@ -454,8 +454,8 @@ def optimize_gap_penalties(sequences, penalty_ranges=None):
     
     if penalty_ranges is None:
         penalty_ranges = {
-            'gap_open': np.arange(-20, -2, 2),
-            'gap_extend': np.arange(-5, -0.5, 0.5)
+            'gap_open': np.arange(2, 20, 2),
+            'gap_extend': np.arange(0.5, 5, 0.5)
         }
     
     print("🔧 Optimizing gap penalties...")

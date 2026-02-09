@@ -185,7 +185,7 @@ sequences = [
 aligned = kalign.align(
     sequences,
     seq_type="protein",    # Change sequence type
-    gap_open=-12.0,        # Adjust gap penalties
+    gap_open=12.0,         # Adjust gap penalties
     n_threads=8            # Set thread count
 )
 
