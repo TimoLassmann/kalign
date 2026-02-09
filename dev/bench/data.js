@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770643068209,
+  "lastUpdate": 1770643429317,
   "repoUrl": "https://github.com/TimoLassmann/kalign",
   "entries": {
     "Benchmark": [
@@ -137,6 +137,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total Time (cli)",
             "value": 20.45,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "timolassmann@icloud.com",
+            "name": "Timo Lassmann",
+            "username": "TimoLassmann"
+          },
+          "committer": {
+            "email": "timolassmann@icloud.com",
+            "name": "Timo Lassmann",
+            "username": "TimoLassmann"
+          },
+          "distinct": true,
+          "id": "dad5e1c4467ec3df5f59383bc44e6b128f543995",
+          "message": "Fixed another linting issue",
+          "timestamp": "2026-02-09T21:22:07+08:00",
+          "tree_id": "36ade422268d8521248c6a72a25eeb659cf6999c",
+          "url": "https://github.com/TimoLassmann/kalign/commit/dad5e1c4467ec3df5f59383bc44e6b128f543995"
+        },
+        "date": 1770643429022,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "SP Score Mean (python_api)",
+            "value": 70.37,
+            "range": "14.0-100.0",
+            "unit": "score"
+          },
+          {
+            "name": "Total Time (python_api)",
+            "value": 23.62,
+            "unit": "seconds"
+          },
+          {
+            "name": "SP Score Mean (cli)",
+            "value": 70.37,
+            "range": "14.0-100.0",
+            "unit": "score"
+          },
+          {
+            "name": "Total Time (cli)",
+            "value": 20.47,
             "unit": "seconds"
           }
         ]
