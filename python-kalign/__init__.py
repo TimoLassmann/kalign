@@ -24,7 +24,7 @@ try:
 
     __version__ = _dist_version("kalign")
 except Exception:
-    __version__ = "3.4.5"
+    __version__ = "3.4.7"
 __author__ = "Timo Lassmann"
 __email__ = "timo.lassmann@telethonkids.org.au"
 
