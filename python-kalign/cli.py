@@ -12,7 +12,8 @@ from __future__ import annotations
 import argparse
 import sys
 import tempfile
-from importlib.metadata import PackageNotFoundError, version as dist_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as dist_version
 from pathlib import Path
 from typing import Optional
 

@@ -21,7 +21,8 @@ class AlignedSequences(NamedTuple):
 from . import _core, io, utils
 
 try:
-    from importlib.metadata import PackageNotFoundError, version as _dist_version
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as _dist_version
 
     __version__ = _dist_version("kalign")
 except Exception:
