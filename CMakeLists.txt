@@ -13,7 +13,7 @@ include(GenerateExportHeader)
 
 set(KALIGN_LIBRARY_VERSION_MAJOR 3)
 set(KALIGN_LIBRARY_VERSION_MINOR 4)
-set(KALIGN_LIBRARY_VERSION_PATCH 5)
+set(KALIGN_LIBRARY_VERSION_PATCH 6)
 set(KALIGN_LIBRARY_VERSION_STRING ${KALIGN_LIBRARY_VERSION_MAJOR}.${KALIGN_LIBRARY_VERSION_MINOR}.${KALIGN_LIBRARY_VERSION_PATCH})
 
 
@@ -246,7 +246,7 @@ if(BUILD_PYTHON_MODULE)
         install(TARGETS _core
                 LIBRARY DESTINATION kalign
                 COMPONENT python)
-        
+
         # Install Python source files
         install(DIRECTORY python-kalign/
                 DESTINATION kalign
