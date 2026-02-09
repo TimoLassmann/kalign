@@ -218,9 +218,48 @@ jobs:
         print('All tests passed successfully!')
         "
 
+  test_ecosystem:
+    name: Test ecosystem integrations
+    needs: [build_wheels]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: cibw-wheels-*
+        merge-multiple: true
+        path: wheelhouse/
+
+    - name: Install kalign with all extras
+      run: |
+        DIST_NAME="$(ls wheelhouse/*.whl | head -n 1 | xargs basename | cut -d- -f1 | tr '_' '-')"
+        pip install --find-links wheelhouse/ "${DIST_NAME}[all]" --force-reinstall
+        pip install pytest
+
+    - name: Verify ecosystem packages are installed
+      run: |
+        python -c "import Bio; print(f'Biopython {Bio.__version__}')"
+        python -c "import skbio; print(f'scikit-bio {skbio.__version__}')"
+        python -c "import pandas; print(f'pandas {pandas.__version__}')"
+        python -c "import matplotlib; print(f'matplotlib {matplotlib.__version__}')"
+
+    - name: Run ecosystem tests (fail if any skipped)
+      run: |
+        pytest tests/python/test_ecosystem_real.py -v --tb=short 2>&1 | tee test_output.txt
+        # Fail if any tests were skipped — all ecosystem deps should be present
+        if grep -q "skipped" test_output.txt; then
+          echo "ERROR: Some ecosystem tests were skipped — all deps should be installed"
+          exit 1
+        fi
+
   upload_pypi:
     name: Upload to PyPI
-    needs: [build_wheels, build_sdist, test_install]
+    needs: [build_wheels, build_sdist, test_install, test_ecosystem]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
@@ -243,7 +282,7 @@ jobs:
 
   upload_testpypi:
     name: Upload to TestPyPI
-    needs: [build_wheels, build_sdist, test_install]
+    needs: [build_wheels, build_sdist, test_install, test_ecosystem]
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && inputs.publish_target == 'testpypi'
 

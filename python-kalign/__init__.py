@@ -124,13 +124,10 @@ def align(
     if not sequences:
         raise ValueError("No sequences were found in the input")
 
-    if len(sequences) < 2:
-        if len(sequences) == 0:
-            raise ValueError("No sequences were found in the input")
-        elif len(sequences) == 1:
-            raise ValueError(
-                "Only 1 sequence was found in the input - at least 2 sequences are required for alignment"
-            )
+    if len(sequences) == 1:
+        raise ValueError(
+            "Only 1 sequence was found in the input - at least 2 sequences are required for alignment"
+        )
 
     if not all(isinstance(seq, str) for seq in sequences):
         raise ValueError("All sequences must be strings")
@@ -291,17 +288,47 @@ def align(
 
     if fmt == "skbio":
         try:
-            TabularMSA = import_module("skbio").TabularMSA
-            SkbioDNA = import_module("skbio.sequence").DNA
+            skbio_mod = import_module("skbio")
+            skbio_seq = import_module("skbio.sequence")
+            TabularMSA = skbio_mod.TabularMSA
         except ModuleNotFoundError as e:
             raise ImportError(
                 "scikit-bio not installed. Run: pip install kalign[skbio]"
             ) from e
+
+        # Select the appropriate skbio sequence type
+        skbio_type_map = {
+            DNA: skbio_seq.DNA,
+            DNA_INTERNAL: skbio_seq.DNA,
+            RNA: skbio_seq.RNA,
+            PROTEIN: skbio_seq.Protein,
+            PROTEIN_DIVERGENT: skbio_seq.Protein,
+        }
+        if seq_type_int in skbio_type_map:
+            SeqClass = skbio_type_map[seq_type_int]
+        else:
+            # AUTO or unknown: infer from sequence content
+            SeqClass = _infer_skbio_type(sequences, skbio_seq)
+
         return TabularMSA(
-            [SkbioDNA(s, metadata={"id": i}) for s, i in zip(aligned_seqs, ids)]
+            [SeqClass(s, metadata={"id": i}) for s, i in zip(aligned_seqs, ids)]
         )
 
     raise ValueError(f"Unknown fmt='{fmt}' (expected 'plain', 'biopython', 'skbio')")
+
+
+def _infer_skbio_type(sequences, skbio_seq):
+    """Infer the appropriate skbio sequence class from raw sequence content."""
+    chars = set()
+    for seq in sequences:
+        chars.update(seq.upper().replace("-", "").replace(".", ""))
+    dna_chars = set("ACGTNRYSWKMBDHV")
+    rna_chars = set("ACGUNRYSWKMBDHV")
+    if "U" in chars and "T" not in chars and chars <= rna_chars:
+        return skbio_seq.RNA
+    if chars <= dna_chars:
+        return skbio_seq.DNA
+    return skbio_seq.Protein
 
 
 def set_num_threads(n: int) -> None:

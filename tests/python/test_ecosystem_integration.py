@@ -6,8 +6,7 @@ as well as threading controls and I/O helpers.
 """
 
 import pytest
-import sys
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 import kalign
 
 
@@ -33,20 +32,17 @@ class TestReturnFormats:
         assert isinstance(result, list)
         assert all(isinstance(seq, str) for seq in result)
 
-    @pytest.mark.skipif(
-        "biopython" not in sys.modules, reason="Biopython not available"
-    )
     def test_biopython_format_with_biopython(self):
         """Test Biopython format when Biopython is available."""
         try:
             from Bio.Align import MultipleSeqAlignment
-
-            result = kalign.align(TEST_SEQUENCES, fmt="biopython", ids=TEST_IDS)
-            assert isinstance(result, MultipleSeqAlignment)
-            assert len(result) == len(TEST_SEQUENCES)
-            assert result[0].id == TEST_IDS[0]
         except ImportError:
-            pytest.skip("Biopython not available")
+            pytest.skip("Biopython not installed")
+
+        result = kalign.align(TEST_SEQUENCES, fmt="biopython", ids=TEST_IDS)
+        assert isinstance(result, MultipleSeqAlignment)
+        assert len(result) == len(TEST_SEQUENCES)
+        assert result[0].id == TEST_IDS[0]
 
     def test_biopython_format_without_biopython(self):
         """Test Biopython format fails gracefully without Biopython."""
@@ -56,17 +52,16 @@ class TestReturnFormats:
             with pytest.raises(ImportError, match="Biopython not installed"):
                 kalign.align(TEST_SEQUENCES, fmt="biopython")
 
-    @pytest.mark.skipif("skbio" not in sys.modules, reason="scikit-bio not available")
     def test_skbio_format_with_skbio(self):
         """Test scikit-bio format when scikit-bio is available."""
         try:
             import skbio
-
-            result = kalign.align(TEST_SEQUENCES, fmt="skbio")
-            assert isinstance(result, skbio.TabularMSA)
-            assert len(result) == len(TEST_SEQUENCES)
         except ImportError:
-            pytest.skip("scikit-bio not available")
+            pytest.skip("scikit-bio not installed")
+
+        result = kalign.align(TEST_SEQUENCES, fmt="skbio")
+        assert isinstance(result, skbio.TabularMSA)
+        assert len(result) == len(TEST_SEQUENCES)
 
     def test_skbio_format_without_skbio(self):
         """Test scikit-bio format fails gracefully without scikit-bio."""
@@ -92,11 +87,16 @@ class TestReturnFormats:
             )
 
     def test_auto_generated_ids(self):
-        """Test automatic ID generation."""
-        # This test checks that IDs are generated even if not explicitly tested
-        # by verifying the function doesn't crash
-        result = kalign.align(TEST_SEQUENCES, fmt="plain")
-        assert len(result) == len(TEST_SEQUENCES)
+        """Test automatic ID generation for ecosystem formats."""
+        try:
+            from Bio.Align import MultipleSeqAlignment
+        except ImportError:
+            pytest.skip("Biopython not installed")
+
+        result = kalign.align(TEST_SEQUENCES, fmt="biopython")
+        assert isinstance(result, MultipleSeqAlignment)
+        for i, record in enumerate(result):
+            assert record.id == f"seq{i}"
 
 
 class TestThreadingControl:
@@ -192,6 +192,7 @@ class TestIOModule:
         assert hasattr(kalign.io, "write_fasta")
         assert hasattr(kalign.io, "write_clustal")
         assert hasattr(kalign.io, "write_stockholm")
+        assert hasattr(kalign.io, "write_phylip")
 
     def test_io_functions_require_biopython(self):
         """Test that I/O functions require Biopython and fail gracefully."""
