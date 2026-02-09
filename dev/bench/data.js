@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770624439841,
+  "lastUpdate": 1770643068209,
   "repoUrl": "https://github.com/TimoLassmann/kalign",
   "entries": {
     "Benchmark": [
@@ -91,6 +91,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total Time (cli)",
             "value": 20.33,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "timolassmann@icloud.com",
+            "name": "Timo Lassmann",
+            "username": "TimoLassmann"
+          },
+          "committer": {
+            "email": "timolassmann@icloud.com",
+            "name": "Timo Lassmann",
+            "username": "TimoLassmann"
+          },
+          "distinct": true,
+          "id": "737c2ff03a69bf59e880720cc4a24a2a6453870b",
+          "message": "Fix to resolve github action issue with python",
+          "timestamp": "2026-02-09T21:15:59+08:00",
+          "tree_id": "065e71df9bccfd1f990190d2dbd29e48ecf18ff1",
+          "url": "https://github.com/TimoLassmann/kalign/commit/737c2ff03a69bf59e880720cc4a24a2a6453870b"
+        },
+        "date": 1770643067454,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "SP Score Mean (python_api)",
+            "value": 70.37,
+            "range": "14.0-100.0",
+            "unit": "score"
+          },
+          {
+            "name": "Total Time (python_api)",
+            "value": 23.58,
+            "unit": "seconds"
+          },
+          {
+            "name": "SP Score Mean (cli)",
+            "value": 70.37,
+            "range": "14.0-100.0",
+            "unit": "score"
+          },
+          {
+            "name": "Total Time (cli)",
+            "value": 20.45,
             "unit": "seconds"
           }
         ]
