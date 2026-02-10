@@ -2,7 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const ArrayList = std.ArrayList;
 
-const kalignPackageVersion = "3.4.1";
+const kalignPackageVersion = "3.4.9";
 
 const targets: []const std.Target.Query = &.{
     .{ .cpu_arch = .aarch64, .os_tag = .macos },
@@ -13,7 +13,7 @@ const targets: []const std.Target.Query = &.{
 };
 
 const cflags = [_][]const u8{
-    "-DKALIGN_PACKAGE_VERSION=\"3.4.1\"",
+    "-DKALIGN_PACKAGE_VERSION=\"3.4.9\"",
     "-DKALIGN_PACKAGE_NAME=\"kalign\"",
     "-DKALIGN_ALN_SERIAL_THRESHOLD=250",
     "-DKALIGN_KMEANS_UPGMA_THRESHOLD=50",
