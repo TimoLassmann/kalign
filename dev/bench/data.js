@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770686913769,
+  "lastUpdate": 1770690412850,
   "repoUrl": "https://github.com/TimoLassmann/kalign",
   "entries": {
     "Benchmark": [
@@ -229,6 +229,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total Time (cli)",
             "value": 20.26,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "timolassmann@icloud.com",
+            "name": "Timo Lassmann",
+            "username": "TimoLassmann"
+          },
+          "committer": {
+            "email": "timolassmann@icloud.com",
+            "name": "Timo Lassmann",
+            "username": "TimoLassmann"
+          },
+          "distinct": true,
+          "id": "4ca8bd5d6738055850785c1b126b6c80405c093b",
+          "message": "Release v3.4.9\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>",
+          "timestamp": "2026-02-10T10:24:33+08:00",
+          "tree_id": "146a97777f3ddaac6efc3dfe1356ada852f58f93",
+          "url": "https://github.com/TimoLassmann/kalign/commit/4ca8bd5d6738055850785c1b126b6c80405c093b"
+        },
+        "date": 1770690411863,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "SP Score Mean (python_api)",
+            "value": 70.37,
+            "range": "14.0-100.0",
+            "unit": "score"
+          },
+          {
+            "name": "Total Time (python_api)",
+            "value": 23.55,
+            "unit": "seconds"
+          },
+          {
+            "name": "SP Score Mean (cli)",
+            "value": 70.37,
+            "range": "14.0-100.0",
+            "unit": "score"
+          },
+          {
+            "name": "Total Time (cli)",
+            "value": 20.38,
             "unit": "seconds"
           }
         ]
