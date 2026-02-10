@@ -1,6 +1,6 @@
 #+TITLE:  Test kalign on BAliBASE 
 #+AUTHOR: Timo Lassmann
-#+EMAIL:  timo.lassmann@telethonkids.org.au
+#+EMAIL:  timolassmann@icloud.com
 #+DATE:   2019-04-23
 #+LATEX_CLASS: report
 #+OPTIONS:  toc:nil

@@ -7,17 +7,17 @@ requires = [
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "kalign"
-version = "3.4.7"
+name = "kalign-python"
+version = "3.4.8"
 description = "Python wrapper for the Kalign multiple sequence alignment engine"
 readme = "README-python.md"
 license = "GPL-3.0-or-later"
 license-files = ["COPYING"]
 authors = [
-    {name = "Timo Lassmann", email = "timo.lassmann@telethonkids.org.au"}
+    {name = "Timo Lassmann", email = "timolassmann@icloud.com"}
 ]
 maintainers = [
-    {name = "Timo Lassmann", email = "timo.lassmann@telethonkids.org.au"}
+    {name = "Timo Lassmann", email = "timolassmann@icloud.com"}
 ]
 keywords = [
     "bioinformatics",

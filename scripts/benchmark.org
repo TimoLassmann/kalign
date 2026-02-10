@@ -1,6 +1,6 @@
 #+TITLE:  Benchmark of MSA algorithms
 #+AUTHOR: Timo Lassmann
-#+EMAIL:  timo.lassmann@telethonkids.org.au
+#+EMAIL:  timolassmann@icloud.com
 #+DATE:   2019-09-27
 #+LATEX_CLASS: report
 #+OPTIONS:  toc:nil

@@ -1,22 +1,22 @@
-2024-04-24  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+2024-04-24  Timo Lassmann  <timolassmann@icloud.com>
 
 	* version 3.4.1
 	- Fixed an issue when kalign is given hundreds of identical sequences.
 	- added build.zig
 
-2023-12-10  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+2023-12-10  Timo Lassmann  <timolassmann@icloud.com>
 
 	* version 3.4.0
 	- Added a simple sequence simulator for testing
 	- Fixed an issue where alignments would be slighly different
 	depending on the number of threads used.
 
-2022-11-05  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+2022-11-05  Timo Lassmann  <timolassmann@icloud.com>
 
 	* version 3.3.5
 	- Added a check to find and remove sequences of length 0.
 
-2022-10-28  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+2022-10-28  Timo Lassmann  <timolassmann@icloud.com>
 
 	* version 3.3.4 - Cmake and more
 	- switched to cmake
@@ -30,7 +30,7 @@
 	3) alignment types giving users more control over alignment parameters.
 	4) multi-threading
 
-2022-03-21  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+2022-03-21  Timo Lassmann  <timolassmann@icloud.com>
 
 	* version 3.3.2 - Bug Fix
 	There was a bug in building a guide tree from highly similar sequences. The fix
@@ -40,7 +40,7 @@
 	In addition Kalign now compiles on Apple's M1 chip and possibly on other ARM architectures
 	as well (although I did not test the latter).
 
-2021-04-16  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+2021-04-16  Timo Lassmann  <timolassmann@icloud.com>
 
 	* version 3.3.1 - Bug Fix
 	The previous version kalign checked the top 50 sequences in inputs to determine
@@ -62,7 +62,7 @@
 	[Date Time] : WARNING : align the sequences.                         (rwalign.c line 517)
 	[Date Time] : WARNING : -------------------------------------------- (rwalign.c line 518)
 
-2020-11-06  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+2020-11-06  Timo Lassmann  <timolassmann@icloud.com>
 
 	* version 3.3 - Threading and more
 	- Kalign now runs pairwise distance estimation, guide tree building and alignments in parallel.
@@ -73,7 +73,7 @@
 
 
 
-2020-09-24  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+2020-09-24  Timo Lassmann  <timolassmann@icloud.com>
 
 	* version 3.2.7 - Development version
 	- dynamic programming in now more modular.
@@ -87,13 +87,13 @@
 
 	with the empirically derived gap penalties.
 
-2020-04-22  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+2020-04-22  Timo Lassmann  <timolassmann@icloud.com>
 
 	* version 3.2.5
 	- Bug fix: when given long output named the first lines in msf
 	output could be truncated.
 
-2020-04-01  Timo Lassmann  <timo.lassmann@telethonkids.org.au>
+2020-04-01  Timo Lassmann  <timolassmann@icloud.com>
 
 	* version 3.2.4
 	- Fixed issue relating to stdin input on clusters.

@@ -18,17 +18,13 @@ class AlignedSequences(NamedTuple):
     sequences: List[str]
 
 
+from importlib.metadata import version
+
 from . import _core, io, utils
 
-try:
-    from importlib.metadata import PackageNotFoundError
-    from importlib.metadata import version as _dist_version
-
-    __version__ = _dist_version("kalign")
-except Exception:
-    __version__ = "3.4.7"
+__version__ = version("kalign-python")
 __author__ = "Timo Lassmann"
-__email__ = "timo.lassmann@telethonkids.org.au"
+__email__ = "timolassmann@icloud.com"
 
 # Re-export constants for convenience
 DNA = _core.DNA
