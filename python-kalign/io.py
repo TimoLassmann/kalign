@@ -40,7 +40,7 @@ def read_fasta(path: Union[str, Path]) -> List[str]:
         from Bio import SeqIO
     except ImportError as e:
         raise ImportError(
-            "Biopython required for FASTA I/O. Run: pip install kalign[io]"
+            "Biopython required for FASTA I/O. Run: pip install kalign-python[io]"
         ) from e
 
     path = Path(path)
@@ -90,7 +90,7 @@ def read_sequences(
         from Bio import SeqIO
     except ImportError as e:
         raise ImportError(
-            "Biopython required for sequence I/O. Run: pip install kalign[io]"
+            "Biopython required for sequence I/O. Run: pip install kalign-python[io]"
         ) from e
 
     path = Path(path)
@@ -210,7 +210,7 @@ def write_clustal(
         from Bio.SeqRecord import SeqRecord
     except ImportError as e:
         raise ImportError(
-            "Biopython required for Clustal I/O. Run: pip install kalign[io]"
+            "Biopython required for Clustal I/O. Run: pip install kalign-python[io]"
         ) from e
 
     if not alignment:
@@ -265,7 +265,7 @@ def write_stockholm(
         from Bio.SeqRecord import SeqRecord
     except ImportError as e:
         raise ImportError(
-            "Biopython required for Stockholm I/O. Run: pip install kalign[io]"
+            "Biopython required for Stockholm I/O. Run: pip install kalign-python[io]"
         ) from e
 
     if not alignment:
@@ -323,7 +323,7 @@ def write_phylip(
         from Bio.SeqRecord import SeqRecord
     except ImportError as e:
         raise ImportError(
-            "Biopython required for PHYLIP I/O. Run: pip install kalign[io]"
+            "Biopython required for PHYLIP I/O. Run: pip install kalign-python[io]"
         ) from e
 
     if not alignment:

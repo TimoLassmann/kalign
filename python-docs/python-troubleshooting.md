@@ -20,8 +20,8 @@ This guide helps resolve common issues when using Kalign Python package, from in
 
 **Symptoms:**
 ```bash
-pip install kalign
-ERROR: Failed building wheel for kalign
+pip install kalign-python
+ERROR: Failed building wheel for kalign-python
 ```
 
 **Solutions:**
@@ -30,7 +30,7 @@ ERROR: Failed building wheel for kalign
 ```bash
 pip install --upgrade pip setuptools wheel
 pip install --upgrade cmake scikit-build-core pybind11
-pip install kalign
+pip install kalign-python
 ```
 
 2. **Install system dependencies (Linux):**
@@ -133,7 +133,7 @@ print(kalign.__file__)
 2. **Reinstall package:**
 ```bash
 pip uninstall kalign
-pip install kalign --no-cache-dir
+pip install kalign-python --no-cache-dir
 ```
 
 3. **Check dependencies:**
@@ -441,7 +441,7 @@ kalign.align(sequences, fmt="biopython")
 
 1. **Install Biopython:**
 ```bash
-pip install kalign[biopython]
+pip install kalign-python[biopython]
 # or
 pip install biopython
 ```
@@ -501,7 +501,7 @@ kalign.align(sequences, fmt="skbio")
 
 1. **Install scikit-bio:**
 ```bash
-pip install kalign[skbio]
+pip install kalign-python[skbio]
 # or
 conda install -c conda-forge scikit-bio
 ```

@@ -20,7 +20,7 @@ from typing import Optional
 
 def _resolve_version() -> str:
     # kalign-test is the name of the test distribution, which may be installed in test environments. If it's present, use its version; otherwise, fall back to the main kalign distribution. If neither is found, try to import __version__ from the package, and if that fails, return "unknown".
-    for dist_name in ("kalign", "kalign-test"):
+    for dist_name in ("kalign-python",):
         try:
             return dist_version(dist_name)
         except PackageNotFoundError:

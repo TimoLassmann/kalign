@@ -466,7 +466,7 @@ except ValueError:
 try:
     kalign.align(sequences, fmt="biopython")
 except ImportError:
-    print("Install with: pip install kalign[biopython]")
+    print("Install with: pip install kalign-python[biopython]")
 
 # ID count mismatch
 try:
@@ -501,8 +501,8 @@ def safe_align(sequences, **kwargs):
     except ImportError as e:
         print(f"Dependency error: {e}")
         print("Consider installing optional dependencies:")
-        print("  pip install kalign[biopython]")
-        print("  pip install kalign[skbio]")
+        print("  pip install kalign-python[biopython]")
+        print("  pip install kalign-python[skbio]")
         return None
 
 # Usage

@@ -101,7 +101,7 @@ def example_biopython():
                 os.remove(f)
         
     except ImportError:
-        print("❌ Biopython not available. Install with: pip install kalign[biopython]")
+        print("❌ Biopython not available. Install with: pip install kalign-python[biopython]")
 
 
 def example_skbio():
@@ -156,7 +156,7 @@ def example_skbio():
             os.remove("output.fasta")
         
     except ImportError:
-        print("❌ scikit-bio not available. Install with: pip install kalign[skbio]")
+        print("❌ scikit-bio not available. Install with: pip install kalign-python[skbio]")
 
 
 def example_pandas():
@@ -457,9 +457,9 @@ def main():
             print(f"\n💡 To unlock more features, install missing dependencies:")
             for dep in missing_deps:
                 if dep == 'biopython':
-                    print(f"   pip install kalign[biopython]")
+                    print(f"   pip install kalign-python[biopython]")
                 elif dep == 'skbio':
-                    print(f"   pip install kalign[skbio]")
+                    print(f"   pip install kalign-python[skbio]")
                 else:
                     print(f"   pip install {dep}")
         

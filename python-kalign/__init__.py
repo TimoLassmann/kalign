@@ -278,7 +278,7 @@ def align(
             Seq = import_module("Bio.Seq").Seq
         except ModuleNotFoundError as e:
             raise ImportError(
-                "Biopython not installed. Run: pip install kalign[biopython]"
+                "Biopython not installed. Run: pip install kalign-python[biopython]"
             ) from e
         return MultipleSeqAlignment(
             [SeqRecord(Seq(s), id=i) for s, i in zip(aligned_seqs, ids)]
@@ -291,7 +291,7 @@ def align(
             TabularMSA = skbio_mod.TabularMSA
         except ModuleNotFoundError as e:
             raise ImportError(
-                "scikit-bio not installed. Run: pip install kalign[skbio]"
+                "scikit-bio not installed. Run: pip install kalign-python[skbio]"
             ) from e
 
         # Select the appropriate skbio sequence type

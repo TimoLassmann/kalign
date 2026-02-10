@@ -41,7 +41,7 @@ python ecosystem_integration.py
 **Prerequisites:**
 ```bash
 # Install optional dependencies for full functionality
-pip install kalign[all]  # or individual packages:
+pip install kalign-python[all]  # or individual packages:
 pip install biopython scikit-bio pandas matplotlib
 ```
 
@@ -80,7 +80,7 @@ pip install psutil matplotlib  # For memory monitoring and plotting
 
 1. **Install Kalign with examples dependencies:**
 ```bash
-pip install kalign[all]
+pip install kalign-python[all]
 pip install psutil  # For performance monitoring
 ```
 

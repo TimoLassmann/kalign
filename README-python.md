@@ -5,17 +5,17 @@ Python bindings for [Kalign](https://github.com/TimoLassmann/kalign), a fast mul
 ## Installation
 
 ```bash
-pip install kalign
+pip install kalign-python
 ```
 
 Optional dependencies for ecosystem integration:
 
 ```bash
-pip install kalign[biopython]    # Biopython integration (fmt="biopython", I/O helpers)
-pip install kalign[skbio]        # scikit-bio integration (fmt="skbio")
-pip install kalign[io]           # I/O helpers (requires Biopython)
-pip install kalign[analysis]     # pandas + matplotlib for downstream analysis
-pip install kalign[all]          # all of the above
+pip install kalign-python[biopython]    # Biopython integration (fmt="biopython", I/O helpers)
+pip install kalign-python[skbio]        # scikit-bio integration (fmt="skbio")
+pip install kalign-python[io]           # I/O helpers (requires Biopython)
+pip install kalign-python[analysis]     # pandas + matplotlib for downstream analysis
+pip install kalign-python[all]          # all of the above
 ```
 
 ## Quick Start
@@ -117,7 +117,7 @@ region = kalign.utils.trim_alignment(aligned, start=2, end=10)
 
 ## Biopython Integration
 
-Requires `pip install kalign[biopython]`.
+Requires `pip install kalign-python[biopython]`.
 
 ```python
 import kalign
@@ -146,7 +146,7 @@ kalign.io.write_phylip(aligned, "output.phy", ids=ids)
 
 ## scikit-bio Integration
 
-Requires `pip install kalign[skbio]`.
+Requires `pip install kalign-python[skbio]`.
 
 ```python
 import kalign

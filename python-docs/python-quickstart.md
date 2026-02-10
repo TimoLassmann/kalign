@@ -19,26 +19,26 @@ Get up and running with Kalign for Python in minutes! This guide covers everythi
 
 ```bash
 # Install from PyPI
-pip install kalign
+pip install kalign-python
 ```
 
 ### With Ecosystem Support
 
 ```bash
 # For Biopython integration
-pip install kalign[biopython]
+pip install kalign-python[biopython]
 
 # For scikit-bio integration
-pip install kalign[skbio]
+pip install kalign-python[skbio]
 
 # For file I/O helpers (Biopython-backed)
-pip install kalign[io]
+pip install kalign-python[io]
 
 # For pandas + matplotlib analysis/visualization helpers
-pip install kalign[analysis]
+pip install kalign-python[analysis]
 
 # For all optional ecosystem integrations
-pip install kalign[all]
+pip install kalign-python[all]
 ```
 
 ### Verify Installation
