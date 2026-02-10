@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770643429317,
+  "lastUpdate": 1770686913769,
   "repoUrl": "https://github.com/TimoLassmann/kalign",
   "entries": {
     "Benchmark": [
@@ -183,6 +183,52 @@ window.BENCHMARK_DATA = {
           {
             "name": "Total Time (cli)",
             "value": 20.47,
+            "unit": "seconds"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "timolassmann@icloud.com",
+            "name": "Timo Lassmann",
+            "username": "TimoLassmann"
+          },
+          "committer": {
+            "email": "timolassmann@icloud.com",
+            "name": "Timo Lassmann",
+            "username": "TimoLassmann"
+          },
+          "distinct": true,
+          "id": "9797460574319e78fe8e507d42f14ee0a01864bb",
+          "message": "renamed the python package from kalign to kalign-python",
+          "timestamp": "2026-02-10T09:21:26+08:00",
+          "tree_id": "39314f74a4c4127b1a4d14f0e6eef63becd7a5fc",
+          "url": "https://github.com/TimoLassmann/kalign/commit/9797460574319e78fe8e507d42f14ee0a01864bb"
+        },
+        "date": 1770686912864,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "SP Score Mean (python_api)",
+            "value": 70.37,
+            "range": "14.0-100.0",
+            "unit": "score"
+          },
+          {
+            "name": "Total Time (python_api)",
+            "value": 23.49,
+            "unit": "seconds"
+          },
+          {
+            "name": "SP Score Mean (cli)",
+            "value": 70.37,
+            "range": "14.0-100.0",
+            "unit": "score"
+          },
+          {
+            "name": "Total Time (cli)",
+            "value": 20.26,
             "unit": "seconds"
           }
         ]
