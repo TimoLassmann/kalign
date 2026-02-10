@@ -1,3 +1,9 @@
+2026-02-10  Timo Lassmann  <timolassmann@icloud.com>
+
+	* version 3.4.9
+	- Updated documentation to use kalign-python package name
+	- Added claude code release command
+
 2024-04-24  Timo Lassmann  <timolassmann@icloud.com>
 
 	* version 3.4.1
