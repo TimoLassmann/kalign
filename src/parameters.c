@@ -83,6 +83,8 @@ struct parameters*init_param(void)
         param->nthreads = get_default_thread_count();
         param->clean = 0;
         param->unalign = 0;
+        param->refine = 0;
+        param->adaptive_budget = 0;
         param->quiet = 0;
         return param;
 ERROR:

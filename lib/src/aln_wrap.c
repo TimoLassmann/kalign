@@ -14,6 +14,7 @@
 
 #include "aln_param.h"
 #include "aln_run.h"
+#include "aln_refine.h"
 
 
 #ifdef HAVE_OPENMP
@@ -33,7 +34,7 @@ int kalign(char **seq, int *len, int numseq,int n_threads, int type, float gpo, 
         if(n_threads < 1){
                 n_threads = 1;
         }
-        RUN(kalign_run(msa,n_threads, type,  gpo, gpe, tgpe));
+        RUN(kalign_run(msa,n_threads, type,  gpo, gpe, tgpe, KALIGN_REFINE_NONE, 0));
 
         RUN(kalign_msa_to_arr(msa, aligned, out_aln_len));
 
@@ -47,7 +48,7 @@ ERROR:
         return FAIL;
 }
 
-int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, float tgpe)
+int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, float tgpe, int refine, int adaptive_budget)
 {
         struct aln_tasks* tasks = NULL;
         struct aln_param* ap = NULL;
@@ -105,7 +106,7 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
                            gpo,
                            gpe,
                            tgpe));
-
+        ap->adaptive_budget = adaptive_budget;
 
         DECLARE_TIMER(t1);
         if(!msa->quiet){
@@ -116,6 +117,11 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
         RUN(create_msa_tree(msa, ap, tasks));
         /* Hurrah we have aligned sequences  */
         msa->aligned = ALN_STATUS_ALIGNED;
+
+        /* Optional iterative refinement */
+        if(refine != KALIGN_REFINE_NONE){
+                RUN(refine_alignment(msa, ap, tasks, refine));
+        }
 
         RUN(finalise_alignment(msa));
 

@@ -14,14 +14,18 @@ from .scoring import AlignmentResult, run_case
 def run_benchmark(
     dataset: str = "balibase",
     methods: Optional[List[str]] = None,
+    refine_modes: Optional[List[str]] = None,
     max_cases: int = 0,
     binary: str = "kalign",
     n_threads: int = 1,
     verbose: bool = False,
+    adaptive_budget: bool = False,
 ) -> List[AlignmentResult]:
     """Run benchmark suite and return results."""
     if methods is None:
         methods = ["python_api"]
+    if refine_modes is None:
+        refine_modes = ["none"]
 
     cases = get_cases(dataset, max_cases=max_cases if max_cases > 0 else None)
 
@@ -30,44 +34,46 @@ def run_benchmark(
         print("Try running with --download-only first.")
         return []
 
-    print(f"Running {len(cases)} cases from '{dataset}' with methods: {methods}")
+    print(f"Running {len(cases)} cases from '{dataset}' with methods: {methods}, refine: {refine_modes}")
     print()
 
     results = []
-    total = len(cases) * len(methods)
+    total = len(cases) * len(methods) * len(refine_modes)
     done = 0
 
     for case in cases:
         for method in methods:
-            done += 1
-            if verbose:
-                print(f"[{done}/{total}] {case.family} ({method}) ... ", end="", flush=True)
+            for refine in refine_modes:
+                done += 1
+                if verbose:
+                    print(f"[{done}/{total}] {case.family} (refine={refine}) ... ", end="", flush=True)
 
-            result = run_case(case, method=method, binary=binary, n_threads=n_threads)
-            results.append(result)
+                result = run_case(case, method=method, binary=binary, n_threads=n_threads, refine=refine, adaptive_budget=adaptive_budget)
+                results.append(result)
 
-            if verbose:
-                if result.error:
-                    print(f"ERROR: {result.error}")
-                else:
-                    print(f"SP={result.sp_score:.1f}  time={result.wall_time:.2f}s")
+                if verbose:
+                    if result.error:
+                        print(f"ERROR: {result.error}")
+                    else:
+                        print(f"SP={result.sp_score:.1f}  time={result.wall_time:.2f}s")
 
     return results
 
 
 def print_summary(results: List[AlignmentResult]) -> None:
     """Print aggregate summary of benchmark results."""
-    by_method = {}
+    by_group = {}
     for r in results:
         if r.error:
             continue
-        by_method.setdefault(r.method, []).append(r)
+        key = f"{r.method} refine={r.refine}"
+        by_group.setdefault(key, []).append(r)
 
-    for method, method_results in sorted(by_method.items()):
-        scores = [r.sp_score for r in method_results]
-        times = [r.wall_time for r in method_results]
+    for group, group_results in sorted(by_group.items()):
+        scores = [r.sp_score for r in group_results]
+        times = [r.wall_time for r in group_results]
 
-        print(f"\n--- {method} ({len(method_results)} cases) ---")
+        print(f"\n--- {group} ({len(group_results)} cases) ---")
         print(f"  SP score:  mean={statistics.mean(scores):.1f}  "
               f"median={statistics.median(scores):.1f}  "
               f"min={min(scores):.1f}  max={max(scores):.1f}")
@@ -79,7 +85,7 @@ def print_summary(results: List[AlignmentResult]) -> None:
     if errors:
         print(f"\n{len(errors)} error(s):")
         for r in errors:
-            print(f"  {r.family} ({r.method}): {r.error}")
+            print(f"  {r.family} ({r.method} refine={r.refine}): {r.error}")
 
 
 def save_results(results: List[AlignmentResult], path: str) -> None:
@@ -90,21 +96,22 @@ def save_results(results: List[AlignmentResult], path: str) -> None:
         "summary": {},
     }
 
-    by_method = {}
+    by_group = {}
     for r in results:
         if r.error:
             continue
-        by_method.setdefault(r.method, []).append(r)
+        key = f"{r.method}_refine={r.refine}"
+        by_group.setdefault(key, []).append(r)
 
-    for method, method_results in by_method.items():
-        scores = [r.sp_score for r in method_results]
-        data["summary"][method] = {
-            "n_cases": len(method_results),
+    for group, group_results in by_group.items():
+        scores = [r.sp_score for r in group_results]
+        data["summary"][group] = {
+            "n_cases": len(group_results),
             "sp_mean": statistics.mean(scores),
             "sp_median": statistics.median(scores),
             "sp_min": min(scores),
             "sp_max": max(scores),
-            "total_time": sum(r.wall_time for r in method_results),
+            "total_time": sum(r.wall_time for r in group_results),
         }
 
     Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -143,6 +150,13 @@ def main() -> None:
         help="Path to C-compiled kalign binary for CLI method (default: build/src/kalign)",
     )
     parser.add_argument(
+        "--refine",
+        nargs="+",
+        default=["none"],
+        choices=["none", "all", "confident"],
+        help="Refinement mode(s) to test (default: none)",
+    )
+    parser.add_argument(
         "--threads",
         type=int,
         default=1,
@@ -152,6 +166,11 @@ def main() -> None:
         "--output",
         default="",
         help="Output JSON file for results",
+    )
+    parser.add_argument(
+        "--adaptive-budget",
+        action="store_true",
+        help="Scale trial count by uncertainty",
     )
     parser.add_argument(
         "--download-only",
@@ -174,10 +193,12 @@ def main() -> None:
     results = run_benchmark(
         dataset=args.dataset,
         methods=args.method,
+        refine_modes=args.refine,
         max_cases=args.max_cases,
         binary=args.binary,
         n_threads=args.threads,
         verbose=args.verbose,
+        adaptive_budget=args.adaptive_budget,
     )
 
     if results:

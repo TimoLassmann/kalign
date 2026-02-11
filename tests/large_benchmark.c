@@ -177,7 +177,7 @@ int run_test_aln(struct aln_case *tcase)
         }
         /* reference  */
         RUN(kalign_read_input(path, &r,1));
-        kalign_run(t,16 , -1, -1, -1 , -1);
+        kalign_run(t,16 , -1, -1, -1 , -1, 0, 0);
 
 
 

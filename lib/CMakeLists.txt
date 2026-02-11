@@ -47,6 +47,8 @@ set(source_files
   src/aln_seqseq.c
   src/aln_seqprofile.c
   src/aln_profileprofile.c
+  src/aln_refine.c
+  src/sp_score.c
   src/weave_alignment.c
 
   # src/coretralign.c

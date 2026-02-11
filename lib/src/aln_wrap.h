@@ -15,7 +15,7 @@
 
 struct msa;
 
-EXTERN int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, float tgpe);
+EXTERN int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, float tgpe, int refine, int adaptive_budget);
 
 #undef ALN_WRAP_IMPORT
 #undef EXTERN

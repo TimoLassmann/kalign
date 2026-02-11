@@ -23,6 +23,18 @@ int alloc_aln_mem(struct aln_mem** mem, int x)
         m->mode = ALN_MODE_FULL;
 
         m->score = 0.0F;
+        m->margin_sum = 0.0F;
+        m->margin_count = 0;
+        m->flip_threshold = 0.0F;
+        m->flip_trial = 0;
+        m->flip_stride = 1;
+        m->flip_counter = 0;
+        m->flip_mask = 0;
+        m->flip_margins = NULL;
+        m->flip_margin_alloc = 0;
+        m->flip_bit_map = NULL;
+        m->flip_n_targets = 0;
+        m->flip_n_uncertain = 0;
         m->ap = NULL;
 
         m->starta = 0;
@@ -85,6 +97,8 @@ ERROR:
 void free_aln_mem(struct aln_mem* m)
 {
         if(m){
+                if(m->flip_bit_map) MFREE(m->flip_bit_map);
+                if(m->flip_margins) MFREE(m->flip_margins);
                 MFREE(m->tmp_path);
                 MFREE(m->path);
                 MFREE(m->f);

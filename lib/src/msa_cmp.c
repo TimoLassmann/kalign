@@ -131,6 +131,11 @@ int compare_pair(char* seq1A, char* seq2A, char* seq1B, char* seq2B, int len_a, 
         int p2;
         int g1;
         int g2;
+
+        if(len_a == 0 || len_b == 0){
+                return OK;
+        }
+
         MMALLOC(codes1_A, sizeof(int) * len_a);
         MMALLOC(codes2_A, sizeof(int) * len_a);
 

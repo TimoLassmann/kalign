@@ -146,6 +146,9 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
 
         RUN(init_alnmem(m));
 
+        m->margin_sum = 0.0F;
+        m->margin_count = 0;
+
         m->mode = ALN_MODE_FULL;
         if(msa->nsip[a] == 1){
                 if(msa->nsip[b] == 1){
@@ -237,6 +240,13 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                                 m->len_b = len_b;
                         }
                 }
+        }
+
+        /* Store alignment confidence (average meetup margin) */
+        if(m->margin_count > 0){
+                t->list[task_id]->confidence = m->margin_sum / (float)m->margin_count;
+        }else{
+                t->list[task_id]->confidence = 0.0F;
         }
 
         RUN(add_gap_info_to_path_n(m)) ;

@@ -61,6 +61,8 @@ struct parameters{
         int nthreads;
         int clean;
         int unalign;
+        int refine;
+        int adaptive_budget;
         int help_flag;
         int quiet;
 };

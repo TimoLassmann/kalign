@@ -26,6 +26,20 @@ struct aln_mem{
         uint8_t run_parallel;
         int alloc_path_len;
         float score;
+        float margin_sum;       /* accumulated meetup margins */
+        int margin_count;       /* number of meetup calls */
+
+        float flip_threshold;   /* midpoints with margin < this are flip candidates; 0 = no flips */
+        int flip_trial;         /* round-robin: current trial (1..K-1, 0 = baseline) */
+        int flip_stride;        /* round-robin: number of flip slots */
+        int flip_counter;       /* running count of flip candidates encountered */
+        uint32_t flip_mask;     /* bitmask of which slots to flip (0 = no flips) */
+
+        float* flip_margins;    /* per-meetup margins recorded during baseline */
+        int flip_margin_alloc;  /* allocated size of flip_margins */
+        int* flip_bit_map;      /* maps flip_counter → bit index (-1 = not targeted) */
+        int flip_n_targets;     /* number of individually targeted midpoints */
+        int flip_n_uncertain;   /* total uncertain midpoints (margin < threshold) */
 
         int starta;
         int starta_2;

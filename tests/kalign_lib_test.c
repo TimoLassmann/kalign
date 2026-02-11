@@ -16,7 +16,7 @@ int main(int argc, char *argv[])
                 kalign_read_input(argv[i], &msa,1);
         }
         /* Align seqences */
-        kalign_run(msa,1 , -1, -1, -1 , -1);
+        kalign_run(msa,1 , -1, -1, -1 , -1, 0, 0);
         /* write alignment in clustal format */
         kalign_write_msa(msa, "test.clu", "clu");
         /* write alignment in aligned fasta format */

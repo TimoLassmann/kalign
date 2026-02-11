@@ -20,6 +20,10 @@
 #define KALIGN_TYPE_PROTEIN_DIVERGENT 4
 #define KALIGN_TYPE_UNDEFINED 5
 
+#define KALIGN_REFINE_NONE 0
+#define KALIGN_REFINE_ALL 1
+#define KALIGN_REFINE_CONFIDENT 2
+
 struct msa;
 /* input output routines  */
 
@@ -36,7 +40,7 @@ EXTERN int kalign(char **seq, int *len, int numseq, int n_threads, int type,
                   float gpo, float gpe, float tgpe, char ***aligned,
                   int *out_aln_len);
 
-EXTERN int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, float tgpe);
+EXTERN int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, float tgpe, int refine, int adaptive_budget);
 /* Memory */
 EXTERN void kalign_free_msa(struct msa* msa);
 

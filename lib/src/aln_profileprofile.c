@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <math.h>
 
 #include "tldevel.h"
 
@@ -291,7 +292,10 @@ int aln_profileprofile_meetup(struct aln_mem* m,int old_cor[], int* meet,int* t,
         struct states* b = m->b;
         int i;
         int c;
+        int c2 = -1;
         int transition = -1;
+        int transition2 = -1;
+        float s_tmp;
 
         const float* prof1 = m->prof1;
         const float* prof2 = m->prof2;
@@ -306,6 +310,7 @@ int aln_profileprofile_meetup(struct aln_mem* m,int old_cor[], int* meet,int* t,
 
         //int max = -FLT_MAX;
         float max = -FLT_MAX;
+        float max2 = -FLT_MAX;
         //float middle =  (m->endb - m->startb)/2 + m->startb;
         float middle = (float) (old_cor[3] - old_cor[2])/2.0F + (float) old_cor[2];
         float sub = 0.0F;
@@ -322,86 +327,142 @@ int aln_profileprofile_meetup(struct aln_mem* m,int old_cor[], int* meet,int* t,
                 sub = fabsf(middle - (float)i);
                 sub /= 1000.0F;
                 prof2 += 64;
-                //fprintf(stderr,"%d	%d	%d \n",f[i].a,b[i].a,max);
-                if(f[i].a+b[i].a-sub > max){
-                        max = f[i].a+b[i].a-sub;
-                        //		fprintf(stderr,"aligned->aligned:%d + %d = %d\n",f[i].a,b[i].a,f[i].a+b[i].a);
+
+                s_tmp = f[i].a+b[i].a-sub;
+                if(s_tmp > max){
+                        max2 = max; c2 = c; transition2 = transition;
+                        max = s_tmp;
                         transition = 1;
                         c = i;
+                }else if(s_tmp > max2){
+                        max2 = s_tmp; c2 = i; transition2 = 1;
                 }
-                if(f[i].a+b[i].ga+prof2[27]-sub > max){
-                        max = f[i].a+b[i].ga+prof2[27]-sub;
-                        //		fprintf(stderr,"aligned->gap_a:%d + %d +%d = %d\n",f[i].a,b[i].ga,prof1[27],f[i].a+b[i].ga+prof2[27]);
+
+                s_tmp = f[i].a+b[i].ga+prof2[27]-sub;
+                if(s_tmp > max){
+                        max2 = max; c2 = c; transition2 = transition;
+                        max = s_tmp;
                         transition = 2;
                         c = i;
+                }else if(s_tmp > max2){
+                        max2 = s_tmp; c2 = i; transition2 = 2;
                 }
-                if(f[i].a+b[i].gb+prof1[27] -sub> max){
-                        max = f[i].a+b[i].gb+prof1[27]-sub;
-                        //		fprintf(stderr,"aligned->gap_b:%d + %d +%d = %d\n",f[i].a,b[i].gb,prof1[27],f[i].a+b[i].gb+prof1[27]);
+
+                s_tmp = f[i].a+b[i].gb+prof1[27]-sub;
+                if(s_tmp > max){
+                        max2 = max; c2 = c; transition2 = transition;
+                        max = s_tmp;
                         transition = 3;
                         c = i;
+                }else if(s_tmp > max2){
+                        max2 = s_tmp; c2 = i; transition2 = 3;
                 }
-                if(f[i].ga+b[i].a+prof2[-37]-sub > max){
-                        max = f[i].ga+b[i].a+prof2[-37]-sub;
-                        //		fprintf(stderr,"gap_a->aligned:%d + %d + %d(gpo) = %d\n",f[i].ga,b[i].a,prof2[27],f[i].ga+b[i].a+prof2[27]);
+
+                s_tmp = f[i].ga+b[i].a+prof2[-37]-sub;
+                if(s_tmp > max){
+                        max2 = max; c2 = c; transition2 = transition;
+                        max = s_tmp;
                         transition = 5;
                         c = i;
+                }else if(s_tmp > max2){
+                        max2 = s_tmp; c2 = i; transition2 = 5;
                 }
 
 
                 if(m->startb == 0){
-                        if(f[i].gb+b[i].gb+prof1[29]-sub > max){
-                                max = f[i].gb+b[i].gb+prof1[29]-sub;
-                                //			fprintf(stderr,"gap_b->gap_b:%d + %d +%d(gpe) =%d \n",f[i].gb, b[i].gb, prof1[28],f[i].gb+b[i].gb+prof1[28]);
-                                transition = 6;
-                                c = i;
-                        }
+                        s_tmp = f[i].gb+b[i].gb+prof1[29]-sub;
                 }else{
-                        if(f[i].gb+b[i].gb+prof1[28]-sub > max){
-                                max = f[i].gb+b[i].gb+prof1[28]-sub;
-                                //			fprintf(stderr,"gap_b->gap_b:%d + %d +%d(gpe) =%d \n",f[i].gb, b[i].gb, prof1[28],f[i].gb+b[i].gb+prof1[28]);
-                                transition = 6;
-                                c = i;
-                        }
+                        s_tmp = f[i].gb+b[i].gb+prof1[28]-sub;
                 }
-                if(f[i].gb+b[i].a+prof1[-37]-sub > max){
-                        max = f[i].gb+b[i].a+prof1[-37]-sub;
-                        //		fprintf(stderr,"gap_b->aligned:%d + %d + %d(gpo) = %d\n",f[i].gb,b[i].a,prof1[27],f[i].gb+b[i].a+prof1[27]);
+                if(s_tmp > max){
+                        max2 = max; c2 = c; transition2 = transition;
+                        max = s_tmp;
+                        transition = 6;
+                        c = i;
+                }else if(s_tmp > max2){
+                        max2 = s_tmp; c2 = i; transition2 = 6;
+                }
+
+                s_tmp = f[i].gb+b[i].a+prof1[-37]-sub;
+                if(s_tmp > max){
+                        max2 = max; c2 = c; transition2 = transition;
+                        max = s_tmp;
                         transition = 7;
                         c = i;
+                }else if(s_tmp > max2){
+                        max2 = s_tmp; c2 = i; transition2 = 7;
                 }
         }
         //i = m->endb;
         i = old_cor[3];
         sub = fabsf(middle - (float)i);
         sub /= 1000.0F;
-        if(f[i].a+b[i].gb+prof1[27]-sub > max){
-                max = f[i].a+b[i].gb+prof1[27]-sub;
-                //		fprintf(stderr,"aligned->gap_b:%d + %d +%d = %d\n",f[i].a,b[i].gb,prof1[27],f[i].a+b[i].gb+prof1[27]);
+
+        s_tmp = f[i].a+b[i].gb+prof1[27]-sub;
+        if(s_tmp > max){
+                max2 = max; c2 = c; transition2 = transition;
+                max = s_tmp;
                 transition = 3;
                 c = i;
+        }else if(s_tmp > max2){
+                max2 = s_tmp; c2 = i; transition2 = 3;
         }
+
         if(m->endb == m->len_b){
-                if(f[i].gb+b[i].gb+prof1[29]-sub > max){
-                        max = f[i].gb+b[i].gb+prof1[29]-sub;
-                        //			fprintf(stderr,"gap_b->gap_b:%d + %d +%d(gpe) =%d \n",f[i].gb, b[i].gb, prof1[28],f[i].gb+b[i].gb+prof1[28]);
-                        transition = 6;
-                        c = i;
-                }
+                s_tmp = f[i].gb+b[i].gb+prof1[29]-sub;
         }else{
-                if(f[i].gb+b[i].gb+prof1[28]-sub > max){
-                        max = f[i].gb+b[i].gb+prof1[28]-sub;
-                        //			fprintf(stderr,"gap_b->gap_b:%d + %d +%d(gpe) =%d \n",f[i].gb, b[i].gb, prof1[28],f[i].gb+b[i].gb+prof1[28]);
-                        transition = 6;
-                        c = i;
+                s_tmp = f[i].gb+b[i].gb+prof1[28]-sub;
+        }
+        if(s_tmp > max){
+                max2 = max; c2 = c; transition2 = transition;
+                max = s_tmp;
+                transition = 6;
+                c = i;
+        }else if(s_tmp > max2){
+                max2 = s_tmp; c2 = i; transition2 = 6;
+        }
+
+        /* Accumulate confidence margin and record per-meetup margins */
+        if(max2 > -FLT_MAX){
+                float _margin = max - max2;
+                if(m->flip_margins != NULL && m->margin_count < m->flip_margin_alloc){
+                        m->flip_margins[m->margin_count] = _margin;
+                }
+                m->margin_sum += _margin;
+                m->margin_count++;
+        }
+
+        /* Perturbation: flip uncertain midpoints to second-best choice.
+           Three modes: individual targeting (MCTS), stride bitmask, or round-robin. */
+        if(m->flip_threshold > 0.0F && c2 >= 0 && max2 > -FLT_MAX){
+                float margin = max - max2;
+                if(margin < m->flip_threshold){
+                        if(m->flip_bit_map != NULL){
+                                /* Individual midpoint targeting (MCTS) */
+                                if(m->flip_counter < m->flip_n_uncertain){
+                                        int bit = m->flip_bit_map[m->flip_counter];
+                                        if(bit >= 0 && ((1U << bit) & m->flip_mask)){
+                                                c = c2;
+                                                transition = transition2;
+                                        }
+                                }
+                        }else if(m->flip_mask != 0){
+                                /* Stride-based bitmask mode */
+                                if((1U << (m->flip_counter % m->flip_stride)) & m->flip_mask){
+                                        c = c2;
+                                        transition = transition2;
+                                }
+                        }else if(m->flip_trial > 0){
+                                /* Round-robin mode */
+                                if(m->flip_counter % m->flip_stride == m->flip_trial - 1){
+                                        c = c2;
+                                        transition = transition2;
+                                }
+                        }
+                        m->flip_counter++;
                 }
         }
 
-
-
-        //prof1-= (old_cor[4]+1)<<6;
-
-        //prof2 -= old_cor[3] << 6;
         *meet = c;
         *t = transition;
         *score = max;

@@ -34,6 +34,11 @@ PROTEIN = _core.PROTEIN
 PROTEIN_DIVERGENT = _core.PROTEIN_DIVERGENT
 AUTO = _core.AUTO
 
+# Refinement mode constants
+REFINE_NONE = _core.REFINE_NONE
+REFINE_ALL = _core.REFINE_ALL
+REFINE_CONFIDENT = _core.REFINE_CONFIDENT
+
 # Global thread control
 _thread_local = threading.local()
 _default_threads = 1
@@ -315,6 +320,23 @@ def align(
     raise ValueError(f"Unknown fmt='{fmt}' (expected 'plain', 'biopython', 'skbio')")
 
 
+def _parse_refine_mode(refine):
+    """Convert string or int refine mode to integer constant."""
+    if isinstance(refine, int):
+        return refine
+    refine_map = {
+        "none": REFINE_NONE,
+        "all": REFINE_ALL,
+        "confident": REFINE_CONFIDENT,
+    }
+    refine_lower = refine.lower()
+    if refine_lower not in refine_map:
+        raise ValueError(
+            f"Invalid refine mode: {refine}. Must be one of: {list(refine_map.keys())}"
+        )
+    return refine_map[refine_lower]
+
+
 def _infer_skbio_type(sequences, skbio_seq):
     """Infer the appropriate skbio sequence class from raw sequence content."""
     chars = set()
@@ -390,6 +412,8 @@ def align_from_file(
     gap_extend: Optional[float] = None,
     terminal_gap_extend: Optional[float] = None,
     n_threads: Optional[int] = None,
+    refine: Union[str, int] = "none",
+    adaptive_budget: bool = False,
 ) -> AlignedSequences:
     """
     Align sequences from a file using Kalign.
@@ -460,6 +484,9 @@ def align_from_file(
     if n_threads < 1:
         raise ValueError("n_threads must be at least 1")
 
+    # Convert refine mode
+    refine_int = _parse_refine_mode(refine)
+
     # Call the C++ binding — returns (names, sequences) tuple
     try:
         names, sequences = _core.align_from_file(
@@ -469,6 +496,8 @@ def align_from_file(
             gap_extend,
             terminal_gap_extend,
             n_threads,
+            refine_int,
+            int(adaptive_budget),
         )
         return AlignedSequences(names=names, sequences=sequences)
     except Exception as e:
@@ -653,6 +682,8 @@ def align_file_to_file(
     gap_extend: Optional[float] = None,
     terminal_gap_extend: Optional[float] = None,
     n_threads: Optional[int] = None,
+    refine: Union[str, int] = "none",
+    adaptive_budget: bool = False,
 ) -> None:
     """
     Align sequences from input file and write result to output file.
@@ -717,6 +748,8 @@ def align_file_to_file(
     if n_threads is None:
         n_threads = get_num_threads()
 
+    refine_int = _parse_refine_mode(refine)
+
     _core.align_file_to_file(
         input_file,
         output_file,
@@ -726,6 +759,8 @@ def align_file_to_file(
         gap_extend,
         terminal_gap_extend,
         n_threads,
+        refine_int,
+        int(adaptive_budget),
     )
 
 
@@ -750,6 +785,9 @@ __all__ = [
     "PROTEIN",
     "PROTEIN_DIVERGENT",
     "AUTO",
+    "REFINE_NONE",
+    "REFINE_ALL",
+    "REFINE_CONFIDENT",
     "__version__",
     "__author__",
     "__email__",

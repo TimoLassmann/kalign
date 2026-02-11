@@ -43,8 +43,11 @@
 #define OPT_NTHREADS 10
 
 #define OPT_ALN_TYPE 13
+#define OPT_REFINE 14
+#define OPT_ADAPTIVE_BUDGET 15
 
 static int set_aln_type(char* in, int* type );
+static int set_refine_mode(char* in, int* refine);
 
 static int run_kalign(struct parameters* param);
 
@@ -73,6 +76,9 @@ int print_kalign_help(char * argv[])
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpo","Gap open penalty." ,"[]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpe","Gap extension penalty." ,"[]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--tgpe","Terminal gap extension penalty." ,"[]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--refine","Refinement mode." ,"[none]");
+        fprintf(stdout,"%*s%-*s  %s %s\n",3,"",MESSAGE_MARGIN-3,"","Options: none, all, confident" ,""  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--adaptive-budget","Scale trial count by uncertainty." ,"[off]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"-n/--nthreads","Number of threads." ,"[auto: N-1, max 16]");
 
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--version (-V/-v)","Prints version." ,"[NA]"  );
@@ -141,6 +147,7 @@ int main(int argc, char *argv[])
         struct parameters* param = NULL;
         char* in = NULL;
         char* in_type = NULL;
+        char* in_refine = NULL;
         RUNP(param = init_param());
 
         param->num_infiles = 0;
@@ -154,6 +161,8 @@ int main(int argc, char *argv[])
                         {"gpo",  required_argument, 0, OPT_GPO},
                         {"gpe",  required_argument, 0, OPT_GPE},
                         {"tgpe",  required_argument, 0, OPT_TGPE},
+                        {"refine",  required_argument, 0, OPT_REFINE},
+                        {"adaptive-budget",  no_argument, 0, OPT_ADAPTIVE_BUDGET},
                         {"nthreads",  required_argument, 0, 'n'},
                         {"input",  required_argument, 0, 'i'},
                         {"infile",  required_argument, 0, 'i'},
@@ -202,6 +211,12 @@ int main(int argc, char *argv[])
                         break;
                 case OPT_TGPE:
                         param->tgpe = atof(optarg);
+                        break;
+                case OPT_REFINE:
+                        in_refine = optarg;
+                        break;
+                case OPT_ADAPTIVE_BUDGET:
+                        param->adaptive_budget = 1;
                         break;
                 case 'h':
                         param->help_flag = 1;
@@ -303,6 +318,7 @@ int main(int argc, char *argv[])
 
         RUN(check_msa_format_string(param->format));
         RUN(set_aln_type(in_type, &param->type));
+        RUN(set_refine_mode(in_refine, &param->refine));
 
         if(param->num_infiles == 0){
                 if (!isatty(fileno(stdin))){
@@ -360,7 +376,9 @@ int run_kalign(struct parameters* param)
                        param->type,
                        param->gpo,
                        param->gpe,
-                       param->tgpe));
+                       param->tgpe,
+                       param->refine,
+                       param->adaptive_budget));
 
 
         RUN(kalign_write_msa(msa, param->outfile, param->format));
@@ -398,3 +416,22 @@ ERROR:
         return FAIL;
 }
 
+int set_refine_mode(char* in, int* refine)
+{
+        int r = KALIGN_REFINE_NONE;
+        if(in){
+                if(strstr(in,"all")){
+                        r = KALIGN_REFINE_ALL;
+                }else if(strstr(in,"confident")){
+                        r = KALIGN_REFINE_CONFIDENT;
+                }else if(strstr(in,"none")){
+                        r = KALIGN_REFINE_NONE;
+                }else{
+                        ERROR_MSG("Refine mode '%s' not recognized. Use: none, all, confident.", in);
+                }
+        }
+        *refine = r;
+        return OK;
+ERROR:
+        return FAIL;
+}

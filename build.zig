@@ -104,6 +104,8 @@ const kalign_lib_sources = [_][]const u8{
     "lib/src/aln_seqseq.c",
     "lib/src/aln_seqprofile.c",
     "lib/src/aln_profileprofile.c",
+    "lib/src/aln_refine.c",
+    "lib/src/sp_score.c",
     "lib/src/weave_alignment.c",
 };
 

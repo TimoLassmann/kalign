@@ -22,6 +22,7 @@ class AlignmentResult:
     sp_score: float
     wall_time: float
     seq_type: str
+    refine: str = "none"
     error: Optional[str] = None
 
     def to_dict(self) -> dict:
@@ -29,7 +30,8 @@ class AlignmentResult:
 
 
 def align_with_python_api(
-    case: BenchmarkCase, output: Path, n_threads: int = 1
+    case: BenchmarkCase, output: Path, n_threads: int = 1, refine: str = "none",
+    adaptive_budget: bool = False,
 ) -> float:
     """Align using kalign Python API. Returns wall time in seconds."""
     start = time.perf_counter()
@@ -39,6 +41,8 @@ def align_with_python_api(
         format="fasta",
         seq_type=case.seq_type,
         n_threads=n_threads,
+        refine=refine,
+        adaptive_budget=adaptive_budget,
     )
     return time.perf_counter() - start
 
@@ -48,11 +52,17 @@ def align_with_cli(
     output: Path,
     binary: str = "kalign",
     n_threads: int = 1,
+    refine: str = "none",
+    adaptive_budget: bool = False,
 ) -> float:
     """Align using kalign C binary via subprocess. Returns wall time in seconds."""
     cmd = [binary, "-i", str(case.unaligned), "-f", "fasta", "-o", str(output)]
     if n_threads > 1:
         cmd.extend(["--nthreads", str(n_threads)])
+    if refine != "none":
+        cmd.extend(["--refine", refine])
+    if adaptive_budget:
+        cmd.append("--adaptive-budget")
 
     start = time.perf_counter()
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -76,6 +86,8 @@ def run_case(
     method: str = "python_api",
     binary: str = "kalign",
     n_threads: int = 1,
+    refine: str = "none",
+    adaptive_budget: bool = False,
 ) -> AlignmentResult:
     """Run alignment + scoring for a single benchmark case."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -83,9 +95,9 @@ def run_case(
 
         try:
             if method == "python_api":
-                wall_time = align_with_python_api(case, output, n_threads)
+                wall_time = align_with_python_api(case, output, n_threads, refine, adaptive_budget)
             elif method == "cli":
-                wall_time = align_with_cli(case, output, binary, n_threads)
+                wall_time = align_with_cli(case, output, binary, n_threads, refine, adaptive_budget)
             else:
                 raise ValueError(f"Unknown method: {method}")
 
@@ -98,6 +110,7 @@ def run_case(
                 sp_score=sp_score,
                 wall_time=wall_time,
                 seq_type=case.seq_type,
+                refine=refine,
             )
         except Exception as e:
             return AlignmentResult(
@@ -107,5 +120,6 @@ def run_case(
                 sp_score=0.0,
                 wall_time=0.0,
                 seq_type=case.seq_type,
+                refine=refine,
                 error=str(e),
             )

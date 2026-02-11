@@ -13,6 +13,7 @@
 
 struct task{
         float score;            /* score of output alignment */
+        float confidence;       /* average meetup margin (alignment confidence) */
         int a;                  /* input 1 */
         int b;                  /* input 2 */
         int c;                  /* output  */

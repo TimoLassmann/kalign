@@ -24,6 +24,7 @@ struct aln_param{
         float gpe;
         float tgpe;
         float score;
+        int adaptive_budget;    /* 0=off, 1=scale trial count by uncertainty */
 };
 
 EXTERN int aln_param_init(struct aln_param **aln_param,int biotype , int n_threads, int type, float gpo, float gpe, float tgpe);

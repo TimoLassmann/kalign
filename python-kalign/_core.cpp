@@ -94,7 +94,9 @@ std::pair<std::vector<std::string>, std::vector<std::string>> align_from_file(
     float gap_open = -1.0f,
     float gap_extend = -1.0f,
     float terminal_gap_extend = -1.0f,
-    int n_threads = 1
+    int n_threads = 1,
+    int refine = KALIGN_REFINE_NONE,
+    int adaptive_budget = 0
 ) {
     struct msa* msa_data = nullptr;
 
@@ -110,7 +112,7 @@ std::pair<std::vector<std::string>, std::vector<std::string>> align_from_file(
     }
 
     // Perform alignment
-    result = kalign_run(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend);
+    result = kalign_run(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget);
     if (result != 0) {
         kalign_free_msa(msa_data);
         throw std::runtime_error("Kalign alignment failed with error code: " + std::to_string(result));
@@ -241,7 +243,9 @@ void align_file_to_file(
     float gap_open = -1.0f,
     float gap_extend = -1.0f,
     float terminal_gap_extend = -1.0f,
-    int n_threads = 1
+    int n_threads = 1,
+    int refine = KALIGN_REFINE_NONE,
+    int adaptive_budget = 0
 ) {
     struct msa* msa_data = nullptr;
 
@@ -250,7 +254,7 @@ void align_file_to_file(
         throw std::runtime_error("Failed to read input file: " + input_file);
     }
 
-    result = kalign_run(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend);
+    result = kalign_run(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget);
     if (result != 0) {
         kalign_free_msa(msa_data);
         throw std::runtime_error("Alignment failed with error code: " + std::to_string(result));
@@ -307,6 +311,8 @@ PYBIND11_MODULE(_core, m) {
           py::arg("gap_extend") = -1.0f,
           py::arg("terminal_gap_extend") = -1.0f,
           py::arg("n_threads") = 1,
+          py::arg("refine") = KALIGN_REFINE_NONE,
+          py::arg("adaptive_budget") = 0,
           "Align sequences from a file. Returns (names, sequences) tuple.");
     
     // Generate test sequences using DSSim
@@ -368,6 +374,8 @@ PYBIND11_MODULE(_core, m) {
           py::arg("gap_extend") = -1.0f,
           py::arg("terminal_gap_extend") = -1.0f,
           py::arg("n_threads") = 1,
+          py::arg("refine") = KALIGN_REFINE_NONE,
+          py::arg("adaptive_budget") = 0,
           R"pbdoc(
           Align sequences from input file and write to output file.
 
@@ -401,4 +409,9 @@ PYBIND11_MODULE(_core, m) {
     m.attr("PROTEIN") = KALIGN_TYPE_PROTEIN;
     m.attr("PROTEIN_DIVERGENT") = KALIGN_TYPE_PROTEIN_DIVERGENT;
     m.attr("AUTO") = KALIGN_TYPE_UNDEFINED;
+
+    // Constants for refinement modes
+    m.attr("REFINE_NONE") = KALIGN_REFINE_NONE;
+    m.attr("REFINE_ALL") = KALIGN_REFINE_ALL;
+    m.attr("REFINE_CONFIDENT") = KALIGN_REFINE_CONFIDENT;
 }
