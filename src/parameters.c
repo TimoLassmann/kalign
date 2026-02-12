@@ -85,6 +85,8 @@ struct parameters*init_param(void)
         param->unalign = 0;
         param->refine = 0;
         param->adaptive_budget = 0;
+        param->ensemble = 0;
+        param->ensemble_seed = 42;
         param->quiet = 0;
         return param;
 ERROR:

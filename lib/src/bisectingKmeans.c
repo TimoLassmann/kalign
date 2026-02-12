@@ -94,6 +94,91 @@ inline int cmp_floats(const float a, const float b)
 }
 
 
+int build_tree_kmeans_noisy(struct msa* msa, struct aln_tasks** tasks,
+                            uint64_t seed, float noise_sigma)
+{
+        struct aln_tasks* t = NULL;
+        struct node* root = NULL;
+        float** dm = NULL;
+        int* samples = NULL;
+        int* anchors = NULL;
+        int num_anchors;
+        int numseq;
+        int i;
+
+        ASSERT(msa != NULL, "No alignment.");
+
+        t = *tasks;
+        if(!t){
+                RUN(alloc_tasks(&t, msa->numseq));
+        }
+        numseq = msa->numseq;
+
+        DECLARE_TIMER(timer);
+        if(!msa->quiet){
+                LOG_MSG("Calculating pairwise distances (noisy, seed=%lu)", (unsigned long)seed);
+        }
+        START_TIMER(timer);
+        RUNP(anchors = pick_anchor(msa, &num_anchors));
+        RUNP(dm = d_estimation(msa, anchors, num_anchors, 0));
+
+        /* Add multiplicative Gaussian noise to distance matrix */
+        if(seed != 0 && noise_sigma > 0.0f){
+                struct rng_state* rng = NULL;
+                rng = init_rng(seed);
+                for(i = 0; i < numseq; i++){
+                        for(int j = 0; j < num_anchors; j++){
+                                double noise = tl_random_gaussian(rng, 1.0, (double)noise_sigma);
+                                if(noise < 0.1) noise = 0.1;
+                                dm[i][j] *= (float)noise;
+                        }
+                }
+                free_rng(rng);
+        }
+
+        STOP_TIMER(timer);
+        if(!msa->quiet){
+                GET_TIMING(timer);
+        }
+        MFREE(anchors);
+
+        MMALLOC(samples, sizeof(int) * numseq);
+        for(i = 0; i < numseq; i++){
+                samples[i] = i;
+        }
+
+        START_TIMER(timer);
+        if(!msa->quiet){
+                LOG_MSG("Building guide tree.");
+        }
+
+#ifdef HAVE_OPENMP
+#pragma omp parallel
+#pragma omp single nowait
+#endif
+        bisecting_kmeans(msa, &root, (const float * const *)dm, samples, numseq);
+
+        STOP_TIMER(timer);
+        if(!msa->quiet){
+                GET_TIMING(timer);
+        }
+        label_internal(root, numseq);
+        create_tasks(root, t);
+        MFREE(root);
+        for(i = 0; i < msa->numseq; i++){
+#ifdef HAVE_AVX2
+                _mm_free(dm[i]);
+#else
+                MFREE(dm[i]);
+#endif
+        }
+        MFREE(dm);
+        DESTROY_TIMER(timer);
+        return OK;
+ERROR:
+        return FAIL;
+}
+
 int build_tree_kmeans(struct msa* msa, struct aln_tasks** tasks)
 {
         struct aln_tasks* t = NULL;

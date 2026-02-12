@@ -107,6 +107,9 @@ const kalign_lib_sources = [_][]const u8{
     "lib/src/aln_refine.c",
     "lib/src/sp_score.c",
     "lib/src/weave_alignment.c",
+    "lib/src/poar.c",
+    "lib/src/consensus_msa.c",
+    "lib/src/ensemble.c",
 };
 
 const kalign_sources = [_][]const u8{

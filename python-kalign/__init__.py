@@ -414,6 +414,8 @@ def align_from_file(
     n_threads: Optional[int] = None,
     refine: Union[str, int] = "none",
     adaptive_budget: bool = False,
+    ensemble: int = 0,
+    ensemble_seed: int = 42,
 ) -> AlignedSequences:
     """
     Align sequences from a file using Kalign.
@@ -498,6 +500,8 @@ def align_from_file(
             n_threads,
             refine_int,
             int(adaptive_budget),
+            ensemble,
+            ensemble_seed,
         )
         return AlignedSequences(names=names, sequences=sequences)
     except Exception as e:
@@ -684,6 +688,8 @@ def align_file_to_file(
     n_threads: Optional[int] = None,
     refine: Union[str, int] = "none",
     adaptive_budget: bool = False,
+    ensemble: int = 0,
+    ensemble_seed: int = 42,
 ) -> None:
     """
     Align sequences from input file and write result to output file.
@@ -761,6 +767,8 @@ def align_file_to_file(
         n_threads,
         refine_int,
         int(adaptive_budget),
+        ensemble,
+        ensemble_seed,
     )
 
 

@@ -23,6 +23,8 @@
 #ifndef PARAMETERS_H
 #define PARAMETERS_H
 
+#include <stdint.h>
+
 
 #ifdef PARAMETERS_IMPORT
 #define EXTERN
@@ -63,6 +65,8 @@ struct parameters{
         int unalign;
         int refine;
         int adaptive_budget;
+        int ensemble;
+        uint64_t ensemble_seed;
         int help_flag;
         int quiet;
 };

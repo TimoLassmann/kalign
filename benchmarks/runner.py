@@ -4,11 +4,19 @@ import argparse
 import json
 import statistics
 import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import List, Optional
 
 from .datasets import download_dataset, get_cases, DATASETS
 from .scoring import AlignmentResult, run_case
+
+
+def _run_one(args):
+    """Worker function for parallel execution."""
+    case, method, binary, n_threads, refine, adaptive_budget, ensemble = args
+    return run_case(case, method=method, binary=binary, n_threads=n_threads,
+                    refine=refine, adaptive_budget=adaptive_budget, ensemble=ensemble)
 
 
 def run_benchmark(
@@ -20,6 +28,8 @@ def run_benchmark(
     n_threads: int = 1,
     verbose: bool = False,
     adaptive_budget: bool = False,
+    ensemble: int = 0,
+    parallel: int = 1,
 ) -> List[AlignmentResult]:
     """Run benchmark suite and return results."""
     if methods is None:
@@ -35,27 +45,48 @@ def run_benchmark(
         return []
 
     print(f"Running {len(cases)} cases from '{dataset}' with methods: {methods}, refine: {refine_modes}")
+    if parallel > 1:
+        print(f"Using {parallel} parallel workers")
     print()
 
-    results = []
-    total = len(cases) * len(methods) * len(refine_modes)
-    done = 0
-
+    # Build work items
+    work = []
     for case in cases:
         for method in methods:
             for refine in refine_modes:
+                work.append((case, method, binary, n_threads, refine, adaptive_budget, ensemble))
+
+    total = len(work)
+
+    if parallel <= 1:
+        # Sequential (original behavior)
+        results = []
+        for i, item in enumerate(work):
+            if verbose:
+                print(f"[{i+1}/{total}] {item[0].family} (refine={item[4]}) ... ", end="", flush=True)
+            result = _run_one(item)
+            results.append(result)
+            if verbose:
+                if result.error:
+                    print(f"ERROR: {result.error}")
+                else:
+                    print(f"SP={result.sp_score:.1f}  time={result.wall_time:.2f}s")
+    else:
+        # Parallel execution
+        results = [None] * total
+        done = 0
+        with ProcessPoolExecutor(max_workers=parallel) as pool:
+            futures = {pool.submit(_run_one, item): i for i, item in enumerate(work)}
+            for future in as_completed(futures):
+                idx = futures[future]
+                result = future.result()
+                results[idx] = result
                 done += 1
                 if verbose:
-                    print(f"[{done}/{total}] {case.family} (refine={refine}) ... ", end="", flush=True)
-
-                result = run_case(case, method=method, binary=binary, n_threads=n_threads, refine=refine, adaptive_budget=adaptive_budget)
-                results.append(result)
-
-                if verbose:
                     if result.error:
-                        print(f"ERROR: {result.error}")
+                        print(f"[{done}/{total}] {result.family} (refine={result.refine}) ERROR: {result.error}")
                     else:
-                        print(f"SP={result.sp_score:.1f}  time={result.wall_time:.2f}s")
+                        print(f"[{done}/{total}] {result.family} (refine={result.refine}) SP={result.sp_score:.1f}  time={result.wall_time:.2f}s")
 
     return results
 
@@ -173,6 +204,18 @@ def main() -> None:
         help="Scale trial count by uncertainty",
     )
     parser.add_argument(
+        "--ensemble",
+        type=int,
+        default=0,
+        help="Number of ensemble runs (0 = off)",
+    )
+    parser.add_argument(
+        "-j", "--parallel",
+        type=int,
+        default=1,
+        help="Number of parallel workers for benchmark cases (default: 1)",
+    )
+    parser.add_argument(
         "--download-only",
         action="store_true",
         help="Only download datasets, don't run benchmarks",
@@ -199,6 +242,8 @@ def main() -> None:
         n_threads=args.threads,
         verbose=args.verbose,
         adaptive_budget=args.adaptive_budget,
+        ensemble=args.ensemble,
+        parallel=args.parallel,
     )
 
     if results:

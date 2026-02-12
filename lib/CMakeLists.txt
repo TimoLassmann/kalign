@@ -50,6 +50,9 @@ set(source_files
   src/aln_refine.c
   src/sp_score.c
   src/weave_alignment.c
+  src/poar.c
+  src/consensus_msa.c
+  src/ensemble.c
 
   # src/coretralign.c
   # src/test.h

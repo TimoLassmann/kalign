@@ -45,6 +45,8 @@
 #define OPT_ALN_TYPE 13
 #define OPT_REFINE 14
 #define OPT_ADAPTIVE_BUDGET 15
+#define OPT_ENSEMBLE 16
+#define OPT_ENSEMBLE_SEED 17
 
 static int set_aln_type(char* in, int* type );
 static int set_refine_mode(char* in, int* refine);
@@ -79,6 +81,8 @@ int print_kalign_help(char * argv[])
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--refine","Refinement mode." ,"[none]");
         fprintf(stdout,"%*s%-*s  %s %s\n",3,"",MESSAGE_MARGIN-3,"","Options: none, all, confident" ,""  );
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--adaptive-budget","Scale trial count by uncertainty." ,"[off]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--ensemble","Number of ensemble runs." ,"[0 = off]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--ensemble-seed","RNG seed for ensemble." ,"[42]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"-n/--nthreads","Number of threads." ,"[auto: N-1, max 16]");
 
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--version (-V/-v)","Prints version." ,"[NA]"  );
@@ -163,6 +167,8 @@ int main(int argc, char *argv[])
                         {"tgpe",  required_argument, 0, OPT_TGPE},
                         {"refine",  required_argument, 0, OPT_REFINE},
                         {"adaptive-budget",  no_argument, 0, OPT_ADAPTIVE_BUDGET},
+                        {"ensemble",  required_argument, 0, OPT_ENSEMBLE},
+                        {"ensemble-seed",  required_argument, 0, OPT_ENSEMBLE_SEED},
                         {"nthreads",  required_argument, 0, 'n'},
                         {"input",  required_argument, 0, 'i'},
                         {"infile",  required_argument, 0, 'i'},
@@ -217,6 +223,12 @@ int main(int argc, char *argv[])
                         break;
                 case OPT_ADAPTIVE_BUDGET:
                         param->adaptive_budget = 1;
+                        break;
+                case OPT_ENSEMBLE:
+                        param->ensemble = atoi(optarg);
+                        break;
+                case OPT_ENSEMBLE_SEED:
+                        param->ensemble_seed = (uint64_t)strtoull(optarg, NULL, 10);
                         break;
                 case 'h':
                         param->help_flag = 1;
@@ -371,14 +383,25 @@ int run_kalign(struct parameters* param)
 
 
 
-        RUN(kalign_run(msa,
-                       param->nthreads,
-                       param->type,
-                       param->gpo,
-                       param->gpe,
-                       param->tgpe,
-                       param->refine,
-                       param->adaptive_budget));
+        if(param->ensemble > 0){
+                RUN(kalign_ensemble(msa,
+                                    param->nthreads,
+                                    param->type,
+                                    param->ensemble,
+                                    param->gpo,
+                                    param->gpe,
+                                    param->tgpe,
+                                    param->ensemble_seed));
+        }else{
+                RUN(kalign_run(msa,
+                               param->nthreads,
+                               param->type,
+                               param->gpo,
+                               param->gpe,
+                               param->tgpe,
+                               param->refine,
+                               param->adaptive_budget));
+        }
 
 
         RUN(kalign_write_msa(msa, param->outfile, param->format));

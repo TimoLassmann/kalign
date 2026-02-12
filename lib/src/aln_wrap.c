@@ -48,7 +48,10 @@ ERROR:
         return FAIL;
 }
 
-int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, float tgpe, int refine, int adaptive_budget)
+int kalign_run_seeded(struct msa *msa, int n_threads, int type,
+                      float gpo, float gpe, float tgpe,
+                      int refine, int adaptive_budget,
+                      uint64_t tree_seed, float tree_noise)
 {
         struct aln_tasks* tasks = NULL;
         struct aln_param* ap = NULL;
@@ -72,33 +75,25 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
         }else{
                 ERROR_MSG("Unable to determine what alphabet to use.");
         }
-        /* LOG_MSG("L: %d  threads: %d",msa->L, n_threads); */
-        /* Start the heavy lifting  */
-
-        /* if(my_file_exists("tasklist.txt")){ */
-        /*         LOG_MSG("Found task list"); */
-        /*         read_tasks(&tasks , "tasklist.txt"); */
-        /* }else{ */
 
         RUN(alloc_tasks(&tasks, msa->numseq));
 
 #ifdef HAVE_OPENMP
         omp_set_num_threads(n_threads);
 #endif
-        /* Build guide tree */
-        RUN(build_tree_kmeans(msa,&tasks));
+        /* Build guide tree - noisy variant if seed != 0 */
+        if(tree_seed != 0 && tree_noise > 0.0f){
+                RUN(build_tree_kmeans_noisy(msa, &tasks, tree_seed, tree_noise));
+        }else{
+                RUN(build_tree_kmeans(msa, &tasks));
+        }
 
         /* Convert to full alphabet after having converted to reduced alphabet for tree building above  */
         if(msa->biotype == ALN_BIOTYPE_PROTEIN){
                 RUN(convert_msa_to_internal(msa, ALPHA_ambigiousPROTEIN));
         }
 
-        /* write_tasks(tasks, "tasklist.txt"); */
-/*         } */
-
-        /* LOG_MSG("L: %d",msa->L); */
         /* align  */
-        /* if gap penalties are not negative they are set below */
         RUN(aln_param_init(&ap,
                            msa->biotype,
                            n_threads,
@@ -115,7 +110,6 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
         START_TIMER(t1);
 
         RUN(create_msa_tree(msa, ap, tasks));
-        /* Hurrah we have aligned sequences  */
         msa->aligned = ALN_STATUS_ALIGNED;
 
         /* Optional iterative refinement */
@@ -125,14 +119,7 @@ int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, f
 
         RUN(finalise_alignment(msa));
 
-
-
-
-        /* LOG_MSG("Internal "); */
-        /* kalign_write_msa(msa, NULL,"fasta"); */
         RUN(msa_sort_rank(msa));
-        /* LOG_MSG("Rank"); */
-        /* kalign_write_msa(msa, NULL,"fasta"); */
 
         STOP_TIMER(t1);
         if(!msa->quiet){
@@ -147,4 +134,9 @@ ERROR:
         aln_param_free(ap);
         free_tasks(tasks);
         return FAIL;
+}
+
+int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, float tgpe, int refine, int adaptive_budget)
+{
+        return kalign_run_seeded(msa, n_threads, type, gpo, gpe, tgpe, refine, adaptive_budget, 0, 0.0f);
 }

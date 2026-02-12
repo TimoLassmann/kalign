@@ -23,6 +23,8 @@
 #ifndef BISECTINGKMEANS_H
 #define BISECTINGKMEANS_H
 
+#include <stdint.h>
+
 
 #ifdef BISECTINGKMEANS_IMPORT
 #define EXTERN
@@ -42,10 +44,9 @@ struct msa;
 /* int build_tree_kmeans(struct msa* msa, struct aln_param* ap,struct  aln_tasks** task_list); */
 
 EXTERN int build_tree_kmeans(struct msa* msa, struct aln_tasks** tasks);
-/* EXTERN int build_tree_kmeans(struct msa* msa, int n_threads, struct aln_tasks** tasks); */
-//int build_tree_kmeans(struct msa* msa, struct aln_param* ap);
+EXTERN int build_tree_kmeans_noisy(struct msa* msa, struct aln_tasks** tasks,
+                                   uint64_t seed, float noise_sigma);
 
-// extern int build_tree_kmeans(struct msa* msa, struct aln_param* ap);
 #undef BISECTINGKMEANS_IMPORT
 #undef EXTERN
 

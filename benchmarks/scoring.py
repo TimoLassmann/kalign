@@ -31,7 +31,7 @@ class AlignmentResult:
 
 def align_with_python_api(
     case: BenchmarkCase, output: Path, n_threads: int = 1, refine: str = "none",
-    adaptive_budget: bool = False,
+    adaptive_budget: bool = False, ensemble: int = 0,
 ) -> float:
     """Align using kalign Python API. Returns wall time in seconds."""
     start = time.perf_counter()
@@ -43,6 +43,7 @@ def align_with_python_api(
         n_threads=n_threads,
         refine=refine,
         adaptive_budget=adaptive_budget,
+        ensemble=ensemble,
     )
     return time.perf_counter() - start
 
@@ -54,6 +55,7 @@ def align_with_cli(
     n_threads: int = 1,
     refine: str = "none",
     adaptive_budget: bool = False,
+    ensemble: int = 0,
 ) -> float:
     """Align using kalign C binary via subprocess. Returns wall time in seconds."""
     cmd = [binary, "-i", str(case.unaligned), "-f", "fasta", "-o", str(output)]
@@ -63,6 +65,8 @@ def align_with_cli(
         cmd.extend(["--refine", refine])
     if adaptive_budget:
         cmd.append("--adaptive-budget")
+    if ensemble > 0:
+        cmd.extend(["--ensemble", str(ensemble)])
 
     start = time.perf_counter()
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -88,6 +92,7 @@ def run_case(
     n_threads: int = 1,
     refine: str = "none",
     adaptive_budget: bool = False,
+    ensemble: int = 0,
 ) -> AlignmentResult:
     """Run alignment + scoring for a single benchmark case."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -95,9 +100,9 @@ def run_case(
 
         try:
             if method == "python_api":
-                wall_time = align_with_python_api(case, output, n_threads, refine, adaptive_budget)
+                wall_time = align_with_python_api(case, output, n_threads, refine, adaptive_budget, ensemble)
             elif method == "cli":
-                wall_time = align_with_cli(case, output, binary, n_threads, refine, adaptive_budget)
+                wall_time = align_with_cli(case, output, binary, n_threads, refine, adaptive_budget, ensemble)
             else:
                 raise ValueError(f"Unknown method: {method}")
 

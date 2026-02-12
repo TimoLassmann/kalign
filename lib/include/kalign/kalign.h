@@ -1,6 +1,8 @@
 #ifndef KALIGN_H
 #define KALIGN_H
 
+#include <stdint.h>
+
 #ifdef KALIGN_IMPORT
    #define EXTERN
 #else
@@ -41,6 +43,16 @@ EXTERN int kalign(char **seq, int *len, int numseq, int n_threads, int type,
                   int *out_aln_len);
 
 EXTERN int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, float tgpe, int refine, int adaptive_budget);
+
+EXTERN int kalign_run_seeded(struct msa *msa, int n_threads, int type,
+                             float gpo, float gpe, float tgpe,
+                             int refine, int adaptive_budget,
+                             uint64_t tree_seed, float tree_noise);
+
+EXTERN int kalign_ensemble(struct msa* msa, int n_threads, int type,
+                           int n_runs, float gpo, float gpe, float tgpe,
+                           uint64_t seed);
+
 /* Memory */
 EXTERN void kalign_free_msa(struct msa* msa);
 
