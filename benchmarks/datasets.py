@@ -59,6 +59,9 @@ def balibase_cases() -> List[BenchmarkCase]:
     """Discover BAliBASE test cases (*.tfa paired with *.msf)."""
     cases = []
     for tfa in sorted(BALIBASE_DIR.rglob("*.tfa")):
+        # Skip BBS (truncated) cases — only use full-length BB alignments
+        if tfa.stem.startswith("BBS"):
+            continue
         msf = tfa.with_suffix(".msf")
         if not msf.exists():
             continue
@@ -87,8 +90,10 @@ def balibase_cases() -> List[BenchmarkCase]:
 # ---------------------------------------------------------------------------
 
 BRALIBASE_URLS = [
-    ("data-set1", "http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz"),
-    ("data-set2", "http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz"),
+    ("data-set1",
+     "https://web.archive.org/web/20160408045442/http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz"),
+    ("data-set2",
+     "https://web.archive.org/web/20160408045453/http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz"),
 ]
 
 
@@ -116,27 +121,40 @@ def bralibase_is_available() -> bool:
 def bralibase_cases() -> List[BenchmarkCase]:
     """Discover BRAliBASE test cases.
 
-    Structure: structural/*.fa (reference) paired with unaligned/*.fa
+    data-set1 structure: {family}/structural/*.fa paired with {family}/unaligned/*.fa
+      families: g2intron, rRNA, SRP, tRNA, U5
+    data-set2 structure: structural/*.fasta paired with unaligned/*.fasta
     """
     cases = []
     for name, _ in BRALIBASE_URLS:
         base = DOWNLOADS_DIR / name
         if not base.exists():
             continue
-        for ref in sorted(base.rglob("structural/*.fa")):
-            # Corresponding unaligned file
+        # Glob for both .fa and .fasta reference files
+        refs = sorted(list(base.rglob("structural/*.fa")) +
+                      list(base.rglob("structural/*.fasta")))
+        for ref in refs:
+            # Corresponding unaligned file — try same extension first, then alternative
             unaligned_dir = ref.parent.parent / "unaligned"
             unaligned = unaligned_dir / ref.name
             if not unaligned.exists():
-                # Try .fasta extension
-                unaligned = unaligned_dir / ref.with_suffix(".fasta").name
+                alt_ext = ".fasta" if ref.suffix == ".fa" else ".fa"
+                unaligned = unaligned_dir / (ref.stem + alt_ext)
                 if not unaligned.exists():
                     continue
             family = ref.stem
+            # For data-set1, extract RNA family category from path
+            # e.g. data-set1/tRNA/structural/aln1.fa -> category "tRNA"
+            structural_parent = ref.parent.parent.name
+            if structural_parent != name:
+                # This is a subcategory (g2intron, rRNA, SRP, tRNA, U5)
+                dataset = f"bralibase_{structural_parent}"
+            else:
+                dataset = f"bralibase_{name}"
             cases.append(
                 BenchmarkCase(
                     family=family,
-                    dataset=f"bralibase_{name}",
+                    dataset=dataset,
                     unaligned=unaligned,
                     reference=ref,
                     seq_type="rna",

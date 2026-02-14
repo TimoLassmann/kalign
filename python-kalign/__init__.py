@@ -51,6 +51,8 @@ def align(
     gap_extend: Optional[float] = None,
     terminal_gap_extend: Optional[float] = None,
     n_threads: Optional[int] = None,
+    refine: Union[str, int] = "confident",
+    ensemble: int = 0,
     fmt: Literal["plain", "biopython", "skbio"] = "plain",
     ids: Optional[List[str]] = None,
 ) -> Union[List[str], Any]:
@@ -79,6 +81,11 @@ def align(
         Terminal gap extension penalty (positive value, e.g. 1.0). If None, uses Kalign defaults.
     n_threads : int, optional
         Number of threads to use for alignment. If None, uses global default.
+    refine : str or int, optional
+        Refinement mode: "none", "all", or "confident" (default: "confident").
+    ensemble : int, optional
+        Number of ensemble runs (default: 0 = off). Set to e.g. 5 for higher
+        accuracy at the cost of ~13x runtime.
     fmt : {'plain', 'biopython', 'skbio'}, default 'plain'
         Choose return-object flavour:
         - 'plain': list of aligned sequences (fastest)
@@ -249,6 +256,13 @@ def align(
             stacklevel=2,
         )
 
+    # Convert refine mode
+    refine_int = _parse_refine_mode(refine)
+
+    # Validate ensemble
+    if not isinstance(ensemble, int) or ensemble < 0:
+        raise ValueError("ensemble must be a non-negative integer")
+
     # Call the C++ binding for core alignment
     try:
         aligned_seqs = _core.align(
@@ -258,6 +272,8 @@ def align(
             gap_extend,
             terminal_gap_extend,
             n_threads,
+            refine_int,
+            ensemble,
         )
     except Exception as e:
         raise RuntimeError(f"Alignment failed: {str(e)}")
@@ -412,10 +428,14 @@ def align_from_file(
     gap_extend: Optional[float] = None,
     terminal_gap_extend: Optional[float] = None,
     n_threads: Optional[int] = None,
-    refine: Union[str, int] = "none",
+    refine: Union[str, int] = "confident",
     adaptive_budget: bool = False,
     ensemble: int = 0,
     ensemble_seed: int = 42,
+    dist_scale: float = 0.0,
+    vsm_amax: float = -1.0,
+    min_support: int = 0,
+    realign: int = 0,
 ) -> AlignedSequences:
     """
     Align sequences from a file using Kalign.
@@ -435,6 +455,11 @@ def align_from_file(
         Terminal gap extension penalty
     n_threads : int, optional
         Number of threads to use for alignment
+    vsm_amax : float, optional
+        Variable scoring matrix a_max parameter (default: -1.0 = use
+        kalign defaults: 2.0 for protein, 0.0 for DNA/RNA). Set to 0.0
+        to disable. When > 0, subtracts max(0, amax - d) from all
+        substitution scores, where d is the estimated pairwise distance.
 
     Returns
     -------
@@ -502,6 +527,10 @@ def align_from_file(
             int(adaptive_budget),
             ensemble,
             ensemble_seed,
+            dist_scale,
+            vsm_amax,
+            min_support,
+            realign,
         )
         return AlignedSequences(names=names, sequences=sequences)
     except Exception as e:
@@ -677,6 +706,57 @@ def compare(reference_file: str, test_file: str) -> float:
     return _core.compare(reference_file, test_file)
 
 
+def compare_detailed(
+    reference_file: str,
+    test_file: str,
+    max_gap_frac: float = 0.2,
+    column_mask: Optional[List[int]] = None,
+) -> dict:
+    """
+    Compare two multiple sequence alignments returning detailed POAR scores.
+
+    Computes BAliBASE-compatible recall (SP), precision, F1, and TC scores.
+    Only "core" columns (gap fraction <= max_gap_frac in reference) are scored
+    for recall/TC. Gap-gap matches are NOT counted.
+
+    Parameters
+    ----------
+    reference_file : str
+        Path to reference alignment file (FASTA, MSF, or Clustal format)
+    test_file : str
+        Path to test alignment file
+    max_gap_frac : float, optional
+        Maximum gap fraction for a reference column to be scored (default: 0.2).
+        Use -1.0 to score all columns regardless of gap content.
+        Ignored when column_mask is provided.
+    column_mask : list of int, optional
+        Explicit binary mask (0/1) for each column in the reference alignment.
+        When provided, only columns with mask=1 are scored (overrides max_gap_frac).
+        Typically parsed from BAliBASE XML core block annotations.
+
+    Returns
+    -------
+    dict
+        Keys: recall, precision, f1, tc, ref_pairs, test_pairs, common_pairs
+
+    Raises
+    ------
+    FileNotFoundError
+        If either file doesn't exist
+    RuntimeError
+        If comparison fails
+    """
+    if not os.path.exists(reference_file):
+        raise FileNotFoundError(f"Reference file not found: {reference_file}")
+    if not os.path.exists(test_file):
+        raise FileNotFoundError(f"Test file not found: {test_file}")
+
+    if column_mask is not None:
+        return _core.compare_detailed_with_mask(reference_file, test_file, column_mask)
+
+    return _core.compare_detailed(reference_file, test_file, max_gap_frac)
+
+
 def align_file_to_file(
     input_file: str,
     output_file: str,
@@ -686,10 +766,14 @@ def align_file_to_file(
     gap_extend: Optional[float] = None,
     terminal_gap_extend: Optional[float] = None,
     n_threads: Optional[int] = None,
-    refine: Union[str, int] = "none",
+    refine: Union[str, int] = "confident",
     adaptive_budget: bool = False,
     ensemble: int = 0,
     ensemble_seed: int = 42,
+    dist_scale: float = 0.0,
+    vsm_amax: float = -1.0,
+    min_support: int = 0,
+    realign: int = 0,
 ) -> None:
     """
     Align sequences from input file and write result to output file.
@@ -715,6 +799,10 @@ def align_file_to_file(
         Terminal gap extension penalty
     n_threads : int, optional
         Number of threads (default: uses global setting)
+    vsm_amax : float, optional
+        Variable scoring matrix a_max parameter (default: -1.0 = use
+        kalign defaults: 2.0 for protein, 0.0 for DNA/RNA). Set to 0.0
+        to disable.
 
     Raises
     ------
@@ -769,6 +857,10 @@ def align_file_to_file(
         int(adaptive_budget),
         ensemble,
         ensemble_seed,
+        dist_scale,
+        vsm_amax,
+        min_support,
+        realign,
     )
 
 
@@ -781,6 +873,7 @@ __all__ = [
     "align_from_file",
     "align_file_to_file",
     "compare",
+    "compare_detailed",
     "write_alignment",
     "generate_test_sequences",
     "set_num_threads",

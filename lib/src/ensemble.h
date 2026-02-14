@@ -19,6 +19,10 @@ EXTERN int kalign_ensemble(struct msa* msa, int n_threads, int type,
                            int n_runs, float gpo, float gpe, float tgpe,
                            uint64_t seed);
 
+EXTERN int kalign_ensemble_consensus(struct msa* msa, int n_threads, int type,
+                                     int n_runs, float gpo, float gpe, float tgpe,
+                                     uint64_t seed, int min_support);
+
 #undef ENSEMBLE_IMPORT
 #undef EXTERN
 

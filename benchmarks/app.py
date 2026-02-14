@@ -27,6 +27,20 @@ from .scoring import run_case
 RESULTS_DIR = Path(__file__).parent / "results"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
+# ---------------------------------------------------------------------------
+# Configuration presets — the 4 varieties of kalign
+# ---------------------------------------------------------------------------
+
+CONFIG_PRESETS = {
+    "Kalign (default)": {"refine": "none", "ensemble": 0},
+    "Kalign + Refinement": {"refine": "confident", "ensemble": 0},
+    "Ensemble (8 runs)": {"refine": "none", "ensemble": 8},
+    "Ensemble (12 runs)": {"refine": "none", "ensemble": 12},
+    "Clustal Omega": {"method": "clustalo", "refine": "none", "ensemble": 0},
+    "MAFFT": {"method": "mafft", "refine": "none", "ensemble": 0},
+    "MUSCLE": {"method": "muscle", "refine": "none", "ensemble": 0},
+}
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -47,11 +61,46 @@ def _load_json(path):
         return json.load(f)
 
 
+_EXTERNAL_LABELS = {
+    "clustalo": "Clustal Omega",
+    "mafft": "MAFFT",
+    "muscle": "MUSCLE",
+}
+
+
+def _config_label(row):
+    """Build a human-readable configuration label from result fields."""
+    method = row.get("method", "python_api")
+    if method in _EXTERNAL_LABELS:
+        return _EXTERNAL_LABELS[method]
+
+    ensemble = row.get("ensemble", 0)
+    refine = row.get("refine", "none")
+
+    if ensemble and ensemble > 0:
+        label = f"Ensemble ({ensemble})"
+    elif refine and refine != "none":
+        label = f"Kalign + {refine}"
+    else:
+        label = "Kalign"
+    return label
+
+
 def _results_to_df(results):
     """Convert list of AlignmentResult dicts to DataFrame."""
     df = pd.DataFrame(results)
     if "error" in df.columns:
-        df = df[df["error"].isna() | (df["error"] == "None")]
+        df = df[df["error"].isna() | (df["error"] == "None") | (df["error"].isnull())]
+    # Ensure columns exist (backward compat with old JSON files)
+    if "ensemble" not in df.columns:
+        df["ensemble"] = 0
+    df["ensemble"] = df["ensemble"].fillna(0).astype(int)
+    for col in ("recall", "precision", "f1", "tc"):
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = df[col].fillna(0.0)
+    # Add config label for plotting
+    df["config"] = df.apply(_config_label, axis=1)
     return df
 
 
@@ -67,33 +116,113 @@ def _build_figures(df):
     if clean.empty:
         return figs
 
-    # Box plot by dataset
-    fig_box = px.box(
-        clean, x="dataset", y="sp_score", color="method",
-        title="SP Score Distribution by Dataset",
-        labels={"sp_score": "SP Score", "dataset": "Dataset"},
-    )
-    fig_box.update_layout(legend=dict(orientation="h", y=-0.2))
-    figs.append(("sp_box", fig_box))
+    # Ensure new columns exist (backward compat with old JSON files)
+    for col in ("recall", "precision", "f1", "tc"):
+        if col not in clean.columns:
+            clean[col] = 0.0
 
-    # Scatter by family
+    # Determine color column: use 'config' if multiple configs, else 'method'
+    configs = clean["config"].nunique()
+    color_col = "config" if configs > 1 else "method"
+
+    # bali_score-compatible metrics
+    has_recall = clean["recall"].sum() > 0
+    if has_recall:
+        # SP score (bali_score compatible) = recall
+        fig_sp = px.box(
+            clean, x="dataset", y="recall", color=color_col,
+            title="SP Score by Dataset (bali_score compatible)",
+            labels={"recall": "SP Score", "dataset": "Dataset", "config": "Configuration"},
+        )
+        fig_sp.update_layout(legend=dict(orientation="h", y=-0.2))
+        figs.append(("sp_box", fig_sp))
+
+        # TC score
+        fig_tc = px.box(
+            clean, x="dataset", y="tc", color=color_col,
+            title="TC Score by Dataset",
+            labels={"tc": "TC Score", "dataset": "Dataset", "config": "Configuration"},
+        )
+        fig_tc.update_layout(legend=dict(orientation="h", y=-0.2))
+        figs.append(("tc_box", fig_tc))
+
+        # Precision
+        fig_prec = px.box(
+            clean, x="dataset", y="precision", color=color_col,
+            title="Precision by Dataset",
+            labels={"precision": "Precision", "dataset": "Dataset", "config": "Configuration"},
+        )
+        fig_prec.update_layout(legend=dict(orientation="h", y=-0.2))
+        figs.append(("precision_box", fig_prec))
+
+        # F1
+        fig_f1 = px.box(
+            clean, x="dataset", y="f1", color=color_col,
+            title="F1 Score by Dataset",
+            labels={"f1": "F1", "dataset": "Dataset", "config": "Configuration"},
+        )
+        fig_f1.update_layout(legend=dict(orientation="h", y=-0.2))
+        figs.append(("f1_box", fig_f1))
+    else:
+        # Fallback: legacy SP score (not bali_score compatible)
+        fig_box = px.box(
+            clean, x="dataset", y="sp_score", color=color_col,
+            title="SP Score Distribution by Dataset (legacy)",
+            labels={"sp_score": "SP Score", "dataset": "Dataset", "config": "Configuration"},
+        )
+        fig_box.update_layout(legend=dict(orientation="h", y=-0.2))
+        figs.append(("sp_box", fig_box))
+
+    # Strip plot by family
+    hover_cols = ["family", "wall_time", "refine", "ensemble"]
+    if has_recall:
+        hover_cols.extend(["recall", "precision", "f1", "tc"])
+    y_strip = "recall" if has_recall else "sp_score"
     fig_scatter = px.strip(
-        clean, x="dataset", y="sp_score", color="method",
-        hover_data=["family", "wall_time"],
+        clean, x="dataset", y=y_strip, color=color_col,
+        hover_data=hover_cols,
         title="SP Score per Family",
-        labels={"sp_score": "SP Score"},
+        labels={"recall": "SP Score", "sp_score": "SP Score (legacy)", "config": "Configuration"},
     )
     fig_scatter.update_layout(legend=dict(orientation="h", y=-0.2))
-    figs.append(("sp_scatter", fig_scatter))
+    figs.append(("scatter", fig_scatter))
 
     # Timing
     fig_time = px.box(
-        clean, x="dataset", y="wall_time", color="method",
+        clean, x="dataset", y="wall_time", color=color_col,
         title="Alignment Time by Dataset",
-        labels={"wall_time": "Wall Time (s)", "dataset": "Dataset"},
+        labels={"wall_time": "Wall Time (s)", "dataset": "Dataset", "config": "Configuration"},
     )
     fig_time.update_layout(legend=dict(orientation="h", y=-0.2))
     figs.append(("timing", fig_time))
+
+    # Summary table by config x dataset
+    if configs > 1:
+        agg_dict = {
+            "mean_sp": ("sp_score", "mean"),
+            "median_sp": ("sp_score", "median"),
+            "mean_time": ("wall_time", "mean"),
+            "n_cases": ("sp_score", "count"),
+        }
+        if has_recall:
+            agg_dict.update({
+                "mean_recall": ("recall", "mean"),
+                "mean_precision": ("precision", "mean"),
+                "mean_f1": ("f1", "mean"),
+                "mean_tc": ("tc", "mean"),
+            })
+        summary = clean.groupby(["config", "dataset"]).agg(**agg_dict).reset_index()
+        summary = summary.round(3)
+        y_col = "mean_recall" if has_recall else "mean_sp"
+        y_label = "Mean SP Score" if has_recall else "Mean SP Score (legacy)"
+        fig_summary = px.bar(
+            summary, x="dataset", y=y_col, color="config",
+            barmode="group",
+            title=f"{y_label} by Dataset and Configuration",
+            labels={y_col: y_label, "dataset": "Dataset", "config": "Configuration"},
+        )
+        fig_summary.update_layout(legend=dict(orientation="h", y=-0.2))
+        figs.append(("summary_bar", fig_summary))
 
     return figs
 
@@ -110,7 +239,7 @@ _run_state = {
 }
 
 
-def _run_in_thread(dataset, methods, binary, max_cases, n_threads):
+def _run_in_thread(dataset, method, binary, max_cases, n_threads, configs):
     """Run benchmarks in a background thread so the UI stays responsive."""
     global _run_state
     _run_state["running"] = True
@@ -126,14 +255,23 @@ def _run_in_thread(dataset, methods, binary, max_cases, n_threads):
             _run_state["done"] = True
             return
 
-        total = len(cases) * len(methods)
+        total = len(cases) * len(configs)
         done = 0
 
-        for case in cases:
-            for method in methods:
+        for cfg_name, cfg in configs:
+            cfg_method = cfg.get("method", method)
+            refine = cfg["refine"]
+            ensemble = cfg["ensemble"]
+
+            for case in cases:
                 done += 1
-                _run_state["progress"] = f"[{done}/{total}] {case.family} ({method})..."
-                result = run_case(case, method=method, binary=binary, n_threads=n_threads)
+                _run_state["progress"] = (
+                    f"[{done}/{total}] {cfg_name}: {case.family}..."
+                )
+                result = run_case(
+                    case, method=cfg_method, binary=binary,
+                    n_threads=n_threads, refine=refine, ensemble=ensemble,
+                )
                 _run_state["results"].append(result.to_dict())
 
         # Auto-save
@@ -175,53 +313,95 @@ def create_app():
         html.Div([
             html.H3("Run Benchmark"),
             html.Div([
+                # Row 1: Dataset, method, binary
                 html.Div([
-                    html.Label("Dataset"),
-                    dcc.Dropdown(
-                        id="dataset-dropdown",
-                        options=[
-                            {"label": f"{name} ({'available' if avail else 'needs download'}, {n} cases)",
-                             "value": name}
-                            for name, avail, n in ds_info
-                        ],
-                        value="balibase",
-                    ),
-                ], style={"width": "25%", "display": "inline-block", "verticalAlign": "top", "marginRight": "2%"}),
+                    html.Div([
+                        html.Label("Dataset"),
+                        dcc.Dropdown(
+                            id="dataset-dropdown",
+                            options=[
+                                {"label": f"{name} ({'available' if avail else 'needs download'}, {n} cases)",
+                                 "value": name}
+                                for name, avail, n in ds_info
+                            ],
+                            value="balibase",
+                        ),
+                    ], style={"width": "30%", "display": "inline-block", "verticalAlign": "top", "marginRight": "2%"}),
+                    html.Div([
+                        html.Label("Method"),
+                        dcc.RadioItems(
+                            id="method-radio",
+                            options=[
+                                {"label": " Python API", "value": "python_api"},
+                                {"label": " C binary", "value": "cli"},
+                            ],
+                            value="python_api",
+                        ),
+                    ], style={"width": "12%", "display": "inline-block", "verticalAlign": "top", "marginRight": "2%"}),
+                    html.Div([
+                        html.Label("C binary path"),
+                        dcc.Input(id="binary-input", type="text", value="build/src/kalign",
+                                  style={"width": "160px"}),
+                    ], style={"width": "18%", "display": "inline-block", "verticalAlign": "top", "marginRight": "2%"}),
+                    html.Div([
+                        html.Label("Max cases (0=all)"),
+                        dcc.Input(id="max-cases-input", type="number", value=0, min=0, style={"width": "80px"}),
+                    ], style={"width": "10%", "display": "inline-block", "verticalAlign": "top", "marginRight": "2%"}),
+                    html.Div([
+                        html.Label("Threads"),
+                        dcc.Input(id="threads-input", type="number", value=1, min=1, style={"width": "60px"}),
+                    ], style={"width": "8%", "display": "inline-block", "verticalAlign": "top"}),
+                ]),
+
+                html.Hr(style={"margin": "10px 0"}),
+
+                # Row 2: Configuration presets
                 html.Div([
-                    html.Label("Method"),
-                    dcc.Checklist(
-                        id="method-checklist",
-                        options=[
-                            {"label": " Python API", "value": "python_api"},
-                            {"label": " C binary", "value": "cli"},
-                        ],
-                        value=["python_api"],
-                    ),
-                ], style={"width": "12%", "display": "inline-block", "verticalAlign": "top", "marginRight": "2%"}),
-                html.Div([
-                    html.Label("C binary path"),
-                    dcc.Input(id="binary-input", type="text", value="build/src/kalign",
-                              style={"width": "160px"}),
-                ], style={"width": "18%", "display": "inline-block", "verticalAlign": "top", "marginRight": "2%"}),
-                html.Div([
-                    html.Label("Max cases (0 = all)"),
-                    dcc.Input(id="max-cases-input", type="number", value=0, min=0, style={"width": "80px"}),
-                ], style={"width": "12%", "display": "inline-block", "verticalAlign": "top", "marginRight": "2%"}),
-                html.Div([
-                    html.Label("Threads"),
-                    dcc.Input(id="threads-input", type="number", value=1, min=1, style={"width": "60px"}),
-                ], style={"width": "8%", "display": "inline-block", "verticalAlign": "top", "marginRight": "2%"}),
-                html.Div([
-                    html.Br(),
-                    html.Button("Download Dataset", id="download-btn", n_clicks=0,
-                                style={"marginRight": "10px"}),
-                    html.Button("Run Benchmark", id="run-btn", n_clicks=0,
-                                style={"backgroundColor": "#4CAF50", "color": "white",
-                                       "border": "none", "padding": "8px 16px", "cursor": "pointer"}),
-                ], style={"width": "15%", "display": "inline-block", "verticalAlign": "top"}),
+                    html.Div([
+                        html.Label("Configurations to run"),
+                        dcc.Checklist(
+                            id="config-checklist",
+                            options=[{"label": f" {name}", "value": name}
+                                     for name in CONFIG_PRESETS],
+                            value=["Kalign (default)"],
+                            style={"lineHeight": "2"},
+                        ),
+                    ], style={"width": "35%", "display": "inline-block", "verticalAlign": "top", "marginRight": "2%"}),
+                    html.Div([
+                        html.Label("Custom ensemble runs"),
+                        dcc.Input(id="custom-ensemble-input", type="number", value=8, min=2, max=32,
+                                  style={"width": "80px"}),
+                        html.Br(),
+                        html.Label("Custom refine mode", style={"marginTop": "8px"}),
+                        dcc.Dropdown(
+                            id="custom-refine-dropdown",
+                            options=[
+                                {"label": "none", "value": "none"},
+                                {"label": "confident", "value": "confident"},
+                                {"label": "all", "value": "all"},
+                            ],
+                            value="none",
+                            style={"width": "140px"},
+                        ),
+                        html.Button("+ Add custom config", id="add-custom-btn", n_clicks=0,
+                                    style={"marginTop": "8px"}),
+                    ], style={"width": "25%", "display": "inline-block", "verticalAlign": "top", "marginRight": "2%"}),
+                    html.Div([
+                        html.Br(),
+                        html.Button("Download Dataset", id="download-btn", n_clicks=0,
+                                    style={"marginRight": "10px"}),
+                        html.Br(), html.Br(),
+                        html.Button("Run Benchmark", id="run-btn", n_clicks=0,
+                                    style={"backgroundColor": "#4CAF50", "color": "white",
+                                           "border": "none", "padding": "12px 24px", "cursor": "pointer",
+                                           "fontSize": "14px"}),
+                    ], style={"width": "20%", "display": "inline-block", "verticalAlign": "top"}),
+                ]),
             ]),
             html.Div(id="progress-text", style={"marginTop": "10px", "fontStyle": "italic"}),
             dcc.Interval(id="progress-interval", interval=1000, n_intervals=0, disabled=True),
+            # Hidden store for custom configs
+            dcc.Store(id="custom-configs-store", data=[]),
         ], style={"padding": "15px", "backgroundColor": "#f5f5f5", "borderRadius": "8px", "marginBottom": "20px"}),
 
         # --- Load saved results ---
@@ -261,20 +441,57 @@ def create_app():
         return [{"label": f.name, "value": str(f)} for f in files]
 
     @app.callback(
+        Output("custom-configs-store", "data"),
+        Output("config-checklist", "options"),
+        Output("config-checklist", "value"),
+        Input("add-custom-btn", "n_clicks"),
+        State("custom-ensemble-input", "value"),
+        State("custom-refine-dropdown", "value"),
+        State("custom-configs-store", "data"),
+        State("config-checklist", "options"),
+        State("config-checklist", "value"),
+        prevent_initial_call=True,
+    )
+    def add_custom_config(_n, ensemble_n, refine, custom_cfgs, options, selected):
+        """Add a custom configuration to the checklist."""
+        ensemble_n = ensemble_n or 0
+        refine = refine or "none"
+
+        if ensemble_n > 0:
+            name = f"Ensemble ({ensemble_n}) + {refine}"
+        else:
+            name = f"Custom (refine={refine})"
+
+        cfg = {"refine": refine, "ensemble": ensemble_n}
+
+        # Avoid duplicates
+        for existing in custom_cfgs:
+            if existing["name"] == name:
+                return custom_cfgs, options, selected
+
+        custom_cfgs.append({"name": name, **cfg})
+        options.append({"label": f" {name}", "value": name})
+        selected.append(name)
+        return custom_cfgs, options, selected
+
+    @app.callback(
         Output("progress-text", "children"),
         Output("progress-interval", "disabled"),
         Input("run-btn", "n_clicks"),
         Input("download-btn", "n_clicks"),
         Input("progress-interval", "n_intervals"),
         State("dataset-dropdown", "value"),
-        State("method-checklist", "value"),
+        State("method-radio", "value"),
         State("binary-input", "value"),
         State("max-cases-input", "value"),
         State("threads-input", "value"),
+        State("config-checklist", "value"),
+        State("custom-configs-store", "data"),
         prevent_initial_call=True,
     )
     def handle_run_or_download(run_clicks, dl_clicks, _n_intervals,
-                                dataset, methods, binary, max_cases, n_threads):
+                                dataset, method, binary, max_cases, n_threads,
+                                selected_configs, custom_cfgs):
         triggered = callback_context.triggered_id
 
         if triggered == "download-btn" and not _run_state["running"]:
@@ -285,22 +502,36 @@ def create_app():
                 return f"Download error: {e}", True
 
         if triggered == "run-btn" and not _run_state["running"]:
-            if not methods:
-                return "Select at least one method.", True
+            if not selected_configs:
+                return "Select at least one configuration.", True
+
+            # Build config list from presets + custom
+            configs = []
+            custom_by_name = {c["name"]: c for c in (custom_cfgs or [])}
+            for name in selected_configs:
+                if name in CONFIG_PRESETS:
+                    configs.append((name, CONFIG_PRESETS[name]))
+                elif name in custom_by_name:
+                    c = custom_by_name[name]
+                    configs.append((name, {"refine": c["refine"], "ensemble": c["ensemble"]}))
+
+            if not configs:
+                return "No valid configurations selected.", True
+
             t = threading.Thread(
                 target=_run_in_thread,
-                args=(dataset, methods, binary or "build/src/kalign",
-                      max_cases or 0, n_threads or 1),
+                args=(dataset, method, binary or "build/src/kalign",
+                      max_cases or 0, n_threads or 1, configs),
                 daemon=True,
             )
             t.start()
-            return "Starting...", False  # enable interval
+            return f"Starting {len(configs)} configuration(s)...", False
 
         # Polling progress
         if _run_state["running"]:
             return _run_state["progress"], False
         if _run_state["done"]:
-            return _run_state["progress"], True  # disable interval
+            return _run_state["progress"], True
 
         return dash.no_update, dash.no_update
 
@@ -359,12 +590,13 @@ def main():
         description="Kalign benchmark dashboard",
         prog="python -m benchmarks.app",
     )
+    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8050, help="Port (default: 8050)")
     args = parser.parse_args()
 
     app = create_app()
-    print(f"Starting dashboard at http://localhost:{args.port}")
-    app.run(debug=False, port=args.port)
+    print(f"Starting dashboard at http://{args.host}:{args.port}")
+    app.run(debug=False, host=args.host, port=args.port)
 
 
 if __name__ == "__main__":

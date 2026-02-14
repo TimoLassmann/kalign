@@ -49,9 +49,30 @@ EXTERN int kalign_run_seeded(struct msa *msa, int n_threads, int type,
                              int refine, int adaptive_budget,
                              uint64_t tree_seed, float tree_noise);
 
+EXTERN int kalign_run_dist_scale(struct msa *msa, int n_threads, int type,
+                                  float gpo, float gpe, float tgpe,
+                                  int refine, int adaptive_budget,
+                                  float dist_scale, float vsm_amax);
+
+EXTERN int kalign_run_realign(struct msa *msa, int n_threads, int type,
+                              float gpo, float gpe, float tgpe,
+                              int refine, int adaptive_budget,
+                              float dist_scale, float vsm_amax,
+                              int realign_iterations);
+
+EXTERN int kalign_post_realign(struct msa *msa, int n_threads, int type,
+                               float gpo, float gpe, float tgpe,
+                               int refine, int adaptive_budget,
+                               float dist_scale, float vsm_amax,
+                               int realign_iterations);
+
 EXTERN int kalign_ensemble(struct msa* msa, int n_threads, int type,
                            int n_runs, float gpo, float gpe, float tgpe,
                            uint64_t seed);
+
+EXTERN int kalign_ensemble_consensus(struct msa* msa, int n_threads, int type,
+                                     int n_runs, float gpo, float gpe, float tgpe,
+                                     uint64_t seed, int min_support);
 
 /* Memory */
 EXTERN void kalign_free_msa(struct msa* msa);
@@ -62,6 +83,15 @@ EXTERN int reformat_settings_msa(struct msa *msa, int rename, int unalign);
 EXTERN int kalign_check_msa(struct msa* msa, int exit_on_error);
 
 EXTERN int kalign_msa_compare(struct msa *r, struct msa *t, float *score);
+
+struct poar_score;
+EXTERN int kalign_msa_compare_detailed(struct msa *r, struct msa *t,
+                                       float max_gap_frac,
+                                       struct poar_score *out);
+
+EXTERN int kalign_msa_compare_with_mask(struct msa *r, struct msa *t,
+                                        int *scored_cols, int n_cols,
+                                        struct poar_score *out);
 #undef KALIGN_IMPORT
 #undef EXTERN
 

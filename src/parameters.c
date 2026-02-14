@@ -21,6 +21,7 @@
 */
 
 #include "tldevel.h"
+#include "kalign/kalign.h"
 
 #include <string.h>
 #ifdef _WIN32
@@ -83,7 +84,7 @@ struct parameters*init_param(void)
         param->nthreads = get_default_thread_count();
         param->clean = 0;
         param->unalign = 0;
-        param->refine = 0;
+        param->refine = KALIGN_REFINE_CONFIDENT;
         param->adaptive_budget = 0;
         param->ensemble = 0;
         param->ensemble_seed = 42;

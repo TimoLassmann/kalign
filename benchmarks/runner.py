@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from .datasets import download_dataset, get_cases, DATASETS
-from .scoring import AlignmentResult, run_case
+from .scoring import AlignmentResult, EXTERNAL_TOOLS, run_case
 
 
 def _run_one(args):
@@ -17,6 +17,18 @@ def _run_one(args):
     case, method, binary, n_threads, refine, adaptive_budget, ensemble = args
     return run_case(case, method=method, binary=binary, n_threads=n_threads,
                     refine=refine, adaptive_budget=adaptive_budget, ensemble=ensemble)
+
+
+def _result_label(r) -> str:
+    """Format a concise label showing method and config for verbose output."""
+    if r.method in EXTERNAL_TOOLS:
+        return r.method
+    parts = ["kalign"]
+    if r.refine != "none":
+        parts.append(f"refine={r.refine}")
+    if r.ensemble:
+        parts.append(f"ens={r.ensemble}")
+    return " ".join(parts)
 
 
 def run_benchmark(
@@ -53,8 +65,12 @@ def run_benchmark(
     work = []
     for case in cases:
         for method in methods:
-            for refine in refine_modes:
-                work.append((case, method, binary, n_threads, refine, adaptive_budget, ensemble))
+            if method in EXTERNAL_TOOLS:
+                # External tools don't support refine/ensemble — run once
+                work.append((case, method, binary, n_threads, "none", False, 0))
+            else:
+                for refine in refine_modes:
+                    work.append((case, method, binary, n_threads, refine, adaptive_budget, ensemble))
 
     total = len(work)
 
@@ -62,15 +78,14 @@ def run_benchmark(
         # Sequential (original behavior)
         results = []
         for i, item in enumerate(work):
-            if verbose:
-                print(f"[{i+1}/{total}] {item[0].family} (refine={item[4]}) ... ", end="", flush=True)
             result = _run_one(item)
             results.append(result)
             if verbose:
+                label = _result_label(result)
                 if result.error:
-                    print(f"ERROR: {result.error}")
+                    print(f"[{i+1}/{total}] {result.family:<12} {label:<25} ERROR: {result.error}")
                 else:
-                    print(f"SP={result.sp_score:.1f}  time={result.wall_time:.2f}s")
+                    print(f"[{i+1}/{total}] {result.family:<12} {label:<25} SP={result.recall:.3f}  TC={result.tc:.3f}  F1={result.f1:.3f}  {result.wall_time:.1f}s")
     else:
         # Parallel execution
         results = [None] * total
@@ -83,10 +98,11 @@ def run_benchmark(
                 results[idx] = result
                 done += 1
                 if verbose:
+                    label = _result_label(result)
                     if result.error:
-                        print(f"[{done}/{total}] {result.family} (refine={result.refine}) ERROR: {result.error}")
+                        print(f"[{done}/{total}] {result.family:<12} {label:<25} ERROR: {result.error}")
                     else:
-                        print(f"[{done}/{total}] {result.family} (refine={result.refine}) SP={result.sp_score:.1f}  time={result.wall_time:.2f}s")
+                        print(f"[{done}/{total}] {result.family:<12} {label:<25} SP={result.recall:.3f}  TC={result.tc:.3f}  F1={result.f1:.3f}  {result.wall_time:.1f}s")
 
     return results
 
@@ -97,17 +113,27 @@ def print_summary(results: List[AlignmentResult]) -> None:
     for r in results:
         if r.error:
             continue
-        key = f"{r.method} refine={r.refine}"
+        ens = f" ensemble={r.ensemble}" if r.ensemble else ""
+        key = f"{r.method} refine={r.refine}{ens}"
         by_group.setdefault(key, []).append(r)
 
     for group, group_results in sorted(by_group.items()):
-        scores = [r.sp_score for r in group_results]
+        recalls = [r.recall for r in group_results]
+        precisions = [r.precision for r in group_results]
+        f1s = [r.f1 for r in group_results]
+        tcs = [r.tc for r in group_results]
         times = [r.wall_time for r in group_results]
 
         print(f"\n--- {group} ({len(group_results)} cases) ---")
-        print(f"  SP score:  mean={statistics.mean(scores):.1f}  "
-              f"median={statistics.median(scores):.1f}  "
-              f"min={min(scores):.1f}  max={max(scores):.1f}")
+        print(f"  SP:        mean={statistics.mean(recalls):.3f}  "
+              f"median={statistics.median(recalls):.3f}  "
+              f"min={min(recalls):.3f}  max={max(recalls):.3f}")
+        print(f"  TC:        mean={statistics.mean(tcs):.3f}  "
+              f"median={statistics.median(tcs):.3f}")
+        print(f"  Precision: mean={statistics.mean(precisions):.3f}  "
+              f"median={statistics.median(precisions):.3f}")
+        print(f"  F1:        mean={statistics.mean(f1s):.3f}  "
+              f"median={statistics.median(f1s):.3f}")
         print(f"  Time (s):  total={sum(times):.1f}  "
               f"mean={statistics.mean(times):.2f}  "
               f"max={max(times):.2f}")
@@ -131,17 +157,26 @@ def save_results(results: List[AlignmentResult], path: str) -> None:
     for r in results:
         if r.error:
             continue
-        key = f"{r.method}_refine={r.refine}"
+        ens = f"_ensemble={r.ensemble}" if r.ensemble else ""
+        key = f"{r.method}_refine={r.refine}{ens}"
         by_group.setdefault(key, []).append(r)
 
     for group, group_results in by_group.items():
         scores = [r.sp_score for r in group_results]
+        recalls = [r.recall for r in group_results]
+        precisions = [r.precision for r in group_results]
+        f1s = [r.f1 for r in group_results]
+        tcs = [r.tc for r in group_results]
         data["summary"][group] = {
             "n_cases": len(group_results),
             "sp_mean": statistics.mean(scores),
             "sp_median": statistics.median(scores),
             "sp_min": min(scores),
             "sp_max": max(scores),
+            "recall_mean": statistics.mean(recalls),
+            "precision_mean": statistics.mean(precisions),
+            "f1_mean": statistics.mean(f1s),
+            "tc_mean": statistics.mean(tcs),
             "total_time": sum(r.wall_time for r in group_results),
         }
 
@@ -166,7 +201,7 @@ def main() -> None:
         "--method",
         nargs="+",
         default=["python_api"],
-        choices=["python_api", "cli"],
+        choices=["python_api", "cli", "clustalo", "mafft", "muscle"],
         help="Alignment method(s) to test (default: python_api)",
     )
     parser.add_argument(

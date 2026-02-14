@@ -35,6 +35,7 @@ int aln_seqseq_foward(struct aln_mem* m)
         const float gpe = m->ap->gpe;
         const float tgpe = m->ap->tgpe;
         float** subm = m->ap->subm;
+        const float soff = m->ap->subm_offset;
 
         s[startb].a = s[0].a;
         s[startb].ga = s[0].ga;
@@ -78,7 +79,7 @@ int aln_seqseq_foward(struct aln_mem* m)
                 for (j = startb+1; j < endb;j++){
                         ca = s[j].a;
                         pa = MAX3(pa,pga-gpo,pgb-gpo);
-                        pa += subp[seq2[j]];
+                        pa += subp[seq2[j]] - soff;
 
                         s[j].a = pa;
 
@@ -97,7 +98,7 @@ int aln_seqseq_foward(struct aln_mem* m)
 
                 ca = s[j].a;
                 pa = MAX3(pa,pga-gpo,pgb-gpo);
-                pa += subp[seq2[j]];
+                pa += subp[seq2[j]] - soff;
 
                 s[j].a = pa;
 
@@ -137,6 +138,7 @@ int aln_seqseq_backward(struct aln_mem* m)
         const float gpe = m->ap->gpe;
         const float tgpe = m->ap->tgpe;
         float** subm = m->ap->subm;
+        const float soff = m->ap->subm_offset;
 
         s[endb].a = s[0].a ;
         s[endb].ga = s[0].ga;
@@ -187,7 +189,7 @@ int aln_seqseq_backward(struct aln_mem* m)
 
                         pa = MAX3(pa,pga - gpo,pgb-gpo);
 
-                        pa += subp[seq2[j]];
+                        pa += subp[seq2[j]] - soff;
 
                         s[j].a = pa;
 
@@ -208,7 +210,7 @@ int aln_seqseq_backward(struct aln_mem* m)
 
                 pa = MAX3(pa,pga - gpo,pgb-gpo);
 
-                pa += subp[seq2[j]];
+                pa += subp[seq2[j]] - soff;
 
                 s[j].a = pa;
 

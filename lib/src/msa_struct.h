@@ -32,6 +32,7 @@ struct msa_seq{
 
 struct msa{
         struct msa_seq** sequences;
+        float* seq_distances;   /* per-sequence mean distance (normalized), set during tree building */
         int** sip;
         int* nsip;
         int* plen;

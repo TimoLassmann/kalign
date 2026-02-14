@@ -32,6 +32,7 @@
 #include "aln_controller.h"
 #include "weave_alignment.h"
 #include "sp_score.h"
+#include "aln_run.h"
 
 #define ALN_REFINE_IMPORT
 #include "aln_refine.h"
@@ -113,6 +114,20 @@ int refine_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
         a = t->list[task_id]->a;
         b = t->list[task_id]->b;
         c = t->list[task_id]->c;
+
+        /* Distance-dependent parameter scaling (must match do_align) */
+        struct aln_param* orig_ap = ap;
+        struct aln_param scaled_ap;
+        float gap_scale = compute_gap_scale(msa, ap, a, b);
+        float subm_off = compute_subm_offset(msa, ap, a, b);
+        if(gap_scale < 1.0f || subm_off > 0.0f){
+                scaled_ap = *ap;
+                scaled_ap.gpo *= gap_scale;
+                scaled_ap.gpe *= gap_scale;
+                scaled_ap.tgpe *= gap_scale;
+                scaled_ap.subm_offset = subm_off;
+                ap = &scaled_ap;
+        }
 
         /* Build profiles progressively (same as do_align) */
         if(msa->nsip[a] == 1){
@@ -253,6 +268,9 @@ int refine_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
                 t->list[task_id]->confidence = 0.0F;
         }
 
+        /* Restore original aln_param for profile update (unscaled base penalties) */
+        ap = orig_ap;
+
         /* Merge profiles for downstream edges */
         MMALLOC(tmp, sizeof(float) * 64 * (ml->path[0] + 2));
         if(task_id != t->n_tasks - 1){
@@ -310,6 +328,20 @@ int replay_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
         b = t->list[task_id]->b;
         c = t->list[task_id]->c;
 
+        /* Distance-dependent parameter scaling (must match do_align) */
+        struct aln_param* orig_ap = ap;
+        struct aln_param scaled_ap;
+        float gap_scale = compute_gap_scale(msa, ap, a, b);
+        float subm_off = compute_subm_offset(msa, ap, a, b);
+        if(gap_scale < 1.0f || subm_off > 0.0f){
+                scaled_ap = *ap;
+                scaled_ap.gpo *= gap_scale;
+                scaled_ap.gpe *= gap_scale;
+                scaled_ap.tgpe *= gap_scale;
+                scaled_ap.subm_offset = subm_off;
+                ap = &scaled_ap;
+        }
+
         /* Build profiles (standard progressive approach) */
         if(msa->nsip[a] == 1){
                 len_a = msa->sequences[a]->len;
@@ -348,10 +380,13 @@ int replay_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
 
         RUN(convert_raw_path(ml));
 
+        /* Restore original aln_param for profile update (unscaled base penalties) */
+        ap = orig_ap;
+
         /* Merge profiles for downstream edges */
         MMALLOC(tmp, sizeof(float) * 64 * (ml->path[0] + 2));
         if(task_id != t->n_tasks - 1){
-                update_n(t->profile[a], t->profile[b], tmp, ml->ap, ml->path, msa->nsip[a], msa->nsip[b]);
+                update_n(t->profile[a], t->profile[b], tmp, ap, ml->path, msa->nsip[a], msa->nsip[b]);
         }
         t->profile[c] = tmp;
 

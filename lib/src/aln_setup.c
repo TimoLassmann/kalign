@@ -51,6 +51,7 @@ int make_profile_n(struct aln_param* ap,const uint8_t* seq,const int len, float*
         gpe = ap->gpe;
         tgpe = ap->tgpe;
         subm = ap->subm;
+        float soff = ap->subm_offset;
 
         MMALLOC(prof,sizeof(float)*(len+2)*64);
         prof +=  (64 *(len+1));
@@ -76,7 +77,7 @@ int make_profile_n(struct aln_param* ap,const uint8_t* seq,const int len, float*
                 prof += 32;
 
                 for(j = 23;j--;){
-                        prof[j] = subm[c][j];
+                        prof[j] = subm[c][j] - soff;
                 }
                 prof[23] = -gpo;
                 prof[24] = -gpe;

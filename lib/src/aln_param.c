@@ -85,6 +85,9 @@ int aln_param_init(struct aln_param **aln_param,int biotype , int n_threads, int
         if(tgpe >= 0.0){
                 ap->tgpe = tgpe;
         }
+        ap->dist_scale = 0.0f;
+        ap->vsm_amax = (biotype == ALN_BIOTYPE_PROTEIN) ? 2.0f : 0.0f;
+        ap->subm_offset = 0.0f;
         ap->adaptive_budget = 0;
         *aln_param = ap;
         return OK;

@@ -379,3 +379,137 @@ ERROR:
         if(ap) aln_param_free(ap);
         return FAIL;
 }
+
+int kalign_ensemble_consensus(struct msa* msa, int n_threads, int type,
+                              int n_runs, float gpo, float gpe, float tgpe,
+                              uint64_t seed, int min_support)
+{
+        struct msa* copy = NULL;
+        struct msa* consensus_msa = NULL;
+        struct msa** alignments = NULL;
+        struct poar_table* poar = NULL;
+        struct pos_matrix* pm = NULL;
+        struct aln_param* ap = NULL;
+        int numseq;
+        int k;
+        float base_gpo, base_gpe, base_tgpe;
+
+        ASSERT(msa != NULL, "No MSA");
+        ASSERT(n_runs >= 1, "n_runs must be >= 1");
+        ASSERT(min_support >= 1, "min_support must be >= 1");
+
+        RUN(kalign_essential_input_check(msa, 0));
+        numseq = msa->numseq;
+
+        if(msa->biotype == ALN_BIOTYPE_UNDEF){
+                RUN(detect_alphabet(msa));
+        }
+
+        RUN(aln_param_init(&ap, msa->biotype, n_threads, type, gpo, gpe, tgpe));
+        base_gpo = ap->gpo;
+        base_gpe = ap->gpe;
+        base_tgpe = ap->tgpe;
+        aln_param_free(ap);
+        ap = NULL;
+
+        RUN(poar_table_alloc(&poar, numseq));
+        MMALLOC(alignments, sizeof(struct msa*) * n_runs);
+        for(k = 0; k < n_runs; k++){
+                alignments[k] = NULL;
+        }
+
+        /* Run N alignments and collect POARs */
+        for(k = 0; k < n_runs; k++){
+                struct ensemble_params ep = run_params[k % N_RUN_PARAMS];
+                float run_gpo, run_gpe, run_tgpe;
+                uint64_t run_seed;
+                float run_noise;
+
+                if(k == 0){
+                        run_gpo = base_gpo;
+                        run_gpe = base_gpe;
+                        run_tgpe = base_tgpe;
+                        run_seed = 0;
+                        run_noise = 0.0f;
+                }else{
+                        run_gpo = base_gpo * ep.gpo_scale;
+                        run_gpe = base_gpe * ep.gpe_scale;
+                        run_tgpe = base_tgpe * ep.tgpe_scale;
+                        run_seed = seed + (uint64_t)k;
+                        run_noise = ep.noise;
+                }
+
+                copy = NULL;
+                RUN(msa_cpy(&copy, msa));
+                copy->quiet = 1;
+
+                RUN(kalign_run_seeded(copy, n_threads, type,
+                                      run_gpo, run_gpe, run_tgpe,
+                                      KALIGN_REFINE_NONE, 0,
+                                      run_seed, run_noise));
+
+                char** aln_seqs = NULL;
+                MMALLOC(aln_seqs, sizeof(char*) * numseq);
+                for(int i = 0; i < numseq; i++){
+                        aln_seqs[i] = copy->sequences[i]->seq;
+                }
+
+                RUN(pos_matrix_from_msa(&pm, aln_seqs, numseq, copy->alnlen));
+                RUN(extract_poars(poar, pm, k));
+
+                pos_matrix_free(pm);
+                pm = NULL;
+                MFREE(aln_seqs);
+
+                alignments[k] = copy;
+                copy = NULL;
+        }
+
+        /* Build consensus at given min_support threshold */
+        RUN(msa_cpy(&consensus_msa, msa));
+
+        int* seq_lens = NULL;
+        MMALLOC(seq_lens, sizeof(int) * numseq);
+        for(int i = 0; i < numseq; i++){
+                seq_lens[i] = msa->sequences[i]->len;
+        }
+
+        RUN(build_consensus(poar, seq_lens, numseq, min_support, consensus_msa));
+        MFREE(seq_lens);
+
+        /* Copy consensus alignment back into original MSA */
+        for(int i = 0; i < numseq; i++){
+                MFREE(msa->sequences[i]->seq);
+                msa->sequences[i]->seq = consensus_msa->sequences[i]->seq;
+                msa->sequences[i]->len = consensus_msa->sequences[i]->len;
+                consensus_msa->sequences[i]->seq = NULL;
+                MMALLOC(consensus_msa->sequences[i]->seq, 1);
+                consensus_msa->sequences[i]->seq[0] = '\0';
+        }
+        msa->alnlen = consensus_msa->alnlen;
+        msa->aligned = consensus_msa->aligned;
+        kalign_free_msa(consensus_msa);
+        consensus_msa = NULL;
+
+        RUN(msa_sort_rank(msa));
+
+        for(k = 0; k < n_runs; k++){
+                if(alignments[k]) kalign_free_msa(alignments[k]);
+        }
+        MFREE(alignments);
+        poar_table_free(poar);
+        return OK;
+ERROR:
+        if(copy) kalign_free_msa(copy);
+        if(consensus_msa) kalign_free_msa(consensus_msa);
+        if(pm) pos_matrix_free(pm);
+        if(alignments){
+                for(k = 0; k < n_runs; k++){
+                        if(alignments[k]) kalign_free_msa(alignments[k]);
+                }
+                MFREE(alignments);
+        }
+        poar_table_free(poar);
+        if(ap) aln_param_free(ap);
+        return FAIL;
+}

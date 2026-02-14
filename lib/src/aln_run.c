@@ -116,6 +116,85 @@ void recursive_aln(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, ui
         free_aln_mem(ml);
 }
 
+float compute_gap_scale(struct msa* msa, struct aln_param* ap, int a, int b)
+{
+        float ds = ap->dist_scale;
+        if(ds <= 0.0f || msa->seq_distances == NULL){
+                return 1.0f;
+        }
+
+        /* Compute mean normalized distance for all sequences in both clusters */
+        float sum = 0.0f;
+        int count = 0;
+        int i;
+        for(i = 0; i < msa->nsip[a]; i++){
+                int si = msa->sip[a][i];
+                if(si < msa->numseq){
+                        sum += msa->seq_distances[si];
+                        count++;
+                }
+        }
+        for(i = 0; i < msa->nsip[b]; i++){
+                int si = msa->sip[b][i];
+                if(si < msa->numseq){
+                        sum += msa->seq_distances[si];
+                        count++;
+                }
+        }
+        if(count == 0){
+                return 1.0f;
+        }
+        float avg_div = sum / (float)count;
+
+        /* Scale: 1.0 for similar sequences, decreasing for divergent.
+           scale = max(0.3, 1.0 - dist_scale * avg_div)
+           With dist_scale=0.5 and avg_div=1.0 (fully divergent): scale=0.5
+           With dist_scale=0.5 and avg_div=0.0 (identical): scale=1.0 */
+        float scale = 1.0f - ds * avg_div;
+        if(scale < 0.3f) scale = 0.3f;
+        if(scale > 1.0f) scale = 1.0f;
+        return scale;
+}
+
+float compute_subm_offset(struct msa* msa, struct aln_param* ap, int a, int b)
+{
+        float amax = ap->vsm_amax;
+        if(amax <= 0.0f || msa->seq_distances == NULL){
+                return 0.0f;
+        }
+
+        /* Compute mean normalized distance for all sequences in both clusters */
+        float sum = 0.0f;
+        int count = 0;
+        int i;
+        for(i = 0; i < msa->nsip[a]; i++){
+                int si = msa->sip[a][i];
+                if(si < msa->numseq){
+                        sum += msa->seq_distances[si];
+                        count++;
+                }
+        }
+        for(i = 0; i < msa->nsip[b]; i++){
+                int si = msa->sip[b][i];
+                if(si < msa->numseq){
+                        sum += msa->seq_distances[si];
+                        count++;
+                }
+        }
+        if(count == 0){
+                return 0.0f;
+        }
+        float avg_div = sum / (float)count;
+
+        /* MAFFT VSM: a(d) = max(0, amax - d)
+           Close sequences (small d) -> large offset -> more stringent scoring
+           Distant sequences (large d) -> small/zero offset -> original scoring */
+        float offset = amax - avg_div;
+        if(offset < 0.0f) offset = 0.0f;
+
+        return offset;
+}
+
 int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
 {
         float* tmp = NULL;
@@ -127,6 +206,20 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
         a = t->list[task_id]->a;
         b = t->list[task_id]->b;
         c = t->list[task_id]->c;
+
+        /* Distance-dependent parameter scaling */
+        struct aln_param* orig_ap = m->ap;
+        struct aln_param scaled_ap;
+        float gap_scale = compute_gap_scale(msa, m->ap, a, b);
+        float subm_off = compute_subm_offset(msa, m->ap, a, b);
+        if(gap_scale < 1.0f || subm_off > 0.0f){
+                scaled_ap = *m->ap;  /* shallow copy — shares subm pointer */
+                scaled_ap.gpo *= gap_scale;
+                scaled_ap.gpe *= gap_scale;
+                scaled_ap.tgpe *= gap_scale;
+                scaled_ap.subm_offset = subm_off;
+                m->ap = &scaled_ap;
+        }
 
         if(msa->nsip[a] == 1){
                 m->len_a = msa->sequences[a]->len;//  aln->sl[a];
@@ -251,6 +344,9 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
 
         RUN(add_gap_info_to_path_n(m)) ;
         /* LOG_MSG("Aligned %d and %d (len %d %d) -> path is of length: %d",a,b, m->len_a,m->len_b, 64*(m->path[0]+2)); */
+
+        /* Restore original aln_param for profile update (unscaled base penalties) */
+        m->ap = orig_ap;
 
         MMALLOC(tmp,sizeof(float)*64*(m->path[0]+2));
 

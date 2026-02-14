@@ -38,6 +38,7 @@ set(source_files
   src/pick_anchor.c
   
   src/aln_wrap.c
+  src/aln_apair_dist.c
 
   src/aln_param.c
   src/aln_run.c

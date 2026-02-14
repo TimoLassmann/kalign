@@ -20,6 +20,7 @@ int alloc_msa(struct msa** msa, int numseq)
         m->aligned = 0;
         m->alnlen = 0;
         m->quiet = 0;
+        m->seq_distances = NULL;
         m->plen = NULL;
         m->sip = NULL;
         m->nsip = NULL;
@@ -73,6 +74,9 @@ void kalign_free_msa(struct msa* msa)
                         }
                 }
 
+                if(msa->seq_distances){
+                        MFREE(msa->seq_distances);
+                }
                 for (i = msa->num_profiles;i--;){
                         if(msa->sip[i]){
                                 MFREE(msa->sip[i]);

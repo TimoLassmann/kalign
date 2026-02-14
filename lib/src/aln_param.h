@@ -24,6 +24,9 @@ struct aln_param{
         float gpe;
         float tgpe;
         float score;
+        float dist_scale;       /* distance-dependent gap scaling: 0=off, >0 scales gap penalties down for divergent pairs */
+        float vsm_amax;         /* variable scoring matrix: 0=off, >0 subtracts a(d)=max(0,amax-d) from subm scores */
+        float subm_offset;      /* computed per alignment step: amount to subtract from substitution scores */
         int adaptive_budget;    /* 0=off, 1=scale trial count by uncertainty */
 };
 

@@ -164,8 +164,24 @@ int build_tree_kmeans_noisy(struct msa* msa, struct aln_tasks** tasks,
         }
         label_internal(root, numseq);
         create_tasks(root, t);
+
+        /* Compute per-sequence normalized mean distance (noisy variant). */
+        if(msa->seq_distances == NULL){
+                MMALLOC(msa->seq_distances, sizeof(float) * numseq);
+        }
+        for(i = 0; i < numseq; i++){
+                float sum = 0.0f;
+                int j;
+                for(j = 0; j < num_anchors; j++){
+                        sum += dm[i][j];
+                }
+                float mean_dist = sum / (float)num_anchors;
+                float seq_len = (float)msa->sequences[i]->len;
+                msa->seq_distances[i] = (seq_len > 0.0f) ? mean_dist / seq_len : 0.0f;
+        }
+
         MFREE(root);
-        for(i = 0; i < msa->numseq; i++){
+        for(i = 0; i < numseq; i++){
 #ifdef HAVE_AVX2
                 _mm_free(dm[i]);
 #else
@@ -243,9 +259,25 @@ int build_tree_kmeans(struct msa* msa, struct aln_tasks** tasks)
         label_internal(root, numseq);
 
         create_tasks(root, t);
-        /* exit(0); */
+
+        /* Compute per-sequence normalized mean distance to anchors.
+           Used for distance-dependent gap penalty scaling. */
+        if(msa->seq_distances == NULL){
+                MMALLOC(msa->seq_distances, sizeof(float) * numseq);
+        }
+        for(i = 0; i < numseq; i++){
+                float sum = 0.0f;
+                int j;
+                for(j = 0; j < num_anchors; j++){
+                        sum += dm[i][j];
+                }
+                float mean_dist = sum / (float)num_anchors;
+                float seq_len = (float)msa->sequences[i]->len;
+                msa->seq_distances[i] = (seq_len > 0.0f) ? mean_dist / seq_len : 0.0f;
+        }
+
         MFREE(root);
-        for(i =0 ; i < msa->numseq;i++){
+        for(i = 0; i < numseq; i++){
 #ifdef HAVE_AVX2
                 _mm_free(dm[i]);
 #else
@@ -1134,4 +1166,55 @@ void free_kmeans_results(struct kmeans_result* k)
                 }
                 MFREE(k);
         }
+}
+
+int build_tree_from_pairwise(struct msa* msa, struct aln_tasks** tasks, float** dm)
+{
+        struct aln_tasks* t = NULL;
+        struct node* root = NULL;
+        int* samples = NULL;
+        int numseq;
+        int i, j;
+
+        ASSERT(msa != NULL, "No alignment.");
+        ASSERT(dm != NULL, "No distance matrix.");
+
+        t = *tasks;
+        if(!t){
+                RUN(alloc_tasks(&t, msa->numseq));
+        }
+        numseq = msa->numseq;
+
+        /* Compute per-sequence mean pairwise distance (for gap/VSM scaling).
+           Must be done BEFORE upgma() which modifies dm in place. */
+        if(msa->seq_distances == NULL){
+                MMALLOC(msa->seq_distances, sizeof(float) * numseq);
+        }
+        for(i = 0; i < numseq; i++){
+                float sum = 0.0f;
+                for(j = 0; j < numseq; j++){
+                        if(j != i) sum += dm[i][j];
+                }
+                msa->seq_distances[i] = (numseq > 1) ? sum / (float)(numseq - 1) : 0.0f;
+        }
+
+        MMALLOC(samples, sizeof(int) * numseq);
+        for(i = 0; i < numseq; i++){
+                samples[i] = i;
+        }
+
+        /* Build UPGMA tree from pairwise distances.
+           Note: upgma() modifies dm in-place. */
+        root = upgma(dm, samples, numseq);
+        ASSERT(root != NULL, "UPGMA tree construction failed.");
+
+        label_internal(root, numseq);
+        create_tasks(root, t);
+
+        MFREE(root);
+        *tasks = t;
+        return OK;
+ERROR:
+        if(samples) MFREE(samples);
+        return FAIL;
 }

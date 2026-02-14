@@ -78,10 +78,10 @@ int print_kalign_help(char * argv[])
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpo","Gap open penalty." ,"[]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpe","Gap extension penalty." ,"[]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--tgpe","Terminal gap extension penalty." ,"[]");
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--refine","Refinement mode." ,"[none]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--refine","Refinement mode." ,"[confident]");
         fprintf(stdout,"%*s%-*s  %s %s\n",3,"",MESSAGE_MARGIN-3,"","Options: none, all, confident" ,""  );
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--adaptive-budget","Scale trial count by uncertainty." ,"[off]");
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--ensemble","Number of ensemble runs." ,"[0 = off]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--ensemble","Number of ensemble runs." ,"[off; 5 if no value given]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--ensemble-seed","RNG seed for ensemble." ,"[42]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"-n/--nthreads","Number of threads." ,"[auto: N-1, max 16]");
 
@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
                         {"tgpe",  required_argument, 0, OPT_TGPE},
                         {"refine",  required_argument, 0, OPT_REFINE},
                         {"adaptive-budget",  no_argument, 0, OPT_ADAPTIVE_BUDGET},
-                        {"ensemble",  required_argument, 0, OPT_ENSEMBLE},
+                        {"ensemble",  optional_argument, 0, OPT_ENSEMBLE},
                         {"ensemble-seed",  required_argument, 0, OPT_ENSEMBLE_SEED},
                         {"nthreads",  required_argument, 0, 'n'},
                         {"input",  required_argument, 0, 'i'},
@@ -225,7 +225,14 @@ int main(int argc, char *argv[])
                         param->adaptive_budget = 1;
                         break;
                 case OPT_ENSEMBLE:
-                        param->ensemble = atoi(optarg);
+                        if(optarg){
+                                param->ensemble = atoi(optarg);
+                        }else if(optind < argc && argv[optind][0] != '-'){
+                                param->ensemble = atoi(argv[optind]);
+                                optind++;
+                        }else{
+                                param->ensemble = 5;
+                        }
                         break;
                 case OPT_ENSEMBLE_SEED:
                         param->ensemble_seed = (uint64_t)strtoull(optarg, NULL, 10);
@@ -441,19 +448,18 @@ ERROR:
 
 int set_refine_mode(char* in, int* refine)
 {
-        int r = KALIGN_REFINE_NONE;
         if(in){
                 if(strstr(in,"all")){
-                        r = KALIGN_REFINE_ALL;
+                        *refine = KALIGN_REFINE_ALL;
                 }else if(strstr(in,"confident")){
-                        r = KALIGN_REFINE_CONFIDENT;
+                        *refine = KALIGN_REFINE_CONFIDENT;
                 }else if(strstr(in,"none")){
-                        r = KALIGN_REFINE_NONE;
+                        *refine = KALIGN_REFINE_NONE;
                 }else{
                         ERROR_MSG("Refine mode '%s' not recognized. Use: none, all, confident.", in);
                 }
         }
-        *refine = r;
+        /* When in is NULL, keep the default from init_param() */
         return OK;
 ERROR:
         return FAIL;

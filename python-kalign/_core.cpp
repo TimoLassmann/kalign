@@ -14,6 +14,8 @@
 extern "C" {
     #include "msa_struct.h"
     #include "msa_alloc.h"
+    #include "msa_op.h"
+    #include "msa_cmp.h"
     #include "dssim.h"
 }
 
@@ -39,50 +41,65 @@ std::vector<std::string> align_sequences(
     const std::vector<std::string>& sequences,
     int seq_type = KALIGN_TYPE_UNDEFINED,
     float gap_open = -1.0f,
-    float gap_extend = -1.0f, 
+    float gap_extend = -1.0f,
     float terminal_gap_extend = -1.0f,
-    int n_threads = 1
+    int n_threads = 1,
+    int refine = KALIGN_REFINE_NONE,
+    int ensemble = 0
 ) {
     if (sequences.empty()) {
         throw std::invalid_argument("Empty sequence list provided");
     }
-    
+
     // Convert Python strings to C format
     std::vector<char*> seq_ptrs;
     std::vector<int> seq_lengths;
     seq_ptrs.reserve(sequences.size());
     seq_lengths.reserve(sequences.size());
-    
+
     for (const auto& seq : sequences) {
         seq_ptrs.push_back(const_cast<char*>(seq.c_str()));
         seq_lengths.push_back(static_cast<int>(seq.length()));
     }
-    
-    // Call kalign function
-    char** aligned_seqs = nullptr;
-    int alignment_length = 0;
-    
-    int result = kalign(
-        seq_ptrs.data(),
-        seq_lengths.data(),
-        static_cast<int>(sequences.size()),
-        n_threads,
-        seq_type,
-        gap_open,
-        gap_extend,
-        terminal_gap_extend,
-        &aligned_seqs,
-        &alignment_length
-    );
-    
+
+    if (n_threads < 1) {
+        n_threads = 1;
+    }
+
+    // Build msa struct from input arrays
+    struct msa* msa_data = nullptr;
+    int result = kalign_arr_to_msa(seq_ptrs.data(), seq_lengths.data(),
+                                    static_cast<int>(sequences.size()), &msa_data);
+    if (result != 0 || !msa_data) {
+        throw std::runtime_error("Failed to create MSA from input sequences");
+    }
+    msa_data->quiet = 1;
+
+    // Route to appropriate alignment function
+    if (ensemble > 0) {
+        result = kalign_ensemble(msa_data, n_threads, seq_type, ensemble,
+                                 gap_open, gap_extend, terminal_gap_extend, 42);
+    } else {
+        result = kalign_run(msa_data, n_threads, seq_type,
+                            gap_open, gap_extend, terminal_gap_extend,
+                            refine, 0);
+    }
+
     if (result != 0) {
+        kalign_free_msa(msa_data);
         throw std::runtime_error("Kalign alignment failed with error code: " + std::to_string(result));
     }
-    
-    if (!aligned_seqs) {
-        throw std::runtime_error("Kalign returned null aligned sequences");
+
+    // Extract aligned sequences
+    char** aligned_seqs = nullptr;
+    int alignment_length = 0;
+    result = kalign_msa_to_arr(msa_data, &aligned_seqs, &alignment_length);
+    kalign_free_msa(msa_data);
+
+    if (result != 0 || !aligned_seqs) {
+        throw std::runtime_error("Failed to extract aligned sequences");
     }
-    
+
     // Convert results back to Python
     return c_strings_to_python(aligned_seqs, static_cast<int>(sequences.size()), alignment_length);
 }
@@ -98,7 +115,11 @@ std::pair<std::vector<std::string>, std::vector<std::string>> align_from_file(
     int refine = KALIGN_REFINE_NONE,
     int adaptive_budget = 0,
     int ensemble = 0,
-    uint64_t ensemble_seed = 42
+    uint64_t ensemble_seed = 42,
+    float dist_scale = 0.0f,
+    float vsm_amax = -1.0f,
+    int min_support = 0,
+    int realign = 0
 ) {
     struct msa* msa_data = nullptr;
 
@@ -114,14 +135,29 @@ std::pair<std::vector<std::string>, std::vector<std::string>> align_from_file(
     }
 
     // Perform alignment
-    if (ensemble > 0) {
+    if (ensemble > 0 && min_support > 0) {
+        result = kalign_ensemble_consensus(msa_data, n_threads, seq_type, ensemble, gap_open, gap_extend, terminal_gap_extend, ensemble_seed, min_support);
+    } else if (ensemble > 0) {
         result = kalign_ensemble(msa_data, n_threads, seq_type, ensemble, gap_open, gap_extend, terminal_gap_extend, ensemble_seed);
+    } else if (realign > 0) {
+        result = kalign_run_realign(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget, dist_scale, vsm_amax, realign);
+    } else if (dist_scale > 0.0f || vsm_amax >= 0.0f) {
+        result = kalign_run_dist_scale(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget, dist_scale, vsm_amax);
     } else {
         result = kalign_run(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget);
     }
     if (result != 0) {
         kalign_free_msa(msa_data);
         throw std::runtime_error("Kalign alignment failed with error code: " + std::to_string(result));
+    }
+
+    // Post-alignment realign pass (e.g. after ensemble)
+    if (ensemble > 0 && realign > 0 && result == 0) {
+        result = kalign_post_realign(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget, dist_scale, vsm_amax, realign);
+        if (result != 0) {
+            kalign_free_msa(msa_data);
+            throw std::runtime_error("Post-realign failed with error code: " + std::to_string(result));
+        }
     }
 
     // Write to a temporary file so kalign_write_msa handles gap insertion
@@ -240,6 +276,89 @@ float compare_msa_files(const std::string& reference_file, const std::string& te
     return score;
 }
 
+// Compare two MSA files returning detailed POAR scores
+py::dict compare_detailed_files(const std::string& reference_file,
+                                const std::string& test_file,
+                                float max_gap_frac = 0.2f) {
+    struct msa* ref = nullptr;
+    struct msa* test = nullptr;
+    struct poar_score score;
+
+    int result = kalign_read_input(const_cast<char*>(reference_file.c_str()), &ref, 1);
+    if (result != 0 || !ref) {
+        throw std::runtime_error("Failed to read reference file: " + reference_file);
+    }
+
+    result = kalign_read_input(const_cast<char*>(test_file.c_str()), &test, 1);
+    if (result != 0 || !test) {
+        kalign_free_msa(ref);
+        throw std::runtime_error("Failed to read test file: " + test_file);
+    }
+
+    result = kalign_msa_compare_detailed(ref, test, max_gap_frac, &score);
+    kalign_free_msa(ref);
+    kalign_free_msa(test);
+
+    if (result != 0) {
+        throw std::runtime_error("Detailed MSA comparison failed");
+    }
+
+    py::dict d;
+    d["recall"] = score.recall;
+    d["precision"] = score.precision;
+    d["f1"] = score.f1;
+    d["tc"] = score.tc;
+    d["ref_pairs"] = score.ref_pairs;
+    d["test_pairs"] = score.test_pairs;
+    d["common_pairs"] = score.common;
+    return d;
+}
+
+// Compare two MSA files with an explicit column mask
+py::dict compare_detailed_with_mask_files(const std::string& reference_file,
+                                          const std::string& test_file,
+                                          py::list column_mask) {
+    struct msa* ref = nullptr;
+    struct msa* test = nullptr;
+    struct poar_score score;
+
+    int result = kalign_read_input(const_cast<char*>(reference_file.c_str()), &ref, 1);
+    if (result != 0 || !ref) {
+        throw std::runtime_error("Failed to read reference file: " + reference_file);
+    }
+
+    result = kalign_read_input(const_cast<char*>(test_file.c_str()), &test, 1);
+    if (result != 0 || !test) {
+        kalign_free_msa(ref);
+        throw std::runtime_error("Failed to read test file: " + test_file);
+    }
+
+    // Convert py::list to int array
+    int n_cols = static_cast<int>(column_mask.size());
+    std::vector<int> mask(n_cols);
+    for (int i = 0; i < n_cols; i++) {
+        mask[i] = column_mask[i].cast<int>();
+    }
+
+    result = kalign_msa_compare_with_mask(ref, test, mask.data(), n_cols, &score);
+    kalign_free_msa(ref);
+    kalign_free_msa(test);
+
+    if (result != 0) {
+        throw std::runtime_error("Detailed MSA comparison with mask failed");
+    }
+
+    py::dict d;
+    d["recall"] = score.recall;
+    d["precision"] = score.precision;
+    d["f1"] = score.f1;
+    d["tc"] = score.tc;
+    d["ref_pairs"] = score.ref_pairs;
+    d["test_pairs"] = score.test_pairs;
+    d["common_pairs"] = score.common;
+    return d;
+}
+
 // Align sequences from input file and write result to output file, preserving all metadata
 void align_file_to_file(
     const std::string& input_file,
@@ -253,7 +372,11 @@ void align_file_to_file(
     int refine = KALIGN_REFINE_NONE,
     int adaptive_budget = 0,
     int ensemble = 0,
-    uint64_t ensemble_seed = 42
+    uint64_t ensemble_seed = 42,
+    float dist_scale = 0.0f,
+    float vsm_amax = -1.0f,
+    int min_support = 0,
+    int realign = 0
 ) {
     struct msa* msa_data = nullptr;
 
@@ -262,14 +385,29 @@ void align_file_to_file(
         throw std::runtime_error("Failed to read input file: " + input_file);
     }
 
-    if (ensemble > 0) {
+    if (ensemble > 0 && min_support > 0) {
+        result = kalign_ensemble_consensus(msa_data, n_threads, seq_type, ensemble, gap_open, gap_extend, terminal_gap_extend, ensemble_seed, min_support);
+    } else if (ensemble > 0) {
         result = kalign_ensemble(msa_data, n_threads, seq_type, ensemble, gap_open, gap_extend, terminal_gap_extend, ensemble_seed);
+    } else if (realign > 0) {
+        result = kalign_run_realign(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget, dist_scale, vsm_amax, realign);
+    } else if (dist_scale > 0.0f || vsm_amax >= 0.0f) {
+        result = kalign_run_dist_scale(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget, dist_scale, vsm_amax);
     } else {
         result = kalign_run(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget);
     }
     if (result != 0) {
         kalign_free_msa(msa_data);
         throw std::runtime_error("Alignment failed with error code: " + std::to_string(result));
+    }
+
+    // Post-alignment realign pass (e.g. after ensemble)
+    if (ensemble > 0 && realign > 0 && result == 0) {
+        result = kalign_post_realign(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget, dist_scale, vsm_amax, realign);
+        if (result != 0) {
+            kalign_free_msa(msa_data);
+            throw std::runtime_error("Post-realign failed with error code: " + std::to_string(result));
+        }
     }
 
     result = kalign_write_msa(msa_data, const_cast<char*>(output_file.c_str()), const_cast<char*>(format.c_str()));
@@ -291,9 +429,11 @@ PYBIND11_MODULE(_core, m) {
           py::arg("gap_extend") = -1.0f,
           py::arg("terminal_gap_extend") = -1.0f,
           py::arg("n_threads") = 1,
+          py::arg("refine") = KALIGN_REFINE_NONE,
+          py::arg("ensemble") = 0,
           R"pbdoc(
           Align a list of sequences using Kalign.
-          
+
           Parameters
           ----------
           sequences : list of str
@@ -303,12 +443,16 @@ PYBIND11_MODULE(_core, m) {
           gap_open : float, optional
               Gap opening penalty (default: -1.0, uses Kalign defaults)
           gap_extend : float, optional
-              Gap extension penalty (default: -1.0, uses Kalign defaults) 
+              Gap extension penalty (default: -1.0, uses Kalign defaults)
           terminal_gap_extend : float, optional
               Terminal gap extension penalty (default: -1.0, uses Kalign defaults)
           n_threads : int, optional
               Number of threads to use (default: 1)
-              
+          refine : int, optional
+              Refinement mode (default: REFINE_NONE)
+          ensemble : int, optional
+              Number of ensemble runs (default: 0 = off)
+
           Returns
           -------
           list of str
@@ -327,8 +471,12 @@ PYBIND11_MODULE(_core, m) {
           py::arg("adaptive_budget") = 0,
           py::arg("ensemble") = 0,
           py::arg("ensemble_seed") = (uint64_t)42,
+          py::arg("dist_scale") = 0.0f,
+          py::arg("vsm_amax") = -1.0f,
+          py::arg("min_support") = 0,
+          py::arg("realign") = 0,
           "Align sequences from a file. Returns (names, sequences) tuple.");
-    
+
     // Generate test sequences using DSSim
     m.def("generate_test_sequences", &generate_test_sequences,
           py::arg("n_seq"),
@@ -378,6 +526,54 @@ PYBIND11_MODULE(_core, m) {
               SP score (0-100)
           )pbdoc");
 
+    // Detailed MSA comparison (POAR recall/precision/F1/TC)
+    m.def("compare_detailed", &compare_detailed_files,
+          py::arg("reference_file"),
+          py::arg("test_file"),
+          py::arg("max_gap_frac") = 0.2f,
+          R"pbdoc(
+          Compare two MSAs returning detailed POAR scores.
+
+          Parameters
+          ----------
+          reference_file : str
+              Path to reference alignment file
+          test_file : str
+              Path to test alignment file
+          max_gap_frac : float, optional
+              Max gap fraction for scored columns (default: 0.2 for bali_score compat).
+              Use -1.0 to score all columns.
+
+          Returns
+          -------
+          dict
+              Keys: recall, precision, f1, tc, ref_pairs, test_pairs, common_pairs
+          )pbdoc");
+
+    // Detailed MSA comparison with explicit column mask
+    m.def("compare_detailed_with_mask", &compare_detailed_with_mask_files,
+          py::arg("reference_file"),
+          py::arg("test_file"),
+          py::arg("column_mask"),
+          R"pbdoc(
+          Compare two MSAs with an explicit column mask.
+
+          Parameters
+          ----------
+          reference_file : str
+              Path to reference alignment file
+          test_file : str
+              Path to test alignment file
+          column_mask : list of int
+              Binary mask (0/1) for each column in the reference alignment.
+              Only columns with mask=1 are scored for recall/TC.
+
+          Returns
+          -------
+          dict
+              Keys: recall, precision, f1, tc, ref_pairs, test_pairs, common_pairs
+          )pbdoc");
+
     // Align file to file (preserves sequence names/metadata)
     m.def("align_file_to_file", &align_file_to_file,
           py::arg("input_file"),
@@ -392,6 +588,10 @@ PYBIND11_MODULE(_core, m) {
           py::arg("adaptive_budget") = 0,
           py::arg("ensemble") = 0,
           py::arg("ensemble_seed") = (uint64_t)42,
+          py::arg("dist_scale") = 0.0f,
+          py::arg("vsm_amax") = -1.0f,
+          py::arg("min_support") = 0,
+          py::arg("realign") = 0,
           R"pbdoc(
           Align sequences from input file and write to output file.
 
