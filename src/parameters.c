@@ -88,6 +88,9 @@ struct parameters*init_param(void)
         param->adaptive_budget = 0;
         param->ensemble = 0;
         param->ensemble_seed = 42;
+        param->min_support = 0;
+        param->save_poar = NULL;
+        param->load_poar = NULL;
         param->quiet = 0;
         return param;
 ERROR:

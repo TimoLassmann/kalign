@@ -267,7 +267,7 @@ void warning(const char *location, const char *format, ...)
 {
         va_list argp;
         va_start(argp, format);
-        vwarning(stdout,location, format, argp);
+        vwarning(stderr,location, format, argp);
         va_end(argp);
 }
 
@@ -275,7 +275,7 @@ void log_message( const char *format, ...)
 {
         va_list argp;
         va_start(argp, format);
-        vlog(stdout,format, argp);
+        vlog(stderr,format, argp);
         va_end(argp);
 }
 

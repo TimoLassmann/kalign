@@ -47,6 +47,9 @@
 #define OPT_ADAPTIVE_BUDGET 15
 #define OPT_ENSEMBLE 16
 #define OPT_ENSEMBLE_SEED 17
+#define OPT_MIN_SUPPORT 18
+#define OPT_SAVE_POAR 19
+#define OPT_LOAD_POAR 20
 
 static int set_aln_type(char* in, int* type );
 static int set_refine_mode(char* in, int* refine);
@@ -81,9 +84,14 @@ int print_kalign_help(char * argv[])
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--refine","Refinement mode." ,"[confident]");
         fprintf(stdout,"%*s%-*s  %s %s\n",3,"",MESSAGE_MARGIN-3,"","Options: none, all, confident" ,""  );
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--adaptive-budget","Scale trial count by uncertainty." ,"[off]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"-n/--nthreads","Number of threads." ,"[auto: N-1, max 16]");
+
+        fprintf(stdout,"\nEnsemble options:\n\n");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--ensemble","Number of ensemble runs." ,"[off; 5 if no value given]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--ensemble-seed","RNG seed for ensemble." ,"[42]");
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"-n/--nthreads","Number of threads." ,"[auto: N-1, max 16]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--min-support","Explicit consensus threshold." ,"[auto]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--save-poar","Save POAR table to file." ,"[off]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--load-poar","Load POAR table for re-threshold." ,"[off]");
 
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--version (-V/-v)","Prints version." ,"[NA]"  );
 
@@ -123,23 +131,23 @@ int print_kalign_warranty(void)
 
 int print_kalign_header(void)
 {
-        fprintf(stdout,"\n");
-        fprintf(stdout,"Kalign (%s)\n", KALIGN_PACKAGE_VERSION);
-        fprintf(stdout,"\n");
-        fprintf(stdout,"Copyright (C) 2006,2019,2020,2021,2023 Timo Lassmann\n");
-        fprintf(stdout,"\n");
-        fprintf(stdout,"This program comes with ABSOLUTELY NO WARRANTY; for details type:\n");
-        fprintf(stdout,"`kalign -showw'.\n");
-        fprintf(stdout,"This is free software, and you are welcome to redistribute it\n");
-        fprintf(stdout,"under certain conditions; consult the COPYING file for details.\n");
-        fprintf(stdout,"\n");
-        fprintf(stdout,"Please cite:\n");
+        fprintf(stderr,"\n");
+        fprintf(stderr,"Kalign (%s)\n", KALIGN_PACKAGE_VERSION);
+        fprintf(stderr,"\n");
+        fprintf(stderr,"Copyright (C) 2006,2019,2020,2021,2023 Timo Lassmann\n");
+        fprintf(stderr,"\n");
+        fprintf(stderr,"This program comes with ABSOLUTELY NO WARRANTY; for details type:\n");
+        fprintf(stderr,"`kalign -showw'.\n");
+        fprintf(stderr,"This is free software, and you are welcome to redistribute it\n");
+        fprintf(stderr,"under certain conditions; consult the COPYING file for details.\n");
+        fprintf(stderr,"\n");
+        fprintf(stderr,"Please cite:\n");
 
-        fprintf(stdout,"  Lassmann, Timo.\n");
-        fprintf(stdout,"  \"Kalign 3: multiple sequence alignment of large data sets.\"\n");
-        fprintf(stdout,"  Bioinformatics (2019) \n");
-        fprintf(stdout,"  https://doi.org/10.1093/bioinformatics/btz795\n");
-        fprintf(stdout,"\n");
+        fprintf(stderr,"  Lassmann, Timo.\n");
+        fprintf(stderr,"  \"Kalign 3: multiple sequence alignment of large data sets.\"\n");
+        fprintf(stderr,"  Bioinformatics (2019) \n");
+        fprintf(stderr,"  https://doi.org/10.1093/bioinformatics/btz795\n");
+        fprintf(stderr,"\n");
         return OK;
 }
 
@@ -169,6 +177,9 @@ int main(int argc, char *argv[])
                         {"adaptive-budget",  no_argument, 0, OPT_ADAPTIVE_BUDGET},
                         {"ensemble",  optional_argument, 0, OPT_ENSEMBLE},
                         {"ensemble-seed",  required_argument, 0, OPT_ENSEMBLE_SEED},
+                        {"min-support",  required_argument, 0, OPT_MIN_SUPPORT},
+                        {"save-poar",  required_argument, 0, OPT_SAVE_POAR},
+                        {"load-poar",  required_argument, 0, OPT_LOAD_POAR},
                         {"nthreads",  required_argument, 0, 'n'},
                         {"input",  required_argument, 0, 'i'},
                         {"infile",  required_argument, 0, 'i'},
@@ -236,6 +247,15 @@ int main(int argc, char *argv[])
                         break;
                 case OPT_ENSEMBLE_SEED:
                         param->ensemble_seed = (uint64_t)strtoull(optarg, NULL, 10);
+                        break;
+                case OPT_MIN_SUPPORT:
+                        param->min_support = atoi(optarg);
+                        break;
+                case OPT_SAVE_POAR:
+                        param->save_poar = optarg;
+                        break;
+                case OPT_LOAD_POAR:
+                        param->load_poar = optarg;
                         break;
                 case 'h':
                         param->help_flag = 1;
@@ -390,7 +410,11 @@ int run_kalign(struct parameters* param)
 
 
 
-        if(param->ensemble > 0){
+        if(param->load_poar != NULL){
+                RUN(kalign_consensus_from_poar(msa,
+                                               param->load_poar,
+                                               param->min_support > 0 ? param->min_support : 2));
+        }else if(param->ensemble > 0){
                 RUN(kalign_ensemble(msa,
                                     param->nthreads,
                                     param->type,
@@ -398,7 +422,9 @@ int run_kalign(struct parameters* param)
                                     param->gpo,
                                     param->gpe,
                                     param->tgpe,
-                                    param->ensemble_seed));
+                                    param->ensemble_seed,
+                                    param->min_support,
+                                    param->save_poar));
         }else{
                 RUN(kalign_run(msa,
                                param->nthreads,

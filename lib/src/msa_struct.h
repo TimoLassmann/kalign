@@ -25,6 +25,7 @@ struct msa_seq{
         char* seq;
         uint8_t* s;
         int* gaps;
+        float* confidence;   /* per-position confidence [0..1], NULL if not computed */
         int rank;
         int len;
         int alloc_len;
@@ -33,6 +34,7 @@ struct msa_seq{
 struct msa{
         struct msa_seq** sequences;
         float* seq_distances;   /* per-sequence mean distance (normalized), set during tree building */
+        float* col_confidence;  /* per-column confidence [0..1], NULL if not computed */
         int** sip;
         int* nsip;
         int* plen;

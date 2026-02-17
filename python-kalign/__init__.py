@@ -8,14 +8,46 @@ Kalign is a fast and accurate multiple sequence alignment tool for biological se
 import os
 import threading
 from importlib import import_module
-from typing import Any, List, Literal, NamedTuple, Optional, Union
+from typing import Any, List, Literal, Optional, Union
 
 
-class AlignedSequences(NamedTuple):
-    """Result of aligning sequences from a file, preserving sequence names."""
+class AlignedSequences:
+    """Result of aligning sequences from a file, preserving sequence names.
 
-    names: List[str]
-    sequences: List[str]
+    Supports unpacking as ``names, sequences = result`` for backward
+    compatibility, while also exposing optional confidence attributes.
+    """
+
+    __slots__ = ("names", "sequences", "column_confidence", "residue_confidence")
+
+    def __init__(
+        self,
+        names: List[str],
+        sequences: List[str],
+        column_confidence: Optional[List[float]] = None,
+        residue_confidence: Optional[List[List[float]]] = None,
+    ):
+        self.names = names
+        self.sequences = sequences
+        self.column_confidence = column_confidence
+        self.residue_confidence = residue_confidence
+
+    # Backward-compatible 2-tuple unpacking: names, sequences = result
+    def __iter__(self):
+        return iter((self.names, self.sequences))
+
+    def __len__(self):
+        return 2
+
+    def __getitem__(self, index):
+        return (self.names, self.sequences)[index]
+
+    def __repr__(self):
+        return (
+            f"AlignedSequences(names={self.names!r}, sequences={self.sequences!r}, "
+            f"column_confidence={'[...]' if self.column_confidence else None}, "
+            f"residue_confidence={'[...]' if self.residue_confidence else None})"
+        )
 
 
 from importlib.metadata import version
@@ -44,6 +76,27 @@ _thread_local = threading.local()
 _default_threads = 1
 
 
+def _conf_to_pp(conf: float) -> str:
+    """Convert a confidence value [0..1] to HMMER-style PP character."""
+    if conf >= 0.95:
+        return "*"
+    return str(int(conf * 10))
+
+
+def _confidence_to_pp_string(seq: str, confidences: list) -> str:
+    """Convert per-residue confidence array to PP string.
+
+    Gap positions get '.', residues get HMMER-style PP characters.
+    """
+    pp = []
+    for ch, conf in zip(seq, confidences):
+        if ch == "-" or ch == ".":
+            pp.append(".")
+        else:
+            pp.append(_conf_to_pp(conf))
+    return "".join(pp)
+
+
 def align(
     sequences: List[str],
     seq_type: Union[str, int] = "auto",
@@ -53,6 +106,7 @@ def align(
     n_threads: Optional[int] = None,
     refine: Union[str, int] = "confident",
     ensemble: int = 0,
+    min_support: int = 0,
     fmt: Literal["plain", "biopython", "skbio"] = "plain",
     ids: Optional[List[str]] = None,
 ) -> Union[List[str], Any]:
@@ -264,8 +318,9 @@ def align(
         raise ValueError("ensemble must be a non-negative integer")
 
     # Call the C++ binding for core alignment
+    confidence_data = None
     try:
-        aligned_seqs = _core.align(
+        result = _core.align(
             sequences,
             seq_type_int,
             gap_open,
@@ -274,7 +329,14 @@ def align(
             n_threads,
             refine_int,
             ensemble,
+            min_support,
         )
+        # When ensemble is used, result is (sequences, confidence_dict)
+        if isinstance(result, tuple):
+            aligned_seqs = result[0]
+            confidence_data = result[1]
+        else:
+            aligned_seqs = result
     except Exception as e:
         raise RuntimeError(f"Alignment failed: {str(e)}")
 
@@ -301,9 +363,19 @@ def align(
             raise ImportError(
                 "Biopython not installed. Run: pip install kalign-python[biopython]"
             ) from e
-        return MultipleSeqAlignment(
-            [SeqRecord(Seq(s), id=i) for s, i in zip(aligned_seqs, ids)]
-        )
+
+        records = []
+        for idx, (s, i) in enumerate(zip(aligned_seqs, ids)):
+            rec = SeqRecord(Seq(s), id=i)
+            # Attach per-residue confidence as letter_annotations if available
+            if confidence_data is not None:
+                res_conf = confidence_data["residue_confidence"]
+                if idx < len(res_conf) and len(res_conf[idx]) == len(s):
+                    pp_str = _confidence_to_pp_string(s, res_conf[idx])
+                    rec.letter_annotations["posterior_probability"] = pp_str
+            records.append(rec)
+
+        return MultipleSeqAlignment(records)
 
     if fmt == "skbio":
         try:
@@ -436,6 +508,8 @@ def align_from_file(
     vsm_amax: float = -1.0,
     min_support: int = 0,
     realign: int = 0,
+    save_poar: str = "",
+    load_poar: str = "",
 ) -> AlignedSequences:
     """
     Align sequences from a file using Kalign.
@@ -514,9 +588,9 @@ def align_from_file(
     # Convert refine mode
     refine_int = _parse_refine_mode(refine)
 
-    # Call the C++ binding — returns (names, sequences) tuple
+    # Call the C++ binding — returns (names, sequences) or (names, sequences, confidence)
     try:
-        names, sequences = _core.align_from_file(
+        result = _core.align_from_file(
             input_file,
             seq_type_int,
             gap_open,
@@ -531,8 +605,22 @@ def align_from_file(
             vsm_amax,
             min_support,
             realign,
+            save_poar,
+            load_poar,
         )
-        return AlignedSequences(names=names, sequences=sequences)
+        if len(result) == 3:
+            names, sequences, conf = result
+            col_conf = list(conf["column_confidence"])
+            res_conf = [list(row) for row in conf["residue_confidence"]]
+            return AlignedSequences(
+                names=names,
+                sequences=sequences,
+                column_confidence=col_conf,
+                residue_confidence=res_conf,
+            )
+        else:
+            names, sequences = result
+            return AlignedSequences(names=names, sequences=sequences)
     except Exception as e:
         raise RuntimeError(f"Alignment failed: {str(e)}")
 
@@ -542,6 +630,8 @@ def write_alignment(
     output_file: str,
     format: str = "fasta",
     ids: Optional[List[str]] = None,
+    column_confidence: Optional[List[float]] = None,
+    residue_confidence: Optional[List[List[float]]] = None,
 ) -> None:
     """
     Write aligned sequences to a file.
@@ -603,7 +693,13 @@ def write_alignment(
     elif mapped_format == "clustal":
         io.write_clustal(sequences, output_file, ids=ids)
     elif mapped_format == "stockholm":
-        io.write_stockholm(sequences, output_file, ids=ids)
+        io.write_stockholm(
+            sequences,
+            output_file,
+            ids=ids,
+            column_confidence=column_confidence,
+            residue_confidence=residue_confidence,
+        )
     elif mapped_format == "phylip":
         io.write_phylip(sequences, output_file, ids=ids)
 
@@ -774,6 +870,8 @@ def align_file_to_file(
     vsm_amax: float = -1.0,
     min_support: int = 0,
     realign: int = 0,
+    save_poar: str = "",
+    load_poar: str = "",
 ) -> None:
     """
     Align sequences from input file and write result to output file.
@@ -861,6 +959,8 @@ def align_file_to_file(
         vsm_amax,
         min_support,
         realign,
+        save_poar,
+        load_poar,
     )
 
 

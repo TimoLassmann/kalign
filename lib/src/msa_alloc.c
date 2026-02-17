@@ -21,6 +21,7 @@ int alloc_msa(struct msa** msa, int numseq)
         m->alnlen = 0;
         m->quiet = 0;
         m->seq_distances = NULL;
+        m->col_confidence = NULL;
         m->plen = NULL;
         m->sip = NULL;
         m->nsip = NULL;
@@ -77,6 +78,9 @@ void kalign_free_msa(struct msa* msa)
                 if(msa->seq_distances){
                         MFREE(msa->seq_distances);
                 }
+                if(msa->col_confidence){
+                        MFREE(msa->col_confidence);
+                }
                 for (i = msa->num_profiles;i--;){
                         if(msa->sip[i]){
                                 MFREE(msa->sip[i]);
@@ -107,6 +111,7 @@ int alloc_msa_seq(struct msa_seq** s)
         seq->seq = NULL;
         seq->s = NULL;
         seq->gaps = NULL;
+        seq->confidence = NULL;
         seq->len = 0;
         seq->rank = 0;
         /* seq->name_len = 128; */
@@ -155,6 +160,9 @@ void free_msa_seq(struct msa_seq* seq)
                 MFREE(seq->seq);
                 MFREE(seq->s);
                 MFREE(seq->gaps);
+                if(seq->confidence){
+                        MFREE(seq->confidence);
+                }
                 MFREE(seq);
         }
 }

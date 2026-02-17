@@ -108,18 +108,23 @@ pip install "kalign[all] @ git+https://github.com/TimoLassmann/kalign.git"      
 ### Command Line Interface
 
 ```bash
-Usage: kalign  -i <seq file> -o <out aln> 
+Usage: kalign  -i <seq file> -o <out aln>
 
 Options:
 
    --format           : Output format. [Fasta]
    --type             : Alignment type (rna, dna, internal). [rna]
-                        Options: protein, divergent (protein) 
-                                 rna, dna, internal (nuc). 
+                        Options: protein, divergent (protein)
+                                 rna, dna, internal (nuc).
    --gpo              : Gap open penalty. []
    --gpe              : Gap extension penalty. []
    --tgpe             : Terminal gap extension penalty. []
    -n/--nthreads      : Number of threads. [auto: N-1, max 16]
+   --refine           : Refinement mode: none, all, confident. [confident]
+   --ensemble N       : Run N stochastic ensemble alignments. [off]
+   --min-support N    : Explicit consensus threshold for ensemble. [auto]
+   --save-poar FILE   : Save POAR table for later re-thresholding.
+   --load-poar FILE   : Load POAR table (skip alignment).
    --version (-V/-v)  : Prints version. [NA]
 ```
 
@@ -165,6 +170,19 @@ sequences = [
 aligned = kalign.align(sequences, seq_type="dna")
 for seq in aligned:
     print(seq)
+
+# Ensemble alignment with per-residue confidence scores
+result = kalign.align_from_file("proteins.fasta", ensemble=5)
+print(result.column_confidence)    # per-column confidence [0..1]
+print(result.residue_confidence)   # per-residue confidence [0..1]
+
+# Write confidence to Stockholm format (#=GR PP annotations)
+kalign.write_alignment(
+    result.sequences, "output.sto", format="stockholm",
+    ids=result.names,
+    column_confidence=result.column_confidence,
+    residue_confidence=result.residue_confidence,
+)
 ```
 
 The Python package also provides a `kalign-py` CLI that uses the Python bindings directly (does not require the C binary):
@@ -197,6 +215,21 @@ kalign -i sequences.fa -o aligned.afa  # Uses N-1 threads automatically
 **Custom threading**:
 ```bash
 kalign -i sequences.fa -o aligned.afa -n 8  # Use exactly 8 threads
+```
+
+### Ensemble Alignment
+
+Ensemble mode runs multiple alignments with varied parameters and combines results for higher accuracy (~5% improvement on BAliBASE at ~10x time cost):
+
+```bash
+# Run 5 ensemble alignments (recommended for best accuracy)
+kalign -i sequences.fa -o aligned.afa --ensemble 5
+
+# Save the POAR consensus table for later re-thresholding
+kalign -i sequences.fa -o aligned.afa --ensemble 5 --save-poar consensus.poar
+
+# Instantly re-threshold with a different support level (no re-alignment needed)
+kalign -i sequences.fa -o rethresholded.afa --load-poar consensus.poar --min-support 3
 ```
 
 ### Format Conversion

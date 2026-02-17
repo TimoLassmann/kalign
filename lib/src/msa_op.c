@@ -443,10 +443,15 @@ int kalign_arr_to_msa(char** input_sequences, int* len, int numseq,struct msa** 
         msa->numseq = numseq;
         msa->num_profiles = 0;
         msa->L = ALPHA_UNDEFINED;
+        msa->biotype = ALN_BIOTYPE_UNDEF;
         msa->aligned = 0;
+        msa->alnlen = 0;
         msa->plen = NULL;
         msa->sip = NULL;
         msa->nsip = NULL;
+        msa->seq_distances = NULL;
+        msa->col_confidence = NULL;
+        msa->run_parallel = 0;
         msa->quiet = 1;
         MMALLOC(msa->sequences, sizeof(struct msa_seq*) * msa->alloc_numseq);
 
@@ -463,6 +468,8 @@ int kalign_arr_to_msa(char** input_sequences, int* len, int numseq,struct msa** 
                 seq->seq = NULL;
                 seq->s = NULL;
                 seq->gaps = NULL;
+                seq->confidence = NULL;
+                seq->rank = 0;
                 seq->len = len[i];
                 seq->alloc_len = len[i]+1;
 

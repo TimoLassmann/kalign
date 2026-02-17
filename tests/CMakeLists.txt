@@ -96,6 +96,17 @@ ${CMAKE_CURRENT_SOURCE_DIR}
   )
 
 
+add_executable(kalign_ensemble_test
+  kalign_ensemble_test.c
+  )
+target_link_libraries(kalign_ensemble_test tldevel ${PROJECT_NAME}_static)
+
+add_test(
+  NAME kalign_ensemble_test
+  COMMAND kalign_ensemble_test ${CMAKE_CURRENT_SOURCE_DIR}/data/BB11001.tfa
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+
 add_test(
   NAME DSSIM_takes_a_min
   COMMAND dssim

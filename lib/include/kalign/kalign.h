@@ -68,11 +68,12 @@ EXTERN int kalign_post_realign(struct msa *msa, int n_threads, int type,
 
 EXTERN int kalign_ensemble(struct msa* msa, int n_threads, int type,
                            int n_runs, float gpo, float gpe, float tgpe,
-                           uint64_t seed);
+                           uint64_t seed, int min_support,
+                           const char* save_poar_path);
 
-EXTERN int kalign_ensemble_consensus(struct msa* msa, int n_threads, int type,
-                                     int n_runs, float gpo, float gpe, float tgpe,
-                                     uint64_t seed, int min_support);
+EXTERN int kalign_consensus_from_poar(struct msa* msa,
+                                      const char* poar_path,
+                                      int min_support);
 
 /* Memory */
 EXTERN void kalign_free_msa(struct msa* msa);

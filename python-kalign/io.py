@@ -236,13 +236,26 @@ def write_clustal(
             AlignIO.write(msa, handle, "clustal")
 
 
+def _conf_to_pp_char(conf: float) -> str:
+    """Convert a confidence value [0..1] to HMMER-style PP character."""
+    if conf >= 0.95:
+        return "*"
+    return str(int(conf * 10))
+
+
 def write_stockholm(
     alignment: List[str],
     path: Union[str, Path, TextIO],
     ids: Optional[List[str]] = None,
+    column_confidence: Optional[List[float]] = None,
+    residue_confidence: Optional[List[List[float]]] = None,
 ) -> None:
     """
     Write aligned sequences to Stockholm format.
+
+    When confidence data is provided (from ensemble alignment), emits
+    ``#=GR <name> PP`` lines (per-residue) and ``#=GC PP_cons`` line
+    (per-column) using HMMER-style PP encoding.
 
     Parameters
     ----------
@@ -252,22 +265,16 @@ def write_stockholm(
         Output path or file handle
     ids : list of str, optional
         Sequence IDs. If None, generates seq0, seq1, etc.
+    column_confidence : list of float, optional
+        Per-column confidence values [0..1]. Emitted as ``#=GC PP_cons``.
+    residue_confidence : list of list of float, optional
+        Per-residue confidence values [0..1]. Emitted as ``#=GR <name> PP``.
 
     Examples
     --------
     >>> aligned = kalign.align(sequences)
     >>> kalign.io.write_stockholm(aligned, "output.sto")
     """
-    try:
-        from Bio import AlignIO
-        from Bio.Align import MultipleSeqAlignment
-        from Bio.Seq import Seq
-        from Bio.SeqRecord import SeqRecord
-    except ImportError as e:
-        raise ImportError(
-            "Biopython required for Stockholm I/O. Run: pip install kalign-python[io]"
-        ) from e
-
     if not alignment:
         raise ValueError("Empty alignment provided")
 
@@ -278,17 +285,69 @@ def write_stockholm(
             f"Number of IDs ({len(ids)}) must match alignment length ({len(alignment)})"
         )
 
-    # Create Biopython alignment object
-    records = [SeqRecord(Seq(seq), id=seq_id) for seq, seq_id in zip(alignment, ids)]
-    msa = MultipleSeqAlignment(records)
+    has_confidence = (
+        residue_confidence is not None or column_confidence is not None
+    )
 
-    if hasattr(path, "write"):
-        # File-like object
-        AlignIO.write(msa, path, "stockholm")
+    if has_confidence:
+        # Write Stockholm manually to include PP annotations
+        def write_to_handle(handle):
+            handle.write("# STOCKHOLM 1.0\n")
+            # Find max ID length for padding
+            max_id = max(len(i) for i in ids)
+            pp_label_len = max(max_id, len("PP_cons"))
+
+            for idx, (seq_id, seq) in enumerate(zip(ids, alignment)):
+                handle.write(f"{seq_id:<{max_id}}   {seq}\n")
+                # Per-residue confidence
+                if residue_confidence is not None and idx < len(residue_confidence):
+                    rc = residue_confidence[idx]
+                    pp = []
+                    for ch, conf in zip(seq, rc):
+                        if ch == "-" or ch == ".":
+                            pp.append(".")
+                        else:
+                            pp.append(_conf_to_pp_char(conf))
+                    pp_str = "".join(pp)
+                    handle.write(f"#=GR {seq_id:<{max_id}} PP {pp_str}\n")
+
+            # Per-column confidence
+            if column_confidence is not None:
+                pp_cons = "".join(
+                    _conf_to_pp_char(c) for c in column_confidence
+                )
+                handle.write(f"#=GC {'PP_cons':<{pp_label_len}}   {pp_cons}\n")
+
+            handle.write("//\n")
+
+        if hasattr(path, "write"):
+            write_to_handle(path)
+        else:
+            with open(path, "w") as handle:
+                write_to_handle(handle)
     else:
-        # File path
-        with open(path, "w") as handle:
-            AlignIO.write(msa, handle, "stockholm")
+        # No confidence data: use Biopython for standard Stockholm output
+        try:
+            from Bio import AlignIO
+            from Bio.Align import MultipleSeqAlignment
+            from Bio.Seq import Seq
+            from Bio.SeqRecord import SeqRecord
+        except ImportError as e:
+            raise ImportError(
+                "Biopython required for Stockholm I/O. Run: pip install kalign-python[io]"
+            ) from e
+
+        records = [
+            SeqRecord(Seq(seq), id=seq_id)
+            for seq, seq_id in zip(alignment, ids)
+        ]
+        msa = MultipleSeqAlignment(records)
+
+        if hasattr(path, "write"):
+            AlignIO.write(msa, path, "stockholm")
+        else:
+            with open(path, "w") as handle:
+                AlignIO.write(msa, handle, "stockholm")
 
 
 def write_phylip(

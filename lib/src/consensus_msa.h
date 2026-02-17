@@ -26,6 +26,9 @@ EXTERN int score_alignment_poar(struct poar_table* table,
                                 int n_alignments,
                                 double* out_score);
 
+EXTERN int compute_residue_confidence(struct poar_table* table,
+                                      struct msa* aligned_msa);
+
 #undef CONSENSUS_MSA_IMPORT
 #undef EXTERN
 

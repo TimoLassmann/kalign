@@ -2,6 +2,7 @@
 
 #include <ctype.h>
 #include <string.h>
+#include <stdio.h>
 
 #define POAR_IMPORT
 #include "poar.h"
@@ -196,5 +197,129 @@ int extract_poars(struct poar_table* table, struct pos_matrix* pm, int aln_idx)
         }
         return OK;
 ERROR:
+        return FAIL;
+}
+
+/* Binary POAR file format:
+   4 bytes: "POAR" magic
+   4 bytes: version (1)
+   4 bytes: numseq
+   4 bytes: n_alignments
+   For each pair (n_pairs = numseq*(numseq-1)/2):
+     4 bytes: n_entries
+     n_entries * 8 bytes: (key, support) pairs
+*/
+
+#define POAR_MAGIC 0x524F4150  /* "POAR" in little-endian */
+#define POAR_VERSION 1
+
+int poar_table_write(struct poar_table* table, const char* path)
+{
+        FILE* fp = NULL;
+        uint32_t magic = POAR_MAGIC;
+        uint32_t version = POAR_VERSION;
+        uint32_t numseq = (uint32_t)table->numseq;
+        uint32_t n_alignments = (uint32_t)table->n_alignments;
+        int i;
+
+        ASSERT(table != NULL, "No POAR table");
+        ASSERT(path != NULL, "No output path");
+
+        fp = fopen(path, "wb");
+        if(!fp){
+                ERROR_MSG("Cannot open %s for writing", path);
+        }
+
+        fwrite(&magic, 4, 1, fp);
+        fwrite(&version, 4, 1, fp);
+        fwrite(&numseq, 4, 1, fp);
+        fwrite(&n_alignments, 4, 1, fp);
+
+        for(i = 0; i < table->n_pairs; i++){
+                struct poar_pair* pp = table->pairs[i];
+                uint32_t n_entries = (uint32_t)pp->n_entries;
+                fwrite(&n_entries, 4, 1, fp);
+                if(n_entries > 0){
+                        fwrite(pp->entries, sizeof(struct poar_entry), n_entries, fp);
+                }
+        }
+
+        fclose(fp);
+        return OK;
+ERROR:
+        if(fp) fclose(fp);
+        return FAIL;
+}
+
+int poar_table_read(struct poar_table** out_table, const char* path)
+{
+        FILE* fp = NULL;
+        struct poar_table* t = NULL;
+        uint32_t magic, version, numseq, n_alignments;
+        int i;
+
+        ASSERT(path != NULL, "No input path");
+
+        fp = fopen(path, "rb");
+        if(!fp){
+                ERROR_MSG("Cannot open %s for reading", path);
+        }
+
+        if(fread(&magic, 4, 1, fp) != 1 || magic != POAR_MAGIC){
+                ERROR_MSG("Invalid POAR file magic in %s", path);
+        }
+        if(fread(&version, 4, 1, fp) != 1 || version != POAR_VERSION){
+                ERROR_MSG("Unsupported POAR file version %u in %s", version, path);
+        }
+        if(fread(&numseq, 4, 1, fp) != 1){
+                ERROR_MSG("Failed to read numseq from %s", path);
+        }
+        if(fread(&n_alignments, 4, 1, fp) != 1){
+                ERROR_MSG("Failed to read n_alignments from %s", path);
+        }
+
+        MMALLOC(t, sizeof(struct poar_table));
+        t->pairs = NULL;
+        t->numseq = (int)numseq;
+        t->n_alignments = (int)n_alignments;
+        t->n_pairs = (int)(numseq * (numseq - 1) / 2);
+
+        MMALLOC(t->pairs, sizeof(struct poar_pair*) * t->n_pairs);
+        for(i = 0; i < t->n_pairs; i++){
+                t->pairs[i] = NULL;
+        }
+
+        for(i = 0; i < t->n_pairs; i++){
+                uint32_t n_entries;
+                struct poar_pair* pp = NULL;
+
+                if(fread(&n_entries, 4, 1, fp) != 1){
+                        ERROR_MSG("Failed to read pair %d entries count", i);
+                }
+
+                MMALLOC(pp, sizeof(struct poar_pair));
+                pp->entries = NULL;
+                pp->n_entries = (int)n_entries;
+                pp->alloc_entries = n_entries > 0 ? (int)n_entries : 1;
+
+                MMALLOC(pp->entries, sizeof(struct poar_entry) * pp->alloc_entries);
+
+                if(n_entries > 0){
+                        if(fread(pp->entries, sizeof(struct poar_entry), n_entries, fp) != n_entries){
+                                MFREE(pp->entries);
+                                MFREE(pp);
+                                ERROR_MSG("Failed to read pair %d entries", i);
+                        }
+                }
+
+                t->pairs[i] = pp;
+        }
+
+        fclose(fp);
+        *out_table = t;
+        return OK;
+ERROR:
+        if(fp) fclose(fp);
+        if(t) poar_table_free(t);
         return FAIL;
 }

@@ -36,8 +36,68 @@ std::vector<std::string> c_strings_to_python(char** c_strings, int count, int le
     return result;
 }
 
+// Helper to extract confidence data from MSA before freeing
+static py::object extract_confidence(struct msa* msa_data, int numseq) {
+    if (!msa_data->col_confidence) {
+        return py::none();
+    }
+
+    int alnlen = msa_data->alnlen;
+
+    // Per-column confidence
+    py::list col_conf;
+    for (int c = 0; c < alnlen; c++) {
+        col_conf.append(msa_data->col_confidence[c]);
+    }
+
+    // Per-residue confidence
+    py::list res_conf;
+    for (int i = 0; i < numseq; i++) {
+        py::list row;
+        if (msa_data->sequences[i]->confidence) {
+            for (int c = 0; c < alnlen; c++) {
+                row.append(msa_data->sequences[i]->confidence[c]);
+            }
+        }
+        res_conf.append(row);
+    }
+
+    py::dict result;
+    result["column_confidence"] = col_conf;
+    result["residue_confidence"] = res_conf;
+    return result;
+}
+
+// Shared alignment routing helper — selects the appropriate kalign function
+// based on the combination of parameters provided.
+static int run_alignment(struct msa* msa_data, int n_threads, int seq_type,
+                         float gap_open, float gap_extend, float terminal_gap_extend,
+                         int refine, int adaptive_budget,
+                         int ensemble, uint64_t ensemble_seed,
+                         float dist_scale, float vsm_amax,
+                         int min_support, int realign,
+                         const std::string& save_poar,
+                         const std::string& load_poar)
+{
+    if (!load_poar.empty()) {
+        return kalign_consensus_from_poar(msa_data, load_poar.c_str(),
+                                          min_support > 0 ? min_support : 2);
+    } else if (ensemble > 0) {
+        const char* save_path = save_poar.empty() ? nullptr : save_poar.c_str();
+        return kalign_ensemble(msa_data, n_threads, seq_type, ensemble,
+                               gap_open, gap_extend, terminal_gap_extend,
+                               ensemble_seed, min_support, save_path);
+    } else if (realign > 0) {
+        return kalign_run_realign(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget, dist_scale, vsm_amax, realign);
+    } else if (dist_scale > 0.0f || vsm_amax >= 0.0f) {
+        return kalign_run_dist_scale(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget, dist_scale, vsm_amax);
+    } else {
+        return kalign_run(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget);
+    }
+}
+
 // Main alignment function
-std::vector<std::string> align_sequences(
+py::object align_sequences(
     const std::vector<std::string>& sequences,
     int seq_type = KALIGN_TYPE_UNDEFINED,
     float gap_open = -1.0f,
@@ -45,7 +105,8 @@ std::vector<std::string> align_sequences(
     float terminal_gap_extend = -1.0f,
     int n_threads = 1,
     int refine = KALIGN_REFINE_NONE,
-    int ensemble = 0
+    int ensemble = 0,
+    int min_support = 0
 ) {
     if (sequences.empty()) {
         throw std::invalid_argument("Empty sequence list provided");
@@ -76,19 +137,21 @@ std::vector<std::string> align_sequences(
     msa_data->quiet = 1;
 
     // Route to appropriate alignment function
-    if (ensemble > 0) {
-        result = kalign_ensemble(msa_data, n_threads, seq_type, ensemble,
-                                 gap_open, gap_extend, terminal_gap_extend, 42);
-    } else {
-        result = kalign_run(msa_data, n_threads, seq_type,
-                            gap_open, gap_extend, terminal_gap_extend,
-                            refine, 0);
-    }
+    result = run_alignment(msa_data, n_threads, seq_type,
+                           gap_open, gap_extend, terminal_gap_extend,
+                           refine, 0,
+                           ensemble, 42,
+                           0.0f, -1.0f,
+                           min_support, 0,
+                           "", "");
 
     if (result != 0) {
         kalign_free_msa(msa_data);
         throw std::runtime_error("Kalign alignment failed with error code: " + std::to_string(result));
     }
+
+    // Extract confidence data before converting to arrays (which frees the MSA)
+    py::object confidence = extract_confidence(msa_data, static_cast<int>(sequences.size()));
 
     // Extract aligned sequences
     char** aligned_seqs = nullptr;
@@ -101,11 +164,19 @@ std::vector<std::string> align_sequences(
     }
 
     // Convert results back to Python
-    return c_strings_to_python(aligned_seqs, static_cast<int>(sequences.size()), alignment_length);
+    auto seqs = c_strings_to_python(aligned_seqs, static_cast<int>(sequences.size()), alignment_length);
+
+    // If ensemble was used and confidence data exists, return tuple
+    if (ensemble > 0 && !confidence.is_none()) {
+        return py::make_tuple(seqs, confidence);
+    }
+
+    // Otherwise return just sequences (backward compat)
+    return py::cast(seqs);
 }
 
-// File-based alignment function — returns (names, sequences)
-std::pair<std::vector<std::string>, std::vector<std::string>> align_from_file(
+// File-based alignment function — returns (names, sequences) or (names, sequences, confidence)
+py::object align_from_file(
     const std::string& input_file,
     int seq_type = KALIGN_TYPE_UNDEFINED,
     float gap_open = -1.0f,
@@ -119,7 +190,9 @@ std::pair<std::vector<std::string>, std::vector<std::string>> align_from_file(
     float dist_scale = 0.0f,
     float vsm_amax = -1.0f,
     int min_support = 0,
-    int realign = 0
+    int realign = 0,
+    const std::string& save_poar = "",
+    const std::string& load_poar = ""
 ) {
     struct msa* msa_data = nullptr;
 
@@ -135,17 +208,13 @@ std::pair<std::vector<std::string>, std::vector<std::string>> align_from_file(
     }
 
     // Perform alignment
-    if (ensemble > 0 && min_support > 0) {
-        result = kalign_ensemble_consensus(msa_data, n_threads, seq_type, ensemble, gap_open, gap_extend, terminal_gap_extend, ensemble_seed, min_support);
-    } else if (ensemble > 0) {
-        result = kalign_ensemble(msa_data, n_threads, seq_type, ensemble, gap_open, gap_extend, terminal_gap_extend, ensemble_seed);
-    } else if (realign > 0) {
-        result = kalign_run_realign(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget, dist_scale, vsm_amax, realign);
-    } else if (dist_scale > 0.0f || vsm_amax >= 0.0f) {
-        result = kalign_run_dist_scale(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget, dist_scale, vsm_amax);
-    } else {
-        result = kalign_run(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget);
-    }
+    result = run_alignment(msa_data, n_threads, seq_type,
+                           gap_open, gap_extend, terminal_gap_extend,
+                           refine, adaptive_budget,
+                           ensemble, ensemble_seed,
+                           dist_scale, vsm_amax,
+                           min_support, realign,
+                           save_poar, load_poar);
     if (result != 0) {
         kalign_free_msa(msa_data);
         throw std::runtime_error("Kalign alignment failed with error code: " + std::to_string(result));
@@ -159,6 +228,9 @@ std::pair<std::vector<std::string>, std::vector<std::string>> align_from_file(
             throw std::runtime_error("Post-realign failed with error code: " + std::to_string(result));
         }
     }
+
+    // Extract confidence data before writing (which doesn't preserve it)
+    py::object confidence = extract_confidence(msa_data, msa_data->numseq);
 
     // Write to a temporary file so kalign_write_msa handles gap insertion
     const char* tmpdir = std::getenv("TMPDIR");
@@ -208,7 +280,12 @@ std::pair<std::vector<std::string>, std::vector<std::string>> align_from_file(
     // Clean up temp file
     std::remove(temp_file.c_str());
 
-    return {names, aligned_sequences};
+    // If confidence data exists, return 3-tuple
+    if (!confidence.is_none()) {
+        return py::make_tuple(names, aligned_sequences, confidence);
+    }
+
+    return py::make_tuple(names, aligned_sequences);
 }
 
 // Generate test sequences using DSSim
@@ -376,7 +453,9 @@ void align_file_to_file(
     float dist_scale = 0.0f,
     float vsm_amax = -1.0f,
     int min_support = 0,
-    int realign = 0
+    int realign = 0,
+    const std::string& save_poar = "",
+    const std::string& load_poar = ""
 ) {
     struct msa* msa_data = nullptr;
 
@@ -385,17 +464,13 @@ void align_file_to_file(
         throw std::runtime_error("Failed to read input file: " + input_file);
     }
 
-    if (ensemble > 0 && min_support > 0) {
-        result = kalign_ensemble_consensus(msa_data, n_threads, seq_type, ensemble, gap_open, gap_extend, terminal_gap_extend, ensemble_seed, min_support);
-    } else if (ensemble > 0) {
-        result = kalign_ensemble(msa_data, n_threads, seq_type, ensemble, gap_open, gap_extend, terminal_gap_extend, ensemble_seed);
-    } else if (realign > 0) {
-        result = kalign_run_realign(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget, dist_scale, vsm_amax, realign);
-    } else if (dist_scale > 0.0f || vsm_amax >= 0.0f) {
-        result = kalign_run_dist_scale(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget, dist_scale, vsm_amax);
-    } else {
-        result = kalign_run(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget);
-    }
+    result = run_alignment(msa_data, n_threads, seq_type,
+                           gap_open, gap_extend, terminal_gap_extend,
+                           refine, adaptive_budget,
+                           ensemble, ensemble_seed,
+                           dist_scale, vsm_amax,
+                           min_support, realign,
+                           save_poar, load_poar);
     if (result != 0) {
         kalign_free_msa(msa_data);
         throw std::runtime_error("Alignment failed with error code: " + std::to_string(result));
@@ -431,6 +506,7 @@ PYBIND11_MODULE(_core, m) {
           py::arg("n_threads") = 1,
           py::arg("refine") = KALIGN_REFINE_NONE,
           py::arg("ensemble") = 0,
+          py::arg("min_support") = 0,
           R"pbdoc(
           Align a list of sequences using Kalign.
 
@@ -452,14 +528,17 @@ PYBIND11_MODULE(_core, m) {
               Refinement mode (default: REFINE_NONE)
           ensemble : int, optional
               Number of ensemble runs (default: 0 = off)
+          min_support : int, optional
+              Explicit consensus threshold (default: 0 = auto)
 
           Returns
           -------
-          list of str
-              Aligned sequences
+          list of str or tuple
+              When ensemble > 0: (aligned_seqs, confidence_dict)
+              Otherwise: aligned sequences
           )pbdoc");
     
-    // File-based alignment — returns (names, sequences)
+    // File-based alignment — returns (names, sequences) or (names, sequences, confidence)
     m.def("align_from_file", &align_from_file,
           py::arg("input_file"),
           py::arg("seq_type") = KALIGN_TYPE_UNDEFINED,
@@ -475,7 +554,9 @@ PYBIND11_MODULE(_core, m) {
           py::arg("vsm_amax") = -1.0f,
           py::arg("min_support") = 0,
           py::arg("realign") = 0,
-          "Align sequences from a file. Returns (names, sequences) tuple.");
+          py::arg("save_poar") = "",
+          py::arg("load_poar") = "",
+          "Align sequences from a file. Returns (names, sequences) or (names, sequences, confidence) tuple.");
 
     // Generate test sequences using DSSim
     m.def("generate_test_sequences", &generate_test_sequences,
@@ -592,6 +673,8 @@ PYBIND11_MODULE(_core, m) {
           py::arg("vsm_amax") = -1.0f,
           py::arg("min_support") = 0,
           py::arg("realign") = 0,
+          py::arg("save_poar") = "",
+          py::arg("load_poar") = "",
           R"pbdoc(
           Align sequences from input file and write to output file.
 

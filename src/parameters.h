@@ -67,6 +67,9 @@ struct parameters{
         int adaptive_budget;
         int ensemble;
         uint64_t ensemble_seed;
+        int min_support;
+        char* save_poar;
+        char* load_poar;
         int help_flag;
         int quiet;
 };

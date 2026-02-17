@@ -49,6 +49,9 @@ EXTERN void pos_matrix_free(struct pos_matrix* pm);
 
 EXTERN int extract_poars(struct poar_table* table, struct pos_matrix* pm, int aln_idx);
 
+EXTERN int poar_table_write(struct poar_table* table, const char* path);
+EXTERN int poar_table_read(struct poar_table** table, const char* path);
+
 #undef POAR_IMPORT
 #undef EXTERN
 

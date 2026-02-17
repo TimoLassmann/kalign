@@ -48,10 +48,15 @@ aligned = kalign.align(
     n_threads=None,         # int, or None for global default
     fmt="plain",            # "plain", "biopython", "skbio"
     ids=None,               # list of str (for biopython/skbio output)
+    refine="confident",     # refinement mode: "none", "all", "confident"
+    ensemble=0,             # number of ensemble runs (0 = off, try 3-5)
+    min_support=0,          # explicit consensus threshold (0 = auto)
 )
 ```
 
 Returns a list of aligned strings (default), a `Bio.Align.MultipleSeqAlignment` (`fmt="biopython"`), or a `skbio.TabularMSA` (`fmt="skbio"`).
+
+When `ensemble > 0` and `fmt="biopython"`, per-residue confidence is attached as HMMER-style PP `letter_annotations["posterior_probability"]`.
 
 ### `kalign.align_from_file()`
 
@@ -63,7 +68,21 @@ for name, seq in zip(result.names, result.sequences):
     print(f"{name}: {seq}")
 ```
 
-Returns an `AlignedSequences` named tuple with `.names` and `.sequences`.
+Returns an `AlignedSequences` object with `.names`, `.sequences`, and optional confidence fields (see below).
+
+Additional parameters for advanced use:
+
+```python
+result = kalign.align_from_file(
+    "input.fasta",
+    ensemble=5,                # ensemble runs for better accuracy
+    min_support=0,             # consensus threshold (0 = auto)
+    save_poar="consensus.poar",  # save POAR table for re-thresholding
+    # load_poar="consensus.poar",  # OR load pre-computed POAR
+    refine="confident",        # refinement mode
+    realign=0,                 # realignment iterations
+)
+```
 
 ### `kalign.compare()`
 
@@ -72,6 +91,15 @@ Score a test alignment against a reference using the Sum-of-Pairs (SP) score:
 ```python
 score = kalign.compare("reference.msf", "test.fasta")
 print(f"SP score: {score:.1f}")  # 0 (no match) to 100 (identical)
+```
+
+### `kalign.compare_detailed()`
+
+Detailed alignment comparison returning POAR recall/precision/F1/TC:
+
+```python
+scores = kalign.compare_detailed("reference.msf", "test.fasta")
+print(f"F1: {scores['f1']:.3f}, TC: {scores['tc']:.3f}")
 ```
 
 ### `kalign.write_alignment()`
@@ -83,6 +111,62 @@ kalign.write_alignment(aligned, "output.fasta", format="fasta", ids=ids)
 ```
 
 Supported formats: `fasta`, `clustal`, `stockholm`, `phylip` (non-FASTA formats require Biopython).
+
+## Ensemble Alignment & Confidence Scores
+
+Ensemble mode runs multiple alignments with varied parameters and combines results via POAR (Pairs of Aligned Residues) consensus. This typically improves accuracy by ~5% on BAliBASE benchmarks at ~10x time cost.
+
+```python
+import kalign
+
+# Ensemble alignment with confidence
+result = kalign.align_from_file("proteins.fasta", ensemble=5)
+
+# Per-column confidence: average agreement across ensemble runs [0..1]
+print(result.column_confidence[:10])   # e.g. [0.93, 0.87, 1.0, ...]
+
+# Per-residue confidence: per-sequence, per-position agreement [0..1]
+print(result.residue_confidence[0][:10])  # e.g. [0.95, 0.90, 1.0, ...]
+```
+
+### POAR Save/Load
+
+Save the POAR consensus table to avoid re-running the ensemble when experimenting with thresholds:
+
+```python
+# First run: compute ensemble and save POAR
+kalign.align_file_to_file("input.fa", "output.fa", ensemble=5,
+                          save_poar="consensus.poar")
+
+# Later: instant re-threshold from saved POAR (no re-alignment)
+kalign.align_file_to_file("input.fa", "output2.fa",
+                          load_poar="consensus.poar", min_support=3)
+```
+
+### Stockholm Output with Confidence
+
+Write confidence annotations in Stockholm format (`#=GR PP` per-residue, `#=GC PP_cons` per-column):
+
+```python
+result = kalign.align_from_file("input.fasta", ensemble=5)
+kalign.write_alignment(
+    result.sequences, "output.sto", format="stockholm",
+    ids=result.names,
+    column_confidence=result.column_confidence,
+    residue_confidence=result.residue_confidence,
+)
+```
+
+Confidence uses HMMER-style PP encoding: `*`=95%+, `9`=85-95%, ..., `0`=0-5%, `.`=gap.
+
+### Biopython Per-Residue PP
+
+When using `fmt="biopython"` with ensemble, per-residue confidence is attached as `letter_annotations["posterior_probability"]`:
+
+```python
+aln = kalign.align(seqs, ensemble=3, fmt="biopython", ids=ids)
+print(aln[0].letter_annotations["posterior_probability"])  # e.g. "998.76*9..."
+```
 
 ## Threading
 
@@ -173,6 +257,12 @@ print(type(aln))  # <class 'skbio.alignment._tabular_msa.TabularMSA'>
 kalign-py -i sequences.fasta -o aligned.fasta --format fasta --type protein
 kalign-py -i sequences.fasta -o - --format clustal   # stdout
 cat input.fa | kalign-py -i - -o aligned.fasta        # stdin
+
+# Ensemble alignment
+kalign-py -i input.fa -o output.fa --ensemble 5
+kalign-py -i input.fa -o output.fa --ensemble 5 --save-poar consensus.poar
+kalign-py -i input.fa -o output.fa --load-poar consensus.poar --min-support 3
+
 kalign-py --version
 ```
 

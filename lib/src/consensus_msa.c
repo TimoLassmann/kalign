@@ -553,6 +553,138 @@ ERROR:
         return FAIL;
 }
 
+/* Compute per-residue and per-column confidence from POAR table.
+   For each residue at alignment position pos in sequence i:
+   - Count residue-residue pairs with other sequences j that also have
+     a residue (not gap) at the same column.
+   - For each such pair, look up POAR support (popcount).
+   - confidence = sum(supports) / (n_residue_pairs * n_alignments)
+   Gaps get confidence 0.0.
+   Column confidence = mean of residue confidences in that column. */
+int compute_residue_confidence(struct poar_table* table,
+                               struct msa* aligned_msa)
+{
+        struct pos_matrix* pm = NULL;
+        int numseq = aligned_msa->numseq;
+        int alnlen = aligned_msa->alnlen;
+        int n_alignments = table->n_alignments;
+        int i, j, col;
+        char** seqs = NULL;
+
+        ASSERT(table != NULL, "No POAR table");
+        ASSERT(aligned_msa != NULL, "No aligned MSA");
+        ASSERT(alnlen > 0, "Alignment length is 0");
+
+        /* Build position matrix from aligned MSA */
+        MMALLOC(seqs, sizeof(char*) * numseq);
+        for(i = 0; i < numseq; i++){
+                seqs[i] = aligned_msa->sequences[i]->seq;
+        }
+        RUN(pos_matrix_from_msa(&pm, seqs, numseq, alnlen));
+
+        /* Allocate per-residue confidence arrays */
+        for(i = 0; i < numseq; i++){
+                if(aligned_msa->sequences[i]->confidence){
+                        MFREE(aligned_msa->sequences[i]->confidence);
+                }
+                aligned_msa->sequences[i]->confidence = NULL;
+                MMALLOC(aligned_msa->sequences[i]->confidence,
+                        sizeof(float) * alnlen);
+                for(col = 0; col < alnlen; col++){
+                        aligned_msa->sequences[i]->confidence[col] = 0.0f;
+                }
+        }
+
+        /* Allocate per-column confidence */
+        if(aligned_msa->col_confidence){
+                MFREE(aligned_msa->col_confidence);
+        }
+        aligned_msa->col_confidence = NULL;
+        MMALLOC(aligned_msa->col_confidence, sizeof(float) * alnlen);
+
+        /* Compute per-residue confidence */
+        for(i = 0; i < numseq; i++){
+                for(col = 0; col < alnlen; col++){
+                        int ri = pm->col_to_res[i][col];
+                        if(ri < 0){
+                                /* gap position */
+                                aligned_msa->sequences[i]->confidence[col] = 0.0f;
+                                continue;
+                        }
+
+                        double sum_support = 0.0;
+                        int n_pairs = 0;
+
+                        for(j = 0; j < numseq; j++){
+                                if(j == i) continue;
+                                int rj = pm->col_to_res[j][col];
+                                if(rj < 0) continue; /* skip gaps */
+
+                                /* Look up POAR support for this pair */
+                                int si = i < j ? i : j;
+                                int sj = i < j ? j : i;
+                                int pidx = pair_index(si, sj, numseq);
+                                struct poar_pair* pp = table->pairs[pidx];
+
+                                int orig_i = i < j ? ri : rj;
+                                int orig_j = i < j ? rj : ri;
+                                uint32_t key = ((uint32_t)orig_i << 20) | (uint32_t)orig_j;
+
+                                /* Binary search */
+                                int lo = 0;
+                                int hi = pp->n_entries;
+                                int support = 0;
+                                while(lo < hi){
+                                        int mid = lo + (hi - lo) / 2;
+                                        if(pp->entries[mid].key < key){
+                                                lo = mid + 1;
+                                        }else if(pp->entries[mid].key == key){
+                                                support = popcount32(pp->entries[mid].support);
+                                                break;
+                                        }else{
+                                                hi = mid;
+                                        }
+                                }
+
+                                sum_support += (double)support;
+                                n_pairs++;
+                        }
+
+                        if(n_pairs > 0 && n_alignments > 0){
+                                aligned_msa->sequences[i]->confidence[col] =
+                                        (float)(sum_support / ((double)n_pairs * (double)n_alignments));
+                        }else{
+                                aligned_msa->sequences[i]->confidence[col] = 0.0f;
+                        }
+                }
+        }
+
+        /* Compute per-column confidence: mean over non-gap residues */
+        for(col = 0; col < alnlen; col++){
+                double sum = 0.0;
+                int count = 0;
+                for(i = 0; i < numseq; i++){
+                        if(pm->col_to_res[i][col] >= 0){
+                                sum += aligned_msa->sequences[i]->confidence[col];
+                                count++;
+                        }
+                }
+                if(count > 0){
+                        aligned_msa->col_confidence[col] = (float)(sum / count);
+                }else{
+                        aligned_msa->col_confidence[col] = 0.0f;
+                }
+        }
+
+        pos_matrix_free(pm);
+        MFREE(seqs);
+        return OK;
+ERROR:
+        if(pm) pos_matrix_free(pm);
+        if(seqs) MFREE(seqs);
+        return FAIL;
+}
+
 /* Score one alignment against the POAR table.
    Returns expected number of correct pairs: for each aligned pair,
    (support - 1) / (m - 1) gives the fraction of OTHER alignments
