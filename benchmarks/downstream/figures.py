@@ -94,6 +94,8 @@ def _method_label(method: str) -> str:
     """Return a human-friendly label for a method key."""
     labels = {
         "kalign": "Kalign",
+        "kalign_basic": "Kalign basic",
+        "kalign_vsm": "Kalign VSM",
         "kalign_ens3": "Kalign ens3",
         "kalign_ens3_m50": "Kalign ens3 m50",
         "kalign_ens3_m70": "Kalign ens3 m70",

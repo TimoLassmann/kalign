@@ -397,9 +397,8 @@ def holm_bonferroni(p_values: list[float]) -> list[float]:
 METHOD_COLORS = {
     "kalign": "#1f77b4",
     "kalign_basic": "#aec7e8",
-    "kalign_fast": "#ff7f0e",
+    "kalign_vsm": "#ff7f0e",
     "kalign_probmsa": "#9467bd",
-    "kalign_probmsa_truetree": "#8c564b",
     "kalign_ens3": "#2ca02c",
     "kalign_ens3_m50": "#98df8a",
     "kalign_ens3_m70": "#006400",
@@ -411,7 +410,6 @@ METHOD_COLORS = {
     "mafft": "#9467bd",
     "muscle": "#8c564b",
     "clustalo": "#7f7f7f",
-    "kalign_best": "#d62728",
     "true": "#000000",
     "pfam_original": "#bcbd22",
 }
@@ -470,6 +468,8 @@ def run_kalign(
     probmsa_guided: bool = False,
     vsm_amax: float | None = None,
     realign: int | None = None,
+    consistency: int | None = None,
+    consistency_weight: float | None = None,
 ) -> AlignResult:
     """Run kalign via the Python API.
 
@@ -504,6 +504,10 @@ def run_kalign(
         extra["vsm_amax"] = vsm_amax
     if realign is not None:
         extra["realign"] = realign
+    if consistency is not None:
+        extra["consistency"] = consistency
+    if consistency_weight is not None:
+        extra["consistency_weight"] = consistency_weight
     result = _kalign.align_from_file(
         str(input_fasta),
         seq_type=seq_type,
@@ -799,32 +803,43 @@ def _parse_guidance2_res_scores(
 # ---------------------------------------------------------------------------
 
 METHODS: dict[str, dict] = {
-    "kalign": {"fn": run_kalign, "ensemble": 0, "mask": None},
+    # --- kalign single-run variants ---
+    # Default: VSM + anchor consistency (recommended single-run)
+    "kalign": {
+        "fn": run_kalign,
+        "ensemble": 0,
+        "mask": None,
+        "vsm_amax": 2.0,
+        "consistency": 5,
+        "consistency_weight": 2.0,
+    },
+    # Bare defaults — no VSM, no consistency (kalign 3.4 baseline)
     "kalign_basic": {"fn": run_kalign, "ensemble": 0, "mask": None, "refine": "none"},
-    "kalign_fast": {"fn": run_kalign, "ensemble": 0, "mask": None, "refine": "confident"},
+    # VSM only — no consistency
+    "kalign_vsm": {"fn": run_kalign, "ensemble": 0, "mask": None, "vsm_amax": 2.0},
+    # Experimental: pair-HMM progressive
     "kalign_probmsa": {"fn": run_kalign, "ensemble": 0, "mask": None, "refine": "none", "probmsa": True},
-    "kalign_probmsa_truetree": {"fn": run_kalign, "ensemble": 0, "mask": None, "refine": "none", "probmsa_guided": True},
-    "kalign_tds0": {"fn": run_kalign, "ensemble": 0, "mask": None, "terminal_dist_scale": 0.0},
-    "kalign_tds4": {"fn": run_kalign, "ensemble": 0, "mask": None, "terminal_dist_scale": 4.0},
-    "kalign_tds8": {"fn": run_kalign, "ensemble": 0, "mask": None, "terminal_dist_scale": 8.0},
-    "kalign_ens3": {"fn": run_kalign, "ensemble": 3, "mask": None},
-    "kalign_ens3_m50": {"fn": run_kalign, "ensemble": 3, "mask": 0.5},
-    "kalign_ens3_m70": {"fn": run_kalign, "ensemble": 3, "mask": 0.7},
-    "kalign_ens3_m90": {"fn": run_kalign, "ensemble": 3, "mask": 0.9},
+    # --- kalign ensemble variants ---
+    # Ensemble: 3 runs + POAR consensus + VSM + realign
+    "kalign_ens3": {
+        "fn": run_kalign,
+        "ensemble": 3,
+        "mask": None,
+        "vsm_amax": 2.0,
+        "realign": 1,
+    },
+    "kalign_ens3_m50": {"fn": run_kalign, "ensemble": 3, "mask": 0.5, "vsm_amax": 2.0, "realign": 1},
+    "kalign_ens3_m70": {"fn": run_kalign, "ensemble": 3, "mask": 0.7, "vsm_amax": 2.0, "realign": 1},
+    "kalign_ens3_m90": {"fn": run_kalign, "ensemble": 3, "mask": 0.9, "vsm_amax": 2.0, "realign": 1},
     "kalign_ens3_wt": {
         "fn": run_kalign,
         "ensemble": 3,
         "mask": None,
         "weights": True,
-    },
-    "kalign_best": {
-        "fn": run_kalign,
-        "ensemble": 3,
-        "mask": None,
-        "refine": "confident",
         "vsm_amax": 2.0,
         "realign": 1,
     },
+    # --- external tools ---
     "guidance2_mafft": {"fn": run_guidance2, "n_bootstrap": 100, "mask": None},
     "guidance2_m93": {"fn": run_guidance2, "n_bootstrap": 100, "mask": 0.93},
     "guidance2_wt": {
@@ -903,6 +918,8 @@ def run_method(
             probmsa_guided=cfg.get("probmsa_guided", False),
             vsm_amax=cfg.get("vsm_amax"),
             realign=cfg.get("realign"),
+            consistency=cfg.get("consistency"),
+            consistency_weight=cfg.get("consistency_weight"),
         )
     elif fn is run_guidance2:
         g2_type = "nuc" if seq_type in ("dna", "rna") else "aa"
