@@ -96,7 +96,7 @@ int aln_param_init(struct aln_param **aln_param,int biotype , int n_threads, int
         ap->vsm_amax = (biotype == ALN_BIOTYPE_PROTEIN) ? 2.0f : 0.0f;
         ap->subm_offset = 0.0f;
         ap->adaptive_budget = 0;
-        ap->use_seq_weights = (biotype == ALN_BIOTYPE_PROTEIN) ? 2.0f : 0.0f;
+        ap->use_seq_weights = 0.0f;
         ap->consistency_anchors = 0;
         ap->consistency_weight = 2.0f;
         *aln_param = ap;
