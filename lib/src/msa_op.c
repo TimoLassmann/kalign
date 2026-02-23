@@ -274,6 +274,10 @@ int set_sip_nsip(struct msa* msa)
 {
         int i;
         ASSERT(msa!= NULL, "No msa");
+        if(msa->seq_weights){
+                MFREE(msa->seq_weights);
+                msa->seq_weights = NULL;
+        }
         if(msa->plen){
                 for (i = msa->num_profiles;i--;){
                         if(msa->sip[i]){
@@ -451,7 +455,9 @@ int kalign_arr_to_msa(char** input_sequences, int* len, int numseq,struct msa** 
         msa->nsip = NULL;
         msa->seq_distances = NULL;
         msa->col_confidence = NULL;
+        msa->seq_weights = NULL;
         msa->run_parallel = 0;
+        msa->consistency_table = NULL;
         msa->quiet = 1;
         MMALLOC(msa->sequences, sizeof(struct msa_seq*) * msa->alloc_numseq);
 

@@ -1,0 +1,12 @@
+.git
+build
+benchmarks/data
+benchmarks/results
+__pycache__
+*.pyc
+.venv
+*.egg-info
+.pytest_cache
+wheelhouse
+dist
+.mypy_cache

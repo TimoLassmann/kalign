@@ -2,7 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const ArrayList = std.ArrayList;
 
-const kalignPackageVersion = "3.4.9";
+const kalignPackageVersion = "3.5.0";
 
 const targets: []const std.Target.Query = &.{
     .{ .cpu_arch = .aarch64, .os_tag = .macos },
@@ -13,7 +13,7 @@ const targets: []const std.Target.Query = &.{
 };
 
 const cflags = [_][]const u8{
-    "-DKALIGN_PACKAGE_VERSION=\"3.4.9\"",
+    "-DKALIGN_PACKAGE_VERSION=\"3.5.0\"",
     "-DKALIGN_PACKAGE_NAME=\"kalign\"",
     "-DKALIGN_ALN_SERIAL_THRESHOLD=250",
     "-DKALIGN_KMEANS_UPGMA_THRESHOLD=50",
@@ -96,6 +96,7 @@ const kalign_lib_sources = [_][]const u8{
     "lib/src/euclidean_dist.c",
     "lib/src/pick_anchor.c",
     "lib/src/aln_wrap.c",
+    "lib/src/aln_apair_dist.c",
     "lib/src/aln_param.c",
     "lib/src/aln_run.c",
     "lib/src/aln_mem.c",
@@ -109,7 +110,14 @@ const kalign_lib_sources = [_][]const u8{
     "lib/src/weave_alignment.c",
     "lib/src/poar.c",
     "lib/src/consensus_msa.c",
+    "lib/src/anchor_consistency.c",
     "lib/src/ensemble.c",
+    "lib/src/probmsa_submat.c",
+    "lib/src/probmsa_emission.c",
+    "lib/src/probmsa_pairhmm.c",
+    "lib/src/probmsa_profile.c",
+    "lib/src/probmsa_dirichlet.c",
+    "lib/src/probmsa_driver.c",
 };
 
 const kalign_sources = [_][]const u8{

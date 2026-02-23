@@ -28,6 +28,9 @@ struct aln_param{
         float vsm_amax;         /* variable scoring matrix: 0=off, >0 subtracts a(d)=max(0,amax-d) from subm scores */
         float subm_offset;      /* computed per alignment step: amount to subtract from substitution scores */
         int adaptive_budget;    /* 0=off, 1=scale trial count by uncertainty */
+        float use_seq_weights;    /* 0=off, >0=pseudocount for profile rebalancing */
+        int consistency_anchors;  /* 0=off, >0=number of anchor sequences K for consistency */
+        float consistency_weight; /* bonus scale for consistency (default: 2.0) */
 };
 
 EXTERN int aln_param_init(struct aln_param **aln_param,int biotype , int n_threads, int type, float gpo, float gpe, float tgpe);

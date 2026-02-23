@@ -22,9 +22,11 @@ int alloc_msa(struct msa** msa, int numseq)
         m->quiet = 0;
         m->seq_distances = NULL;
         m->col_confidence = NULL;
+        m->seq_weights = NULL;
         m->plen = NULL;
         m->sip = NULL;
         m->nsip = NULL;
+        m->consistency_table = NULL;
 
 
         MMALLOC(m->sequences, sizeof(struct msa_seq*) * m->alloc_numseq);
@@ -80,6 +82,9 @@ void kalign_free_msa(struct msa* msa)
                 }
                 if(msa->col_confidence){
                         MFREE(msa->col_confidence);
+                }
+                if(msa->seq_weights){
+                        MFREE(msa->seq_weights);
                 }
                 for (i = msa->num_profiles;i--;){
                         if(msa->sip[i]){

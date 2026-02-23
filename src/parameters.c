@@ -91,6 +91,8 @@ struct parameters*init_param(void)
         param->min_support = 0;
         param->save_poar = NULL;
         param->load_poar = NULL;
+        param->consistency_anchors = 0;
+        param->consistency_weight = 2.0f;
         param->quiet = 0;
         return param;
 ERROR:

@@ -28,9 +28,9 @@ int aln_seqprofile_foward(struct aln_mem* m)
         register int i = 0;
         register int j = 0;
 
-        const float open = m->ap->gpo  * (float)sip;
-        const float ext  = m->ap->gpe  * (float)sip;
-        const float text = m->ap->tgpe * (float)sip;
+        const float open = m->ap->gpo  * sip;
+        const float ext  = m->ap->gpe  * sip;
+        const float text = m->ap->tgpe * sip;
 
 
         prof1 += (m->starta)<< 6;
@@ -79,6 +79,9 @@ int aln_seqprofile_foward(struct aln_mem* m)
                         pa = MAX3(pa,pga -open,pgb + prof1[-37]);
 
                         pa += prof1[32 + seq2[j]];
+                        if(m->consistency){
+                                pa += m->consistency[i * m->consistency_stride + j];
+                        }
 
                         s[j].a = pa;
 
@@ -101,6 +104,9 @@ int aln_seqprofile_foward(struct aln_mem* m)
                 pa = MAX3(pa,pga -open,pgb + prof1[-37]);
 
                 pa += prof1[32 + seq2[j]];
+                if(m->consistency){
+                        pa += m->consistency[i * m->consistency_stride + j];
+                }
 
                 s[j].a = pa;
 
@@ -133,9 +139,9 @@ int aln_seqprofile_backward(struct aln_mem* m)
         register int i = 0;
         register int j = 0;
 
-        const float open = m->ap->gpo  * (float)sip;
-        const float ext  = m->ap->gpe  * (float)sip;
-        const float text = m->ap->tgpe * (float)sip;
+        const float open = m->ap->gpo  * sip;
+        const float ext  = m->ap->gpe  * sip;
+        const float text = m->ap->tgpe * sip;
 
         prof1 += (m->enda_2 +1) << 6;
 
@@ -184,6 +190,9 @@ int aln_seqprofile_backward(struct aln_mem* m)
 
                         pa = MAX3(pa,pga - open,pgb +prof1[91]);
                         pa += prof1[32 + seq2[j]];
+                        if(m->consistency){
+                                pa += m->consistency[(m->starta_2 + i) * m->consistency_stride + j];
+                        }
 
                         s[j].a = pa;
 
@@ -204,6 +213,9 @@ int aln_seqprofile_backward(struct aln_mem* m)
 
                 pa = MAX3(pa,pga - open,pgb +prof1[91]);
                 pa += prof1[32 + seq2[j]];
+                if(m->consistency){
+                        pa += m->consistency[(m->starta_2 + i) * m->consistency_stride + j];
+                }
 
                 s[j].a = pa;
 
@@ -222,7 +234,7 @@ int aln_seqprofile_meetup(struct aln_mem* m,int old_cor[],int* meet,int* t,float
         struct states* f = m->f;
         struct states* b = m->b;
         const float* prof1 = m->prof1;
-        int sip = m->sip;
+        float sip = m->sip;
         int i;
         int c;
         int c2 = -1;
@@ -230,7 +242,7 @@ int aln_seqprofile_meetup(struct aln_mem* m,int old_cor[],int* meet,int* t,float
         int transition2 = -1;
         float s_tmp;
 
-        const float open = m->ap->gpo * (float)sip;
+        const float open = m->ap->gpo * sip;
 
 
         //code:

@@ -67,6 +67,13 @@ RUN which kalign && which clustalo && which mafft && which muscle
 # ---------- Data & results directories ----------
 RUN mkdir -p /kalign/benchmarks/data/downloads /kalign/benchmarks/results
 
+# ---------- Hot-swap: cross-compiled kalign binary (last for fast rebuilds) ----------
+COPY zig-out/kalign-linux-aarch64 /usr/local/bin/kalign
+RUN chmod +x /usr/local/bin/kalign
+
+# Rebuild Python module with latest source (uses cached venv layer)
+RUN uv pip install --no-cache -e ".[benchmark]"
+
 EXPOSE 8050
 
 CMD ["python", "-m", "benchmarks.app", "--host", "0.0.0.0", "--port", "8050"]

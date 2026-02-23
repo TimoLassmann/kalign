@@ -1,0 +1,160 @@
+# Kalign Downstream Benchmark Container
+#
+# Extends the base benchmark setup with tools for downstream application
+# benchmarks: positive selection (HyPhy), phylogenetics (IQ-TREE),
+# homology detection (HMMER), and confidence comparison (GUIDANCE2).
+#
+# Build:
+#   podman build -f Containerfile.downstream -t kalign-downstream .
+#
+# Run all downstream benchmarks:
+#   podman run -it \
+#     -v ./benchmarks/data:/kalign/benchmarks/data \
+#     -v ./benchmarks/results:/kalign/benchmarks/results \
+#     kalign-downstream \
+#     python -m benchmarks.downstream --all -j 4
+#
+# Quick smoke test (5 cases per pipeline):
+#   podman run -it \
+#     -v ./benchmarks/data:/kalign/benchmarks/data \
+#     -v ./benchmarks/results:/kalign/benchmarks/results \
+#     kalign-downstream \
+#     python -m benchmarks.downstream --all -j 4 --quick
+#
+# Generate figures from existing results:
+#   podman run -it \
+#     -v ./benchmarks/results:/kalign/benchmarks/results \
+#     -v ./benchmarks/figures:/kalign/benchmarks/figures \
+#     kalign-downstream \
+#     python -m benchmarks.downstream --figures -o benchmarks/figures/
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ── System dependencies ──────────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake g++ git curl wget ca-certificates \
+    python3 python3-pip python3-venv python3-dev \
+    pkg-config zlib1g-dev libcurl4-openssl-dev libssl-dev libeigen3-dev libboost-dev \
+    clustalo mafft hmmer \
+    perl libwww-perl libbio-perl-perl cpanminus \
+    && rm -rf /var/lib/apt/lists/*
+
+# Bio::Perl convenience module (removed from BioPerl core in 1.7.x)
+RUN cpanm --notest Bio::Perl
+
+# ── MUSCLE v5 from source ───────────────────────────────────────────
+# myutils.h checks __arm64__ (macOS) but not __aarch64__ (Linux); add it
+RUN cd /tmp && \
+    git clone --depth 1 https://github.com/rcedgar/muscle.git && \
+    cd muscle/src && \
+    sed -i 's/defined(__arm64__)/defined(__arm64__) || defined(__aarch64__)/' myutils.h && \
+    bash build_linux.bash && \
+    cp ../bin/muscle /usr/local/bin/ && \
+    rm -rf /tmp/muscle
+
+# ── INDELible v1.03 from source ─────────────────────────────────────
+RUN cd /tmp && \
+    git clone --depth 1 https://github.com/matsengrp/indelible.git && \
+    cd indelible/src && \
+    make && \
+    cp indelible /usr/local/bin/ && \
+    rm -rf /tmp/indelible
+
+# ── HyPhy from source ───────────────────────────────────────────────
+RUN cd /tmp && \
+    git clone --depth 1 https://github.com/veg/hyphy.git && \
+    cd hyphy && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DNOAVX=ON . && \
+    make -j"$(nproc)" hyphy && \
+    cp hyphy /usr/local/bin/hyphy && \
+    cp -r res /usr/local/lib/hyphy && \
+    rm -rf /tmp/hyphy
+ENV HYPHY_LIB=/usr/local/lib/hyphy
+ENV HYPHY_PATH=/usr/local/lib/hyphy
+
+# ── IQ-TREE 2 from source ───────────────────────────────────────────
+RUN cd /tmp && \
+    git clone --depth 1 --recurse-submodules https://github.com/iqtree/iqtree2.git && \
+    cd iqtree2 && \
+    mkdir build && cd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release .. && \
+    make -j"$(nproc)" && \
+    cp iqtree2 /usr/local/bin/ && \
+    rm -rf /tmp/iqtree2
+
+# ── GUIDANCE2 from GitHub (original tar.gz URL is dead) ────────────
+# guidance.pl uses FindBin-relative paths ($Bin, $Bin/../Selecton, etc.)
+# We install the full www/ tree under /opt/guidance-root/ so sibling
+# directories (Selecton, bioSequence_scripts_and_constants) resolve
+# correctly relative to the guidance.pl script location.
+RUN cd /tmp && \
+    git clone --depth 1 https://github.com/anzaika/guidance.git && \
+    cd guidance && make && \
+    mkdir -p /opt/guidance-root && \
+    cp -r www/Guidance /opt/guidance-root/Guidance && \
+    cp -r www/Selecton /opt/guidance-root/Selecton && \
+    cp -r www/bioSequence_scripts_and_constants /opt/guidance-root/bioSequence_scripts_and_constants && \
+    mkdir -p /opt/guidance-root/Guidance/exec && \
+    cp programs/msa_set_score/msa_set_score /opt/guidance-root/Guidance/exec/ && \
+    cp programs/removeTaxa/removeTaxa /opt/guidance-root/Guidance/exec/ && \
+    cp programs/isEqualTree/isEqualTree /opt/guidance-root/Guidance/exec/ && \
+    chmod +x /opt/guidance-root/Guidance/guidance.pl && \
+    mkdir -p /opt/programs/semphy /opt/programs/msa_set_score \
+             /opt/programs/removeTaxa /opt/programs/isEqualTree && \
+    cp programs/semphy/semphy /opt/programs/semphy/ && \
+    cp programs/msa_set_score/msa_set_score /opt/programs/msa_set_score/ && \
+    cp programs/removeTaxa/removeTaxa /opt/programs/removeTaxa/ && \
+    cp programs/isEqualTree/isEqualTree /opt/programs/isEqualTree/ && \
+    printf '#!/bin/sh\nexec perl /opt/guidance-root/Guidance/guidance.pl "$@"\n' \
+        > /usr/local/bin/guidance2 && \
+    chmod +x /usr/local/bin/guidance2 && \
+    rm -rf /tmp/guidance
+
+# ── Kalign C build ──────────────────────────────────────────────────
+COPY . /kalign
+WORKDIR /kalign
+
+RUN mkdir -p build && cd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release .. && \
+    make -j"$(nproc)"
+
+# ── Record tool versions at build time ──────────────────────────────
+RUN echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /tool_versions.txt && \
+    echo "kalign=$(build/src/kalign --version 2>&1 | head -1 || echo unknown)" >> /tool_versions.txt && \
+    echo "mafft=$(mafft --version 2>&1 | head -1 || echo unknown)" >> /tool_versions.txt && \
+    echo "muscle=$(muscle --version 2>&1 | head -1 || echo unknown)" >> /tool_versions.txt && \
+    echo "clustalo=$(clustalo --version 2>&1 | head -1 || echo unknown)" >> /tool_versions.txt && \
+    echo "hmmer=$(hmmbuild -h 2>&1 | grep '^# HMMER' | head -1 || echo unknown)" >> /tool_versions.txt && \
+    echo "iqtree=$(iqtree2 --version 2>&1 | grep 'IQ-TREE' | head -1 || echo unknown)" >> /tool_versions.txt && \
+    echo "indelible=1.03" >> /tool_versions.txt && \
+    echo "hyphy=$(hyphy --version 2>&1 | head -1 || echo unknown)" >> /tool_versions.txt
+
+# ── Python environment ──────────────────────────────────────────────
+RUN python3 -m venv /venv
+ENV PATH="/venv/bin:/kalign/build/src:$PATH"
+
+RUN pip install --no-cache-dir uv && \
+    uv pip install --no-cache -e ".[benchmark]" && \
+    uv pip install --no-cache \
+        dendropy biopython pandas matplotlib scipy seaborn numpy
+
+# ── Verify tools ────────────────────────────────────────────────────
+RUN which kalign && which clustalo && which mafft && which muscle && \
+    which hmmbuild && which hmmsearch && which iqtree2 && \
+    which hyphy && which indelible && which guidance2
+
+# ── Data & results directories ──────────────────────────────────────
+RUN mkdir -p benchmarks/data/downloads/pfam_seed \
+             benchmarks/data/downloads/swissprot \
+             benchmarks/data/downloads/selectome \
+             benchmarks/results/calibration \
+             benchmarks/results/positive_selection \
+             benchmarks/results/phylo_accuracy \
+             benchmarks/results/hmmer_detection \
+             benchmarks/figures
+
+EXPOSE 8050
+
+CMD ["python", "-m", "benchmarks.downstream", "--help"]

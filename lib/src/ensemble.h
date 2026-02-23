@@ -18,7 +18,10 @@ struct msa;
 EXTERN int kalign_ensemble(struct msa* msa, int n_threads, int type,
                            int n_runs, float gpo, float gpe, float tgpe,
                            uint64_t seed, int min_support,
-                           const char* save_poar_path);
+                           const char* save_poar_path,
+                           int refine, float dist_scale, float vsm_amax,
+                           int realign, float use_seq_weights,
+                           int consistency_anchors, float consistency_weight);
 
 EXTERN int kalign_consensus_from_poar(struct msa* msa,
                                       const char* poar_path,

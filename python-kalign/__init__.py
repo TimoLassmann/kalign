@@ -63,6 +63,9 @@ DNA = _core.DNA
 DNA_INTERNAL = _core.DNA_INTERNAL
 RNA = _core.RNA
 PROTEIN = _core.PROTEIN
+PROTEIN_PFASUM43 = _core.PROTEIN_PFASUM43
+PROTEIN_PFASUM60 = _core.PROTEIN_PFASUM60
+PROTEIN_PFASUM_AUTO = _core.PROTEIN_PFASUM_AUTO
 PROTEIN_DIVERGENT = _core.PROTEIN_DIVERGENT
 AUTO = _core.AUTO
 
@@ -70,6 +73,7 @@ AUTO = _core.AUTO
 REFINE_NONE = _core.REFINE_NONE
 REFINE_ALL = _core.REFINE_ALL
 REFINE_CONFIDENT = _core.REFINE_CONFIDENT
+REFINE_INLINE = _core.REFINE_INLINE
 
 # Global thread control
 _thread_local = threading.local()
@@ -107,6 +111,22 @@ def align(
     refine: Union[str, int] = "confident",
     ensemble: int = 0,
     min_support: int = 0,
+    probmsa: bool = False,
+    probmsa_5state: bool = False,
+    pm_delta: float = -1.0,
+    pm_epsilon: float = -1.0,
+    pm_tau: float = -1.0,
+    pm_threshold: float = -1.0,
+    pm_gpo: float = -1.0,
+    pm_gpe: float = -1.0,
+    pm_prior_scale: float = -1.0,
+    pm_delta_s: float = -1.0,
+    pm_epsilon_s: float = -1.0,
+    pm_delta_l: float = -1.0,
+    pm_epsilon_l: float = -1.0,
+    seq_weights: float = -1.0,
+    consistency: int = 0,
+    consistency_weight: float = 2.0,
     fmt: Literal["plain", "biopython", "skbio"] = "plain",
     ids: Optional[List[str]] = None,
 ) -> Union[List[str], Any]:
@@ -254,6 +274,9 @@ def align(
         "dna": DNA,
         "rna": RNA,
         "protein": PROTEIN,
+        "pfasum43": PROTEIN_PFASUM43,
+        "pfasum60": PROTEIN_PFASUM60,
+        "pfasum": PROTEIN_PFASUM_AUTO,
         "divergent": PROTEIN_DIVERGENT,
         "internal": DNA_INTERNAL,
     }
@@ -330,6 +353,22 @@ def align(
             refine_int,
             ensemble,
             min_support,
+            int(probmsa or probmsa_5state),
+            pm_delta,
+            pm_epsilon,
+            pm_tau,
+            pm_threshold,
+            pm_gpo,
+            pm_gpe,
+            pm_prior_scale,
+            int(probmsa_5state),
+            pm_delta_s,
+            pm_epsilon_s,
+            pm_delta_l,
+            pm_epsilon_l,
+            float(seq_weights),
+            consistency,
+            consistency_weight,
         )
         # When ensemble is used, result is (sequences, confidence_dict)
         if isinstance(result, tuple):
@@ -416,6 +455,7 @@ def _parse_refine_mode(refine):
         "none": REFINE_NONE,
         "all": REFINE_ALL,
         "confident": REFINE_CONFIDENT,
+        "inline": REFINE_INLINE,
     }
     refine_lower = refine.lower()
     if refine_lower not in refine_map:
@@ -510,6 +550,23 @@ def align_from_file(
     realign: int = 0,
     save_poar: str = "",
     load_poar: str = "",
+    probmsa: bool = False,
+    probmsa_5state: bool = False,
+    pm_delta: float = -1.0,
+    pm_epsilon: float = -1.0,
+    pm_tau: float = -1.0,
+    pm_threshold: float = -1.0,
+    pm_gpo: float = -1.0,
+    pm_gpe: float = -1.0,
+    pm_prior_scale: float = -1.0,
+    pm_delta_s: float = -1.0,
+    pm_epsilon_s: float = -1.0,
+    pm_delta_l: float = -1.0,
+    pm_epsilon_l: float = -1.0,
+    probmsa_guided: bool = False,
+    seq_weights: float = -1.0,
+    consistency: int = 0,
+    consistency_weight: float = 2.0,
 ) -> AlignedSequences:
     """
     Align sequences from a file using Kalign.
@@ -557,6 +614,9 @@ def align_from_file(
         "dna": DNA,
         "rna": RNA,
         "protein": PROTEIN,
+        "pfasum43": PROTEIN_PFASUM43,
+        "pfasum60": PROTEIN_PFASUM60,
+        "pfasum": PROTEIN_PFASUM_AUTO,
         "divergent": PROTEIN_DIVERGENT,
         "internal": DNA_INTERNAL,
     }
@@ -607,6 +667,23 @@ def align_from_file(
             realign,
             save_poar,
             load_poar,
+            int(probmsa or probmsa_5state),
+            pm_delta,
+            pm_epsilon,
+            pm_tau,
+            pm_threshold,
+            pm_gpo,
+            pm_gpe,
+            pm_prior_scale,
+            int(probmsa_guided),
+            int(probmsa_5state),
+            pm_delta_s,
+            pm_epsilon_s,
+            pm_delta_l,
+            pm_epsilon_l,
+            float(seq_weights),
+            consistency,
+            consistency_weight,
         )
         if len(result) == 3:
             names, sequences, conf = result
@@ -872,6 +949,23 @@ def align_file_to_file(
     realign: int = 0,
     save_poar: str = "",
     load_poar: str = "",
+    probmsa: bool = False,
+    probmsa_5state: bool = False,
+    pm_delta: float = -1.0,
+    pm_epsilon: float = -1.0,
+    pm_tau: float = -1.0,
+    pm_threshold: float = -1.0,
+    pm_gpo: float = -1.0,
+    pm_gpe: float = -1.0,
+    pm_prior_scale: float = -1.0,
+    pm_delta_s: float = -1.0,
+    pm_epsilon_s: float = -1.0,
+    pm_delta_l: float = -1.0,
+    pm_epsilon_l: float = -1.0,
+    probmsa_guided: bool = False,
+    seq_weights: float = -1.0,
+    consistency: int = 0,
+    consistency_weight: float = 2.0,
 ) -> None:
     """
     Align sequences from input file and write result to output file.
@@ -917,6 +1011,9 @@ def align_file_to_file(
         "dna": DNA,
         "rna": RNA,
         "protein": PROTEIN,
+        "pfasum43": PROTEIN_PFASUM43,
+        "pfasum60": PROTEIN_PFASUM60,
+        "pfasum": PROTEIN_PFASUM_AUTO,
         "divergent": PROTEIN_DIVERGENT,
         "internal": DNA_INTERNAL,
     }
@@ -961,6 +1058,23 @@ def align_file_to_file(
         realign,
         save_poar,
         load_poar,
+        int(probmsa or probmsa_5state),
+        pm_delta,
+        pm_epsilon,
+        pm_tau,
+        pm_threshold,
+        pm_gpo,
+        pm_gpe,
+        pm_prior_scale,
+        int(probmsa_guided),
+        int(probmsa_5state),
+        pm_delta_s,
+        pm_epsilon_s,
+        pm_delta_l,
+        pm_epsilon_l,
+        float(seq_weights),
+        consistency,
+        consistency_weight,
     )
 
 
@@ -984,6 +1098,9 @@ __all__ = [
     "DNA_INTERNAL",
     "RNA",
     "PROTEIN",
+    "PROTEIN_PFASUM43",
+    "PROTEIN_PFASUM60",
+    "PROTEIN_PFASUM_AUTO",
     "PROTEIN_DIVERGENT",
     "AUTO",
     "REFINE_NONE",

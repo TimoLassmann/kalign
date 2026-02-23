@@ -53,6 +53,9 @@ struct aln_mem{
 
         int sip;
         int mode;
+
+        float* consistency;         /* bonus matrix [i * consistency_stride + j], NULL if disabled */
+        int consistency_stride;     /* = len_b (stride for j dimension) */
 };
 
 #endif

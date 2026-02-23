@@ -50,6 +50,7 @@
 #define OPT_MIN_SUPPORT 18
 #define OPT_SAVE_POAR 19
 #define OPT_LOAD_POAR 20
+#define OPT_CONSISTENCY 21
 
 static int set_aln_type(char* in, int* type );
 static int set_refine_mode(char* in, int* refine);
@@ -92,6 +93,7 @@ int print_kalign_help(char * argv[])
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--min-support","Explicit consensus threshold." ,"[auto]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--save-poar","Save POAR table to file." ,"[off]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--load-poar","Load POAR table for re-threshold." ,"[off]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--consistency","Anchor consistency (K anchors)." ,"[off]");
 
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--version (-V/-v)","Prints version." ,"[NA]"  );
 
@@ -180,6 +182,7 @@ int main(int argc, char *argv[])
                         {"min-support",  required_argument, 0, OPT_MIN_SUPPORT},
                         {"save-poar",  required_argument, 0, OPT_SAVE_POAR},
                         {"load-poar",  required_argument, 0, OPT_LOAD_POAR},
+                        {"consistency",  required_argument, 0, OPT_CONSISTENCY},
                         {"nthreads",  required_argument, 0, 'n'},
                         {"input",  required_argument, 0, 'i'},
                         {"infile",  required_argument, 0, 'i'},
@@ -256,6 +259,9 @@ int main(int argc, char *argv[])
                         break;
                 case OPT_LOAD_POAR:
                         param->load_poar = optarg;
+                        break;
+                case OPT_CONSISTENCY:
+                        param->consistency_anchors = atoi(optarg);
                         break;
                 case 'h':
                         param->help_flag = 1;
@@ -424,16 +430,20 @@ int run_kalign(struct parameters* param)
                                     param->tgpe,
                                     param->ensemble_seed,
                                     param->min_support,
-                                    param->save_poar));
+                                    param->save_poar,
+                                    KALIGN_REFINE_NONE, 0.0f, -1.0f, 0, -1.0f,
+                                    param->consistency_anchors, param->consistency_weight));
         }else{
-                RUN(kalign_run(msa,
-                               param->nthreads,
-                               param->type,
-                               param->gpo,
-                               param->gpe,
-                               param->tgpe,
-                               param->refine,
-                               param->adaptive_budget));
+                RUN(kalign_run_seeded(msa,
+                                      param->nthreads,
+                                      param->type,
+                                      param->gpo,
+                                      param->gpe,
+                                      param->tgpe,
+                                      param->refine,
+                                      param->adaptive_budget,
+                                      0, 0.0f, 0.0f, -1.0f, -1.0f,
+                                      param->consistency_anchors, param->consistency_weight));
         }
 
 
@@ -460,6 +470,12 @@ int set_aln_type(char* in, int* type )
                         t = KALIGN_TYPE_PROTEIN;
                 }else if(strstr(in,"divergent")){
                         t = KALIGN_TYPE_PROTEIN_DIVERGENT;
+                }else if(strstr(in,"pfasum43")){
+                        t = KALIGN_TYPE_PROTEIN_PFASUM43;
+                }else if(strstr(in,"pfasum60")){
+                        t = KALIGN_TYPE_PROTEIN_PFASUM60;
+                }else if(strstr(in,"pfasum")){
+                        t = KALIGN_TYPE_PROTEIN_PFASUM_AUTO;
                 }else{
                         ERROR_MSG("In %s not recognized.",in);
                 }

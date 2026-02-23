@@ -70,6 +70,8 @@ struct parameters{
         int min_support;
         char* save_poar;
         char* load_poar;
+        int consistency_anchors;
+        float consistency_weight;
         int help_flag;
         int quiet;
 };

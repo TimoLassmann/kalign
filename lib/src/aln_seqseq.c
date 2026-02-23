@@ -80,6 +80,9 @@ int aln_seqseq_foward(struct aln_mem* m)
                         ca = s[j].a;
                         pa = MAX3(pa,pga-gpo,pgb-gpo);
                         pa += subp[seq2[j]] - soff;
+                        if(m->consistency){
+                                pa += m->consistency[i * m->consistency_stride + j];
+                        }
 
                         s[j].a = pa;
 
@@ -99,6 +102,9 @@ int aln_seqseq_foward(struct aln_mem* m)
                 ca = s[j].a;
                 pa = MAX3(pa,pga-gpo,pgb-gpo);
                 pa += subp[seq2[j]] - soff;
+                if(m->consistency){
+                        pa += m->consistency[i * m->consistency_stride + j];
+                }
 
                 s[j].a = pa;
 
@@ -190,6 +196,9 @@ int aln_seqseq_backward(struct aln_mem* m)
                         pa = MAX3(pa,pga - gpo,pgb-gpo);
 
                         pa += subp[seq2[j]] - soff;
+                        if(m->consistency){
+                                pa += m->consistency[(starta + i) * m->consistency_stride + j];
+                        }
 
                         s[j].a = pa;
 
@@ -211,6 +220,9 @@ int aln_seqseq_backward(struct aln_mem* m)
                 pa = MAX3(pa,pga - gpo,pgb-gpo);
 
                 pa += subp[seq2[j]] - soff;
+                if(m->consistency){
+                        pa += m->consistency[(starta + i) * m->consistency_stride + j];
+                }
 
                 s[j].a = pa;
 

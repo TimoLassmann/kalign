@@ -8,6 +8,8 @@
 
 static int set_subm_gaps_CorBLOSUM66_13plus(struct aln_param *ap);
 static int set_subm_gaps_gon250(struct aln_param* ap);
+static int set_subm_gaps_PFASUM43(struct aln_param *ap);
+static int set_subm_gaps_PFASUM60(struct aln_param *ap);
 static int set_subm_gaps_DNA(struct aln_param *ap);
 static int set_subm_gaps_DNA_internal(struct aln_param *ap);
 static int set_subm_gaps_RNA(struct aln_param *ap);
@@ -52,10 +54,16 @@ int aln_param_init(struct aln_param **aln_param,int biotype , int n_threads, int
         }else if(biotype == ALN_BIOTYPE_PROTEIN){
                 switch (type) {
                 case KALIGN_TYPE_PROTEIN:
-                        set_subm_gaps_CorBLOSUM66_13plus(ap);
+                        set_subm_gaps_PFASUM43(ap);
                         break;
                 case KALIGN_TYPE_PROTEIN_DIVERGENT:
                          set_subm_gaps_gon250(ap);
+                        break;
+                case KALIGN_TYPE_PROTEIN_PFASUM43:
+                        set_subm_gaps_PFASUM43(ap);
+                        break;
+                case KALIGN_TYPE_PROTEIN_PFASUM60:
+                        set_subm_gaps_PFASUM60(ap);
                         break;
                 case KALIGN_TYPE_DNA:
                         ERROR_MSG("Detected protein sequences but --type dna option was selected.");
@@ -67,8 +75,7 @@ int aln_param_init(struct aln_param **aln_param,int biotype , int n_threads, int
                         ERROR_MSG("Detected protein sequences but --type rna option was selected.");
                         break;
                 default:
-                        set_subm_gaps_CorBLOSUM66_13plus(ap);
-                        /* set_subm_gaps_gon250(ap); */
+                        set_subm_gaps_PFASUM43(ap);
                         break;
                 }
         }else{
@@ -89,6 +96,9 @@ int aln_param_init(struct aln_param **aln_param,int biotype , int n_threads, int
         ap->vsm_amax = (biotype == ALN_BIOTYPE_PROTEIN) ? 2.0f : 0.0f;
         ap->subm_offset = 0.0f;
         ap->adaptive_budget = 0;
+        ap->use_seq_weights = (biotype == ALN_BIOTYPE_PROTEIN) ? 2.0f : 0.0f;
+        ap->consistency_anchors = 0;
+        ap->consistency_weight = 2.0f;
         *aln_param = ap;
         return OK;
 ERROR:
@@ -180,9 +190,103 @@ int set_subm_gaps_CorBLOSUM66_13plus(struct aln_param* ap)
                         ap->subm[i][j] = (float)(CorBLOSUM66_13plus[i][j]);// *2.0F;
                 }
         }
-        ap->gpo = 5.5F;// * 2.0F;
-        ap->gpe = 2.0F;// * 2.0F;
-        ap->tgpe = 1.0F;// * 2.0F;
+        ap->gpo = 5.5F;
+        ap->gpe = 2.0F;
+        ap->tgpe = 1.0F;
+        return OK;
+}
+
+/* PFASUM43 matrix (H = 0.3354 bit) from Keul, Hess, Goesele, Hamacher (2017)
+ * BMC Bioinformatics 18:293. Derived from Pfam seed alignments (v29.0) with
+ * 43% clustering threshold. 1/3 bit units — same scale as CorBLOSUM66. */
+int set_subm_gaps_PFASUM43(struct aln_param *ap)
+{
+        /* A,R,N,D,C,Q,E,G,H,I,L,K,M,F,P,S,T,W,Y,V,B,Z,X */
+        int PFASUM43[23][23] = {
+                /*  A   R   N   D   C   Q   E   G   H   I   L   K   M   F   P   S   T   W   Y   V   B   Z   X */
+                {  4, -1, -1, -1,  0,  0, -1,  0, -2, -1, -1, -1,  0, -2, -1,  1,  0, -2, -2,  0,  0,  0,  0}, /* A */
+                { -1,  6,  0,  0, -3,  2,  1, -2,  1, -3, -3,  3, -2, -3, -1,  0,  0, -2, -2, -3,  0,  0,  0}, /* R */
+                { -1,  0,  6,  2, -2,  1,  1,  0,  1, -4, -4,  1, -2, -3, -1,  1,  0, -3, -2, -3,  0,  0,  0}, /* N */
+                { -1,  0,  2,  6, -4,  1,  3,  0,  0, -5, -5,  0, -4, -5,  0,  0,  0, -4, -3, -4,  0,  0,  0}, /* D */
+                {  0, -3, -2, -4, 13, -3, -4, -2, -2, -1, -1, -4,  0, -1, -3,  0, -1, -2, -1,  0,  0,  0,  0}, /* C */
+                {  0,  2,  1,  1, -3,  5,  2, -1,  1, -3, -3,  2, -1, -3, -1,  0,  0, -3, -2, -2,  0,  0,  0}, /* Q */
+                { -1,  1,  1,  3, -4,  2,  5, -1,  0, -4, -4,  2, -3, -4, -1,  0,  0, -4, -3, -3,  0,  0,  0}, /* E */
+                {  0, -2,  0,  0, -2, -1, -1,  7, -2, -4, -4, -1, -3, -4, -1,  0, -1, -3, -3, -3,  0,  0,  0}, /* G */
+                { -2,  1,  1,  0, -2,  1,  0, -2,  9, -3, -3,  0, -2, -1, -1,  0, -1, -1,  2, -3,  0,  0,  0}, /* H */
+                { -1, -3, -4, -5, -1, -3, -4, -4, -3,  5,  2, -3,  2,  1, -3, -3, -1, -1, -1,  3,  0,  0,  0}, /* I */
+                { -1, -3, -4, -5, -1, -3, -4, -4, -3,  2,  4, -3,  2,  2, -3, -3, -2,  0,  0,  2,  0,  0,  0}, /* L */
+                { -1,  3,  1,  0, -4,  2,  2, -1,  0, -3, -3,  5, -2, -4, -1,  0,  0, -3, -2, -3,  0,  0,  0}, /* K */
+                {  0, -2, -2, -4,  0, -1, -3, -3, -2,  2,  2, -2,  6,  1, -3, -2, -1,  0,  0,  1,  0,  0,  0}, /* M */
+                { -2, -3, -3, -5, -1, -3, -4, -4, -1,  1,  2, -4,  1,  7, -3, -3, -2,  3,  4,  0,  0,  0,  0}, /* F */
+                { -1, -1, -1,  0, -3, -1, -1, -1, -1, -3, -3, -1, -3, -3,  9,  0, -1, -3, -3, -2,  0,  0,  0}, /* P */
+                {  1,  0,  1,  0,  0,  0,  0,  0,  0, -3, -3,  0, -2, -3,  0,  4,  2, -3, -2, -2,  0,  0,  0}, /* S */
+                {  0,  0,  0,  0, -1,  0,  0, -1, -1, -1, -2,  0, -1, -2, -1,  2,  4, -3, -2,  0,  0,  0,  0}, /* T */
+                { -2, -2, -3, -4, -2, -3, -4, -3, -1, -1,  0, -3,  0,  3, -3, -3, -3, 13,  3, -2,  0,  0,  0}, /* W */
+                { -2, -2, -2, -3, -1, -2, -3, -3,  2, -1,  0, -2,  0,  4, -3, -2, -2,  3,  8, -1,  0,  0,  0}, /* Y */
+                {  0, -3, -3, -4,  0, -2, -3, -3, -3,  3,  2, -3,  1,  0, -2, -2,  0, -2, -1,  4,  0,  0,  0}, /* V */
+                {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0}, /* B */
+                {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0}, /* Z */
+                {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0}, /* X */
+        };
+
+        for(int i = 0; i < 23; i++){
+                for(int j = 0; j < 23; j++){
+                        ap->subm[i][j] = (float)(PFASUM43[i][j]);
+                }
+        }
+        /* PFASUM43 is in 1/3 bit units (same scale as CorBLOSUM66).
+           Jointly tuned with seq_weights=2.0 and vsm_amax=2.0 on BAliBASE
+           to balance SP, TC, and F1. */
+        ap->gpo = 7.0F;
+        ap->gpe = 1.25F;
+        ap->tgpe = 1.0F;
+        return OK;
+}
+
+/* PFASUM60 matrix (H = 0.4941 bit) from Keul, Hess, Goesele, Hamacher (2017)
+ * BMC Bioinformatics 18:293. Derived from Pfam seed alignments (v29.0) with
+ * 60% clustering threshold. 1/3 bit units — same scale as CorBLOSUM66.
+ * Recommended as general-purpose matrix by the authors. */
+int set_subm_gaps_PFASUM60(struct aln_param *ap)
+{
+        /* A,R,N,D,C,Q,E,G,H,I,L,K,M,F,P,S,T,W,Y,V,B,Z,X */
+        int PFASUM60[23][23] = {
+                /*  A   R   N   D   C   Q   E   G   H   I   L   K   M   F   P   S   T   W   Y   V   B   Z   X */
+                {  5, -1, -2, -2,  0, -1, -1,  0, -2, -1, -1, -1, -1, -2, -1,  1,  0, -3, -3,  0,  0,  0,  0}, /* A */
+                { -1,  7,  0, -1, -4,  2,  0, -2,  1, -4, -3,  3, -2, -4, -2, -1, -1, -3, -2, -3,  0,  0,  0}, /* R */
+                { -2,  0,  7,  2, -3,  1,  0,  0,  1, -5, -4,  1, -3, -4, -1,  1,  0, -4, -2, -4,  0,  0,  0}, /* N */
+                { -2, -1,  2,  7, -5,  1,  3, -1,  0, -6, -6,  0, -4, -6, -1,  0, -1, -5, -4, -5,  0,  0,  0}, /* D */
+                {  0, -4, -3, -5, 14, -4, -5, -2, -2, -1, -1, -4, -1, -1, -4,  0, -1, -2, -1,  0,  0,  0,  0}, /* C */
+                { -1,  2,  1,  1, -4,  6,  2, -2,  1, -4, -3,  2, -1, -4, -1,  0,  0, -3, -2, -3,  0,  0,  0}, /* Q */
+                { -1,  0,  0,  3, -5,  2,  6, -2,  0, -5, -4,  1, -3, -5, -1,  0, -1, -5, -3, -4,  0,  0,  0}, /* E */
+                {  0, -2,  0, -1, -2, -2, -2,  8, -2, -5, -5, -2, -4, -5, -2,  0, -2, -4, -4, -4,  0,  0,  0}, /* G */
+                { -2,  1,  1,  0, -2,  1,  0, -2, 10, -4, -3,  0, -2, -1, -2, -1, -1, -1,  2, -3,  0,  0,  0}, /* H */
+                { -1, -4, -5, -6, -1, -4, -5, -5, -4,  6,  3, -4,  2,  1, -4, -3, -1, -2, -2,  4,  0,  0,  0}, /* I */
+                { -1, -3, -4, -6, -1, -3, -4, -5, -3,  3,  5, -4,  3,  2, -4, -4, -2, -1, -1,  1,  0,  0,  0}, /* L */
+                { -1,  3,  1,  0, -4,  2,  1, -2,  0, -4, -4,  6, -2, -5, -1,  0,  0, -4, -3, -3,  0,  0,  0}, /* K */
+                { -1, -2, -3, -4, -1, -1, -3, -4, -2,  2,  3, -2,  8,  1, -4, -2, -1, -1, -1,  1,  0,  0,  0}, /* M */
+                { -2, -4, -4, -6, -1, -4, -5, -5, -1,  1,  2, -5,  1,  8, -4, -3, -3,  3,  4,  0,  0,  0,  0}, /* F */
+                { -1, -2, -1, -1, -4, -1, -1, -2, -2, -4, -4, -1, -4, -4, 10,  0, -1, -4, -4, -3,  0,  0,  0}, /* P */
+                {  1, -1,  1,  0,  0,  0,  0,  0, -1, -3, -4,  0, -2, -3,  0,  5,  2, -4, -3, -2,  0,  0,  0}, /* S */
+                {  0, -1,  0, -1, -1,  0, -1, -2, -1, -1, -2,  0, -1, -3, -1,  2,  6, -3, -2,  0,  0,  0,  0}, /* T */
+                { -3, -3, -4, -5, -2, -3, -5, -4, -1, -2, -1, -4, -1,  3, -4, -4, -3, 14,  3, -2,  0,  0,  0}, /* W */
+                { -3, -2, -2, -4, -1, -2, -3, -4,  2, -2, -1, -3, -1,  4, -4, -3, -2,  3,  9, -2,  0,  0,  0}, /* Y */
+                {  0, -3, -4, -5,  0, -3, -4, -4, -3,  4,  1, -3,  1,  0, -3, -2,  0, -2, -2,  5,  0,  0,  0}, /* V */
+                {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0}, /* B */
+                {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0}, /* Z */
+                {  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0}, /* X */
+        };
+
+        for(int i = 0; i < 23; i++){
+                for(int j = 0; j < 23; j++){
+                        ap->subm[i][j] = (float)(PFASUM60[i][j]);
+                }
+        }
+        /* PFASUM60 is in 1/3 bit units (same scale as CorBLOSUM66).
+           Tuned with seq_weights=2.0 and vsm_amax=2.0 on BAliBASE. */
+        ap->gpo = 7.0F;
+        ap->gpe = 1.25F;
+        ap->tgpe = 1.0F;
         return OK;
 }
 

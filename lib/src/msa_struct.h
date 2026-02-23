@@ -35,6 +35,7 @@ struct msa{
         struct msa_seq** sequences;
         float* seq_distances;   /* per-sequence mean distance (normalized), set during tree building */
         float* col_confidence;  /* per-column confidence [0..1], NULL if not computed */
+        float* seq_weights;     /* per-sequence tree-based weight, NULL when not computed */
         int** sip;
         int* nsip;
         int* plen;
@@ -48,6 +49,7 @@ struct msa{
         uint8_t L;
         uint8_t biotype;
         int quiet;
+        void* consistency_table;    /* struct consistency_table*, NULL when disabled */
 };
 
 #undef MSA_STRUCT_IMPORT

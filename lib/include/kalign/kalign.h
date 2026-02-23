@@ -20,11 +20,15 @@
 #define KALIGN_TYPE_RNA 2
 #define KALIGN_TYPE_PROTEIN 3
 #define KALIGN_TYPE_PROTEIN_DIVERGENT 4
-#define KALIGN_TYPE_UNDEFINED 5
+#define KALIGN_TYPE_PROTEIN_PFASUM43 5
+#define KALIGN_TYPE_PROTEIN_PFASUM60 6
+#define KALIGN_TYPE_PROTEIN_PFASUM_AUTO 7
+#define KALIGN_TYPE_UNDEFINED 8
 
 #define KALIGN_REFINE_NONE 0
 #define KALIGN_REFINE_ALL 1
 #define KALIGN_REFINE_CONFIDENT 2
+#define KALIGN_REFINE_INLINE 3
 
 struct msa;
 /* input output routines  */
@@ -47,29 +51,54 @@ EXTERN int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float
 EXTERN int kalign_run_seeded(struct msa *msa, int n_threads, int type,
                              float gpo, float gpe, float tgpe,
                              int refine, int adaptive_budget,
-                             uint64_t tree_seed, float tree_noise);
+                             uint64_t tree_seed, float tree_noise,
+                             float dist_scale, float vsm_amax,
+                             float use_seq_weights,
+                             int consistency_anchors, float consistency_weight);
 
 EXTERN int kalign_run_dist_scale(struct msa *msa, int n_threads, int type,
                                   float gpo, float gpe, float tgpe,
                                   int refine, int adaptive_budget,
-                                  float dist_scale, float vsm_amax);
+                                  float dist_scale, float vsm_amax,
+                                  float use_seq_weights);
 
 EXTERN int kalign_run_realign(struct msa *msa, int n_threads, int type,
                               float gpo, float gpe, float tgpe,
                               int refine, int adaptive_budget,
                               float dist_scale, float vsm_amax,
-                              int realign_iterations);
+                              int realign_iterations,
+                              float use_seq_weights,
+                              int consistency_anchors, float consistency_weight);
 
 EXTERN int kalign_post_realign(struct msa *msa, int n_threads, int type,
                                float gpo, float gpe, float tgpe,
                                int refine, int adaptive_budget,
                                float dist_scale, float vsm_amax,
-                               int realign_iterations);
+                               int realign_iterations,
+                               float use_seq_weights);
 
 EXTERN int kalign_ensemble(struct msa* msa, int n_threads, int type,
                            int n_runs, float gpo, float gpe, float tgpe,
                            uint64_t seed, int min_support,
-                           const char* save_poar_path);
+                           const char* save_poar_path,
+                           int refine, float dist_scale, float vsm_amax,
+                           int realign, float use_seq_weights,
+                           int consistency_anchors, float consistency_weight);
+
+EXTERN int kalign_run_probmsa(struct msa *msa, int n_threads, int type,
+                              double hmm_delta, double hmm_epsilon,
+                              double hmm_tau,
+                              double mea_threshold, double mea_gpo, double mea_gpe,
+                              double prior_scale,
+                              int use_5state,
+                              double delta_s, double epsilon_s,
+                              double delta_l, double epsilon_l);
+
+EXTERN int kalign_post_realign_probmsa(struct msa *msa, int n_threads, int type,
+                                       double hmm_delta, double hmm_epsilon,
+                                       double hmm_tau,
+                                       double mea_threshold, double mea_gpo, double mea_gpe,
+                                       double prior_scale);
 
 EXTERN int kalign_consensus_from_poar(struct msa* msa,
                                       const char* poar_path,

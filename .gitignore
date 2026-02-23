@@ -24,8 +24,8 @@
 *.exe
 *.out
 *.app
-kalign
-kaligncpp
+/kalign
+/kaligncpp
 kalign_*_test
 dssim
 
@@ -70,6 +70,7 @@ _deps/
 # -----------------------------------------------------------------------------
 zig-out/
 zig-cache/
+.zig-cache/
 
 # -----------------------------------------------------------------------------
 # Python Development
@@ -404,8 +405,9 @@ test_output/
 
 # Benchmark results
 benchmark_results/
-benchmarks/data/downloads/
+benchmarks/data/
 benchmarks/results/
+benchmarks/figures/
 performance_*.txt
 
 # Profiling data

@@ -37,6 +37,9 @@ int alloc_aln_mem(struct aln_mem** mem, int x)
         m->flip_n_uncertain = 0;
         m->ap = NULL;
 
+        m->consistency = NULL;
+        m->consistency_stride = 0;
+
         m->starta = 0;
         m->startb = 0;
         m->enda = 0;

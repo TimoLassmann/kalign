@@ -14,6 +14,7 @@
 #define KALIGN_REFINE_NONE 0
 #define KALIGN_REFINE_ALL 1
 #define KALIGN_REFINE_CONFIDENT 2
+#define KALIGN_REFINE_INLINE 3
 
 struct msa;
 struct aln_param;

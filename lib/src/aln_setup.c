@@ -37,7 +37,7 @@ ERROR:
         return FAIL;
 }
 
-int make_profile_n(struct aln_param* ap,const uint8_t* seq,const int len, float** p)
+int make_profile_n(struct aln_param* ap,const uint8_t* seq,const int len, float weight, float** p)
 {
         float** subm = NULL;
         float* prof = NULL;
@@ -72,7 +72,7 @@ int make_profile_n(struct aln_param* ap,const uint8_t* seq,const int len, float*
                 }
                 c = seq[i];
 
-                prof[c] += 1;
+                prof[c] += weight;
 
                 prof += 32;
 
@@ -233,8 +233,43 @@ int update_n(const float* profa, const float* profb,float* newp, struct aln_para
         int i;
         int j;
         int c;
-        for (i = 64; i--;){
-                newp[i] = profa[i] + profb[i];
+
+        /* Balanced profile merging: when use_seq_weights is on, rescale
+           positions 0-22 (amino acid frequencies) at match columns so each
+           side contributes 50%, keeping the total = sipa + sipb.  Then
+           recompute substitution scores (32-54) from the balanced freqs
+           via a delta correction that preserves gap penalty adjustments
+           already embedded in those positions from earlier merge steps.
+
+           delta[j] = sum_aa((freqA*(scaleA-1) + freqB*(scaleB-1)) * subm[aa][j])
+
+           This gives: newp[32+j] = balanced_subst[j] - soff_sum + gap_adj,
+           exactly rebalancing the substitution component while keeping
+           gap penalties (which scale with nsip, not weights) intact. */
+        float scaleA = 1.0f;
+        float scaleB = 1.0f;
+        int do_rebalance = 0;
+        if(ap->use_seq_weights > 0.0f && sipa > 0 && sipb > 0){
+                float pseudo = ap->use_seq_weights;
+                float total = (float)(sipa + sipb);
+                float denom = total + 2.0f * pseudo;
+                scaleA = total * ((float)sipa + pseudo) / (denom * (float)sipa);
+                scaleB = total * ((float)sipb + pseudo) / (denom * (float)sipb);
+                do_rebalance = 1;
+        }
+
+        /* First boundary row (freq counts are zero — no rebalancing needed) */
+        if(do_rebalance){
+                for (i = 0; i < 23; i++){
+                        newp[i] = profa[i] * scaleA + profb[i] * scaleB;
+                }
+                for (i = 23; i < 64; i++){
+                        newp[i] = profa[i] + profb[i];
+                }
+        }else{
+                for (i = 64; i--;){
+                        newp[i] = profa[i] + profb[i];
+                }
         }
 
         profa += 64;
@@ -244,16 +279,33 @@ int update_n(const float* profa, const float* profb,float* newp, struct aln_para
         c = 1;
 
         while(path[c] != 3){
-                //Idea: limit the 'virtual' number of residues of one type to x.
-                // i.e. only allow a maximum of 10 alanines to be registered in each column
-                // the penalty for aligning a 'G' to this column will stay stable even when many (>10) alanines are present.
-                // the difference in score between the 'correct' (all alanine) and incorrect (alanines + glycine) will not increase
-                // with the number of sequences. -> see Durbin pp 140
-
                 if (!path[c]){
-                        //fprintf(stderr,"Align	%d\n",c);
-                        for (i = 64; i--;){
-                                newp[i] = profa[i] + profb[i];
+                        /* Match column */
+                        if(do_rebalance){
+                                for (i = 0; i < 23; i++){
+                                        newp[i] = profa[i] * scaleA + profb[i] * scaleB;
+                                }
+                                for (i = 23; i < 64; i++){
+                                        newp[i] = profa[i] + profb[i];
+                                }
+                                /* Correct subst scores (32-54) for rebalanced freqs */
+                                {
+                                        float** subm = ap->subm;
+                                        float dA = scaleA - 1.0f;
+                                        float dB = scaleB - 1.0f;
+                                        for(j = 0; j < 23; j++){
+                                                float delta = 0.0f;
+                                                int aa;
+                                                for(aa = 0; aa < 23; aa++){
+                                                        delta += (profa[aa]*dA + profb[aa]*dB) * subm[aa][j];
+                                                }
+                                                newp[32 + j] += delta;
+                                        }
+                                }
+                        }else{
+                                for (i = 64; i--;){
+                                        newp[i] = profa[i] + profb[i];
+                                }
                         }
                         profa += 64;
                         profb += 64;
@@ -321,11 +373,11 @@ int update_n(const float* profa, const float* profb,float* newp, struct aln_para
                         profa+=64;
                         if(!(path[c] & 20)){
                                 if(path[c] & 32){
-                                        newp[25] += sipb;//1;
-                                        gp = ap->tgpe*sipb;
+                                        newp[25] += (float)sipb;//1;
+                                        gp = ap->tgpe*(float)sipb;
                                 }else{
-                                        newp[24] += sipb;//1;
-                                        gp = ap->gpe*sipb;
+                                        newp[24] += (float)sipb;//1;
+                                        gp = ap->gpe*(float)sipb;
                                 }
                                 for (j = 32; j < 55;j++){
                                         newp[j] -= gp;
@@ -367,10 +419,19 @@ int update_n(const float* profa, const float* profb,float* newp, struct aln_para
                 newp += 64;
                 c++;
         }
-        for (i = 64; i--;){
-                newp[i] =  profa[i] + profb[i];
+        /* Last boundary row (freq counts are zero — no subst correction needed) */
+        if(do_rebalance){
+                for (i = 0; i < 23; i++){
+                        newp[i] = profa[i] * scaleA + profb[i] * scaleB;
+                }
+                for (i = 23; i < 64; i++){
+                        newp[i] = profa[i] + profb[i];
+                }
+        }else{
+                for (i = 64; i--;){
+                        newp[i] = profa[i] + profb[i];
+                }
         }
-        //newp -= (path[0]+1) *64;
         return OK;
 }
 

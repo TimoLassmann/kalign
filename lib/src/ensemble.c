@@ -223,7 +223,10 @@ ERROR:
 int kalign_ensemble(struct msa* msa, int n_threads, int type,
                     int n_runs, float gpo, float gpe, float tgpe,
                     uint64_t seed, int min_support,
-                    const char* save_poar_path)
+                    const char* save_poar_path,
+                    int refine, float dist_scale, float vsm_amax,
+                    int realign, float use_seq_weights,
+                    int consistency_anchors, float consistency_weight)
 {
         struct msa* copy = NULL;
         struct msa* consensus_msa = NULL;
@@ -240,6 +243,12 @@ int kalign_ensemble(struct msa* msa, int n_threads, int type,
 
         ASSERT(msa != NULL, "No MSA");
         ASSERT(n_runs >= 1, "n_runs must be >= 1");
+
+        /* Seq_weights hurts ensemble performance (POAR consensus already
+           handles profile imbalance).  Default to OFF in ensemble mode. */
+        if(use_seq_weights < 0.0f){
+                use_seq_weights = 0.0f;
+        }
 
         /* Essential input check + detect alphabet */
         RUN(kalign_essential_input_check(msa, 0));
@@ -293,10 +302,22 @@ int kalign_ensemble(struct msa* msa, int n_threads, int type,
                 }
 
                 /* Run alignment */
-                RUN(kalign_run_seeded(copy, n_threads, type,
-                                      run_gpo, run_gpe, run_tgpe,
-                                      KALIGN_REFINE_NONE, 0,
-                                      run_seed, run_noise));
+                if(realign > 0){
+                        RUN(kalign_run_realign(copy, n_threads, type,
+                                              run_gpo, run_gpe, run_tgpe,
+                                              refine, 0,
+                                              dist_scale, vsm_amax,
+                                              realign, use_seq_weights,
+                                              consistency_anchors, consistency_weight));
+                }else{
+                        RUN(kalign_run_seeded(copy, n_threads, type,
+                                              run_gpo, run_gpe, run_tgpe,
+                                              refine, 0,
+                                              run_seed, run_noise,
+                                              dist_scale, vsm_amax,
+                                              use_seq_weights,
+                                              consistency_anchors, consistency_weight));
+                }
 
                 /* Extract POARs from the finalized alignment */
                 char** aln_seqs = NULL;
@@ -398,7 +419,10 @@ int kalign_ensemble(struct msa* msa, int n_threads, int type,
                 RUN(kalign_run_seeded(copy, n_threads, type,
                                       ref_gpo, ref_gpe, ref_tgpe,
                                       KALIGN_REFINE_CONFIDENT, 0,
-                                      ref_seed, ref_noise));
+                                      ref_seed, ref_noise,
+                                      dist_scale, vsm_amax,
+                                      use_seq_weights,
+                                      consistency_anchors, consistency_weight));
 
                 /* Score the refined alignment against the same POAR table */
                 double refined_score = 0.0;

@@ -105,6 +105,9 @@ int aln_profileprofile_foward(struct aln_mem* m)
                                 pa += prof1[freq[c]]*prof2[freq[c]];
                         }
                         prof2 -= 32;
+                        if(m->consistency){
+                                pa += m->consistency[i * m->consistency_stride + j];
+                        }
 
                         s[j].a = pa;
 
@@ -132,6 +135,9 @@ int aln_profileprofile_foward(struct aln_mem* m)
                         pa += prof1[freq[c]]*prof2[freq[c]];
                 }
                 prof2 -= 32;
+                if(m->consistency){
+                        pa += m->consistency[i * m->consistency_stride + j];
+                }
 
                 s[j].a = pa;
 
@@ -242,6 +248,9 @@ int aln_profileprofile_backward(struct aln_mem* m)
                                 pa += prof1[freq[c]]*prof2[freq[c]];
                         }
                         prof2 -= 32;
+                        if(m->consistency){
+                                pa += m->consistency[(m->starta_2 + i) * m->consistency_stride + j];
+                        }
 
                         s[j].a = pa;
 
@@ -268,6 +277,9 @@ int aln_profileprofile_backward(struct aln_mem* m)
                         pa += prof1[freq[c]]*prof2[freq[c]];
                 }
                 prof2 -= 32;
+                if(m->consistency){
+                        pa += m->consistency[(m->starta_2 + i) * m->consistency_stride + j];
+                }
                 s[j].a = pa;
 
                 //pga = s[j].ga;

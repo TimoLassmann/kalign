@@ -33,6 +33,7 @@
 #include "weave_alignment.h"
 #include "sp_score.h"
 #include "aln_run.h"
+#include "anchor_consistency.h"
 
 #define ALN_REFINE_IMPORT
 #include "aln_refine.h"
@@ -44,6 +45,14 @@ static int replay_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* 
 static int dispatch_alignment(struct msa* msa, struct aln_mem* ml, float* prof_a, float* prof_b, int a, int b, int len_a, int len_b);
 static int convert_raw_path(struct aln_mem* m);
 static int compute_confidence_threshold(struct aln_tasks* t, float* threshold);
+
+/* Leaf weight for make_profile_n — always 1.0 since sequence weighting
+   is handled via balanced freq-count merging in update_n. */
+static float leaf_weight(struct msa* msa, int node)
+{
+        (void)msa; (void)node;
+        return 1.0f;
+}
 
 int refine_alignment(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int refine_mode)
 {
@@ -132,7 +141,7 @@ int refine_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
         /* Build profiles progressively (same as do_align) */
         if(msa->nsip[a] == 1){
                 len_a = msa->sequences[a]->len;
-                RUN(make_profile_n(ap, msa->sequences[a]->s, len_a, &t->profile[a]));
+                RUN(make_profile_n(ap, msa->sequences[a]->s, len_a, leaf_weight(msa,a), &t->profile[a]));
         }else{
                 len_a = msa->plen[a];
                 RUN(set_gap_penalties_n(t->profile[a], len_a, msa->nsip[b]));
@@ -140,7 +149,7 @@ int refine_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
 
         if(msa->nsip[b] == 1){
                 len_b = msa->sequences[b]->len;
-                RUN(make_profile_n(ap, msa->sequences[b]->s, len_b, &t->profile[b]));
+                RUN(make_profile_n(ap, msa->sequences[b]->s, len_b, leaf_weight(msa,b), &t->profile[b]));
         }else{
                 len_b = msa->plen[b];
                 RUN(set_gap_penalties_n(t->profile[b], len_b, msa->nsip[a]));
@@ -158,6 +167,43 @@ int refine_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
 
         /* Allocate best_path buffer */
         MMALLOC(best_path, sizeof(int) * ml->alloc_path_len);
+
+        /* Compute consistency bonus for all merge types */
+        ml->consistency = NULL;
+        ml->consistency_stride = 0;
+        {
+                struct consistency_table* ct = (struct consistency_table*)msa->consistency_table;
+                if(ct != NULL){
+                        int dp_row_node, dp_col_node, dp_rows, dp_cols;
+                        if(msa->nsip[a] == 1 && msa->nsip[b] == 1){
+                                if(len_a < len_b){
+                                        dp_row_node = a; dp_rows = len_a;
+                                        dp_col_node = b; dp_cols = len_b;
+                                }else{
+                                        dp_row_node = b; dp_rows = len_b;
+                                        dp_col_node = a; dp_cols = len_a;
+                                }
+                        }else if(msa->nsip[a] == 1){
+                                dp_row_node = b; dp_rows = len_b;
+                                dp_col_node = a; dp_cols = len_a;
+                        }else if(msa->nsip[b] == 1){
+                                dp_row_node = a; dp_rows = len_a;
+                                dp_col_node = b; dp_cols = len_b;
+                        }else{
+                                if(len_a < len_b){
+                                        dp_row_node = a; dp_rows = len_a;
+                                        dp_col_node = b; dp_cols = len_b;
+                                }else{
+                                        dp_row_node = b; dp_rows = len_b;
+                                        dp_col_node = a; dp_cols = len_a;
+                                }
+                        }
+                        RUN(anchor_consistency_get_bonus_profile(ct, msa,
+                                dp_row_node, dp_rows, dp_col_node, dp_cols,
+                                &ml->consistency));
+                        ml->consistency_stride = dp_cols;
+                }
+        }
 
         /* If adaptive budget, allocate flip_margins for baseline trial
            to record per-meetup margins for uncertainty analysis */
@@ -261,6 +307,13 @@ int refine_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
         memcpy(ml->path, best_path,
                sizeof(int) * (best_path[0] + 2));
 
+        /* Free consistency bonus */
+        if(ml->consistency){
+                MFREE(ml->consistency);
+                ml->consistency = NULL;
+                ml->consistency_stride = 0;
+        }
+
         /* Update confidence from best trial */
         if(best_margin_count > 0){
                 t->list[task_id]->confidence = best_margin_sum / (float)best_margin_count;
@@ -345,7 +398,7 @@ int replay_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
         /* Build profiles (standard progressive approach) */
         if(msa->nsip[a] == 1){
                 len_a = msa->sequences[a]->len;
-                RUN(make_profile_n(ap, msa->sequences[a]->s, len_a, &t->profile[a]));
+                RUN(make_profile_n(ap, msa->sequences[a]->s, len_a, leaf_weight(msa,a), &t->profile[a]));
         }else{
                 len_a = msa->plen[a];
                 RUN(set_gap_penalties_n(t->profile[a], len_a, msa->nsip[b]));
@@ -353,7 +406,7 @@ int replay_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
 
         if(msa->nsip[b] == 1){
                 len_b = msa->sequences[b]->len;
-                RUN(make_profile_n(ap, msa->sequences[b]->s, len_b, &t->profile[b]));
+                RUN(make_profile_n(ap, msa->sequences[b]->s, len_b, leaf_weight(msa,b), &t->profile[b]));
         }else{
                 len_b = msa->plen[b];
                 RUN(set_gap_penalties_n(t->profile[b], len_b, msa->nsip[a]));
@@ -369,7 +422,51 @@ int replay_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
         ml->margin_count = 0;
         RUN(init_alnmem(ml));
 
+        /* Compute consistency bonus for all merge types */
+        ml->consistency = NULL;
+        ml->consistency_stride = 0;
+        {
+                struct consistency_table* ct = (struct consistency_table*)msa->consistency_table;
+                if(ct != NULL){
+                        int dp_row_node, dp_col_node, dp_rows, dp_cols;
+                        if(msa->nsip[a] == 1 && msa->nsip[b] == 1){
+                                if(len_a < len_b){
+                                        dp_row_node = a; dp_rows = len_a;
+                                        dp_col_node = b; dp_cols = len_b;
+                                }else{
+                                        dp_row_node = b; dp_rows = len_b;
+                                        dp_col_node = a; dp_cols = len_a;
+                                }
+                        }else if(msa->nsip[a] == 1){
+                                dp_row_node = b; dp_rows = len_b;
+                                dp_col_node = a; dp_cols = len_a;
+                        }else if(msa->nsip[b] == 1){
+                                dp_row_node = a; dp_rows = len_a;
+                                dp_col_node = b; dp_cols = len_b;
+                        }else{
+                                if(len_a < len_b){
+                                        dp_row_node = a; dp_rows = len_a;
+                                        dp_col_node = b; dp_cols = len_b;
+                                }else{
+                                        dp_row_node = b; dp_rows = len_b;
+                                        dp_col_node = a; dp_cols = len_a;
+                                }
+                        }
+                        RUN(anchor_consistency_get_bonus_profile(ct, msa,
+                                dp_row_node, dp_rows, dp_col_node, dp_cols,
+                                &ml->consistency));
+                        ml->consistency_stride = dp_cols;
+                }
+        }
+
         RUN(dispatch_alignment(msa, ml, t->profile[a], t->profile[b], a, b, len_a, len_b));
+
+        /* Free consistency bonus */
+        if(ml->consistency){
+                MFREE(ml->consistency);
+                ml->consistency = NULL;
+                ml->consistency_stride = 0;
+        }
 
         /* Store alignment confidence */
         if(ml->margin_count > 0){

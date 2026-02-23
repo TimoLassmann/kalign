@@ -19,6 +19,8 @@ struct msa;
 /* EXTERN int create_msa(struct msa* msa, struct aln_param* ap,struct aln_tasks* t); */
 
 EXTERN int create_msa_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t);
+EXTERN int create_msa_tree_inline_refine(struct msa* msa, struct aln_param* ap,
+                                         struct aln_tasks* t, int n_trials);
 EXTERN float compute_gap_scale(struct msa* msa, struct aln_param* ap, int a, int b);
 EXTERN float compute_subm_offset(struct msa* msa, struct aln_param* ap, int a, int b);
 EXTERN int create_chaos_msa_serial(struct msa* msa, struct aln_param* ap,struct aln_tasks* t);
