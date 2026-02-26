@@ -126,7 +126,7 @@ int sort_tasks(struct aln_tasks* t , int order)
                 break;
         }
         default:
-                ERROR_MSG("Task ordering %d not recognised.");
+                ERROR_MSG("Task ordering %d not recognised.", order);
                 break;
         }
 

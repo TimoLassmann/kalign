@@ -91,9 +91,9 @@ def balibase_cases() -> List[BenchmarkCase]:
 
 BRALIBASE_URLS = [
     ("data-set1",
-     "https://web.archive.org/web/20160408045442/http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz"),
+     "https://web.archive.org/web/20160408045442id_/http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz"),
     ("data-set2",
-     "https://web.archive.org/web/20160408045453/http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz"),
+     "https://web.archive.org/web/20160408045453id_/http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz"),
 ]
 
 

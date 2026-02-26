@@ -20,12 +20,14 @@ from pathlib import Path
 
 logger = logging.getLogger("benchmarks.downstream")
 
-PIPELINES = ["calibration", "positive_selection", "phylo_accuracy", "hmmer_detection"]
+PIPELINES = ["alignment_accuracy", "calibration", "positive_selection", "phylo_accuracy", "hmmer_detection"]
 
 
 def _run_pipeline(name: str, params: dict) -> None:
     """Import and run a single pipeline by name."""
-    if name == "calibration":
+    if name == "alignment_accuracy":
+        from .alignment_accuracy import run_pipeline
+    elif name == "calibration":
         from .calibration import run_pipeline
     elif name == "positive_selection":
         from .positive_selection import run_pipeline
@@ -62,8 +64,8 @@ def main(argv: list[str] | None = None) -> int:
         nargs="*",
         default=[],
         metavar="PIPELINE",
-        help="Pipeline(s) to run: calibration, positive_selection, "
-             "phylo_accuracy, hmmer_detection, or 'all'.",
+        help="Pipeline(s) to run: alignment_accuracy, calibration, "
+             "positive_selection, phylo_accuracy, hmmer_detection, or 'all'.",
     )
     parser.add_argument(
         "--all",

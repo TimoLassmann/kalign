@@ -227,7 +227,7 @@ Contributors are recognized in:
 
 ## License
 
-By contributing to Kalign, you agree that your contributions will be licensed under the GNU General Public License v3.0.
+By contributing to Kalign, you agree that your contributions will be licensed under the Apache License 2.0.
 
 ## Questions?
 

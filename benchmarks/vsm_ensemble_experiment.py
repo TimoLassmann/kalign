@@ -7,8 +7,6 @@ Modes:
   4. ens3            - ensemble(3), no VSM, no refinement in runs
   5. ens3+vsm        - ensemble(3), VSM in each run
   6. ens3+vsm+ref    - ensemble(3), VSM + refinement in each run
-  7. probmsa_3s      - 3-state pair-HMM
-  8. probmsa_5s      - 5-state pair-HMM (best: ds=0.05, es=0.70)
 
 Usage:
   uv run python -m benchmarks.vsm_ensemble_experiment
@@ -157,16 +155,6 @@ CONFIGS = [
         "vsm_amax": 2.0,
         "realign": 1,
     },
-    {
-        "label": "probmsa_3s",
-        "probmsa": True,
-    },
-    {
-        "label": "probmsa_5s",
-        "probmsa_5state": True,
-        "pm_delta_s": 0.05,
-        "pm_epsilon_s": 0.70,
-    },
 ]
 
 
@@ -179,16 +167,7 @@ def _run_one(case, config):
         kwargs = dict(format="fasta", seq_type=case.seq_type)
 
         # Alignment mode
-        if config.get("probmsa_5state"):
-            kwargs["probmsa_5state"] = True
-            kwargs["refine"] = "none"
-            for k in ("pm_delta_s", "pm_epsilon_s", "pm_delta_l", "pm_epsilon_l"):
-                if k in config:
-                    kwargs[k] = config[k]
-        elif config.get("probmsa"):
-            kwargs["probmsa"] = True
-            kwargs["refine"] = "none"
-        elif config.get("ensemble"):
+        if config.get("ensemble"):
             kwargs["ensemble"] = config["ensemble"]
             kwargs["refine"] = config.get("refine", "none")
             kwargs["vsm_amax"] = config.get("vsm_amax", -1.0)

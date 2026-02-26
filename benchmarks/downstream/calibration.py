@@ -449,7 +449,7 @@ def run_pipeline(params: dict) -> CalibrationResult:
     data_dir = Path(params.get("data_dir", "benchmarks/data/downstream/calibration"))
     results_dir = Path(params.get("results_dir", "benchmarks/results"))
     # Calibration evaluates raw confidence scores → masked methods are excluded
-    _default_methods = ["kalign", "kalign_ens3", "true"]
+    _default_methods = ["kalign", "kalign_cons", "kalign_ens3", "true"]
     methods = params.get("methods", _default_methods)
     quick = params.get("quick", False)
     n_jobs = params.get("n_jobs", 1)

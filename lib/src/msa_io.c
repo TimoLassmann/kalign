@@ -398,7 +398,9 @@ int read_file_stdin(struct in_buffer** buffer,char* infile)
                 }
 
         }
-        fclose(f_ptr);
+        if(f_ptr != stdin){
+                fclose(f_ptr);
+        }
         MFREE(line);
         *buffer = b;
         return OK;

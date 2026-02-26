@@ -1,25 +1,3 @@
-/*
-    Kalign - a multiple sequence alignment program
-
-    Copyright 2006, 2019, 2020, 2021 Timo Lassmann
-
-    This file is part of kalign.
-
-    Kalign is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-*/
-
 #include "tldevel.h"
 #include "tlmisc.h"
 #include "kalign/kalign.h"
@@ -79,19 +57,16 @@ ERROR:
 
 int print_kalign_warranty(void)
 {
-        fprintf(stdout,"Here is the Disclaimer of Warranty section of the GNU General Public License (GPL):\n");
+        fprintf(stdout,"Disclaimer of Warranty (Apache License, Version 2.0, Section 7):\n");
         fprintf(stdout,"\n");
-        fprintf(stdout,"15. Disclaimer of Warranty.\n");
-        fprintf(stdout,"THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY\n");
-        fprintf(stdout,"APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT\n");
-        fprintf(stdout,"HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM \"AS IS\" WITHOUT WARRANTY\n");
-        fprintf(stdout,"OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO,\n");
-        fprintf(stdout,"THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR\n");
-        fprintf(stdout,"PURPOSE.  THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM\n");
-        fprintf(stdout,"IS WITH YOU.  SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF\n");
-        fprintf(stdout,"ALL NECESSARY SERVICING, REPAIR OR CORRECTION.\n");
+        fprintf(stdout,"Unless required by applicable law or agreed to in writing, Licensor\n");
+        fprintf(stdout,"provides the Work (and each Contributor provides its Contributions)\n");
+        fprintf(stdout,"on an \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,\n");
+        fprintf(stdout,"either express or implied, including, without limitation, any\n");
+        fprintf(stdout,"warranties or conditions of TITLE, NON-INFRINGEMENT,\n");
+        fprintf(stdout,"MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE.\n");
         fprintf(stdout,"\n");
-        fprintf(stdout,"A complete copy of the GPL can be found in the \"COPYING\" file.\n");
+        fprintf(stdout,"See the COPYING file for the full Apache License, Version 2.0.\n");
         return OK;
 }
 
@@ -100,12 +75,10 @@ int print_kalign_header(void)
         fprintf(stdout,"\n");
         fprintf(stdout,"Kalign (%s)\n", KALIGN_PACKAGE_VERSION);
         fprintf(stdout,"\n");
-        fprintf(stdout,"Copyright (C) 2006,2019,2020,2021 Timo Lassmann\n");
+        fprintf(stdout,"Copyright (C) 2006-2026 Timo Lassmann\n");
         fprintf(stdout,"\n");
-        fprintf(stdout,"This program comes with ABSOLUTELY NO WARRANTY; for details type:\n");
-        fprintf(stdout,"`kalign -showw'.\n");
-        fprintf(stdout,"This is free software, and you are welcome to redistribute it\n");
-        fprintf(stdout,"under certain conditions; consult the COPYING file for details.\n");
+        fprintf(stdout,"Licensed under the Apache License, Version 2.0.\n");
+        fprintf(stdout,"See the COPYING file or http://www.apache.org/licenses/LICENSE-2.0\n");
         fprintf(stdout,"\n");
         fprintf(stdout,"Please cite:\n");
 

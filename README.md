@@ -108,29 +108,40 @@ pip install "kalign[all] @ git+https://github.com/TimoLassmann/kalign.git"      
 ### Command Line Interface
 
 ```bash
-Usage: kalign  -i <seq file> -o <out aln>
+Usage: kalign [--fast | --precise] -i <seq file> -o <out aln>
+
+Modes:
+
+   (default)          : Consistency anchors + VSM (best general-purpose)
+   --fast             : VSM only, no consistency (fastest)
+   --precise          : Ensemble(3) + VSM + realign (highest precision)
 
 Options:
 
    --format           : Output format. [Fasta]
-   --type             : Alignment type (rna, dna, internal). [rna]
-                        Options: protein, divergent (protein)
-                                 rna, dna, internal (nuc).
-   --gpo              : Gap open penalty. []
-   --gpe              : Gap extension penalty. []
-   --tgpe             : Terminal gap extension penalty. []
+   --type             : Alignment type (rna, dna, protein, divergent, internal)
+   --gpo              : Gap open penalty. [auto]
+   --gpe              : Gap extension penalty. [auto]
+   --tgpe             : Terminal gap extension penalty. [auto]
+   --refine           : Refinement mode: none, all, confident. [none]
    -n/--nthreads      : Number of threads. [auto: N-1, max 16]
-   --refine           : Refinement mode: none, all, confident. [confident]
-   --ensemble N       : Run N stochastic ensemble alignments. [off]
-   --min-support N    : Explicit consensus threshold for ensemble. [auto]
+
+Ensemble options:
+
+   --ensemble N       : Run N ensemble alignments. [off; 5 if no value given]
+   --ensemble-seed    : RNG seed for ensemble. [42]
+   --min-support N    : Explicit consensus threshold. [auto]
    --save-poar FILE   : Save POAR table for later re-thresholding.
    --load-poar FILE   : Load POAR table (skip alignment).
-   --version (-V/-v)  : Prints version. [NA]
+   --version (-V/-v)  : Prints version.
 ```
+
+Most users only need to choose a mode. Explicit parameters override mode defaults
+(e.g., `--fast --ensemble 5` uses fast base settings with 5 ensemble runs).
 
 #### Threading Behavior
 
-**New in this version**: Kalign automatically detects your system's CPU cores and uses N-1 threads by default (leaving one core free), with a maximum of 16 threads. This provides good performance out-of-the-box while maintaining system responsiveness.
+Kalign automatically detects your system's CPU cores and uses N-1 threads by default (leaving one core free), with a maximum of 16 threads.
 
 - **Auto-detection**: Uses CPU cores - 1 (e.g., 15 threads on a 16-core system)
 - **Maximum cap**: Never uses more than 16 threads
@@ -160,29 +171,28 @@ Fine-tune with `--gpo` (gap open), `--gpe` (gap extension), and `--tgpe` (termin
 ```python
 import kalign
 
-# Align DNA sequences
 sequences = [
     "ATCGATCGATCG",
-    "ATCGTCGATCG", 
+    "ATCGTCGATCG",
     "ATCGATCATCG"
 ]
 
-aligned = kalign.align(sequences, seq_type="dna")
-for seq in aligned:
-    print(seq)
+# Default mode — consistency anchors + VSM (best general-purpose)
+aligned = kalign.align(sequences)
+
+# Fast mode — no consistency, fastest
+aligned = kalign.align(sequences, mode="fast")
+
+# Precise mode — ensemble + realign, highest precision
+aligned = kalign.align(sequences, mode="precise")
+
+# Expert: override specific parameters within a mode
+aligned = kalign.align(sequences, mode="fast", ensemble=5)
 
 # Ensemble alignment with per-residue confidence scores
-result = kalign.align_from_file("proteins.fasta", ensemble=5)
+result = kalign.align_from_file("proteins.fasta", mode="precise")
 print(result.column_confidence)    # per-column confidence [0..1]
 print(result.residue_confidence)   # per-residue confidence [0..1]
-
-# Write confidence to Stockholm format (#=GR PP annotations)
-kalign.write_alignment(
-    result.sequences, "output.sto", format="stockholm",
-    ids=result.names,
-    column_confidence=result.column_confidence,
-    residue_confidence=result.residue_confidence,
-)
 ```
 
 The Python package also provides a `kalign-py` CLI that uses the Python bindings directly (does not require the C binary):
@@ -219,10 +229,13 @@ kalign -i sequences.fa -o aligned.afa -n 8  # Use exactly 8 threads
 
 ### Ensemble Alignment
 
-Ensemble mode runs multiple alignments with varied parameters and combines results for higher accuracy (~5% improvement on BAliBASE at ~10x time cost):
+Precise mode runs 3 ensemble alignments with realignment, producing the highest precision. For more control, use `--ensemble` directly:
 
 ```bash
-# Run 5 ensemble alignments (recommended for best accuracy)
+# Precise mode (ensemble + realign, highest precision)
+kalign --precise -i sequences.fa -o aligned.afa
+
+# Or fine-tune: 5 ensemble runs instead of 3
 kalign -i sequences.fa -o aligned.afa --ensemble 5
 
 # Save the POAR consensus table for later re-thresholding
@@ -419,4 +432,4 @@ Please cite Kalign in your publications:
 
 ## License
 
-Kalign is licensed under the GNU General Public License v3.0. See [COPYING](COPYING) for details.
+Kalign is licensed under the Apache License, Version 2.0. See [COPYING](COPYING) for details.

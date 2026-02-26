@@ -79,33 +79,9 @@ static int run_alignment(struct msa* msa_data, int n_threads, int seq_type,
                          const std::string& save_poar,
                          const std::string& load_poar,
                          float use_seq_weights = -1.0f,
-                         int probmsa = 0,
-                         double pm_delta = -1.0, double pm_epsilon = -1.0,
-                         double pm_tau = -1.0,
-                         double pm_threshold = -1.0, double pm_gpo = -1.0, double pm_gpe = -1.0,
-                         double pm_prior_scale = -1.0,
-                         int probmsa_guided = 0,
-                         int pm_use_5state = 0,
-                         double pm_delta_s = -1.0, double pm_epsilon_s = -1.0,
-                         double pm_delta_l = -1.0, double pm_epsilon_l = -1.0,
                          int consistency_anchors = 0, float consistency_weight = 2.0f)
 {
-    if (probmsa_guided > 0) {
-        /* Input MSA is already aligned; compute distances from it,
-           build tree, and re-align with ProbMSA. */
-        return kalign_post_realign_probmsa(msa_data, n_threads, seq_type,
-                                           pm_delta, pm_epsilon, pm_tau,
-                                           pm_threshold, pm_gpo, pm_gpe,
-                                           pm_prior_scale);
-    } else if (probmsa > 0 || pm_use_5state > 0) {
-        return kalign_run_probmsa(msa_data, n_threads, seq_type,
-                                  pm_delta, pm_epsilon, pm_tau,
-                                  pm_threshold, pm_gpo, pm_gpe,
-                                  pm_prior_scale,
-                                  pm_use_5state,
-                                  pm_delta_s, pm_epsilon_s,
-                                  pm_delta_l, pm_epsilon_l);
-    } else if (!load_poar.empty()) {
+    if (!load_poar.empty()) {
         return kalign_consensus_from_poar(msa_data, load_poar.c_str(),
                                           min_support > 0 ? min_support : 2);
     } else if (ensemble > 0) {
@@ -138,19 +114,11 @@ py::object align_sequences(
     int refine = KALIGN_REFINE_NONE,
     int ensemble = 0,
     int min_support = 0,
-    int probmsa = 0,
-    double pm_delta = -1.0,
-    double pm_epsilon = -1.0,
-    double pm_tau = -1.0,
-    double pm_threshold = -1.0,
-    double pm_gpo = -1.0,
-    double pm_gpe = -1.0,
-    double pm_prior_scale = -1.0,
-    int pm_use_5state = 0,
-    double pm_delta_s = -1.0, double pm_epsilon_s = -1.0,
-    double pm_delta_l = -1.0, double pm_epsilon_l = -1.0,
     float seq_weights = -1.0f,
-    int consistency_anchors = 0, float consistency_weight = 2.0f
+    int consistency_anchors = 0, float consistency_weight = 2.0f,
+    float vsm_amax = -1.0f,
+    int realign = 0,
+    uint64_t ensemble_seed = 42
 ) {
     if (sequences.empty()) {
         throw std::invalid_argument("Empty sequence list provided");
@@ -184,15 +152,11 @@ py::object align_sequences(
     result = run_alignment(msa_data, n_threads, seq_type,
                            gap_open, gap_extend, terminal_gap_extend,
                            refine, 0,
-                           ensemble, 42,
-                           0.0f, -1.0f,
-                           min_support, 0,
+                           ensemble, ensemble_seed,
+                           0.0f, vsm_amax,
+                           min_support, realign,
                            "", "",
                            seq_weights,
-                           probmsa,
-                           pm_delta, pm_epsilon, pm_tau, pm_threshold, pm_gpo, pm_gpe,
-                           pm_prior_scale, 0, pm_use_5state,
-                           pm_delta_s, pm_epsilon_s, pm_delta_l, pm_epsilon_l,
                            consistency_anchors, consistency_weight);
 
     if (result != 0) {
@@ -243,18 +207,6 @@ py::object align_from_file(
     int realign = 0,
     const std::string& save_poar = "",
     const std::string& load_poar = "",
-    int probmsa = 0,
-    double pm_delta = -1.0,
-    double pm_epsilon = -1.0,
-    double pm_tau = -1.0,
-    double pm_threshold = -1.0,
-    double pm_gpo = -1.0,
-    double pm_gpe = -1.0,
-    double pm_prior_scale = -1.0,
-    int probmsa_guided = 0,
-    int pm_use_5state = 0,
-    double pm_delta_s = -1.0, double pm_epsilon_s = -1.0,
-    double pm_delta_l = -1.0, double pm_epsilon_l = -1.0,
     float seq_weights = -1.0f,
     int consistency_anchors = 0, float consistency_weight = 2.0f
 ) {
@@ -280,10 +232,6 @@ py::object align_from_file(
                            min_support, realign,
                            save_poar, load_poar,
                            seq_weights,
-                           probmsa,
-                           pm_delta, pm_epsilon, pm_tau, pm_threshold, pm_gpo, pm_gpe,
-                           pm_prior_scale, probmsa_guided, pm_use_5state,
-                           pm_delta_s, pm_epsilon_s, pm_delta_l, pm_epsilon_l,
                            consistency_anchors, consistency_weight);
     if (result != 0) {
         kalign_free_msa(msa_data);
@@ -517,18 +465,6 @@ void align_file_to_file(
     int realign = 0,
     const std::string& save_poar = "",
     const std::string& load_poar = "",
-    int probmsa = 0,
-    double pm_delta = -1.0,
-    double pm_epsilon = -1.0,
-    double pm_tau = -1.0,
-    double pm_threshold = -1.0,
-    double pm_gpo = -1.0,
-    double pm_gpe = -1.0,
-    double pm_prior_scale = -1.0,
-    int probmsa_guided = 0,
-    int pm_use_5state = 0,
-    double pm_delta_s = -1.0, double pm_epsilon_s = -1.0,
-    double pm_delta_l = -1.0, double pm_epsilon_l = -1.0,
     float seq_weights = -1.0f,
     int consistency_anchors = 0, float consistency_weight = 2.0f
 ) {
@@ -547,10 +483,6 @@ void align_file_to_file(
                            min_support, realign,
                            save_poar, load_poar,
                            seq_weights,
-                           probmsa,
-                           pm_delta, pm_epsilon, pm_tau, pm_threshold, pm_gpo, pm_gpe,
-                           pm_prior_scale, probmsa_guided, pm_use_5state,
-                           pm_delta_s, pm_epsilon_s, pm_delta_l, pm_epsilon_l,
                            consistency_anchors, consistency_weight);
     if (result != 0) {
         kalign_free_msa(msa_data);
@@ -579,22 +511,12 @@ PYBIND11_MODULE(_core, m) {
           py::arg("refine") = KALIGN_REFINE_NONE,
           py::arg("ensemble") = 0,
           py::arg("min_support") = 0,
-          py::arg("probmsa") = 0,
-          py::arg("pm_delta") = -1.0,
-          py::arg("pm_epsilon") = -1.0,
-          py::arg("pm_tau") = -1.0,
-          py::arg("pm_threshold") = -1.0,
-          py::arg("pm_gpo") = -1.0,
-          py::arg("pm_gpe") = -1.0,
-          py::arg("pm_prior_scale") = -1.0,
-          py::arg("pm_use_5state") = 0,
-          py::arg("pm_delta_s") = -1.0,
-          py::arg("pm_epsilon_s") = -1.0,
-          py::arg("pm_delta_l") = -1.0,
-          py::arg("pm_epsilon_l") = -1.0,
           py::arg("seq_weights") = -1.0f,
           py::arg("consistency_anchors") = 0,
           py::arg("consistency_weight") = 2.0f,
+          py::arg("vsm_amax") = -1.0f,
+          py::arg("realign") = 0,
+          py::arg("ensemble_seed") = (uint64_t)42,
           R"pbdoc(
           Align a list of sequences using Kalign.
 
@@ -618,6 +540,12 @@ PYBIND11_MODULE(_core, m) {
               Number of ensemble runs (default: 0 = off)
           min_support : int, optional
               Explicit consensus threshold (default: 0 = auto)
+          vsm_amax : float, optional
+              Variable scoring matrix amplitude (default: -1.0, uses Kalign defaults)
+          realign : int, optional
+              Number of realignment iterations (default: 0 = off)
+          ensemble_seed : int, optional
+              RNG seed for ensemble (default: 42)
 
           Returns
           -------
@@ -644,20 +572,6 @@ PYBIND11_MODULE(_core, m) {
           py::arg("realign") = 0,
           py::arg("save_poar") = "",
           py::arg("load_poar") = "",
-          py::arg("probmsa") = 0,
-          py::arg("pm_delta") = -1.0,
-          py::arg("pm_epsilon") = -1.0,
-          py::arg("pm_tau") = -1.0,
-          py::arg("pm_threshold") = -1.0,
-          py::arg("pm_gpo") = -1.0,
-          py::arg("pm_gpe") = -1.0,
-          py::arg("pm_prior_scale") = -1.0,
-          py::arg("probmsa_guided") = 0,
-          py::arg("pm_use_5state") = 0,
-          py::arg("pm_delta_s") = -1.0,
-          py::arg("pm_epsilon_s") = -1.0,
-          py::arg("pm_delta_l") = -1.0,
-          py::arg("pm_epsilon_l") = -1.0,
           py::arg("seq_weights") = -1.0f,
           py::arg("consistency_anchors") = 0,
           py::arg("consistency_weight") = 2.0f,
@@ -780,20 +694,6 @@ PYBIND11_MODULE(_core, m) {
           py::arg("realign") = 0,
           py::arg("save_poar") = "",
           py::arg("load_poar") = "",
-          py::arg("probmsa") = 0,
-          py::arg("pm_delta") = -1.0,
-          py::arg("pm_epsilon") = -1.0,
-          py::arg("pm_tau") = -1.0,
-          py::arg("pm_threshold") = -1.0,
-          py::arg("pm_gpo") = -1.0,
-          py::arg("pm_gpe") = -1.0,
-          py::arg("pm_prior_scale") = -1.0,
-          py::arg("probmsa_guided") = 0,
-          py::arg("pm_use_5state") = 0,
-          py::arg("pm_delta_s") = -1.0,
-          py::arg("pm_epsilon_s") = -1.0,
-          py::arg("pm_delta_l") = -1.0,
-          py::arg("pm_epsilon_l") = -1.0,
           py::arg("seq_weights") = -1.0f,
           py::arg("consistency_anchors") = 0,
           py::arg("consistency_weight") = 2.0f,

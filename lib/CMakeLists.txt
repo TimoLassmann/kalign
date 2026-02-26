@@ -56,13 +56,6 @@ set(source_files
   src/anchor_consistency.c
   src/ensemble.c
 
-  src/probmsa_submat.c
-  src/probmsa_emission.c
-  src/probmsa_pairhmm.c
-  src/probmsa_profile.c
-  src/probmsa_dirichlet.c
-  src/probmsa_driver.c
-
   # src/coretralign.c
   # src/test.h
   )

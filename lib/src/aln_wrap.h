@@ -40,21 +40,6 @@ EXTERN int kalign_post_realign(struct msa *msa, int n_threads, int type,
                                int realign_iterations,
                                float use_seq_weights);
 
-EXTERN int kalign_run_probmsa(struct msa *msa, int n_threads, int type,
-                              double hmm_delta, double hmm_epsilon,
-                              double hmm_tau,
-                              double mea_threshold, double mea_gpo, double mea_gpe,
-                              double prior_scale,
-                              int use_5state,
-                              double delta_s, double epsilon_s,
-                              double delta_l, double epsilon_l);
-
-EXTERN int kalign_post_realign_probmsa(struct msa *msa, int n_threads, int type,
-                                       double hmm_delta, double hmm_epsilon,
-                                       double hmm_tau,
-                                       double mea_threshold, double mea_gpo, double mea_gpe,
-                                       double prior_scale);
-
 #undef ALN_WRAP_IMPORT
 #undef EXTERN
 

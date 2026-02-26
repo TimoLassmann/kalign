@@ -254,11 +254,7 @@ def run_phylo_case(
     # -- Step 1: Align -------------------------------------------------------
     # For guided methods, pass the true alignment as input so that
     # kalign can compute pairwise distances from it and build a tree.
-    cfg = METHODS.get(method_name, {})
-    if cfg.get("probmsa_guided"):
-        input_fasta = sim_dataset.true_alignment
-    else:
-        input_fasta = sim_dataset.unaligned
+    input_fasta = sim_dataset.unaligned
 
     aln_result = run_method(
         method_name,
@@ -398,7 +394,7 @@ def run_pipeline(params: dict) -> PhyloResult:
     data_dir = Path(params.get("data_dir", "benchmarks/data/downloads"))
     results_dir = Path(params.get("results_dir", "benchmarks/results"))
     full = params.get("full", False)
-    _default_methods = ["kalign", "kalign_ens3", "mafft", "muscle", "clustalo", "true"]
+    _default_methods = ["kalign", "kalign_cons", "kalign_ens3", "mafft", "muscle", "clustalo", "true"]
     methods = params.get("methods", list(METHODS.keys()) if full else _default_methods)
     n_jobs = params.get("n_jobs", 1)
     quick = params.get("quick", False)

@@ -85,21 +85,6 @@ EXTERN int kalign_ensemble(struct msa* msa, int n_threads, int type,
                            int realign, float use_seq_weights,
                            int consistency_anchors, float consistency_weight);
 
-EXTERN int kalign_run_probmsa(struct msa *msa, int n_threads, int type,
-                              double hmm_delta, double hmm_epsilon,
-                              double hmm_tau,
-                              double mea_threshold, double mea_gpo, double mea_gpe,
-                              double prior_scale,
-                              int use_5state,
-                              double delta_s, double epsilon_s,
-                              double delta_l, double epsilon_l);
-
-EXTERN int kalign_post_realign_probmsa(struct msa *msa, int n_threads, int type,
-                                       double hmm_delta, double hmm_epsilon,
-                                       double hmm_tau,
-                                       double mea_threshold, double mea_gpo, double mea_gpe,
-                                       double prior_scale);
-
 EXTERN int kalign_consensus_from_poar(struct msa* msa,
                                       const char* poar_path,
                                       int min_support);

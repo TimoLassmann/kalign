@@ -1,7 +1,6 @@
 """Run external tools (mafft, muscle, clustalo) on BAliBASE inside container.
 
 Scores against references using kalign's compare_detailed with XML masks.
-Outputs JSON results compatible with probmsa_experiment.py format.
 
 Usage (inside container):
     python -m benchmarks.external_balibase

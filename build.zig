@@ -112,12 +112,6 @@ const kalign_lib_sources = [_][]const u8{
     "lib/src/consensus_msa.c",
     "lib/src/anchor_consistency.c",
     "lib/src/ensemble.c",
-    "lib/src/probmsa_submat.c",
-    "lib/src/probmsa_emission.c",
-    "lib/src/probmsa_pairhmm.c",
-    "lib/src/probmsa_profile.c",
-    "lib/src/probmsa_dirichlet.c",
-    "lib/src/probmsa_driver.c",
 };
 
 const kalign_sources = [_][]const u8{

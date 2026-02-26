@@ -29,10 +29,37 @@ sequences = [
     "ATCGATCATCG"
 ]
 
-aligned = kalign.align(sequences, seq_type="dna")
-for seq in aligned:
-    print(seq)
+# Default mode — consistency anchors + VSM (best general-purpose)
+aligned = kalign.align(sequences)
+
+# Fast mode — no consistency, fastest
+aligned = kalign.align(sequences, mode="fast")
+
+# Precise mode — ensemble + realign, highest precision
+aligned = kalign.align(sequences, mode="precise")
 ```
+
+## Modes
+
+Kalign v3.5 provides three named modes that package the best configurations:
+
+| Mode | Python | CLI | Description |
+|------|--------|-----|-------------|
+| **default** | `mode="default"` or omit | `kalign` | Consistency anchors + VSM. Best general-purpose. |
+| **fast** | `mode="fast"` | `kalign --fast` | VSM only. Fastest, similar to kalign v3.4. |
+| **precise** | `mode="precise"` | `kalign --precise` | Ensemble(3) + VSM + realign. Highest precision. |
+
+Explicit parameters always override mode defaults:
+
+```python
+# Fast base + 5 ensemble runs
+aligned = kalign.align(sequences, mode="fast", ensemble=5)
+
+# Precise base + custom gap penalty
+aligned = kalign.align(sequences, mode="precise", gap_open=8.0)
+```
+
+Mode constants are also available: `kalign.MODE_DEFAULT`, `kalign.MODE_FAST`, `kalign.MODE_PRECISE`.
 
 ## Core API
 
@@ -41,16 +68,17 @@ for seq in aligned:
 ```python
 aligned = kalign.align(
     sequences,              # list of str
+    mode=None,              # "default", "fast", "precise", or None (= default)
     seq_type="auto",        # "auto", "dna", "rna", "protein", "divergent", "internal"
     gap_open=None,          # positive float, or None for defaults
     gap_extend=None,        # positive float, or None for defaults
     terminal_gap_extend=None,
     n_threads=None,         # int, or None for global default
-    fmt="plain",            # "plain", "biopython", "skbio"
-    ids=None,               # list of str (for biopython/skbio output)
-    refine="confident",     # refinement mode: "none", "all", "confident"
+    refine="none",          # refinement mode: "none", "all", "confident", "inline"
     ensemble=0,             # number of ensemble runs (0 = off, try 3-5)
     min_support=0,          # explicit consensus threshold (0 = auto)
+    fmt="plain",            # "plain", "biopython", "skbio"
+    ids=None,               # list of str (for biopython/skbio output)
 )
 ```
 
@@ -75,12 +103,12 @@ Additional parameters for advanced use:
 ```python
 result = kalign.align_from_file(
     "input.fasta",
-    ensemble=5,                # ensemble runs for better accuracy
-    min_support=0,             # consensus threshold (0 = auto)
+    mode="precise",              # or "default", "fast"
+    ensemble=5,                  # override: 5 runs instead of mode default (3)
+    min_support=0,               # consensus threshold (0 = auto)
     save_poar="consensus.poar",  # save POAR table for re-thresholding
     # load_poar="consensus.poar",  # OR load pre-computed POAR
-    refine="confident",        # refinement mode
-    realign=0,                 # realignment iterations
+    refine="none",               # refinement mode
 )
 ```
 
@@ -114,12 +142,15 @@ Supported formats: `fasta`, `clustal`, `stockholm`, `phylip` (non-FASTA formats 
 
 ## Ensemble Alignment & Confidence Scores
 
-Ensemble mode runs multiple alignments with varied parameters and combines results via POAR (Pairs of Aligned Residues) consensus. This typically improves accuracy by ~5% on BAliBASE benchmarks at ~10x time cost.
+Ensemble mode runs multiple alignments with varied parameters and combines results via POAR (Pairs of Aligned Residues) consensus. The simplest way to use it is `mode="precise"` (ensemble=3 + realign). For more control, set `ensemble` directly.
 
 ```python
 import kalign
 
-# Ensemble alignment with confidence
+# Precise mode: ensemble(3) + realign — highest precision
+result = kalign.align_from_file("proteins.fasta", mode="precise")
+
+# Or: explicit 5 ensemble runs
 result = kalign.align_from_file("proteins.fasta", ensemble=5)
 
 # Per-column confidence: average agreement across ensemble runs [0..1]
@@ -240,7 +271,9 @@ aln = kalign.align(sequences, seq_type="dna", fmt="skbio")
 print(type(aln))  # <class 'skbio.alignment._tabular_msa.TabularMSA'>
 ```
 
-## Sequence Types
+## Constants
+
+### Sequence Types
 
 | String | Constant | Description |
 |--------|----------|-------------|
@@ -251,15 +284,29 @@ print(type(aln))  # <class 'skbio.alignment._tabular_msa.TabularMSA'>
 | `"divergent"` | `kalign.PROTEIN_DIVERGENT` | Divergent protein sequences |
 | `"internal"` | `kalign.DNA_INTERNAL` | DNA with internal gap preference |
 
+### Refinement Modes
+
+| String | Constant | Description |
+|--------|----------|-------------|
+| `"none"` | `kalign.REFINE_NONE` | No refinement (default) |
+| `"all"` | `kalign.REFINE_ALL` | Refine all columns |
+| `"confident"` | `kalign.REFINE_CONFIDENT` | Refine only confident columns |
+| `"inline"` | `kalign.REFINE_INLINE` | Inline refinement (disables parallelism) |
+
 ## Command-line Interface
 
 ```bash
-kalign-py -i sequences.fasta -o aligned.fasta --format fasta --type protein
-kalign-py -i sequences.fasta -o - --format clustal   # stdout
-cat input.fa | kalign-py -i - -o aligned.fasta        # stdin
+# Modes
+kalign-py -i sequences.fasta -o aligned.fasta                    # default mode
+kalign-py --fast -i sequences.fasta -o aligned.fasta             # fast mode
+kalign-py --precise -i sequences.fasta -o aligned.fasta          # precise mode
 
-# Ensemble alignment
-kalign-py -i input.fa -o output.fa --ensemble 5
+# I/O options
+kalign-py -i sequences.fasta -o - --format clustal               # stdout
+cat input.fa | kalign-py -i - -o aligned.fasta                   # stdin
+kalign-py -i sequences.fasta -o aligned.fasta --type protein     # explicit type
+
+# Ensemble with POAR save/load
 kalign-py -i input.fa -o output.fa --ensemble 5 --save-poar consensus.poar
 kalign-py -i input.fa -o output.fa --load-poar consensus.poar --min-support 3
 
@@ -287,4 +334,4 @@ If you use Kalign in your research, please cite:
 
 ## License
 
-GNU General Public License v3.0 or later. See [COPYING](COPYING).
+Apache License, Version 2.0. See [COPYING](COPYING).

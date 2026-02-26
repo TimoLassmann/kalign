@@ -93,10 +93,17 @@ int dssim_get_fasta(struct msa **msa, int n_seq, int n_obs, int dna,int len, int
         m->numseq = n_seq;
         m->num_profiles = 0;
         m->L = ALPHA_UNDEFINED;
+        m->biotype = ALN_BIOTYPE_UNDEF;
         m->aligned = 0;
+        m->alnlen = 0;
         m->plen = NULL;
         m->sip = NULL;
         m->nsip = NULL;
+        m->seq_distances = NULL;
+        m->col_confidence = NULL;
+        m->seq_weights = NULL;
+        m->run_parallel = 0;
+        m->consistency_table = NULL;
         m->quiet = 1;
         MMALLOC(m->sequences, sizeof(struct msa_seq*) * m->alloc_numseq);
 
@@ -117,6 +124,7 @@ int dssim_get_fasta(struct msa **msa, int n_seq, int n_obs, int dna,int len, int
                 seq->seq = NULL;
                 seq->s = NULL;
                 seq->gaps = NULL;
+                seq->confidence = NULL;
                 seq->len = r_len;
                 seq->alloc_len = r_len+1;
                 seq->rank = i;

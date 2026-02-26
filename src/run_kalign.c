@@ -1,25 +1,3 @@
-/*
-    Kalign - a multiple sequence alignment program
-
-    Copyright 2006, 2019, 2020, 2021 Timo Lassmann
-
-    This file is part of kalign.
-
-    Kalign is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-*/
-
 #include "tldevel.h"
 #include "tlmisc.h"
 #include "kalign/kalign.h"
@@ -51,6 +29,11 @@
 #define OPT_SAVE_POAR 19
 #define OPT_LOAD_POAR 20
 #define OPT_CONSISTENCY 21
+#define OPT_FAST 22
+#define OPT_PRECISE 23
+#define OPT_REALIGN 24
+#define OPT_VSM_AMAX 25
+#define OPT_CONSISTENCY_WEIGHT 26
 
 static int set_aln_type(char* in, int* type );
 static int set_refine_mode(char* in, int* refine);
@@ -70,21 +53,23 @@ int print_kalign_help(char * argv[])
         RUN(tlfilename(argv[0], &basename));
 
         fprintf(stdout,"\nUsage: %s %s\n\n",basename ,usage);
-        fprintf(stdout,"Options:\n\n");
+
+        fprintf(stdout,"Modes:\n\n");
+        fprintf(stdout,"%*s%-*s: %s\n",3,"",MESSAGE_MARGIN-3,"(default)","Consistency anchors + VSM (best general-purpose)");
+        fprintf(stdout,"%*s%-*s: %s\n",3,"",MESSAGE_MARGIN-3,"--fast","VSM only, no consistency (fastest)");
+        fprintf(stdout,"%*s%-*s: %s\n",3,"",MESSAGE_MARGIN-3,"--precise","Ensemble(3) + VSM + realign (highest precision)");
+
+        fprintf(stdout,"\nOptions:\n\n");
 
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--format","Output format." ,"[Fasta]"  );
-
-        /* fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--reformat","Reformat existing alignment." ,"[NA]"  ); */
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--type","Alignment type (rna, dna, internal)." ,"[rna]"  );
         fprintf(stdout,"%*s%-*s  %s %s\n",3,"",MESSAGE_MARGIN-3,"","Options: protein, divergent (protein)" ,""  );
         fprintf(stdout,"%*s%-*s  %s %s\n",3,"",MESSAGE_MARGIN-3,"","         rna, dna, internal (nuc)." ,""  );
-
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpo","Gap open penalty." ,"[]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpe","Gap extension penalty." ,"[]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--tgpe","Terminal gap extension penalty." ,"[]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--refine","Refinement mode." ,"[none]");
         fprintf(stdout,"%*s%-*s  %s %s\n",3,"",MESSAGE_MARGIN-3,"","Options: none, all, confident" ,""  );
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--adaptive-budget","Scale trial count by uncertainty." ,"[off]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"-n/--nthreads","Number of threads." ,"[auto: N-1, max 16]");
 
         fprintf(stdout,"\nEnsemble options:\n\n");
@@ -93,13 +78,19 @@ int print_kalign_help(char * argv[])
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--min-support","Explicit consensus threshold." ,"[auto]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--save-poar","Save POAR table to file." ,"[off]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--load-poar","Load POAR table for re-threshold." ,"[off]");
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--consistency","Anchor consistency (K anchors)." ,"[off]");
+
+        fprintf(stdout,"\nAdvanced (usually managed by modes):\n\n");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--consistency","Anchor consistency (K anchors)." ,"[5]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--consistency-weight","Consistency anchor weight." ,"[2.0]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--realign","Alignment-guided tree rebuild iters." ,"[0]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--vsm-amax","VSM amplitude (0 to disable)." ,"[auto]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--adaptive-budget","Scale refinement trials by uncertainty." ,"[off]");
 
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--version (-V/-v)","Prints version." ,"[NA]"  );
 
         fprintf(stdout,"\nExamples:\n\n");
 
-        fprintf(stdout,"Passing sequences via stdin:\n\n   cat input.fa | kalign -f fasta > out.afa\n\n");
+        fprintf(stdout,"Passing sequences via stdin:\n\n   cat input.fa | kalign -i - -f fasta > out.afa\n\n");
         fprintf(stdout,"Combining multiple input files:\n\n   kalign seqsA.fa seqsB.fa seqsC.fa -f fasta > combined.afa\n\n");
 
         if(basename){
@@ -115,19 +106,16 @@ ERROR:
 
 int print_kalign_warranty(void)
 {
-        fprintf(stdout,"Here is the Disclaimer of Warranty section of the GNU General Public License (GPL):\n");
+        fprintf(stdout,"Disclaimer of Warranty (Apache License, Version 2.0, Section 7):\n");
         fprintf(stdout,"\n");
-        fprintf(stdout,"15. Disclaimer of Warranty.\n");
-        fprintf(stdout,"THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY\n");
-        fprintf(stdout,"APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT\n");
-        fprintf(stdout,"HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM \"AS IS\" WITHOUT WARRANTY\n");
-        fprintf(stdout,"OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO,\n");
-        fprintf(stdout,"THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR\n");
-        fprintf(stdout,"PURPOSE.  THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM\n");
-        fprintf(stdout,"IS WITH YOU.  SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF\n");
-        fprintf(stdout,"ALL NECESSARY SERVICING, REPAIR OR CORRECTION.\n");
+        fprintf(stdout,"Unless required by applicable law or agreed to in writing, Licensor\n");
+        fprintf(stdout,"provides the Work (and each Contributor provides its Contributions)\n");
+        fprintf(stdout,"on an \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,\n");
+        fprintf(stdout,"either express or implied, including, without limitation, any\n");
+        fprintf(stdout,"warranties or conditions of TITLE, NON-INFRINGEMENT,\n");
+        fprintf(stdout,"MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE.\n");
         fprintf(stdout,"\n");
-        fprintf(stdout,"A complete copy of the GPL can be found in the \"COPYING\" file.\n");
+        fprintf(stdout,"See the COPYING file for the full Apache License, Version 2.0.\n");
         return OK;
 }
 
@@ -136,12 +124,10 @@ int print_kalign_header(void)
         fprintf(stderr,"\n");
         fprintf(stderr,"Kalign (%s)\n", KALIGN_PACKAGE_VERSION);
         fprintf(stderr,"\n");
-        fprintf(stderr,"Copyright (C) 2006,2019,2020,2021,2023 Timo Lassmann\n");
+        fprintf(stderr,"Copyright (C) 2006-2026 Timo Lassmann\n");
         fprintf(stderr,"\n");
-        fprintf(stderr,"This program comes with ABSOLUTELY NO WARRANTY; for details type:\n");
-        fprintf(stderr,"`kalign -showw'.\n");
-        fprintf(stderr,"This is free software, and you are welcome to redistribute it\n");
-        fprintf(stderr,"under certain conditions; consult the COPYING file for details.\n");
+        fprintf(stderr,"Licensed under the Apache License, Version 2.0.\n");
+        fprintf(stderr,"See the COPYING file or http://www.apache.org/licenses/LICENSE-2.0\n");
         fprintf(stderr,"\n");
         fprintf(stderr,"Please cite:\n");
 
@@ -183,6 +169,11 @@ int main(int argc, char *argv[])
                         {"save-poar",  required_argument, 0, OPT_SAVE_POAR},
                         {"load-poar",  required_argument, 0, OPT_LOAD_POAR},
                         {"consistency",  required_argument, 0, OPT_CONSISTENCY},
+                        {"consistency-weight",  required_argument, 0, OPT_CONSISTENCY_WEIGHT},
+                        {"fast",  no_argument, 0, OPT_FAST},
+                        {"precise",  no_argument, 0, OPT_PRECISE},
+                        {"realign",  required_argument, 0, OPT_REALIGN},
+                        {"vsm-amax",  required_argument, 0, OPT_VSM_AMAX},
                         {"nthreads",  required_argument, 0, 'n'},
                         {"input",  required_argument, 0, 'i'},
                         {"infile",  required_argument, 0, 'i'},
@@ -263,6 +254,21 @@ int main(int argc, char *argv[])
                 case OPT_CONSISTENCY:
                         param->consistency_anchors = atoi(optarg);
                         break;
+                case OPT_CONSISTENCY_WEIGHT:
+                        param->consistency_weight = atof(optarg);
+                        break;
+                case OPT_FAST:
+                        param->mode = 1;
+                        break;
+                case OPT_PRECISE:
+                        param->mode = 2;
+                        break;
+                case OPT_REALIGN:
+                        param->realign = atoi(optarg);
+                        break;
+                case OPT_VSM_AMAX:
+                        param->vsm_amax = atof(optarg);
+                        break;
                 case 'h':
                         param->help_flag = 1;
                         break;
@@ -318,14 +324,8 @@ int main(int argc, char *argv[])
 
         param->num_infiles = 0;
 
-        /* Not sure if this is the best way to detect stdin input */
-        /* I fixed this by attempting to read and checking for valid
-           sequences */
-
-        if (!isatty(fileno(stdin))){
-                param->num_infiles++;
-        }
-
+        /* Use "-" to indicate stdin (like samtools/bcftools).
+         * NULL in the infile array signals read_file_stdin() to use stdin. */
         if(in){
                 param->num_infiles++;
         }
@@ -340,24 +340,23 @@ int main(int argc, char *argv[])
                 free_parameters(param);
                 return EXIT_SUCCESS;
         }
-        //fprintf(stdout,"%d fgiles\n",param->num_infiles);
         MMALLOC(param->infile, sizeof(char*) * param->num_infiles);
 
         c = 0;
-        if (!isatty(fileno(stdin))){
-                param->infile[c] = NULL;
-                c++;
-        }
-
         if(in){
-                param->infile[c] = in;
+                param->infile[c] = (strcmp(in, "-") == 0) ? NULL : in;
                 c++;
         }
 
         if (optind < argc){
                 while (optind < argc){
-                        param->infile[c] =  argv[optind++];
+                        if(strcmp(argv[optind], "-") == 0){
+                                param->infile[c] = NULL; /* stdin */
+                        }else{
+                                param->infile[c] = argv[optind];
+                        }
                         c++;
+                        optind++;
                 }
         }
 
@@ -365,16 +364,21 @@ int main(int argc, char *argv[])
         RUN(set_aln_type(in_type, &param->type));
         RUN(set_refine_mode(in_refine, &param->refine));
 
-        if(param->num_infiles == 0){
-                if (!isatty(fileno(stdin))){
-                        LOG_MSG("Attempting stdin");
-                        param->num_infiles =1;
-                        MMALLOC(param->infile, sizeof(char*));
-                        param->infile[0] = NULL;
-                }else{
-                        LOG_MSG("No infiles");
-                        free_parameters(param);
-                        return EXIT_SUCCESS;
+        /* Apply mode presets. Explicit params (already set above) will have
+         * overridden their init_param() defaults, so we only fill in mode
+         * values for fields that are still at their init_param() defaults. */
+        if(param->mode == 1){
+                /* fast: no consistency anchors (unless user explicitly set --consistency) */
+                if(param->consistency_anchors == 5){  /* still at default */
+                        param->consistency_anchors = 0;
+                }
+        }else if(param->mode == 2){
+                /* precise: ensemble + realign */
+                if(param->ensemble == 0){
+                        param->ensemble = 3;
+                }
+                if(param->realign == 0){
+                        param->realign = 1;
                 }
         }
 
@@ -431,8 +435,21 @@ int run_kalign(struct parameters* param)
                                     param->ensemble_seed,
                                     param->min_support,
                                     param->save_poar,
-                                    KALIGN_REFINE_NONE, 0.0f, -1.0f, 0, -1.0f,
+                                    param->refine, 0.0f, param->vsm_amax,
+                                    param->realign, -1.0f,
                                     param->consistency_anchors, param->consistency_weight));
+        }else if(param->realign > 0){
+                RUN(kalign_run_realign(msa,
+                                       param->nthreads,
+                                       param->type,
+                                       param->gpo,
+                                       param->gpe,
+                                       param->tgpe,
+                                       param->refine,
+                                       param->adaptive_budget,
+                                       0.0f, param->vsm_amax,
+                                       param->realign, -1.0f,
+                                       param->consistency_anchors, param->consistency_weight));
         }else{
                 RUN(kalign_run_seeded(msa,
                                       param->nthreads,
@@ -442,7 +459,7 @@ int run_kalign(struct parameters* param)
                                       param->tgpe,
                                       param->refine,
                                       param->adaptive_budget,
-                                      0, 0.0f, 0.0f, -1.0f, -1.0f,
+                                      0, 0.0f, 0.0f, param->vsm_amax, -1.0f,
                                       param->consistency_anchors, param->consistency_weight));
         }
 

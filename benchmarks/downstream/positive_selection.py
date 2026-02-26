@@ -692,6 +692,7 @@ def _aggregate_summary(
 # Default methods for positive-selection pipeline (subset of all methods)
 _DEFAULT_METHODS = [
     "kalign",
+    "kalign_cons",
     "kalign_ens3",
     "mafft",
     "muscle",
@@ -701,6 +702,7 @@ _DEFAULT_METHODS = [
 
 _FULL_METHODS = [
     "kalign",
+    "kalign_cons",
     "kalign_ens3",
     "mafft",
     "muscle",

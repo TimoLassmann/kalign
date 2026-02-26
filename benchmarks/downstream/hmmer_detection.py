@@ -1021,7 +1021,7 @@ def run_pipeline(params: dict) -> HmmerResult:
 
     data_dir = Path(params.get("data_dir", "benchmarks/data/downloads"))
     results_dir = Path(params.get("results_dir", "benchmarks/results"))
-    methods = params.get("methods", ["kalign", "kalign_ens3", "kalign_ens3_m70"])
+    methods = params.get("methods", ["kalign", "kalign_cons", "kalign_ens3", "mafft", "muscle", "clustalo"])
     n_families = params.get("n_families", 50)
     n_jobs = params.get("n_jobs", 1)
     quick = params.get("quick", False)

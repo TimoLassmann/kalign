@@ -1,26 +1,3 @@
-/*
-
-    Kalign - a multiple sequence alignment program
-
-    Copyright 2006, 2019 Timo Lassmann
-
-    This file is part of kalign.
-
-    Kalign is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-*/
-
 #include "tldevel.h"
 #include <stdint.h>
 #ifdef HAVE_AVX2
@@ -196,6 +173,7 @@ float protein_wu_distance_calculation(struct bignode* hash[],const uint8_t* seq,
         register unsigned int hv;
 
         d = malloc(sizeof(unsigned int)*diagonals);
+        if(d == NULL) return 0.0f;
         //for (i = diagonals;i--;){
         for (i = 0;i < diagonals;i++){
                 d[i] = 0;
@@ -274,7 +252,8 @@ float dna_distance_calculation(struct bignode* hash[],const uint8_t * p,const in
         int i,j;
         unsigned int hv;
 
-        d = malloc(sizeof(int)*diagonals);
+        d = malloc(sizeof(unsigned int)*diagonals);
+        if(d == NULL) return 0.0f;
         for (i = 0;i < diagonals;i++){
                 d[i] = 0;
         }

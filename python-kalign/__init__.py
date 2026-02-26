@@ -75,6 +75,18 @@ REFINE_ALL = _core.REFINE_ALL
 REFINE_CONFIDENT = _core.REFINE_CONFIDENT
 REFINE_INLINE = _core.REFINE_INLINE
 
+# Mode constants
+MODE_DEFAULT = "default"
+MODE_FAST = "fast"
+MODE_PRECISE = "precise"
+
+# Mode preset definitions
+_MODE_PRESETS = {
+    "default": {"vsm_amax": -1.0, "consistency": 5, "consistency_weight": 2.0},
+    "fast": {"vsm_amax": -1.0, "consistency": 0, "consistency_weight": 2.0},
+    "precise": {"vsm_amax": -1.0, "ensemble": 3, "realign": 1, "consistency": 0, "consistency_weight": 2.0},
+}
+
 # Global thread control
 _thread_local = threading.local()
 _default_threads = 1
@@ -111,22 +123,13 @@ def align(
     refine: Union[str, int] = "none",
     ensemble: int = 0,
     min_support: int = 0,
-    probmsa: bool = False,
-    probmsa_5state: bool = False,
-    pm_delta: float = -1.0,
-    pm_epsilon: float = -1.0,
-    pm_tau: float = -1.0,
-    pm_threshold: float = -1.0,
-    pm_gpo: float = -1.0,
-    pm_gpe: float = -1.0,
-    pm_prior_scale: float = -1.0,
-    pm_delta_s: float = -1.0,
-    pm_epsilon_s: float = -1.0,
-    pm_delta_l: float = -1.0,
-    pm_epsilon_l: float = -1.0,
     seq_weights: float = 0.0,
-    consistency: int = 0,
+    consistency: int = 5,
     consistency_weight: float = 2.0,
+    vsm_amax: float = -1.0,
+    realign: int = 0,
+    ensemble_seed: int = 42,
+    mode: Optional[str] = None,
     fmt: Literal["plain", "biopython", "skbio"] = "plain",
     ids: Optional[List[str]] = None,
 ) -> Union[List[str], Any]:
@@ -156,10 +159,21 @@ def align(
     n_threads : int, optional
         Number of threads to use for alignment. If None, uses global default.
     refine : str or int, optional
-        Refinement mode: "none", "all", or "confident" (default: "confident").
+        Refinement mode: "none", "all", "confident", or "inline" (default: "none").
     ensemble : int, optional
-        Number of ensemble runs (default: 0 = off). Set to e.g. 5 for higher
-        accuracy at the cost of ~13x runtime.
+        Number of ensemble runs (default: 0 = off). Set to e.g. 3 for higher
+        accuracy at the cost of ~10x runtime.
+    vsm_amax : float, optional
+        Variable scoring matrix amplitude (default: -1.0 = use kalign defaults:
+        2.0 for protein, 0.0 for DNA/RNA). Set to 0.0 to disable.
+    realign : int, optional
+        Number of alignment-guided tree rebuild iterations (default: 0 = off).
+    ensemble_seed : int, optional
+        RNG seed for ensemble runs (default: 42).
+    mode : str, optional
+        Preset mode: "default" (consistency+VSM), "fast" (VSM only),
+        "precise" (ensemble+VSM+realign). Explicit parameters override
+        mode defaults. None is treated as "default".
     fmt : {'plain', 'biopython', 'skbio'}, default 'plain'
         Choose return-object flavour:
         - 'plain': list of aligned sequences (fastest)
@@ -333,6 +347,28 @@ def align(
             stacklevel=2,
         )
 
+    # Resolve mode presets — collect explicitly-set params
+    _explicit = {}
+    # We detect "explicit" by checking if the value differs from the function signature default.
+    # For mode-relevant params, the signature defaults match the "default" mode preset.
+    if ensemble != 0:
+        _explicit["ensemble"] = ensemble
+    if realign != 0:
+        _explicit["realign"] = realign
+    if consistency != 5:
+        _explicit["consistency"] = consistency
+    if consistency_weight != 2.0:
+        _explicit["consistency_weight"] = consistency_weight
+    if vsm_amax != -1.0:
+        _explicit["vsm_amax"] = vsm_amax
+
+    resolved = _resolve_mode(mode, _explicit)
+    ensemble = resolved.get("ensemble", ensemble)
+    realign = resolved.get("realign", realign)
+    consistency = resolved.get("consistency", consistency)
+    consistency_weight = resolved.get("consistency_weight", consistency_weight)
+    vsm_amax = resolved.get("vsm_amax", vsm_amax)
+
     # Convert refine mode
     refine_int = _parse_refine_mode(refine)
 
@@ -353,22 +389,12 @@ def align(
             refine_int,
             ensemble,
             min_support,
-            int(probmsa or probmsa_5state),
-            pm_delta,
-            pm_epsilon,
-            pm_tau,
-            pm_threshold,
-            pm_gpo,
-            pm_gpe,
-            pm_prior_scale,
-            int(probmsa_5state),
-            pm_delta_s,
-            pm_epsilon_s,
-            pm_delta_l,
-            pm_epsilon_l,
             float(seq_weights),
             consistency,
             consistency_weight,
+            vsm_amax,
+            realign,
+            ensemble_seed,
         )
         # When ensemble is used, result is (sequences, confidence_dict)
         if isinstance(result, tuple):
@@ -479,6 +505,33 @@ def _infer_skbio_type(sequences, skbio_seq):
     return skbio_seq.Protein
 
 
+def _resolve_mode(mode, explicit_kwargs):
+    """Resolve mode presets, letting explicit parameters override.
+
+    Parameters
+    ----------
+    mode : str or None
+        One of "default", "fast", "precise", or None (treated as "default").
+    explicit_kwargs : dict
+        Only keys that the caller *explicitly* passed (not sentinel/default).
+
+    Returns
+    -------
+    dict
+        Merged parameter values: mode defaults + explicit overrides.
+    """
+    if mode is None:
+        mode = "default"
+    mode_lower = mode.lower()
+    if mode_lower not in _MODE_PRESETS:
+        raise ValueError(
+            f"Invalid mode: {mode!r}. Must be one of: 'default', 'fast', 'precise'"
+        )
+    result = dict(_MODE_PRESETS[mode_lower])
+    result.update(explicit_kwargs)
+    return result
+
+
 def set_num_threads(n: int) -> None:
     """
     Set the default number of threads for alignment operations.
@@ -550,23 +603,10 @@ def align_from_file(
     realign: int = 0,
     save_poar: str = "",
     load_poar: str = "",
-    probmsa: bool = False,
-    probmsa_5state: bool = False,
-    pm_delta: float = -1.0,
-    pm_epsilon: float = -1.0,
-    pm_tau: float = -1.0,
-    pm_threshold: float = -1.0,
-    pm_gpo: float = -1.0,
-    pm_gpe: float = -1.0,
-    pm_prior_scale: float = -1.0,
-    pm_delta_s: float = -1.0,
-    pm_epsilon_s: float = -1.0,
-    pm_delta_l: float = -1.0,
-    pm_epsilon_l: float = -1.0,
-    probmsa_guided: bool = False,
     seq_weights: float = 0.0,
-    consistency: int = 0,
+    consistency: int = 5,
     consistency_weight: float = 2.0,
+    mode: Optional[str] = None,
 ) -> AlignedSequences:
     """
     Align sequences from a file using Kalign.
@@ -645,6 +685,26 @@ def align_from_file(
     if n_threads < 1:
         raise ValueError("n_threads must be at least 1")
 
+    # Resolve mode presets
+    _explicit = {}
+    if ensemble != 0:
+        _explicit["ensemble"] = ensemble
+    if realign != 0:
+        _explicit["realign"] = realign
+    if consistency != 5:
+        _explicit["consistency"] = consistency
+    if consistency_weight != 2.0:
+        _explicit["consistency_weight"] = consistency_weight
+    if vsm_amax != -1.0:
+        _explicit["vsm_amax"] = vsm_amax
+
+    resolved = _resolve_mode(mode, _explicit)
+    ensemble = resolved.get("ensemble", ensemble)
+    realign = resolved.get("realign", realign)
+    consistency = resolved.get("consistency", consistency)
+    consistency_weight = resolved.get("consistency_weight", consistency_weight)
+    vsm_amax = resolved.get("vsm_amax", vsm_amax)
+
     # Convert refine mode
     refine_int = _parse_refine_mode(refine)
 
@@ -667,20 +727,6 @@ def align_from_file(
             realign,
             save_poar,
             load_poar,
-            int(probmsa or probmsa_5state),
-            pm_delta,
-            pm_epsilon,
-            pm_tau,
-            pm_threshold,
-            pm_gpo,
-            pm_gpe,
-            pm_prior_scale,
-            int(probmsa_guided),
-            int(probmsa_5state),
-            pm_delta_s,
-            pm_epsilon_s,
-            pm_delta_l,
-            pm_epsilon_l,
             float(seq_weights),
             consistency,
             consistency_weight,
@@ -949,23 +995,10 @@ def align_file_to_file(
     realign: int = 0,
     save_poar: str = "",
     load_poar: str = "",
-    probmsa: bool = False,
-    probmsa_5state: bool = False,
-    pm_delta: float = -1.0,
-    pm_epsilon: float = -1.0,
-    pm_tau: float = -1.0,
-    pm_threshold: float = -1.0,
-    pm_gpo: float = -1.0,
-    pm_gpe: float = -1.0,
-    pm_prior_scale: float = -1.0,
-    pm_delta_s: float = -1.0,
-    pm_epsilon_s: float = -1.0,
-    pm_delta_l: float = -1.0,
-    pm_epsilon_l: float = -1.0,
-    probmsa_guided: bool = False,
     seq_weights: float = 0.0,
-    consistency: int = 0,
+    consistency: int = 5,
     consistency_weight: float = 2.0,
+    mode: Optional[str] = None,
 ) -> None:
     """
     Align sequences from input file and write result to output file.
@@ -1037,6 +1070,26 @@ def align_file_to_file(
     if n_threads is None:
         n_threads = get_num_threads()
 
+    # Resolve mode presets
+    _explicit = {}
+    if ensemble != 0:
+        _explicit["ensemble"] = ensemble
+    if realign != 0:
+        _explicit["realign"] = realign
+    if consistency != 5:
+        _explicit["consistency"] = consistency
+    if consistency_weight != 2.0:
+        _explicit["consistency_weight"] = consistency_weight
+    if vsm_amax != -1.0:
+        _explicit["vsm_amax"] = vsm_amax
+
+    resolved = _resolve_mode(mode, _explicit)
+    ensemble = resolved.get("ensemble", ensemble)
+    realign = resolved.get("realign", realign)
+    consistency = resolved.get("consistency", consistency)
+    consistency_weight = resolved.get("consistency_weight", consistency_weight)
+    vsm_amax = resolved.get("vsm_amax", vsm_amax)
+
     refine_int = _parse_refine_mode(refine)
 
     _core.align_file_to_file(
@@ -1058,20 +1111,6 @@ def align_file_to_file(
         realign,
         save_poar,
         load_poar,
-        int(probmsa or probmsa_5state),
-        pm_delta,
-        pm_epsilon,
-        pm_tau,
-        pm_threshold,
-        pm_gpo,
-        pm_gpe,
-        pm_prior_scale,
-        int(probmsa_guided),
-        int(probmsa_5state),
-        pm_delta_s,
-        pm_epsilon_s,
-        pm_delta_l,
-        pm_epsilon_l,
         float(seq_weights),
         consistency,
         consistency_weight,
@@ -1106,6 +1145,10 @@ __all__ = [
     "REFINE_NONE",
     "REFINE_ALL",
     "REFINE_CONFIDENT",
+    "REFINE_INLINE",
+    "MODE_DEFAULT",
+    "MODE_FAST",
+    "MODE_PRECISE",
     "__version__",
     "__author__",
     "__email__",

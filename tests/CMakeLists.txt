@@ -83,7 +83,7 @@ add_test(
 #BB30014.msf     
 add_test(
   NAME kalign_itest_BB30014.msf
-  COMMAND kalign-bin ${CMAKE_CURRENT_SOURCE_DIR}/data/BB12006.tfa
+  COMMAND kalign-bin ${CMAKE_CURRENT_SOURCE_DIR}/data/BB30014.msf
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   )
 
@@ -104,6 +104,23 @@ target_link_libraries(kalign_ensemble_test tldevel ${PROJECT_NAME}_static)
 add_test(
   NAME kalign_ensemble_test
   COMMAND kalign_ensemble_test ${CMAKE_CURRENT_SOURCE_DIR}/data/BB11001.tfa
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+
+add_executable(kalign_api_test
+  kalign_api_test.c
+  )
+target_link_libraries(kalign_api_test tldevel ${PROJECT_NAME}_static)
+
+add_test(
+  NAME kalign_api_test
+  COMMAND kalign_api_test ${CMAKE_CURRENT_SOURCE_DIR}/data/BB11001.tfa
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+
+add_test(
+  NAME kalign_api_test_large
+  COMMAND kalign_api_test ${CMAKE_CURRENT_SOURCE_DIR}/data/BB30014.tfa
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   )
 

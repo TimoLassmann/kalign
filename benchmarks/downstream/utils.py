@@ -395,23 +395,13 @@ def holm_bonferroni(p_values: list[float]) -> list[float]:
 # ---------------------------------------------------------------------------
 
 METHOD_COLORS = {
-    "kalign": "#1f77b4",
-    "kalign_basic": "#aec7e8",
-    "kalign_vsm": "#ff7f0e",
-    "kalign_probmsa": "#9467bd",
-    "kalign_ens3": "#2ca02c",
-    "kalign_ens3_m50": "#98df8a",
-    "kalign_ens3_m70": "#006400",
-    "kalign_ens3_m90": "#004d00",
-    "kalign_ens3_wt": "#ff7f0e",
-    "guidance2_mafft": "#d62728",
-    "guidance2_m93": "#ff9896",
-    "guidance2_wt": "#e377c2",
-    "mafft": "#9467bd",
-    "muscle": "#8c564b",
-    "clustalo": "#7f7f7f",
-    "true": "#000000",
-    "pfam_original": "#bcbd22",
+    "kalign": "#1f77b4",       # blue
+    "kalign_cons": "#2ca02c",  # green
+    "kalign_ens3": "#ff7f0e",  # orange
+    "mafft": "#d62728",        # red
+    "muscle": "#9467bd",       # purple
+    "clustalo": "#7f7f7f",     # grey
+    "true": "#000000",         # black (reference)
 }
 
 
@@ -464,8 +454,6 @@ def run_kalign(
     tgpo: float | None = None,
     terminal_dist_scale: float | None = None,
     refine: str | None = None,
-    probmsa: bool = False,
-    probmsa_guided: bool = False,
     vsm_amax: float | None = None,
     realign: int | None = None,
     consistency: int | None = None,
@@ -496,10 +484,6 @@ def run_kalign(
         extra["terminal_dist_scale"] = terminal_dist_scale
     if refine is not None:
         extra["refine"] = refine
-    if probmsa:
-        extra["probmsa"] = True
-    if probmsa_guided:
-        extra["probmsa_guided"] = True
     if vsm_amax is not None:
         extra["vsm_amax"] = vsm_amax
     if realign is not None:
@@ -803,9 +787,13 @@ def _parse_guidance2_res_scores(
 # ---------------------------------------------------------------------------
 
 METHODS: dict[str, dict] = {
-    # --- kalign single-run variants ---
-    # Default: VSM + anchor consistency (recommended single-run)
     "kalign": {
+        "fn": run_kalign,
+        "ensemble": 0,
+        "mask": None,
+        "vsm_amax": 2.0,
+    },
+    "kalign_cons": {
         "fn": run_kalign,
         "ensemble": 0,
         "mask": None,
@@ -813,14 +801,6 @@ METHODS: dict[str, dict] = {
         "consistency": 5,
         "consistency_weight": 2.0,
     },
-    # Bare defaults — no VSM, no consistency (kalign 3.4 baseline)
-    "kalign_basic": {"fn": run_kalign, "ensemble": 0, "mask": None, "refine": "none"},
-    # VSM only — no consistency
-    "kalign_vsm": {"fn": run_kalign, "ensemble": 0, "mask": None, "vsm_amax": 2.0},
-    # Experimental: pair-HMM progressive
-    "kalign_probmsa": {"fn": run_kalign, "ensemble": 0, "mask": None, "refine": "none", "probmsa": True},
-    # --- kalign ensemble variants ---
-    # Ensemble: 3 runs + POAR consensus + VSM + realign
     "kalign_ens3": {
         "fn": run_kalign,
         "ensemble": 3,
@@ -828,29 +808,9 @@ METHODS: dict[str, dict] = {
         "vsm_amax": 2.0,
         "realign": 1,
     },
-    "kalign_ens3_m50": {"fn": run_kalign, "ensemble": 3, "mask": 0.5, "vsm_amax": 2.0, "realign": 1},
-    "kalign_ens3_m70": {"fn": run_kalign, "ensemble": 3, "mask": 0.7, "vsm_amax": 2.0, "realign": 1},
-    "kalign_ens3_m90": {"fn": run_kalign, "ensemble": 3, "mask": 0.9, "vsm_amax": 2.0, "realign": 1},
-    "kalign_ens3_wt": {
-        "fn": run_kalign,
-        "ensemble": 3,
-        "mask": None,
-        "weights": True,
-        "vsm_amax": 2.0,
-        "realign": 1,
-    },
-    # --- external tools ---
-    "guidance2_mafft": {"fn": run_guidance2, "n_bootstrap": 100, "mask": None},
-    "guidance2_m93": {"fn": run_guidance2, "n_bootstrap": 100, "mask": 0.93},
-    "guidance2_wt": {
-        "fn": run_guidance2,
-        "n_bootstrap": 100,
-        "mask": None,
-        "weights": True,
-    },
-    "mafft": {"fn": run_mafft},
-    "muscle": {"fn": run_muscle},
-    "clustalo": {"fn": run_clustalo},
+    "mafft": {"fn": run_mafft, "mask": None},
+    "muscle": {"fn": run_muscle, "mask": None},
+    "clustalo": {"fn": run_clustalo, "mask": None},
     "true": {"fn": None},
 }
 
@@ -914,8 +874,6 @@ def run_method(
             tgpo=cfg.get("tgpo"),
             terminal_dist_scale=cfg.get("terminal_dist_scale"),
             refine=cfg.get("refine"),
-            probmsa=cfg.get("probmsa", False),
-            probmsa_guided=cfg.get("probmsa_guided", False),
             vsm_amax=cfg.get("vsm_amax"),
             realign=cfg.get("realign"),
             consistency=cfg.get("consistency"),
