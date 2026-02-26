@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("benchmarks", reason="benchmarks package not on sys.path (run from repo root)")
+
 
 # ======================================================================
 # Module import tests
