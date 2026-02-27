@@ -1,5 +1,11 @@
 2026-02-27  Timo Lassmann  <timolassmann@icloud.com>
 
+	* version 3.5.1 - Bugfix release
+	- Fix memory leak in build_tree_from_pairwise (realign/ensemble)
+	- Move seaborn from core to optional dependency
+	- Fix benchmark workflow to handle unavailable datasets gracefully
+	- Black formatting fixes
+
 	* version 3.5.0 - Three modes
 	Kalign now has three modes: default (best general-purpose), fast
 	(same as v3.4), and precise (ensemble, highest accuracy, ~10x slower).

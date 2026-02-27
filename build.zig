@@ -2,7 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const ArrayList = std.ArrayList;
 
-const kalignPackageVersion = "3.5.0";
+const kalignPackageVersion = "3.5.1";
 
 const targets: []const std.Target.Query = &.{
     .{ .cpu_arch = .aarch64, .os_tag = .macos },
