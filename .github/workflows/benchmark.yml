@@ -66,7 +66,18 @@ jobs:
             --output benchmarks/results/latest.json \
             -v
 
+      - name: Check if results were produced
+        id: check_results
+        run: |
+          if [ -f benchmarks/results/latest.json ]; then
+            echo "has_results=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No benchmark results produced (dataset download may have failed)"
+            echo "has_results=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Convert results for github-action-benchmark
+        if: steps.check_results.outputs.has_results == 'true'
         run: |
           python -c "
           import json
@@ -90,7 +101,7 @@ jobs:
           "
 
       - name: Store benchmark result
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && steps.check_results.outputs.has_results == 'true'
         uses: benchmark-action/github-action-benchmark@v1
         with:
           tool: 'customBiggerIsBetter'
@@ -104,7 +115,7 @@ jobs:
           fail-on-alert: false
 
       - name: Compare with baseline (PRs only)
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.check_results.outputs.has_results == 'true'
         uses: benchmark-action/github-action-benchmark@v1
         with:
           tool: 'customBiggerIsBetter'
@@ -118,6 +129,7 @@ jobs:
           fail-on-alert: true
 
       - name: Upload results artifact
+        if: steps.check_results.outputs.has_results == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results
