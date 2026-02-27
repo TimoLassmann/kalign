@@ -1,3 +1,19 @@
+2026-02-27  Timo Lassmann  <timolassmann@icloud.com>
+
+	* version 3.5.0 - Three modes
+	Kalign now has three modes: default (best general-purpose), fast
+	(same as v3.4), and precise (ensemble, highest accuracy, ~10x slower).
+	- Ensemble alignment (--precise or --ensemble N)
+	- Per-column confidence scores from ensemble mode
+	- Ensemble consensus save/load (--save-poar, --load-poar)
+	- Alignment refinement (--refine)
+	- PFASUM substitution matrices (--type pfasum, pfasum43, pfasum60)
+	- stdin via -i - convention (samtools/bcftools style)
+	- Python align() now supports all parameters (mode, ensemble, etc.)
+	- License changed from GPL-3.0-or-later to Apache-2.0
+	- Fixed crash in Python align() on Linux (uninitialized MSA fields)
+	- Fixed selenocysteine (U) handling in reduced alphabet (Debian #1127766)
+
 2026-02-10  Timo Lassmann  <timolassmann@icloud.com>
 
 	* version 3.4.9
