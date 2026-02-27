@@ -1190,6 +1190,7 @@ int build_tree_from_pairwise(struct msa* msa, struct aln_tasks** tasks, float** 
         label_internal(root, numseq);
         create_tasks(root, t);
 
+        MFREE(samples);
         MFREE(root);
         *tasks = t;
         return OK;

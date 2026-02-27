@@ -84,7 +84,13 @@ MODE_PRECISE = "precise"
 _MODE_PRESETS = {
     "default": {"vsm_amax": -1.0, "consistency": 5, "consistency_weight": 2.0},
     "fast": {"vsm_amax": -1.0, "consistency": 0, "consistency_weight": 2.0},
-    "precise": {"vsm_amax": -1.0, "ensemble": 3, "realign": 1, "consistency": 0, "consistency_weight": 2.0},
+    "precise": {
+        "vsm_amax": -1.0,
+        "ensemble": 3,
+        "realign": 1,
+        "consistency": 0,
+        "consistency_weight": 2.0,
+    },
 }
 
 # Global thread control

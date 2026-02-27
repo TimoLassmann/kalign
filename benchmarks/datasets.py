@@ -6,6 +6,7 @@ Supports BAliBASE, BRAliBASE, and BaliFam100 benchmark datasets.
 import shutil
 import subprocess
 import tarfile
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -276,7 +277,13 @@ def get_cases(name: str, max_cases: Optional[int] = None) -> List[BenchmarkCase]
     """Get benchmark cases for a dataset. Downloads if not available."""
     if name == "all":
         all_cases = []
-        for ds in DATASETS.values():
+        for ds_name, ds in DATASETS.items():
+            if not ds["is_available"]():
+                try:
+                    ds["download"]()
+                except (urllib.error.URLError, OSError) as e:
+                    print(f"WARNING: Could not download {ds_name} dataset: {e}")
+                    continue
             if ds["is_available"]():
                 all_cases.extend(ds["cases"]())
         if max_cases:
@@ -288,7 +295,12 @@ def get_cases(name: str, max_cases: Optional[int] = None) -> List[BenchmarkCase]
 
     ds = DATASETS[name]
     if not ds["is_available"]():
-        ds["download"]()
+        try:
+            ds["download"]()
+        except (urllib.error.URLError, OSError) as e:
+            print(f"WARNING: Could not download {name} dataset: {e}")
+            print("Skipping benchmark — dataset unavailable.")
+            return []
     cases = ds["cases"]()
     if max_cases:
         cases = cases[:max_cases]

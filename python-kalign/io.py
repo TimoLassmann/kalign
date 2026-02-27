@@ -285,9 +285,7 @@ def write_stockholm(
             f"Number of IDs ({len(ids)}) must match alignment length ({len(alignment)})"
         )
 
-    has_confidence = (
-        residue_confidence is not None or column_confidence is not None
-    )
+    has_confidence = residue_confidence is not None or column_confidence is not None
 
     if has_confidence:
         # Write Stockholm manually to include PP annotations
@@ -313,9 +311,7 @@ def write_stockholm(
 
             # Per-column confidence
             if column_confidence is not None:
-                pp_cons = "".join(
-                    _conf_to_pp_char(c) for c in column_confidence
-                )
+                pp_cons = "".join(_conf_to_pp_char(c) for c in column_confidence)
                 handle.write(f"#=GC {'PP_cons':<{pp_label_len}}   {pp_cons}\n")
 
             handle.write("//\n")
@@ -338,8 +334,7 @@ def write_stockholm(
             ) from e
 
         records = [
-            SeqRecord(Seq(seq), id=seq_id)
-            for seq, seq_id in zip(alignment, ids)
+            SeqRecord(Seq(seq), id=seq_id) for seq, seq_id in zip(alignment, ids)
         ]
         msa = MultipleSeqAlignment(records)
 
