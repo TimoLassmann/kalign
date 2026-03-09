@@ -13,6 +13,7 @@
 #include "consensus_msa.h"
 
 #include "kalign/kalign.h"
+#include "kalign/kalign_config.h"
 
 #define ENSEMBLE_IMPORT
 #include "ensemble.h"
@@ -496,6 +497,539 @@ ERROR:
         if(ap) aln_param_free(ap);
         return FAIL;
 }
+
+/* ======================================================================== */
+/* kalign_ensemble_custom: like kalign_ensemble but with per-run parameters.
+ *
+ * Instead of a hardcoded scale-factor table, each run gets its own
+ * gap penalties, matrix type, and tree noise via arrays.
+ *
+ * run_gpo[n_runs], run_gpe[n_runs], run_tgpe[n_runs]: per-run gap penalties
+ * run_types[n_runs]: per-run matrix type (KALIGN_TYPE_PROTEIN, _PFASUM43, etc.)
+ *                    Pass NULL to use the same 'type' for all runs.
+ * run_noise[n_runs]: per-run tree noise sigma
+ *
+ * All other parameters (vsm_amax, realign, consistency, etc.) are shared
+ * across runs — they affect *how* each alignment is computed, not *what*
+ * gap/matrix parameters it uses.
+ */
+int kalign_ensemble_custom(struct msa* msa, int n_threads, int type,
+                           int n_runs,
+                           const float* run_gpo,
+                           const float* run_gpe,
+                           const float* run_tgpe,
+                           const int* run_types,
+                           const float* run_noise,
+                           uint64_t seed, int min_support,
+                           int refine, float vsm_amax,
+                           int realign, float use_seq_weights,
+                           int consistency_anchors, float consistency_weight)
+{
+        struct msa* copy = NULL;
+        struct msa* consensus_msa = NULL;
+        struct msa** alignments = NULL;
+        struct poar_table* poar = NULL;
+        struct pos_matrix* pm = NULL;
+        double* scores = NULL;
+        int numseq;
+        int k;
+        int best_k = 0;
+        int use_consensus = 0;
+
+        ASSERT(msa != NULL, "No MSA");
+        ASSERT(n_runs >= 1, "n_runs must be >= 1");
+        ASSERT(run_gpo != NULL, "run_gpo is NULL");
+        ASSERT(run_gpe != NULL, "run_gpe is NULL");
+        ASSERT(run_tgpe != NULL, "run_tgpe is NULL");
+        ASSERT(run_noise != NULL, "run_noise is NULL");
+
+        if(use_seq_weights < 0.0f){
+                use_seq_weights = 0.0f;
+        }
+
+        RUN(kalign_essential_input_check(msa, 0));
+
+        numseq = msa->numseq;
+
+        DECLARE_TIMER(t_ensemble);
+        if(!msa->quiet){
+                LOG_MSG("Custom ensemble alignment with %d runs", n_runs);
+        }
+        START_TIMER(t_ensemble);
+
+        if(msa->biotype == ALN_BIOTYPE_UNDEF){
+                RUN(detect_alphabet(msa));
+        }
+
+        RUN(poar_table_alloc(&poar, numseq));
+        MMALLOC(alignments, sizeof(struct msa*) * n_runs);
+        for(k = 0; k < n_runs; k++){
+                alignments[k] = NULL;
+        }
+
+        for(k = 0; k < n_runs; k++){
+                int run_type = (run_types != NULL) ? run_types[k] : type;
+                uint64_t run_seed = seed + (uint64_t)k;
+
+                copy = NULL;
+                RUN(msa_cpy(&copy, msa));
+                copy->quiet = 1;
+
+                if(!msa->quiet){
+                        LOG_MSG("  Run %d/%d (gpo=%.2f gpe=%.2f tgpe=%.2f noise=%.2f type=%d)",
+                                k + 1, n_runs, run_gpo[k], run_gpe[k], run_tgpe[k],
+                                run_noise[k], run_type);
+                }
+
+                if(realign > 0){
+                        RUN(kalign_run_realign(copy, n_threads, run_type,
+                                              run_gpo[k], run_gpe[k], run_tgpe[k],
+                                              refine, 0,
+                                              0.0f, vsm_amax,
+                                              realign, use_seq_weights,
+                                              consistency_anchors, consistency_weight));
+                }else{
+                        RUN(kalign_run_seeded(copy, n_threads, run_type,
+                                              run_gpo[k], run_gpe[k], run_tgpe[k],
+                                              refine, 0,
+                                              run_seed, run_noise[k],
+                                              0.0f, vsm_amax,
+                                              use_seq_weights,
+                                              consistency_anchors, consistency_weight));
+                }
+
+                char** aln_seqs = NULL;
+                MMALLOC(aln_seqs, sizeof(char*) * numseq);
+                for(int i = 0; i < numseq; i++){
+                        aln_seqs[i] = copy->sequences[i]->seq;
+                }
+
+                RUN(pos_matrix_from_msa(&pm, aln_seqs, numseq, copy->alnlen));
+                RUN(extract_poars(poar, pm, k));
+
+                pos_matrix_free(pm);
+                pm = NULL;
+                MFREE(aln_seqs);
+
+                alignments[k] = copy;
+                copy = NULL;
+        }
+
+        RUN(score_alignments(alignments, poar, numseq, n_runs, msa->quiet,
+                             &scores, &best_k));
+
+        if(!msa->quiet){
+                LOG_MSG("  Selected run %d (score=%.1f)", best_k + 1, scores[best_k]);
+        }
+
+        if(min_support > 0){
+                RUN(build_consensus_from_poar(poar, msa, numseq, min_support,
+                                              &consensus_msa));
+                use_consensus = 1;
+                if(!msa->quiet){
+                        LOG_MSG("  Using consensus alignment (min_support=%d)", min_support);
+                }
+        }else{
+                double consensus_score = 0.0;
+                int min_sup = (n_runs + 2) / 3;
+                if(min_sup < 2) min_sup = 2;
+
+                RUN(build_consensus_from_poar(poar, msa, numseq, min_sup,
+                                              &consensus_msa));
+
+                RUN(score_single_msa(consensus_msa, poar, numseq, n_runs,
+                                     &consensus_score));
+
+                if(!msa->quiet){
+                        LOG_MSG("  Consensus score: %.1f (selection: %.1f)",
+                                consensus_score, scores[best_k]);
+                }
+
+                if(consensus_score > scores[best_k]){
+                        use_consensus = 1;
+                        if(!msa->quiet){
+                                LOG_MSG("  Using consensus alignment");
+                        }
+                }else{
+                        kalign_free_msa(consensus_msa);
+                        consensus_msa = NULL;
+                        if(!msa->quiet){
+                                LOG_MSG("  Keeping selection winner");
+                        }
+                }
+        }
+
+        /* Post-selection refinement */
+        if(!use_consensus){
+                int ref_type = (run_types != NULL) ? run_types[best_k] : type;
+                uint64_t ref_seed = seed + (uint64_t)best_k;
+
+                copy = NULL;
+                RUN(msa_cpy(&copy, msa));
+                copy->quiet = 1;
+
+                if(!msa->quiet){
+                        LOG_MSG("  Refining run %d...", best_k + 1);
+                }
+
+                RUN(kalign_run_seeded(copy, n_threads, ref_type,
+                                      run_gpo[best_k], run_gpe[best_k], run_tgpe[best_k],
+                                      KALIGN_REFINE_CONFIDENT, 0,
+                                      ref_seed, run_noise[best_k],
+                                      0.0f, vsm_amax,
+                                      use_seq_weights,
+                                      consistency_anchors, consistency_weight));
+
+                double refined_score = 0.0;
+                RUN(score_single_msa(copy, poar, numseq, n_runs,
+                                     &refined_score));
+
+                if(!msa->quiet){
+                        LOG_MSG("  Refined score: %.1f (was %.1f)",
+                                refined_score, scores[best_k]);
+                }
+
+                if(refined_score > scores[best_k]){
+                        kalign_free_msa(alignments[best_k]);
+                        alignments[best_k] = copy;
+                        copy = NULL;
+                        if(!msa->quiet){
+                                LOG_MSG("  Using refined alignment");
+                        }
+                }else{
+                        kalign_free_msa(copy);
+                        copy = NULL;
+                        if(!msa->quiet){
+                                LOG_MSG("  Keeping original alignment");
+                        }
+                }
+        }
+
+        MFREE(scores);
+        scores = NULL;
+
+        if(use_consensus){
+                RUN(copy_alignment_to_msa(msa, consensus_msa, numseq));
+                kalign_free_msa(consensus_msa);
+                consensus_msa = NULL;
+        }else{
+                RUN(copy_alignment_to_msa(msa, alignments[best_k], numseq));
+        }
+
+        RUN(compute_residue_confidence(poar, msa));
+        RUN(msa_sort_rank(msa));
+
+        STOP_TIMER(t_ensemble);
+        if(!msa->quiet){
+                GET_TIMING(t_ensemble);
+        }
+        DESTROY_TIMER(t_ensemble);
+
+        for(k = 0; k < n_runs; k++){
+                if(alignments[k]) kalign_free_msa(alignments[k]);
+        }
+        MFREE(alignments);
+        poar_table_free(poar);
+        return OK;
+ERROR:
+        if(copy) kalign_free_msa(copy);
+        if(consensus_msa) kalign_free_msa(consensus_msa);
+        if(pm) pos_matrix_free(pm);
+        if(alignments){
+                for(k = 0; k < n_runs; k++){
+                        if(alignments[k]) kalign_free_msa(alignments[k]);
+                }
+                MFREE(alignments);
+        }
+        poar_table_free(poar);
+        if(scores) MFREE(scores);
+        return FAIL;
+}
+
+/* ======================================================================== */
+/* kalign_generate_ensemble_runs: expand base config into N diversified runs.
+ *
+ * IMPORTANT: base.gpo/gpe/tgpe must be resolved (non-sentinel) values.
+ * If they are -1.0 (sentinel), the scale factors will produce garbage.
+ * The caller should resolve sentinels via aln_param_init before calling this.
+ */
+int kalign_generate_ensemble_runs(const struct kalign_run_config* base,
+                                  int n_runs, uint64_t seed,
+                                  struct kalign_run_config* out)
+{
+        int k;
+
+        ASSERT(base != NULL, "base config is NULL");
+        ASSERT(out != NULL, "output array is NULL");
+        ASSERT(n_runs >= 1, "n_runs must be >= 1");
+
+        for(k = 0; k < n_runs; k++){
+                /* Start with a copy of the base config */
+                out[k] = *base;
+
+                if(k == 0){
+                        /* Run 0: base params, deterministic tree */
+                        out[k].tree_seed = 0;
+                        out[k].tree_noise = 0.0f;
+                }else{
+                        /* Apply diversity table scale factors */
+                        struct ensemble_params ep = run_params[k % N_RUN_PARAMS];
+                        out[k].gpo = base->gpo * ep.gpo_scale;
+                        out[k].gpe = base->gpe * ep.gpe_scale;
+                        out[k].tgpe = base->tgpe * ep.tgpe_scale;
+                        out[k].tree_seed = seed + (uint64_t)k;
+                        out[k].tree_noise = ep.noise;
+                }
+        }
+
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+/* ======================================================================== */
+/* kalign_ensemble_from_configs: run ensemble alignment with per-run configs.
+ *
+ * This is the core ensemble implementation used by kalign_align_full.
+ * Each runs[k] is a fully-specified run configuration.
+ */
+int kalign_ensemble_from_configs(struct msa* msa,
+                                 const struct kalign_run_config* runs,
+                                 int n_runs,
+                                 const struct kalign_ensemble_config* ens,
+                                 int n_threads)
+{
+        struct msa* copy = NULL;
+        struct msa* consensus_msa = NULL;
+        struct msa** alignments = NULL;
+        struct poar_table* poar = NULL;
+        struct pos_matrix* pm = NULL;
+        double* scores = NULL;
+        int numseq;
+        int k;
+        int best_k = 0;
+        int use_consensus = 0;
+
+        ASSERT(msa != NULL, "No MSA");
+        ASSERT(runs != NULL, "No run configs");
+        ASSERT(n_runs >= 1, "n_runs must be >= 1");
+
+        RUN(kalign_essential_input_check(msa, 0));
+
+        numseq = msa->numseq;
+
+        DECLARE_TIMER(t_ensemble);
+        if(!msa->quiet){
+                LOG_MSG("Ensemble alignment with %d runs", n_runs);
+        }
+        START_TIMER(t_ensemble);
+
+        if(msa->biotype == ALN_BIOTYPE_UNDEF){
+                RUN(detect_alphabet(msa));
+        }
+
+        RUN(poar_table_alloc(&poar, numseq));
+        MMALLOC(alignments, sizeof(struct msa*) * n_runs);
+        for(k = 0; k < n_runs; k++){
+                alignments[k] = NULL;
+        }
+
+        /* Run N alignments */
+        for(k = 0; k < n_runs; k++){
+                copy = NULL;
+                RUN(msa_cpy(&copy, msa));
+                copy->quiet = 1;
+
+                if(!msa->quiet){
+                        LOG_MSG("  Run %d/%d (gpo=%.1f gpe=%.1f tgpe=%.1f noise=%.2f)",
+                                k + 1, n_runs,
+                                runs[k].gpo, runs[k].gpe, runs[k].tgpe,
+                                runs[k].tree_noise);
+                }
+
+                if(runs[k].realign > 0){
+                        RUN(kalign_run_realign(copy, n_threads, runs[k].type,
+                                              runs[k].gpo, runs[k].gpe, runs[k].tgpe,
+                                              runs[k].refine, 0,
+                                              runs[k].dist_scale, runs[k].vsm_amax,
+                                              runs[k].realign, runs[k].use_seq_weights,
+                                              runs[k].consistency_anchors,
+                                              runs[k].consistency_weight));
+                }else{
+                        RUN(kalign_run_seeded(copy, n_threads, runs[k].type,
+                                              runs[k].gpo, runs[k].gpe, runs[k].tgpe,
+                                              runs[k].refine, 0,
+                                              runs[k].tree_seed, runs[k].tree_noise,
+                                              runs[k].dist_scale, runs[k].vsm_amax,
+                                              runs[k].use_seq_weights,
+                                              runs[k].consistency_anchors,
+                                              runs[k].consistency_weight));
+                }
+
+                /* Extract POARs from the finalized alignment */
+                char** aln_seqs = NULL;
+                MMALLOC(aln_seqs, sizeof(char*) * numseq);
+                for(int i = 0; i < numseq; i++){
+                        aln_seqs[i] = copy->sequences[i]->seq;
+                }
+
+                RUN(pos_matrix_from_msa(&pm, aln_seqs, numseq, copy->alnlen));
+                RUN(extract_poars(poar, pm, k));
+
+                pos_matrix_free(pm);
+                pm = NULL;
+                MFREE(aln_seqs);
+
+                alignments[k] = copy;
+                copy = NULL;
+        }
+
+        /* Score all alignments and select the best */
+        RUN(score_alignments(alignments, poar, numseq, n_runs, msa->quiet,
+                             &scores, &best_k));
+
+        if(!msa->quiet){
+                LOG_MSG("  Selected run %d (score=%.1f)", best_k + 1, scores[best_k]);
+        }
+
+        /* Save POAR table if requested */
+        if(ens != NULL && ens->save_poar != NULL){
+                RUN(poar_table_write(poar, ens->save_poar));
+                if(!msa->quiet){
+                        LOG_MSG("  Saved POAR table to %s", ens->save_poar);
+                }
+        }
+
+        /* Determine min_support */
+        int min_support = (ens != NULL) ? ens->min_support : 0;
+
+        if(min_support > 0){
+                RUN(build_consensus_from_poar(poar, msa, numseq, min_support,
+                                              &consensus_msa));
+                use_consensus = 1;
+                if(!msa->quiet){
+                        LOG_MSG("  Using consensus alignment (min_support=%d)", min_support);
+                }
+        }else{
+                double consensus_score = 0.0;
+                int min_sup = (n_runs + 2) / 3;
+                if(min_sup < 2) min_sup = 2;
+
+                RUN(build_consensus_from_poar(poar, msa, numseq, min_sup,
+                                              &consensus_msa));
+
+                RUN(score_single_msa(consensus_msa, poar, numseq, n_runs,
+                                     &consensus_score));
+
+                if(!msa->quiet){
+                        LOG_MSG("  Consensus score: %.1f (selection: %.1f)",
+                                consensus_score, scores[best_k]);
+                }
+
+                if(consensus_score > scores[best_k]){
+                        use_consensus = 1;
+                        if(!msa->quiet){
+                                LOG_MSG("  Using consensus alignment");
+                        }
+                }else{
+                        kalign_free_msa(consensus_msa);
+                        consensus_msa = NULL;
+                        if(!msa->quiet){
+                                LOG_MSG("  Keeping selection winner");
+                        }
+                }
+        }
+
+        /* Post-selection refinement: re-run the winner with REFINE_CONFIDENT */
+        if(!use_consensus){
+                copy = NULL;
+                RUN(msa_cpy(&copy, msa));
+                copy->quiet = 1;
+
+                if(!msa->quiet){
+                        LOG_MSG("  Refining run %d...", best_k + 1);
+                }
+
+                /* Post-selection refinement always uses REFINE_CONFIDENT and
+                   the winning run's parameters (matching old behavior). */
+                RUN(kalign_run_seeded(copy, n_threads, runs[best_k].type,
+                                      runs[best_k].gpo, runs[best_k].gpe,
+                                      runs[best_k].tgpe,
+                                      KALIGN_REFINE_CONFIDENT, 0,
+                                      runs[best_k].tree_seed, runs[best_k].tree_noise,
+                                      runs[best_k].dist_scale, runs[best_k].vsm_amax,
+                                      runs[best_k].use_seq_weights,
+                                      runs[best_k].consistency_anchors,
+                                      runs[best_k].consistency_weight));
+
+                double refined_score = 0.0;
+                RUN(score_single_msa(copy, poar, numseq, n_runs,
+                                     &refined_score));
+
+                if(!msa->quiet){
+                        LOG_MSG("  Refined score: %.1f (was %.1f)",
+                                refined_score, scores[best_k]);
+                }
+
+                if(refined_score > scores[best_k]){
+                        kalign_free_msa(alignments[best_k]);
+                        alignments[best_k] = copy;
+                        copy = NULL;
+                        if(!msa->quiet){
+                                LOG_MSG("  Using refined alignment");
+                        }
+                }else{
+                        kalign_free_msa(copy);
+                        copy = NULL;
+                        if(!msa->quiet){
+                                LOG_MSG("  Keeping original alignment");
+                        }
+                }
+        }
+
+        MFREE(scores);
+        scores = NULL;
+
+        /* Copy the winning alignment back into the original MSA */
+        if(use_consensus){
+                RUN(copy_alignment_to_msa(msa, consensus_msa, numseq));
+                kalign_free_msa(consensus_msa);
+                consensus_msa = NULL;
+        }else{
+                RUN(copy_alignment_to_msa(msa, alignments[best_k], numseq));
+        }
+
+        RUN(compute_residue_confidence(poar, msa));
+        RUN(msa_sort_rank(msa));
+
+        STOP_TIMER(t_ensemble);
+        if(!msa->quiet){
+                GET_TIMING(t_ensemble);
+        }
+        DESTROY_TIMER(t_ensemble);
+
+        for(k = 0; k < n_runs; k++){
+                if(alignments[k]) kalign_free_msa(alignments[k]);
+        }
+        MFREE(alignments);
+        poar_table_free(poar);
+        return OK;
+ERROR:
+        if(copy) kalign_free_msa(copy);
+        if(consensus_msa) kalign_free_msa(consensus_msa);
+        if(pm) pos_matrix_free(pm);
+        if(alignments){
+                for(k = 0; k < n_runs; k++){
+                        if(alignments[k]) kalign_free_msa(alignments[k]);
+                }
+                MFREE(alignments);
+        }
+        poar_table_free(poar);
+        if(scores) MFREE(scores);
+        return FAIL;
+}
+
+/* ======================================================================== */
 
 int kalign_consensus_from_poar(struct msa* msa,
                                const char* poar_path,

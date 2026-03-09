@@ -69,7 +69,7 @@ skbio = ["scikit-bio>=0.6.3"]
 io = ["biopython>=1.85"]  # For I/O helper functions
 analysis = ["pandas>=2.3.0", "matplotlib>=3.9.4", "seaborn>=0.13.2"]
 all = ["biopython>=1.85", "scikit-bio>=0.6.3", "pandas>=2.3.0", "matplotlib>=3.9.4", "seaborn>=0.13.2"]
-benchmark = ["dash>=2.14", "plotly>=5.18", "pandas>=2.0", "tqdm>=4.60"]
+benchmark = ["dash>=2.14", "plotly>=5.18", "pandas>=2.0", "tqdm>=4.60", "pymoo>=0.6", "rich>=13.0", "kneed>=0.8"]
 
 # Development dependencies
 dev = [

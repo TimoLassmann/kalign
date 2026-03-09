@@ -2,6 +2,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
 #include <kalign/kalign.h>
+#include <kalign/kalign_config.h>
 #include <vector>
 #include <string>
 #include <memory>
@@ -68,8 +69,8 @@ static py::object extract_confidence(struct msa* msa_data, int numseq) {
     return result;
 }
 
-// Shared alignment routing helper — selects the appropriate kalign function
-// based on the combination of parameters provided.
+// Shared alignment helper — builds kalign_run_config and calls kalign_align_full.
+// All alignment paths go through the same function, eliminating routing bugs.
 static int run_alignment(struct msa* msa_data, int n_threads, int seq_type,
                          float gap_open, float gap_extend, float terminal_gap_extend,
                          int refine, int adaptive_budget,
@@ -84,7 +85,28 @@ static int run_alignment(struct msa* msa_data, int n_threads, int seq_type,
     if (!load_poar.empty()) {
         return kalign_consensus_from_poar(msa_data, load_poar.c_str(),
                                           min_support > 0 ? min_support : 2);
-    } else if (ensemble > 0) {
+    }
+
+    struct kalign_run_config base = kalign_run_config_defaults();
+    base.type = seq_type;
+    base.gpo = gap_open;
+    base.gpe = gap_extend;
+    base.tgpe = terminal_gap_extend;
+    base.refine = refine;
+    base.adaptive_budget = adaptive_budget;
+    base.dist_scale = dist_scale;
+    base.vsm_amax = vsm_amax;
+    base.use_seq_weights = use_seq_weights;
+    base.consistency_anchors = consistency_anchors;
+    base.consistency_weight = consistency_weight;
+    base.realign = realign;
+
+    if (ensemble > 0) {
+        /* Ensemble path: resolve base gap penalties, then generate diversified runs.
+           We need resolved gap penalties for the scale factors to work.
+           Use kalign_ensemble (old path) which handles sentinel resolution internally,
+           OR resolve here and use kalign_align_full. We use the old kalign_ensemble
+           to maintain exact backward compatibility. */
         const char* save_path = save_poar.empty() ? nullptr : save_poar.c_str();
         return kalign_ensemble(msa_data, n_threads, seq_type, ensemble,
                                gap_open, gap_extend, terminal_gap_extend,
@@ -92,15 +114,10 @@ static int run_alignment(struct msa* msa_data, int n_threads, int seq_type,
                                refine, dist_scale, vsm_amax, realign,
                                use_seq_weights,
                                consistency_anchors, consistency_weight);
-    } else if (realign > 0) {
-        return kalign_run_realign(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget, dist_scale, vsm_amax, realign, use_seq_weights, consistency_anchors, consistency_weight);
-    } else if (consistency_anchors > 0) {
-        return kalign_run_seeded(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget, 0, 0.0f, dist_scale, vsm_amax, use_seq_weights, consistency_anchors, consistency_weight);
-    } else if (dist_scale > 0.0f || vsm_amax >= 0.0f || use_seq_weights >= 0.0f) {
-        return kalign_run_dist_scale(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget, dist_scale, vsm_amax, use_seq_weights);
-    } else {
-        return kalign_run(msa_data, n_threads, seq_type, gap_open, gap_extend, terminal_gap_extend, refine, adaptive_budget);
     }
+
+    /* Single-run path: all params go through kalign_align_full */
+    return kalign_align_full(msa_data, &base, 1, nullptr, n_threads);
 }
 
 // Main alignment function
@@ -497,6 +514,86 @@ void align_file_to_file(
     }
 }
 
+// Ensemble with per-run parameters — playground for optimization.
+// Each run gets its own gap penalties, matrix type, and tree noise.
+// Now uses kalign_align_full with per-run configs.
+void ensemble_custom_file_to_file(
+    const std::string& input_file,
+    const std::string& output_file,
+    const std::vector<float>& run_gpo,
+    const std::vector<float>& run_gpe,
+    const std::vector<float>& run_tgpe,
+    const std::vector<float>& run_noise,
+    const std::vector<int>& run_types = {},
+    const std::string& format = "fasta",
+    int seq_type = KALIGN_TYPE_PROTEIN,
+    uint64_t seed = 42,
+    int min_support = 0,
+    int refine = KALIGN_REFINE_NONE,
+    float vsm_amax = -1.0f,
+    int realign = 0,
+    float seq_weights = -1.0f,
+    int n_threads = 1,
+    int consistency_anchors = 0,
+    float consistency_weight = 2.0f
+) {
+    int n_runs = static_cast<int>(run_gpo.size());
+    if (n_runs < 1) {
+        throw std::invalid_argument("Must provide at least 1 run");
+    }
+    if (static_cast<int>(run_gpe.size()) != n_runs ||
+        static_cast<int>(run_tgpe.size()) != n_runs ||
+        static_cast<int>(run_noise.size()) != n_runs) {
+        throw std::invalid_argument("All per-run arrays must have the same length");
+    }
+    if (!run_types.empty() && static_cast<int>(run_types.size()) != n_runs) {
+        throw std::invalid_argument("run_types must be empty or same length as run_gpo");
+    }
+
+    struct msa* msa_data = nullptr;
+    int result = kalign_read_input(const_cast<char*>(input_file.c_str()), &msa_data, 1);
+    if (result != 0 || !msa_data) {
+        throw std::runtime_error("Failed to read input file: " + input_file);
+    }
+
+    /* Build per-run configs */
+    std::vector<kalign_run_config> runs(n_runs);
+    for (int k = 0; k < n_runs; k++) {
+        runs[k] = kalign_run_config_defaults();
+        runs[k].type = (!run_types.empty()) ? run_types[k] : seq_type;
+        runs[k].gpo = run_gpo[k];
+        runs[k].gpe = run_gpe[k];
+        runs[k].tgpe = run_tgpe[k];
+        runs[k].tree_seed = seed + static_cast<uint64_t>(k);
+        runs[k].tree_noise = run_noise[k];
+        runs[k].vsm_amax = vsm_amax;
+        runs[k].dist_scale = 0.0f;
+        runs[k].use_seq_weights = seq_weights;
+        runs[k].refine = refine;
+        runs[k].realign = realign;
+        runs[k].consistency_anchors = consistency_anchors;
+        runs[k].consistency_weight = consistency_weight;
+    }
+
+    struct kalign_ensemble_config ens = kalign_ensemble_config_defaults();
+    ens.seed = seed;
+    ens.min_support = min_support;
+
+    result = kalign_align_full(msa_data, runs.data(), n_runs, &ens, n_threads);
+    if (result != 0) {
+        kalign_free_msa(msa_data);
+        throw std::runtime_error("Ensemble alignment failed with error code: " + std::to_string(result));
+    }
+
+    result = kalign_write_msa(msa_data, const_cast<char*>(output_file.c_str()),
+                               const_cast<char*>(format.c_str()));
+    kalign_free_msa(msa_data);
+
+    if (result != 0) {
+        throw std::runtime_error("Failed to write output file: " + output_file);
+    }
+}
+
 PYBIND11_MODULE(_core, m) {
     m.doc() = "Python bindings for Kalign multiple sequence alignment";
     
@@ -721,6 +818,51 @@ PYBIND11_MODULE(_core, m) {
               Terminal gap extension penalty
           n_threads : int, optional
               Number of threads (default: 1)
+          )pbdoc");
+
+    // Ensemble with per-run parameters (optimization playground)
+    m.def("ensemble_custom_file_to_file", &ensemble_custom_file_to_file,
+          py::arg("input_file"),
+          py::arg("output_file"),
+          py::arg("run_gpo"),
+          py::arg("run_gpe"),
+          py::arg("run_tgpe"),
+          py::arg("run_noise"),
+          py::arg("run_types") = std::vector<int>{},
+          py::arg("format") = "fasta",
+          py::arg("seq_type") = KALIGN_TYPE_PROTEIN,
+          py::arg("seed") = (uint64_t)42,
+          py::arg("min_support") = 0,
+          py::arg("refine") = KALIGN_REFINE_NONE,
+          py::arg("vsm_amax") = -1.0f,
+          py::arg("realign") = 0,
+          py::arg("seq_weights") = -1.0f,
+          py::arg("n_threads") = 1,
+          py::arg("consistency_anchors") = 0,
+          py::arg("consistency_weight") = 2.0f,
+          R"pbdoc(
+          Ensemble alignment with per-run parameters.
+
+          Each run gets its own gap penalties, matrix type, and tree noise.
+          This is a playground for optimizing ensemble configurations.
+
+          Parameters
+          ----------
+          input_file : str
+              Path to input sequence file
+          output_file : str
+              Path to output alignment file
+          run_gpo : list of float
+              Per-run gap open penalties (length = n_runs)
+          run_gpe : list of float
+              Per-run gap extend penalties
+          run_tgpe : list of float
+              Per-run terminal gap extend penalties
+          run_noise : list of float
+              Per-run tree noise sigma values
+          run_types : list of int, optional
+              Per-run matrix types (e.g. PROTEIN_PFASUM43, PROTEIN_PFASUM60, PROTEIN).
+              Empty = use seq_type for all runs.
           )pbdoc");
 
     // Constants for sequence types

@@ -419,3 +419,7 @@ callgrind.out.*
 *.large.fasta
 test_data/large/
 
+# Benchmark data (downloaded datasets + simulation results)
+benchmarks/data/
+benchmarks/results/
+

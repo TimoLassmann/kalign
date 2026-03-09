@@ -6,6 +6,7 @@
 #include "aln_param.h"
 
 #include "aln_struct.h"
+#include "anchor_consistency.h"
 
 #define ALN_SEQSEQ_IMPORT
 #include "aln_seqseq.h"
@@ -81,7 +82,7 @@ int aln_seqseq_foward(struct aln_mem* m)
                         pa = MAX3(pa,pga-gpo,pgb-gpo);
                         pa += subp[seq2[j]] - soff;
                         if(m->consistency){
-                                pa += m->consistency[i * m->consistency_stride + j];
+                                pa += sparse_bonus_lookup(m->consistency, i, j);
                         }
 
                         s[j].a = pa;
@@ -103,7 +104,7 @@ int aln_seqseq_foward(struct aln_mem* m)
                 pa = MAX3(pa,pga-gpo,pgb-gpo);
                 pa += subp[seq2[j]] - soff;
                 if(m->consistency){
-                        pa += m->consistency[i * m->consistency_stride + j];
+                        pa += sparse_bonus_lookup(m->consistency, i, j);
                 }
 
                 s[j].a = pa;
@@ -197,7 +198,7 @@ int aln_seqseq_backward(struct aln_mem* m)
 
                         pa += subp[seq2[j]] - soff;
                         if(m->consistency){
-                                pa += m->consistency[(starta + i) * m->consistency_stride + j];
+                                pa += sparse_bonus_lookup(m->consistency, starta + i, j);
                         }
 
                         s[j].a = pa;
@@ -221,7 +222,7 @@ int aln_seqseq_backward(struct aln_mem* m)
 
                 pa += subp[seq2[j]] - soff;
                 if(m->consistency){
-                        pa += m->consistency[(starta + i) * m->consistency_stride + j];
+                        pa += sparse_bonus_lookup(m->consistency, starta + i, j);
                 }
 
                 s[j].a = pa;

@@ -18,6 +18,8 @@
 #include "aln_apair_dist.h"
 #include "anchor_consistency.h"
 #include "kalign/kalign.h"
+#include "kalign/kalign_config.h"
+#include "ensemble.h"
 
 #ifdef HAVE_OPENMP
 #include <omp.h>
@@ -672,3 +674,76 @@ ERROR:
         return FAIL;
 }
 
+/* ======================================================================== */
+/* Config defaults and unified entry point                                   */
+/* ======================================================================== */
+
+struct kalign_run_config kalign_run_config_defaults(void)
+{
+        struct kalign_run_config cfg;
+        cfg.type = KALIGN_TYPE_UNDEFINED;
+        cfg.gpo = -1.0f;
+        cfg.gpe = -1.0f;
+        cfg.tgpe = -1.0f;
+        cfg.vsm_amax = -1.0f;
+        cfg.dist_scale = 0.0f;
+        cfg.use_seq_weights = -1.0f;
+        cfg.consistency_anchors = 0;
+        cfg.consistency_weight = 2.0f;
+        cfg.refine = KALIGN_REFINE_NONE;
+        cfg.adaptive_budget = 0;
+        cfg.realign = 0;
+        cfg.tree_seed = 0;
+        cfg.tree_noise = 0.0f;
+        return cfg;
+}
+
+struct kalign_ensemble_config kalign_ensemble_config_defaults(void)
+{
+        struct kalign_ensemble_config ens;
+        ens.seed = 42;
+        ens.min_support = 0;
+        ens.save_poar = NULL;
+        return ens;
+}
+
+int kalign_align_full(struct msa* msa,
+                      const struct kalign_run_config* runs,
+                      int n_runs,
+                      const struct kalign_ensemble_config* ens,
+                      int n_threads)
+{
+        ASSERT(msa != NULL, "No MSA");
+        ASSERT(runs != NULL, "No run configs");
+        ASSERT(n_runs >= 1, "n_runs must be >= 1");
+
+        if(n_runs > 1){
+                /* Ensemble path */
+                RUN(kalign_ensemble_from_configs(msa, runs, n_runs, ens, n_threads));
+        }else{
+                /* Single-run path */
+                const struct kalign_run_config* r = &runs[0];
+                if(r->realign > 0){
+                        RUN(kalign_run_realign(msa, n_threads, r->type,
+                                              r->gpo, r->gpe, r->tgpe,
+                                              r->refine, r->adaptive_budget,
+                                              r->dist_scale, r->vsm_amax,
+                                              r->realign, r->use_seq_weights,
+                                              r->consistency_anchors,
+                                              r->consistency_weight));
+                }else{
+                        RUN(kalign_run_seeded(msa, n_threads, r->type,
+                                             r->gpo, r->gpe, r->tgpe,
+                                             r->refine, r->adaptive_budget,
+                                             r->tree_seed, r->tree_noise,
+                                             r->dist_scale, r->vsm_amax,
+                                             r->use_seq_weights,
+                                             r->consistency_anchors,
+                                             r->consistency_weight));
+                }
+        }
+
+        return OK;
+ERROR:
+        return FAIL;
+}

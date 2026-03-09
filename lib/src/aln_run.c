@@ -257,7 +257,6 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
         m->margin_sum = 0.0F;
         m->margin_count = 0;
         m->consistency = NULL;
-        m->consistency_stride = 0;
 
         /* Compute consistency bonus for all merge types */
         {
@@ -290,7 +289,6 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                         RUN(anchor_consistency_get_bonus_profile(ct, msa,
                                 dp_row_node, dp_rows, dp_col_node, dp_cols,
                                 &m->consistency));
-                        m->consistency_stride = dp_cols;
                 }
         }
 
@@ -399,9 +397,8 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
 
         /* Free consistency bonus if allocated */
         if(m->consistency){
-                MFREE(m->consistency);
+                sparse_bonus_free(m->consistency);
                 m->consistency = NULL;
-                m->consistency_stride = 0;
         }
 
         /* Restore original aln_param for profile update (unscaled base penalties) */
@@ -564,7 +561,6 @@ int do_align_inline_refine(struct msa* msa, struct aln_tasks* t,
 
         /* Compute consistency bonus for all merge types */
         m->consistency = NULL;
-        m->consistency_stride = 0;
         {
                 struct consistency_table* ct = (struct consistency_table*)msa->consistency_table;
                 if(ct != NULL){
@@ -595,7 +591,6 @@ int do_align_inline_refine(struct msa* msa, struct aln_tasks* t,
                         RUN(anchor_consistency_get_bonus_profile(ct, msa,
                                 dp_row_node, dp_rows, dp_col_node, dp_cols,
                                 &m->consistency));
-                        m->consistency_stride = dp_cols;
                 }
         }
 
@@ -734,9 +729,8 @@ int do_align_inline_refine(struct msa* msa, struct aln_tasks* t,
 
         /* Free consistency bonus if allocated */
         if(m->consistency){
-                MFREE(m->consistency);
+                sparse_bonus_free(m->consistency);
                 m->consistency = NULL;
-                m->consistency_stride = 0;
         }
 
         /* Store confidence */

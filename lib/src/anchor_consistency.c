@@ -274,19 +274,38 @@ ERROR:
         return FAIL;
 }
 
+void sparse_bonus_free(struct sparse_bonus* sb)
+{
+        if(sb){
+                if(sb->cols) MFREE(sb->cols);
+                if(sb->vals) MFREE(sb->vals);
+                MFREE(sb);
+        }
+}
+
 int anchor_consistency_get_bonus(struct consistency_table* ct,
                                  int seq_a, int len_a,
                                  int seq_b, int len_b,
-                                 float** bonus_out)
+                                 struct sparse_bonus** bonus_out)
 {
-        float* bonus = NULL;
+        struct sparse_bonus* sb = NULL;
         int* inv_b = NULL;
         int K = ct->n_anchors;
         int k, i;
         float per_anchor_weight = ct->weight / (float)K;
 
-        MMALLOC(bonus, sizeof(float) * len_a * len_b);
-        memset(bonus, 0, sizeof(float) * len_a * len_b);
+        MMALLOC(sb, sizeof(struct sparse_bonus));
+        sb->cols = NULL;
+        sb->vals = NULL;
+        sb->n_rows = len_a;
+        sb->K = K;
+
+        MMALLOC(sb->cols, sizeof(int) * len_a * K);
+        MMALLOC(sb->vals, sizeof(float) * len_a * K);
+        for(i = 0; i < len_a * K; i++){
+                sb->cols[i] = -1;
+                sb->vals[i] = 0.0f;
+        }
 
         /* For each anchor, build inverse map for seq_b (anchor_pos → seq_b_pos),
            then scan seq_a's map to accumulate bonus. O(K * (La + Lb + max_anchor_len)) */
@@ -298,8 +317,6 @@ int anchor_consistency_get_bonus(struct consistency_table* ct,
 
                 if(map_a == NULL || map_b == NULL) continue;
 
-                /* Determine anchor length for inverse map */
-                /* Find max mapped position to size the inverse map */
                 anchor_len = 0;
                 for(i = 0; i < len_a; i++){
                         if(map_a[i] >= anchor_len) anchor_len = map_a[i] + 1;
@@ -309,7 +326,6 @@ int anchor_consistency_get_bonus(struct consistency_table* ct,
                 }
                 if(anchor_len == 0) continue;
 
-                /* Build inverse map: anchor_pos → seq_b_pos */
                 MMALLOC(inv_b, sizeof(int) * anchor_len);
                 for(j = 0; j < anchor_len; j++){
                         inv_b[j] = -1;
@@ -320,13 +336,23 @@ int anchor_consistency_get_bonus(struct consistency_table* ct,
                         }
                 }
 
-                /* Accumulate bonus */
+                /* Accumulate bonus into sparse slots */
                 for(i = 0; i < len_a; i++){
                         int ak_pos = map_a[i];
                         if(ak_pos >= 0 && ak_pos < anchor_len){
                                 int bj = inv_b[ak_pos];
                                 if(bj >= 0){
-                                        bonus[i * len_b + bj] += per_anchor_weight;
+                                        int base = i * K;
+                                        int slot = -1;
+                                        int s;
+                                        for(s = 0; s < K; s++){
+                                                if(sb->cols[base + s] == bj){ slot = s; break; }
+                                                if(sb->cols[base + s] < 0){ slot = s; break; }
+                                        }
+                                        if(slot >= 0){
+                                                sb->vals[base + slot] += per_anchor_weight;
+                                                sb->cols[base + slot] = bj;
+                                        }
                                 }
                         }
                 }
@@ -335,10 +361,10 @@ int anchor_consistency_get_bonus(struct consistency_table* ct,
                 inv_b = NULL;
         }
 
-        *bonus_out = bonus;
+        *bonus_out = sb;
         return OK;
 ERROR:
-        if(bonus) MFREE(bonus);
+        sparse_bonus_free(sb);
         if(inv_b) MFREE(inv_b);
         *bonus_out = NULL;
         return FAIL;
@@ -470,9 +496,9 @@ int anchor_consistency_get_bonus_profile(struct consistency_table* ct,
                                           struct msa* msa,
                                           int node_a, int len_a,
                                           int node_b, int len_b,
-                                          float** bonus_out)
+                                          struct sparse_bonus** bonus_out)
 {
-        float* bonus = NULL;
+        struct sparse_bonus* sb = NULL;
         int* apos_a = NULL;
         float* conf_a = NULL;
         int* apos_b = NULL;
@@ -483,8 +509,18 @@ int anchor_consistency_get_bonus_profile(struct consistency_table* ct,
         int k, i, j;
         float per_anchor_weight = ct->weight / (float)K;
 
-        MMALLOC(bonus, sizeof(float) * len_a * len_b);
-        memset(bonus, 0, sizeof(float) * len_a * len_b);
+        MMALLOC(sb, sizeof(struct sparse_bonus));
+        sb->cols = NULL;
+        sb->vals = NULL;
+        sb->n_rows = len_a;
+        sb->K = K;
+
+        MMALLOC(sb->cols, sizeof(int) * len_a * K);
+        MMALLOC(sb->vals, sizeof(float) * len_a * K);
+        for(i = 0; i < len_a * K; i++){
+                sb->cols[i] = -1;
+                sb->vals[i] = 0.0f;
+        }
 
         MMALLOC(apos_a, sizeof(int) * len_a);
         MMALLOC(conf_a, sizeof(float) * len_a);
@@ -523,14 +559,24 @@ int anchor_consistency_get_bonus_profile(struct consistency_table* ct,
                         }
                 }
 
-                /* Accumulate bonus */
+                /* Accumulate bonus into sparse slots */
                 for(i = 0; i < len_a; i++){
                         int ak_pos = apos_a[i];
                         if(ak_pos >= 0 && ak_pos < anchor_len){
                                 int bj = inv_b[ak_pos];
                                 if(bj >= 0){
-                                        bonus[i * len_b + bj] +=
-                                                per_anchor_weight * conf_a[i] * inv_conf_b[ak_pos];
+                                        float val = per_anchor_weight * conf_a[i] * inv_conf_b[ak_pos];
+                                        int base = i * K;
+                                        int slot = -1;
+                                        int s;
+                                        for(s = 0; s < K; s++){
+                                                if(sb->cols[base + s] == bj){ slot = s; break; }
+                                                if(sb->cols[base + s] < 0){ slot = s; break; }
+                                        }
+                                        if(slot >= 0){
+                                                sb->vals[base + slot] += val;
+                                                sb->cols[base + slot] = bj;
+                                        }
                                 }
                         }
                 }
@@ -546,10 +592,10 @@ int anchor_consistency_get_bonus_profile(struct consistency_table* ct,
         MFREE(apos_b);
         MFREE(conf_b);
 
-        *bonus_out = bonus;
+        *bonus_out = sb;
         return OK;
 ERROR:
-        if(bonus) MFREE(bonus);
+        sparse_bonus_free(sb);
         if(apos_a) MFREE(apos_a);
         if(conf_a) MFREE(conf_a);
         if(apos_b) MFREE(apos_b);

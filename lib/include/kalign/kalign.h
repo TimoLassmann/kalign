@@ -2,6 +2,7 @@
 #define KALIGN_H
 
 #include <stdint.h>
+#include <kalign/kalign_config.h>
 
 #ifdef KALIGN_IMPORT
    #define EXTERN
@@ -85,6 +86,18 @@ EXTERN int kalign_ensemble(struct msa* msa, int n_threads, int type,
                            int realign, float use_seq_weights,
                            int consistency_anchors, float consistency_weight);
 
+EXTERN int kalign_ensemble_custom(struct msa* msa, int n_threads, int type,
+                                  int n_runs,
+                                  const float* run_gpo,
+                                  const float* run_gpe,
+                                  const float* run_tgpe,
+                                  const int* run_types,
+                                  const float* run_noise,
+                                  uint64_t seed, int min_support,
+                                  int refine, float vsm_amax,
+                                  int realign, float use_seq_weights,
+                                  int consistency_anchors, float consistency_weight);
+
 EXTERN int kalign_consensus_from_poar(struct msa* msa,
                                       const char* poar_path,
                                       int min_support);
@@ -107,6 +120,24 @@ EXTERN int kalign_msa_compare_detailed(struct msa *r, struct msa *t,
 EXTERN int kalign_msa_compare_with_mask(struct msa *r, struct msa *t,
                                         int *scored_cols, int n_cols,
                                         struct poar_score *out);
+
+/* Unified alignment entry point — all callers should use this. */
+EXTERN struct kalign_run_config kalign_run_config_defaults(void);
+EXTERN struct kalign_ensemble_config kalign_ensemble_config_defaults(void);
+
+EXTERN int kalign_align_full(struct msa* msa,
+                             const struct kalign_run_config* runs,
+                             int n_runs,
+                             const struct kalign_ensemble_config* ens,
+                             int n_threads);
+
+/* Expand a base config into n_runs configs using the built-in diversity table.
+   Caller must pass resolved (non-sentinel) gap penalties in base.
+   Caller allocates out[n_runs]. */
+EXTERN int kalign_generate_ensemble_runs(const struct kalign_run_config* base,
+                                         int n_runs, uint64_t seed,
+                                         struct kalign_run_config* out);
+
 #undef KALIGN_IMPORT
 #undef EXTERN
 

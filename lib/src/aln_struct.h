@@ -6,6 +6,8 @@
 #define ALN_MODE_SCORE_ONLY 2
 #define ALN_MODE_FULL 1
 
+struct sparse_bonus;
+
 struct states{
         float a;
         float ga;
@@ -54,8 +56,7 @@ struct aln_mem{
         int sip;
         int mode;
 
-        float* consistency;         /* bonus matrix [i * consistency_stride + j], NULL if disabled */
-        int consistency_stride;     /* = len_b (stride for j dimension) */
+        struct sparse_bonus* consistency;   /* sparse bonus matrix, NULL if disabled */
 };
 
 #endif

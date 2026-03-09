@@ -5,6 +5,7 @@
 
 #include "aln_param.h"
 #include "aln_struct.h"
+#include "anchor_consistency.h"
 #define ALN_SEQPROFILE_IMPORT
 #include "aln_seqprofile.h"
 #define MAX(a, b) (a > b ? a : b)
@@ -80,7 +81,7 @@ int aln_seqprofile_foward(struct aln_mem* m)
 
                         pa += prof1[32 + seq2[j]];
                         if(m->consistency){
-                                pa += m->consistency[i * m->consistency_stride + j];
+                                pa += sparse_bonus_lookup(m->consistency, i, j);
                         }
 
                         s[j].a = pa;
@@ -105,7 +106,7 @@ int aln_seqprofile_foward(struct aln_mem* m)
 
                 pa += prof1[32 + seq2[j]];
                 if(m->consistency){
-                        pa += m->consistency[i * m->consistency_stride + j];
+                        pa += sparse_bonus_lookup(m->consistency, i, j);
                 }
 
                 s[j].a = pa;
@@ -191,7 +192,7 @@ int aln_seqprofile_backward(struct aln_mem* m)
                         pa = MAX3(pa,pga - open,pgb +prof1[91]);
                         pa += prof1[32 + seq2[j]];
                         if(m->consistency){
-                                pa += m->consistency[(m->starta_2 + i) * m->consistency_stride + j];
+                                pa += sparse_bonus_lookup(m->consistency, m->starta_2 + i, j);
                         }
 
                         s[j].a = pa;
@@ -214,7 +215,7 @@ int aln_seqprofile_backward(struct aln_mem* m)
                 pa = MAX3(pa,pga - open,pgb +prof1[91]);
                 pa += prof1[32 + seq2[j]];
                 if(m->consistency){
-                        pa += m->consistency[(m->starta_2 + i) * m->consistency_stride + j];
+                        pa += sparse_bonus_lookup(m->consistency, m->starta_2 + i, j);
                 }
 
                 s[j].a = pa;

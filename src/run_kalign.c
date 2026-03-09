@@ -425,6 +425,8 @@ int run_kalign(struct parameters* param)
                                                param->load_poar,
                                                param->min_support > 0 ? param->min_support : 2));
         }else if(param->ensemble > 0){
+                /* Ensemble uses the old kalign_ensemble which handles
+                   sentinel resolution + diversity table internally. */
                 RUN(kalign_ensemble(msa,
                                     param->nthreads,
                                     param->type,
@@ -438,29 +440,21 @@ int run_kalign(struct parameters* param)
                                     param->refine, 0.0f, param->vsm_amax,
                                     param->realign, -1.0f,
                                     param->consistency_anchors, param->consistency_weight));
-        }else if(param->realign > 0){
-                RUN(kalign_run_realign(msa,
-                                       param->nthreads,
-                                       param->type,
-                                       param->gpo,
-                                       param->gpe,
-                                       param->tgpe,
-                                       param->refine,
-                                       param->adaptive_budget,
-                                       0.0f, param->vsm_amax,
-                                       param->realign, -1.0f,
-                                       param->consistency_anchors, param->consistency_weight));
         }else{
-                RUN(kalign_run_seeded(msa,
-                                      param->nthreads,
-                                      param->type,
-                                      param->gpo,
-                                      param->gpe,
-                                      param->tgpe,
-                                      param->refine,
-                                      param->adaptive_budget,
-                                      0, 0.0f, 0.0f, param->vsm_amax, -1.0f,
-                                      param->consistency_anchors, param->consistency_weight));
+                /* Single-run: use kalign_align_full */
+                struct kalign_run_config run = kalign_run_config_defaults();
+                run.type = param->type;
+                run.gpo = param->gpo;
+                run.gpe = param->gpe;
+                run.tgpe = param->tgpe;
+                run.refine = param->refine;
+                run.adaptive_budget = param->adaptive_budget;
+                run.vsm_amax = param->vsm_amax;
+                run.use_seq_weights = -1.0f;
+                run.consistency_anchors = param->consistency_anchors;
+                run.consistency_weight = param->consistency_weight;
+                run.realign = param->realign;
+                RUN(kalign_align_full(msa, &run, 1, NULL, param->nthreads));
         }
 
 

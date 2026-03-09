@@ -149,7 +149,6 @@ int refine_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
 
         /* Compute consistency bonus for all merge types */
         ml->consistency = NULL;
-        ml->consistency_stride = 0;
         {
                 struct consistency_table* ct = (struct consistency_table*)msa->consistency_table;
                 if(ct != NULL){
@@ -180,7 +179,6 @@ int refine_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
                         RUN(anchor_consistency_get_bonus_profile(ct, msa,
                                 dp_row_node, dp_rows, dp_col_node, dp_cols,
                                 &ml->consistency));
-                        ml->consistency_stride = dp_cols;
                 }
         }
 
@@ -288,9 +286,8 @@ int refine_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
 
         /* Free consistency bonus */
         if(ml->consistency){
-                MFREE(ml->consistency);
+                sparse_bonus_free(ml->consistency);
                 ml->consistency = NULL;
-                ml->consistency_stride = 0;
         }
 
         /* Update confidence from best trial */
@@ -403,7 +400,6 @@ int replay_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
 
         /* Compute consistency bonus for all merge types */
         ml->consistency = NULL;
-        ml->consistency_stride = 0;
         {
                 struct consistency_table* ct = (struct consistency_table*)msa->consistency_table;
                 if(ct != NULL){
@@ -434,7 +430,6 @@ int replay_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
                         RUN(anchor_consistency_get_bonus_profile(ct, msa,
                                 dp_row_node, dp_rows, dp_col_node, dp_cols,
                                 &ml->consistency));
-                        ml->consistency_stride = dp_cols;
                 }
         }
 
@@ -442,9 +437,8 @@ int replay_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
 
         /* Free consistency bonus */
         if(ml->consistency){
-                MFREE(ml->consistency);
+                sparse_bonus_free(ml->consistency);
                 ml->consistency = NULL;
-                ml->consistency_stride = 0;
         }
 
         /* Store alignment confidence */

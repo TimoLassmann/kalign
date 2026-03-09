@@ -179,7 +179,7 @@ def score_alignment_detailed(reference: Path, test_output: Path) -> dict:
         return kalign.compare_detailed(str(reference), str(test_output), column_mask=mask)
 
     # For non-BAliBASE references (FASTA format), check for gapless edge case
-    if reference.suffix in ('.fa', '.fasta') and not _fasta_ref_has_gaps(reference):
+    if reference.suffix in ('.fa', '.fasta', '.afa') and not _fasta_ref_has_gaps(reference):
         raise RuntimeError("Reference alignment has no gaps — skipping (trivially aligned)")
 
     return kalign.compare_detailed(str(reference), str(test_output), max_gap_frac=-1.0)

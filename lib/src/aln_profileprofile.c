@@ -6,6 +6,7 @@
 #include "aln_param.h"
 
 #include "aln_struct.h"
+#include "anchor_consistency.h"
 
 #define ALN_PROFILEPROFILE_IMPORT
 #include "aln_profileprofile.h"
@@ -106,7 +107,7 @@ int aln_profileprofile_foward(struct aln_mem* m)
                         }
                         prof2 -= 32;
                         if(m->consistency){
-                                pa += m->consistency[i * m->consistency_stride + j];
+                                pa += sparse_bonus_lookup(m->consistency, i, j);
                         }
 
                         s[j].a = pa;
@@ -136,7 +137,7 @@ int aln_profileprofile_foward(struct aln_mem* m)
                 }
                 prof2 -= 32;
                 if(m->consistency){
-                        pa += m->consistency[i * m->consistency_stride + j];
+                        pa += sparse_bonus_lookup(m->consistency, i, j);
                 }
 
                 s[j].a = pa;
@@ -249,7 +250,7 @@ int aln_profileprofile_backward(struct aln_mem* m)
                         }
                         prof2 -= 32;
                         if(m->consistency){
-                                pa += m->consistency[(m->starta_2 + i) * m->consistency_stride + j];
+                                pa += sparse_bonus_lookup(m->consistency, m->starta_2 + i, j);
                         }
 
                         s[j].a = pa;
@@ -278,7 +279,7 @@ int aln_profileprofile_backward(struct aln_mem* m)
                 }
                 prof2 -= 32;
                 if(m->consistency){
-                        pa += m->consistency[(m->starta_2 + i) * m->consistency_stride + j];
+                        pa += sparse_bonus_lookup(m->consistency, m->starta_2 + i, j);
                 }
                 s[j].a = pa;
 

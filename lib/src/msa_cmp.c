@@ -49,6 +49,14 @@ int kalign_msa_compare(struct msa *r, struct msa *t,  float *score)
         if(t->aligned == ALN_STATUS_ALIGNED){
                 finalise_alignment(t);
         }
+
+        if(r->alnlen == 0 && r->numseq > 0){
+                r->alnlen = r->sequences[0]->len;
+        }
+        if(t->alnlen == 0 && t->numseq > 0){
+                t->alnlen = t->sequences[0]->len;
+        }
+
         RUN(kalign_check_msa(r,1));
         RUN(kalign_check_msa(t,1));
 
@@ -418,11 +426,26 @@ int kalign_msa_compare_detailed(struct msa *r, struct msa *t,
         if(t->aligned == ALN_STATUS_ALIGNED){
                 finalise_alignment(t);
         }
+
+        /* Handle references read from file that had no gaps:
+           detect_aligned() sets ALN_STATUS_UNKNOWN when all sequences are
+           the same length with no gap characters. In that case alnlen is
+           still 0 but the sequences are stored verbatim in seq and the
+           alignment length equals the sequence length. */
+        if(r->alnlen == 0 && r->numseq > 0){
+                r->alnlen = r->sequences[0]->len;
+        }
+        if(t->alnlen == 0 && t->numseq > 0){
+                t->alnlen = t->sequences[0]->len;
+        }
+
         RUN(kalign_check_msa(r, 1));
         RUN(kalign_check_msa(t, 1));
 
         kalign_sort_msa(r);
         kalign_sort_msa(t);
+
+        ASSERT(r->alnlen > 0, "Reference alignment has length 0");
 
         /* Build scored column mask from reference alignment */
         MMALLOC(scored_cols, sizeof(int) * r->alnlen);
@@ -465,6 +488,14 @@ int kalign_msa_compare_with_mask(struct msa *r, struct msa *t,
         if(t->aligned == ALN_STATUS_ALIGNED){
                 finalise_alignment(t);
         }
+
+        if(r->alnlen == 0 && r->numseq > 0){
+                r->alnlen = r->sequences[0]->len;
+        }
+        if(t->alnlen == 0 && t->numseq > 0){
+                t->alnlen = t->sequences[0]->len;
+        }
+
         RUN(kalign_check_msa(r, 1));
         RUN(kalign_check_msa(t, 1));
 

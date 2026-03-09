@@ -33,7 +33,18 @@ class BenchmarkCase:
 # ---------------------------------------------------------------------------
 
 BALIBASE_URL = "http://www.lbgi.fr/balibase/BalibaseDownload/BAliBASE_R1-5.tar.gz"
+BALIBASE_URL_FALLBACK = "https://web.archive.org/web/20231117003408/https://www.lbgi.fr/balibase/BalibaseDownload/BAliBASE_R1-5.tar.gz"
 BALIBASE_DIR = DOWNLOADS_DIR / "bb3_release"
+
+
+def _validate_tarball(path: Path) -> bool:
+    """Check that a file is a valid gzip tarball (not an HTML error page)."""
+    try:
+        with tarfile.open(path) as tf:
+            tf.getnames()
+        return True
+    except (tarfile.ReadError, tarfile.CompressionError, EOFError):
+        return False
 
 
 def balibase_download() -> None:
@@ -44,12 +55,37 @@ def balibase_download() -> None:
     if BALIBASE_DIR.exists():
         return
 
-    print(f"Downloading BAliBASE from {BALIBASE_URL} ...")
-    urllib.request.urlretrieve(BALIBASE_URL, tarball)
+    if tarball.exists() and not _validate_tarball(tarball):
+        print(f"  Removing corrupt tarball: {tarball}")
+        tarball.unlink()
+
+    if not tarball.exists():
+        for url in [BALIBASE_URL, BALIBASE_URL_FALLBACK]:
+            try:
+                print(f"Downloading BAliBASE from {url} ...")
+                urllib.request.urlretrieve(url, tarball)
+                if not _validate_tarball(tarball):
+                    print(f"  Downloaded file is not a valid tarball (got HTML error page?)")
+                    tarball.unlink()
+                    continue
+                break
+            except (urllib.error.HTTPError, urllib.error.URLError) as e:
+                print(f"  Failed: {e}")
+                if tarball.exists():
+                    tarball.unlink()
+                continue
+        else:
+            raise RuntimeError(
+                "Could not download BAliBASE from any URL.\n"
+                "Please download manually and place at:\n"
+                f"  {tarball}\n"
+                "Or extract bb3_release/ into:\n"
+                f"  {DOWNLOADS_DIR}/"
+            )
+
     print("Extracting ...")
     with tarfile.open(tarball) as tf:
         tf.extractall(DOWNLOADS_DIR)
-    tarball.unlink()
 
 
 def balibase_is_available() -> bool:
@@ -107,8 +143,22 @@ def bralibase_download() -> None:
         if target.exists():
             continue
         tarball = DOWNLOADS_DIR / f"{name}.tar.gz"
-        print(f"Downloading BRAliBASE {name} from {url} ...")
-        urllib.request.urlretrieve(url, tarball)
+        if tarball.exists() and not _validate_tarball(tarball):
+            print(f"  Removing corrupt tarball: {tarball}")
+            tarball.unlink()
+        if not tarball.exists():
+            print(f"Downloading BRAliBASE {name} from {url} ...")
+            try:
+                urllib.request.urlretrieve(url, tarball)
+            except (urllib.error.HTTPError, urllib.error.URLError) as e:
+                raise RuntimeError(f"Could not download BRAliBASE {name}: {e}")
+            if not _validate_tarball(tarball):
+                tarball.unlink()
+                raise RuntimeError(
+                    f"Downloaded BRAliBASE {name} is not a valid tarball.\n"
+                    f"Please download manually from:\n  {url}\n"
+                    f"and place at:\n  {tarball}"
+                )
         print("Extracting ...")
         with tarfile.open(tarball) as tf:
             tf.extractall(DOWNLOADS_DIR)
@@ -240,6 +290,140 @@ def balifam_cases() -> List[BenchmarkCase]:
 
 
 # ---------------------------------------------------------------------------
+# MDSA (Multiple DNA Sequence Alignments — Carroll et al. 2007)
+# ---------------------------------------------------------------------------
+
+MDSA_BASE_URL = "https://dna.cs.byu.edu/mdsas/tarred"
+MDSA_DIR = DOWNLOADS_DIR / "mdsa"
+# Skip PREFAB (all pairwise, 2 seqs — not useful for MSA benchmarking)
+MDSA_DATABASES = ["balibase", "oxbench", "smart"]
+MDSA_VERSION = "all"  # "100s" is too small (400 cases); "all" has 1,869 usable cases
+MDSA_MAX_SEQS = 500   # Skip very large families (SMART has up to 1,769 seqs)
+
+
+def mdsa_download() -> None:
+    """Download and extract MDSA DNA alignment benchmark datasets."""
+    MDSA_DIR.mkdir(parents=True, exist_ok=True)
+
+    for db in MDSA_DATABASES:
+        db_dir = MDSA_DIR / f"{db}_mdsa_{MDSA_VERSION}"
+        if db_dir.exists() and any(db_dir.glob("*.afa")):
+            continue
+
+        tarball = MDSA_DIR / f"{db}_mdsa_{MDSA_VERSION}.tar.gz"
+        if tarball.exists() and not _validate_tarball(tarball):
+            print(f"  Removing corrupt tarball: {tarball}")
+            tarball.unlink()
+        if not tarball.exists():
+            url = f"{MDSA_BASE_URL}/{db}_mdsa_{MDSA_VERSION}.tar.gz"
+            print(f"Downloading MDSA {db} from {url} ...")
+            urllib.request.urlretrieve(url, tarball)
+            if not _validate_tarball(tarball):
+                tarball.unlink()
+                raise RuntimeError(
+                    f"Downloaded MDSA {db} is not a valid tarball.\n"
+                    f"Please download manually from:\n  {url}\n"
+                    f"and place at:\n  {tarball}"
+                )
+
+        print(f"Extracting {db} ...")
+        with tarfile.open(tarball) as tf:
+            tf.extractall(MDSA_DIR)
+
+    # Generate unaligned files by stripping gaps from reference .afa files
+    unaligned_dir = MDSA_DIR / "unaligned"
+    unaligned_dir.mkdir(exist_ok=True)
+
+    for db in MDSA_DATABASES:
+        db_dir = MDSA_DIR / f"{db}_mdsa_{MDSA_VERSION}"
+        if not db_dir.exists():
+            continue
+        db_unaligned = unaligned_dir / db
+        db_unaligned.mkdir(exist_ok=True)
+        for afa in sorted(db_dir.glob("*.afa")):
+            out = db_unaligned / afa.name
+            if out.exists():
+                continue
+            _strip_gaps_fasta(afa, out)
+
+    print(f"MDSA ready: {sum(1 for _ in unaligned_dir.rglob('*.afa'))} unaligned files")
+
+
+def _strip_gaps_fasta(ref_path: Path, out_path: Path) -> None:
+    """Read aligned FASTA, strip gap characters, write unaligned FASTA."""
+    sequences = []
+    current_header = None
+    current_seq = []
+
+    with open(ref_path) as f:
+        for line in f:
+            line = line.rstrip("\n")
+            if line.startswith(">"):
+                if current_header is not None:
+                    seq = "".join(current_seq).replace("-", "").replace(".", "")
+                    sequences.append((current_header, seq))
+                current_header = line
+                current_seq = []
+            else:
+                current_seq.append(line)
+        if current_header is not None:
+            seq = "".join(current_seq).replace("-", "").replace(".", "")
+            sequences.append((current_header, seq))
+
+    with open(out_path, "w") as f:
+        for header, seq in sequences:
+            f.write(f"{header}\n{seq}\n")
+
+
+def mdsa_is_available() -> bool:
+    unaligned_dir = MDSA_DIR / "unaligned"
+    return unaligned_dir.exists() and any(unaligned_dir.rglob("*.afa"))
+
+
+def mdsa_cases() -> List[BenchmarkCase]:
+    """Discover MDSA test cases.
+
+    Reference = original .afa (aligned FASTA)
+    Unaligned = gap-stripped version in unaligned/{db}/*.afa
+    Skips PREFAB (pairwise) and very large families (>MDSA_MAX_SEQS).
+    """
+    cases = []
+    unaligned_dir = MDSA_DIR / "unaligned"
+
+    for db in MDSA_DATABASES:
+        ref_dir = MDSA_DIR / f"{db}_mdsa_{MDSA_VERSION}"
+        ua_dir = unaligned_dir / db
+
+        if not ref_dir.exists() or not ua_dir.exists():
+            continue
+
+        for ref in sorted(ref_dir.glob("*.afa")):
+            unaligned = ua_dir / ref.name
+            if not unaligned.exists():
+                continue
+
+            # Count sequences and skip very large families
+            n_seqs = sum(1 for line in open(ref) if line.startswith(">"))
+            if n_seqs > MDSA_MAX_SEQS:
+                continue
+            # Skip trivial pairwise cases
+            if n_seqs < 3:
+                continue
+
+            cases.append(
+                BenchmarkCase(
+                    family=ref.stem,
+                    dataset=f"mdsa_{db}",
+                    unaligned=unaligned,
+                    reference=ref,
+                    seq_type="dna",
+                )
+            )
+
+    return cases
+
+
+# ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 
@@ -258,6 +442,11 @@ DATASETS = {
         "download": balifam_download,
         "is_available": balifam_is_available,
         "cases": balifam_cases,
+    },
+    "mdsa": {
+        "download": mdsa_download,
+        "is_available": mdsa_is_available,
+        "cases": mdsa_cases,
     },
 }
 
