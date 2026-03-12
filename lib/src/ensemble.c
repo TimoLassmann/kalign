@@ -848,20 +848,20 @@ int kalign_ensemble_from_configs(struct msa* msa,
                 }
 
                 if(runs[k].realign > 0){
-                        RUN(kalign_run_realign(copy, n_threads, runs[k].type,
+                        RUN(kalign_run_realign(copy, n_threads, runs[k].matrix,
                                               runs[k].gpo, runs[k].gpe, runs[k].tgpe,
                                               runs[k].refine, 0,
                                               runs[k].dist_scale, runs[k].vsm_amax,
-                                              runs[k].realign, runs[k].use_seq_weights,
+                                              runs[k].realign, runs[k].seq_weights,
                                               runs[k].consistency_anchors,
                                               runs[k].consistency_weight));
                 }else{
-                        RUN(kalign_run_seeded(copy, n_threads, runs[k].type,
+                        RUN(kalign_run_seeded(copy, n_threads, runs[k].matrix,
                                               runs[k].gpo, runs[k].gpe, runs[k].tgpe,
                                               runs[k].refine, 0,
                                               runs[k].tree_seed, runs[k].tree_noise,
                                               runs[k].dist_scale, runs[k].vsm_amax,
-                                              runs[k].use_seq_weights,
+                                              runs[k].seq_weights,
                                               runs[k].consistency_anchors,
                                               runs[k].consistency_weight));
                 }
@@ -892,13 +892,7 @@ int kalign_ensemble_from_configs(struct msa* msa,
                 LOG_MSG("  Selected run %d (score=%.1f)", best_k + 1, scores[best_k]);
         }
 
-        /* Save POAR table if requested */
-        if(ens != NULL && ens->save_poar != NULL){
-                RUN(poar_table_write(poar, ens->save_poar));
-                if(!msa->quiet){
-                        LOG_MSG("  Saved POAR table to %s", ens->save_poar);
-                }
-        }
+        /* POAR save removed from ensemble_config — debug feature */
 
         /* Determine min_support */
         int min_support = (ens != NULL) ? ens->min_support : 0;
@@ -952,13 +946,13 @@ int kalign_ensemble_from_configs(struct msa* msa,
 
                 /* Post-selection refinement always uses REFINE_CONFIDENT and
                    the winning run's parameters (matching old behavior). */
-                RUN(kalign_run_seeded(copy, n_threads, runs[best_k].type,
+                RUN(kalign_run_seeded(copy, n_threads, runs[best_k].matrix,
                                       runs[best_k].gpo, runs[best_k].gpe,
                                       runs[best_k].tgpe,
                                       KALIGN_REFINE_CONFIDENT, 0,
                                       runs[best_k].tree_seed, runs[best_k].tree_noise,
                                       runs[best_k].dist_scale, runs[best_k].vsm_amax,
-                                      runs[best_k].use_seq_weights,
+                                      runs[best_k].seq_weights,
                                       runs[best_k].consistency_anchors,
                                       runs[best_k].consistency_weight));
 

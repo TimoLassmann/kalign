@@ -81,20 +81,24 @@ def build_pareto_df(ckpt: dict, max_runs: int) -> tuple[pd.DataFrame, dict]:
         tc = -pop_F[i, 1]
         wt = pop_F[i, 2]
 
-        ref_name = REFINE_LONG.get(params["refine"], "?")
         mode = mode_label(params)
 
         # Per-run details
         run_details = []
         for k in range(params["n_runs"]):
             mat = MATRIX_NAMES.get(params["run_types"][k], "?")
+            ref = REFINE_LONG.get(params["run_refine"][k], "?")
             noise = params["run_noise"][k]
             noise_str = f" n={noise:.2f}" if noise > 0 else ""
             run_details.append(
                 f"R{k}: gpo={params['run_gpo'][k]:.2f} "
                 f"gpe={params['run_gpe'][k]:.2f} "
-                f"tgpe={params['run_tgpe'][k]:.2f}{noise_str} {mat}"
+                f"tgpe={params['run_tgpe'][k]:.2f}{noise_str} {mat} "
+                f"vsm={params['run_vsm_amax'][k]:.2f} ref={ref}"
             )
+
+        # Summarize per-run refine/vsm for the table
+        refs = "/".join(REFINE_LONG.get(r, "?") for r in params["run_refine"])
 
         rows.append({
             "idx": i,
@@ -103,12 +107,12 @@ def build_pareto_df(ckpt: dict, max_runs: int) -> tuple[pd.DataFrame, dict]:
             "wall_time": round(wt, 1),
             "mode": mode,
             "n_runs": params["n_runs"],
-            "vsm_amax": round(params["vsm_amax"], 3),
+            "vsm_amax_0": round(params["run_vsm_amax"][0], 3),
             "seq_weights": round(params["seq_weights"], 3),
             "consistency": params["consistency"],
             "consistency_weight": round(params["consistency_weight"], 3),
             "realign": params["realign"],
-            "refine": ref_name,
+            "refine": refs,
             "min_support": params["min_support"],
             "run_details": "\n".join(run_details),
             # Flattened run 0 params for color/hover
@@ -307,7 +311,7 @@ def _format_tier_config(row) -> str:
             lines.append(f"# {line}")
     lines.append(f"config = {{")
     lines.append(f'    "n_runs": {row["n_runs"]},')
-    lines.append(f'    "vsm_amax": {row["vsm_amax"]},')
+    lines.append(f'    "vsm_amax_0": {row["vsm_amax_0"]},')
     lines.append(f'    "seq_weights": {row["seq_weights"]},')
     lines.append(f'    "consistency": {row["consistency"]},')
     lines.append(f'    "consistency_weight": {row["consistency_weight"]},')
@@ -340,7 +344,7 @@ def create_app(ckpt_path: str, remote_path: str = "", refresh_sec: int = 30,
                     id="color-by",
                     options=[
                         {"label": "Mode", "value": "mode"},
-                        {"label": "VSM amax", "value": "vsm_amax"},
+                        {"label": "VSM amax", "value": "vsm_amax_0"},
                         {"label": "Seq weights", "value": "seq_weights"},
                         {"label": "Consistency", "value": "consistency"},
                         {"label": "Realign", "value": "realign"},
@@ -465,7 +469,7 @@ def create_app(ckpt_path: str, remote_path: str = "", refresh_sec: int = 30,
                 {"name": "F1", "id": "f1"},
                 {"name": "TC", "id": "tc"},
                 {"name": "Time", "id": "wall_time"},
-                {"name": "VSM", "id": "vsm_amax"},
+                {"name": "VSM", "id": "vsm_amax_0"},
                 {"name": "SW", "id": "seq_weights"},
                 {"name": "C", "id": "consistency"},
                 {"name": "CW", "id": "consistency_weight"},
@@ -559,7 +563,7 @@ def create_app(ckpt_path: str, remote_path: str = "", refresh_sec: int = 30,
                   f"Last update: {ago:.0f}s ago")
 
         # 2D scatter
-        hover_data = ["mode", "vsm_amax", "seq_weights", "consistency",
+        hover_data = ["mode", "vsm_amax_0", "seq_weights", "consistency",
                       "realign", "refine", "gpo_0", "gpe_0", "tgpe_0", "matrix_0",
                       "min_support"]
         fig2d = px.scatter(
@@ -850,6 +854,8 @@ def create_app(ckpt_path: str, remote_path: str = "", refresh_sec: int = 30,
                     "gpe": round(float(full_params["run_gpe"][k]), 4),
                     "tgpe": round(float(full_params["run_tgpe"][k]), 4),
                     "matrix": MATRIX_NAMES.get(full_params["run_types"][k], "?"),
+                    "vsm_amax": round(float(full_params["run_vsm_amax"][k]), 4),
+                    "refine": REFINE_LONG.get(full_params["run_refine"][k], "NONE"),
                 }
                 if full_params["run_noise"][k] > 0:
                     run["noise"] = round(float(full_params["run_noise"][k]), 4)
@@ -863,12 +869,10 @@ def create_app(ckpt_path: str, remote_path: str = "", refresh_sec: int = 30,
                 },
                 "params": {
                     "n_runs": int(row["n_runs"]),
-                    "vsm_amax": float(row["vsm_amax"]),
                     "seq_weights": float(row["seq_weights"]),
                     "consistency": int(row["consistency"]),
                     "consistency_weight": float(row["consistency_weight"]),
                     "realign": int(row["realign"]),
-                    "refine": str(row["refine"]),
                     "min_support": int(row["min_support"]),
                 },
                 "runs": runs,
@@ -948,13 +952,12 @@ def _format_detail(row):
         row["run_details"],
         f"",
         f"Shared parameters:",
-        f"  vsm_amax         = {row['vsm_amax']}",
         f"  seq_weights      = {row['seq_weights']}",
         f"  consistency      = {row['consistency']}",
         f"  consistency_wt   = {row['consistency_weight']}",
         f"  realign          = {row['realign']}",
-        f"  refine           = {row['refine']}",
         f"  min_support      = {row['min_support']}",
+        f"  (vsm_amax, refine are per-run — see run details above)",
     ]
     return "\n".join(lines)
 

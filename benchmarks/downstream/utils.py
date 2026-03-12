@@ -449,24 +449,17 @@ def _parse_fasta_string(text: str) -> tuple[list[str], list[str]]:
 
 def run_kalign(
     input_fasta: Path,
-    ensemble: int = 0,
+    mode: str = "default",
     seq_type: str = "auto",
-    tgpo: float | None = None,
-    terminal_dist_scale: float | None = None,
-    refine: str | None = None,
-    vsm_amax: float | None = None,
-    realign: int | None = None,
-    consistency: int | None = None,
-    consistency_weight: float | None = None,
 ) -> AlignResult:
-    """Run kalign via the Python API.
+    """Run kalign via the Python API using mode presets.
 
     Parameters
     ----------
     input_fasta : Path
         Path to unaligned FASTA.
-    ensemble : int
-        Number of ensemble runs (0 = off).
+    mode : str
+        Alignment mode: "fast", "default", "accurate".
     seq_type : str
         Sequence type passed to ``kalign.align_from_file``.
 
@@ -477,26 +470,10 @@ def run_kalign(
     import kalign as _kalign
 
     start = time.perf_counter()
-    extra = {}
-    if tgpo is not None:
-        extra["tgpo"] = tgpo
-    if terminal_dist_scale is not None:
-        extra["terminal_dist_scale"] = terminal_dist_scale
-    if refine is not None:
-        extra["refine"] = refine
-    if vsm_amax is not None:
-        extra["vsm_amax"] = vsm_amax
-    if realign is not None:
-        extra["realign"] = realign
-    if consistency is not None:
-        extra["consistency"] = consistency
-    if consistency_weight is not None:
-        extra["consistency_weight"] = consistency_weight
     result = _kalign.align_from_file(
         str(input_fasta),
         seq_type=seq_type,
-        ensemble=ensemble,
-        **extra,
+        mode=mode,
     )
     wall = time.perf_counter() - start
 

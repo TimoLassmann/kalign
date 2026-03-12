@@ -443,16 +443,14 @@ int run_kalign(struct parameters* param)
         }else{
                 /* Single-run: use kalign_align_full */
                 struct kalign_run_config run = kalign_run_config_defaults();
-                run.type = param->type;
+                run.matrix = param->type;
                 run.gpo = param->gpo;
                 run.gpe = param->gpe;
                 run.tgpe = param->tgpe;
                 run.refine = param->refine;
                 run.adaptive_budget = param->adaptive_budget;
                 run.vsm_amax = param->vsm_amax;
-                run.use_seq_weights = -1.0f;
-                run.consistency_anchors = param->consistency_anchors;
-                run.consistency_weight = param->consistency_weight;
+                run.seq_weights = -1.0f;
                 run.realign = param->realign;
                 RUN(kalign_align_full(msa, &run, 1, NULL, param->nthreads));
         }

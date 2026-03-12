@@ -24,7 +24,8 @@ class TestModeConstants:
     def test_mode_constants_exist(self):
         assert kalign.MODE_DEFAULT == "default"
         assert kalign.MODE_FAST == "fast"
-        assert kalign.MODE_PRECISE == "precise"
+        assert kalign.MODE_ACCURATE == "accurate"
+        assert kalign.MODE_PRECISE == "precise"  # deprecated alias
 
 
 class TestAlignModes:
@@ -51,9 +52,9 @@ class TestAlignModes:
         assert all(len(s) == len(result[0]) for s in result)
 
     def test_precise_mode(self):
-        """mode='precise' produces alignment (ensemble)."""
-        result = kalign.align(TEST_SEQUENCES, mode="precise")
-        # precise uses ensemble, which returns (seqs, confidence) tuple
+        """mode='precise' is deprecated alias for 'accurate'."""
+        with pytest.warns(DeprecationWarning, match="precise"):
+            result = kalign.align(TEST_SEQUENCES, mode="precise")
         if isinstance(result, tuple):
             seqs = result[0]
         else:
@@ -61,17 +62,19 @@ class TestAlignModes:
         assert len(seqs) == len(TEST_SEQUENCES)
         assert all(len(s) == len(seqs[0]) for s in seqs)
 
+    def test_accurate_mode(self):
+        """mode='accurate' produces alignment."""
+        result = kalign.align(TEST_SEQUENCES, mode="accurate")
+        if isinstance(result, tuple):
+            seqs = result[0]
+        else:
+            seqs = result
+        assert len(seqs) == len(TEST_SEQUENCES)
+
     def test_invalid_mode(self):
         """Invalid mode raises ValueError."""
         with pytest.raises(ValueError, match="Invalid mode"):
             kalign.align(TEST_SEQUENCES, mode="turbo")
-
-    def test_explicit_param_overrides_mode(self):
-        """Explicit consistency=10 overrides fast mode default (consistency=0)."""
-        # This should not crash — fast base + explicit consistency
-        result = kalign.align(TEST_SEQUENCES, mode="fast", consistency=10)
-        assert isinstance(result, list)
-        assert len(result) == len(TEST_SEQUENCES)
 
     def test_mode_case_insensitive(self):
         """Mode names are case-insensitive."""

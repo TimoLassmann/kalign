@@ -19,7 +19,6 @@ from typing import Optional
 
 
 def _resolve_version() -> str:
-    # kalign-test is the name of the test distribution, which may be installed in test environments. If it's present, use its version; otherwise, fall back to the main kalign distribution. If neither is found, try to import __version__ from the package, and if that fails, return "unknown".
     for dist_name in ("kalign-python",):
         try:
             return dist_version(dist_name)
@@ -64,22 +63,28 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Sequence type: auto, dna, rna, internal, protein, divergent (default: auto).",
     )
     parser.add_argument(
+        "--mode",
+        default="default",
+        choices=["fast", "default", "accurate"],
+        help="Alignment mode preset (default: default).",
+    )
+    parser.add_argument(
         "--gpo",
         type=float,
         default=None,
-        help="Gap open penalty (default: Kalign internal defaults).",
+        help="Gap open penalty (overrides mode preset).",
     )
     parser.add_argument(
         "--gpe",
         type=float,
         default=None,
-        help="Gap extension penalty (default: Kalign internal defaults).",
+        help="Gap extension penalty (overrides mode preset).",
     )
     parser.add_argument(
         "--tgpe",
         type=float,
         default=None,
-        help="Terminal gap extension penalty (default: Kalign internal defaults).",
+        help="Terminal gap extension penalty (overrides mode preset).",
     )
     parser.add_argument(
         "-n",
@@ -87,69 +92,6 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=1,
         help="Number of threads to use (default: 1).",
-    )
-    parser.add_argument(
-        "--refine",
-        default="confident",
-        help="Refinement mode: none, all, confident (default: confident).",
-    )
-    parser.add_argument(
-        "--adaptive-budget",
-        action="store_true",
-        default=False,
-        help="Scale refinement trial count by uncertainty.",
-    )
-    ens = parser.add_argument_group(
-        "ensemble options",
-        "These options only take effect when --ensemble is used.",
-    )
-    ens.add_argument(
-        "--ensemble",
-        type=int,
-        default=0,
-        help="Number of ensemble runs (default: 0 = off). Try 3-5 for better accuracy.",
-    )
-    ens.add_argument(
-        "--ensemble-seed",
-        type=int,
-        default=42,
-        help="RNG seed for ensemble (default: 42).",
-    )
-    ens.add_argument(
-        "--min-support",
-        type=int,
-        default=0,
-        help="Explicit consensus threshold (default: 0 = auto).",
-    )
-    ens.add_argument(
-        "--save-poar",
-        default=None,
-        help="Save POAR consensus table to file for later re-thresholding.",
-    )
-    ens.add_argument(
-        "--load-poar",
-        default=None,
-        help="Load POAR consensus table from file (skip alignment, just re-threshold).",
-    )
-
-    adv = parser.add_argument_group("advanced options")
-    adv.add_argument(
-        "--dist-scale",
-        type=float,
-        default=0.0,
-        help="Distance scaling parameter (default: 0.0).",
-    )
-    adv.add_argument(
-        "--vsm-amax",
-        type=float,
-        default=None,
-        help="Variable Scoring Matrix a_max (default: Kalign internal defaults).",
-    )
-    adv.add_argument(
-        "--realign",
-        type=int,
-        default=0,
-        help="Realignment iterations (default: 0 = off).",
     )
 
     parser.add_argument(
@@ -204,30 +146,16 @@ def main(argv: Optional[list[str]] = None) -> int:
         input_path = str(tmp_path)
 
     try:
-        kwargs = dict(
+        result = kalign.align_from_file(
+            input_path,
             seq_type=args.seq_type,
             gap_open=args.gpo,
             gap_extend=args.gpe,
             terminal_gap_extend=args.tgpe,
             n_threads=args.nthreads,
-            refine=args.refine,
-            adaptive_budget=args.adaptive_budget,
-            ensemble=args.ensemble,
-            ensemble_seed=args.ensemble_seed,
-            min_support=args.min_support,
-            realign=args.realign,
-            dist_scale=args.dist_scale,
+            mode=args.mode,
         )
-        if args.vsm_amax is not None:
-            kwargs["vsm_amax"] = args.vsm_amax
-        if args.save_poar is not None:
-            kwargs["save_poar"] = args.save_poar
-        if args.load_poar is not None:
-            kwargs["load_poar"] = args.load_poar
 
-        result = kalign.align_from_file(input_path, **kwargs)
-
-        # Pass confidence data to Stockholm writer when available
         write_kwargs = dict(
             format=args.format,
             ids=result.names,

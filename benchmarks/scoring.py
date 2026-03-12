@@ -36,31 +36,19 @@ class AlignmentResult:
 
 
 def align_with_python_api(
-    case: BenchmarkCase, output: Path, n_threads: int = 1, refine: str = "none",
-    adaptive_budget: bool = False, ensemble: int = 0,
-    mode: Optional[str] = None,
+    case: BenchmarkCase, output: Path, n_threads: int = 1,
+    mode: str = "default",
 ) -> float:
     """Align using kalign Python API. Returns wall time in seconds."""
     start = time.perf_counter()
-    if mode is not None:
-        kalign.align_file_to_file(
-            str(case.unaligned),
-            str(output),
-            format="fasta",
-            n_threads=n_threads,
-            mode=mode,
-        )
-    else:
-        kalign.align_file_to_file(
-            str(case.unaligned),
-            str(output),
-            format="fasta",
-            seq_type=case.seq_type,
-            n_threads=n_threads,
-            refine=refine,
-            adaptive_budget=adaptive_budget,
-            ensemble=ensemble,
-        )
+    kalign.align_file_to_file(
+        str(case.unaligned),
+        str(output),
+        format="fasta",
+        seq_type=case.seq_type,
+        n_threads=n_threads,
+        mode=mode,
+    )
     return time.perf_counter() - start
 
 
@@ -69,20 +57,13 @@ def align_with_cli(
     output: Path,
     binary: str = "kalign",
     n_threads: int = 1,
-    refine: str = "none",
-    adaptive_budget: bool = False,
-    ensemble: int = 0,
+    mode: str = "default",
 ) -> float:
     """Align using kalign C binary via subprocess. Returns wall time in seconds."""
     cmd = [binary, "-i", str(case.unaligned), "-f", "fasta", "-o", str(output)]
     if n_threads > 1:
         cmd.extend(["--nthreads", str(n_threads)])
-    if refine != "none":
-        cmd.extend(["--refine", refine])
-    if adaptive_budget:
-        cmd.append("--adaptive-budget")
-    if ensemble > 0:
-        cmd.extend(["--ensemble", str(ensemble)])
+    cmd.extend(["--mode", mode])
 
     start = time.perf_counter()
     result = subprocess.run(cmd, capture_output=True, text=True)
@@ -200,10 +181,7 @@ def run_case(
     method: str = "python_api",
     binary: str = "kalign",
     n_threads: int = 1,
-    refine: str = "none",
-    adaptive_budget: bool = False,
-    ensemble: int = 0,
-    mode: Optional[str] = None,
+    mode: str = "default",
 ) -> AlignmentResult:
     """Run alignment + scoring for a single benchmark case."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -212,11 +190,10 @@ def run_case(
         try:
             if method == "python_api":
                 wall_time = align_with_python_api(
-                    case, output, n_threads, refine, adaptive_budget,
-                    ensemble, mode=mode,
+                    case, output, n_threads, mode=mode,
                 )
             elif method == "cli":
-                wall_time = align_with_cli(case, output, binary, n_threads, refine, adaptive_budget, ensemble)
+                wall_time = align_with_cli(case, output, binary, n_threads, mode=mode)
             elif method in EXTERNAL_TOOLS:
                 wall_time = align_with_external(case, output, method, n_threads)
             else:
@@ -233,8 +210,8 @@ def run_case(
                 sp_score=sp_score,
                 wall_time=wall_time,
                 seq_type=case.seq_type,
-                refine="n/a" if is_external else (mode or refine),
-                ensemble=0 if is_external else ensemble,
+                refine="n/a" if is_external else mode,
+                ensemble=0,
                 recall=detailed["recall"],
                 precision=detailed["precision"],
                 f1=detailed["f1"],
@@ -249,7 +226,7 @@ def run_case(
                 sp_score=0.0,
                 wall_time=0.0,
                 seq_type=case.seq_type,
-                refine="n/a" if is_external else (mode or refine),
-                ensemble=0 if is_external else ensemble,
+                refine="n/a" if is_external else mode,
+                ensemble=0,
                 error=str(e),
             )

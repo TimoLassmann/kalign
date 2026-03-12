@@ -12,20 +12,20 @@ Objectives (always 3):
     3. Minimize wall time (total CV evaluation time in seconds)
 
 Per-run decision variables (x max_runs slots):
-    - gpo:    gap open penalty           [2.0, 15.0]
-    - gpe:    gap extend penalty          [0.5, 5.0]
-    - tgpe:   terminal gap extend         [0.1, 3.0]
-    - noise:  tree perturbation sigma     [0.0, 0.5]
-    - matrix: substitution matrix         {PFASUM43, PFASUM60, CorBLOSUM66}
+    - gpo:       gap open penalty           [2.0, 15.0]
+    - gpe:       gap extend penalty          [0.5, 5.0]
+    - tgpe:      terminal gap extend         [0.1, 3.0]
+    - noise:     tree perturbation sigma     [0.0, 0.5]
+    - matrix:    substitution matrix         {PFASUM43, PFASUM60, CorBLOSUM66}
+    - vsm_amax:  variable scoring matrix     [0.0, 5.0]
+    - refine:    post-alignment refinement   {NONE, ALL, CONFIDENT, INLINE}
 
 Shared decision variables:
     - n_runs:             {1, 3, 5}       Core mode variable
-    - vsm_amax:           [0.0, 5.0]     Variable scoring matrix
     - seq_weights:        [0.0, 5.0]     Profile rebalancing
     - consistency:        {0..6}          Anchor consistency rounds
     - consistency_weight: [0.5, 5.0]     Consistency bonus weight
     - realign:            {0, 1, 2}       Tree-rebuild iterations
-    - refine:             {0, 1, 2, 3}    Post-alignment refinement
     - min_support:        {0..max_runs}   POAR consensus threshold
 
 Usage:
@@ -99,11 +99,11 @@ from rich.table import Table  # type: ignore[import-untyped]
 from rich.text import Text  # type: ignore[import-untyped]
 
 from kalign._core import (  # type: ignore[import-untyped]
-    PROTEIN, PROTEIN_PFASUM43, PROTEIN_PFASUM60, DNA, RNA,
+    MATRIX_PFASUM43, MATRIX_PFASUM60, MATRIX_CORBLOSUM66,
+    MATRIX_DNA, MATRIX_RNA,
     REFINE_NONE, REFINE_ALL,
     REFINE_CONFIDENT, REFINE_INLINE, ensemble_custom_file_to_file,
 )
-import kalign  # type: ignore[import-untyped]
 
 from .datasets import (BenchmarkCase,
                         balibase_cases, balibase_download, balibase_is_available,
@@ -133,11 +133,11 @@ PARAM_PROFILES = {
         "per_run_cont_upper": np.array([15.0, 5.0, 3.0, 0.5]),
         "shared_cont_lower": np.array([0.0, 0.0, 0.5]),
         "shared_cont_upper": np.array([5.0, 5.0, 5.0]),
-        "matrix_map_int": [PROTEIN_PFASUM43, PROTEIN_PFASUM60, PROTEIN],
-        "matrix_map_str": ["pfasum43", "pfasum60", "protein"],
-        "matrix_names": {PROTEIN_PFASUM43: "P43", PROTEIN_PFASUM60: "P60", PROTEIN: "CB66"},
+        "matrix_map_int": [MATRIX_PFASUM43, MATRIX_PFASUM60, MATRIX_CORBLOSUM66],
+        "matrix_map_str": ["pfasum43", "pfasum60", "corblosum66"],
+        "matrix_names": {MATRIX_PFASUM43: "P43", MATRIX_PFASUM60: "P60", MATRIX_CORBLOSUM66: "CB66"},
         "n_matrices": 3,
-        "seq_type_int": PROTEIN,  # C constant for ensemble seq_type
+        "seq_type_int": MATRIX_PFASUM43,  # default protein matrix for ensemble seq_type
         "seq_type_str": "protein",  # Python API string
         "max_consistency_idx": len(CONSISTENCY_MAP) - 1,  # full range
     },
@@ -150,11 +150,11 @@ PARAM_PROFILES = {
         "shared_cont_lower": np.array([0.0, 0.0, 0.5]),
         "shared_cont_upper": np.array([3.0, 3.0, 5.0]),
         # RNA has only one scoring type
-        "matrix_map_int": [RNA],
+        "matrix_map_int": [MATRIX_RNA],
         "matrix_map_str": ["rna"],
-        "matrix_names": {RNA: "RNA"},
+        "matrix_names": {MATRIX_RNA: "RNA"},
         "n_matrices": 1,
-        "seq_type_int": RNA,
+        "seq_type_int": MATRIX_RNA,
         "seq_type_str": "rna",
         "max_consistency_idx": len(CONSISTENCY_MAP) - 1,  # full range
     },
@@ -163,11 +163,11 @@ PARAM_PROFILES = {
         "per_run_cont_upper": np.array([20.0, 5.0, 3.0, 0.5]),
         "shared_cont_lower": np.array([0.0, 0.0, 0.5]),
         "shared_cont_upper": np.array([3.0, 3.0, 5.0]),
-        "matrix_map_int": [DNA],
+        "matrix_map_int": [MATRIX_DNA],
         "matrix_map_str": ["dna"],
-        "matrix_names": {DNA: "DNA"},
+        "matrix_names": {MATRIX_DNA: "DNA"},
         "n_matrices": 1,
-        "seq_type_int": DNA,
+        "seq_type_int": MATRIX_DNA,
         "seq_type_str": "dna",
         "max_consistency_idx": len(CONSISTENCY_MAP) - 1,  # full range
     },
@@ -185,14 +185,27 @@ def _matrix_map_int(): return _active_profile["matrix_map_int"]
 def _matrix_map_str(): return _active_profile["matrix_map_str"]
 def _matrix_names(): return _active_profile["matrix_names"]
 
-# Legacy aliases for backward compat (used in view_pareto.py etc.)
+# Legacy aliases (used in view_pareto.py etc.)
 MATRIX_MAP_INT = PARAM_PROFILES["protein"]["matrix_map_int"]
 MATRIX_MAP_STR = PARAM_PROFILES["protein"]["matrix_map_str"]
 MATRIX_NAMES = PARAM_PROFILES["protein"]["matrix_names"]
 
+# Old constant names used in view_pareto.py and checkpoint data — keep for loading old checkpoints
+_OLD_MATRIX_COMPAT = {3: MATRIX_PFASUM43, 5: MATRIX_PFASUM43, 6: MATRIX_PFASUM60}
+
 
 def get_vars(max_runs: int) -> dict:
-    """Return pymoo mixed-variable space definition."""
+    """Return pymoo mixed-variable space definition.
+
+    Per-run variables (one slot per max_runs):
+        gpo, gpe, tgpe, noise, matrix  — gap/tree params
+        vsm_amax                       — variable scoring matrix amplitude
+        refine                         — post-alignment refinement mode
+
+    Shared variables:
+        seq_weights, consistency_weight — scalars applied to all runs
+        n_runs, consistency, realign, min_support — integer/categorical
+    """
     profile = _active_profile
     lo = profile["per_run_cont_lower"]
     hi = profile["per_run_cont_upper"]
@@ -206,8 +219,10 @@ def get_vars(max_runs: int) -> dict:
         variables[f"tgpe_{k}"] = Real(bounds=(float(lo[2]), float(hi[2])))
         variables[f"noise_{k}"] = Real(bounds=(float(lo[3]), float(hi[3])))
         variables[f"matrix_{k}"] = Choice(options=list(range(profile["n_matrices"])))
+        # Per-run VSM amplitude and refinement mode
+        variables[f"vsm_amax_{k}"] = Real(bounds=(float(slo[0]), float(shi[0])))
+        variables[f"refine_{k}"] = Choice(options=REFINE_MAP)
 
-    variables["vsm_amax"] = Real(bounds=(float(slo[0]), float(shi[0])))
     variables["seq_weights"] = Real(bounds=(float(slo[1]), float(shi[1])))
     variables["consistency_weight"] = Real(bounds=(float(slo[2]), float(shi[2])))
 
@@ -215,7 +230,6 @@ def get_vars(max_runs: int) -> dict:
     variables["n_runs"] = Choice(options=N_RUNS_MAP)
     variables["consistency"] = Choice(options=consistency_options)
     variables["realign"] = Integer(bounds=(0, 2))
-    variables["refine"] = Choice(options=REFINE_MAP)
     variables["min_support"] = Integer(bounds=(0, max_runs))
 
     return variables
@@ -226,19 +240,28 @@ def decode_unified_params(x, max_runs: int):
 
     x is a dict with keys like 'gpo_0', 'n_runs', 'consistency', etc.
     Values are native types (float for Real, int for Integer/Choice).
+
+    vsm_amax and refine are per-run (vsm_amax_{k}, refine_{k}).
+    If the per-run keys are missing (old checkpoint), falls back to
+    shared 'vsm_amax' / 'refine' keys.
     """
     n_runs = int(x["n_runs"])
     consistency = int(x["consistency"])
     realign = int(x["realign"])
-    refine = int(x["refine"])
     min_support_raw = int(x["min_support"])
 
-    vsm_amax = float(x["vsm_amax"])
     seq_weights = float(x["seq_weights"])
     consistency_weight = float(x["consistency_weight"])
 
     run_gpo, run_gpe, run_tgpe, run_noise = [], [], [], []
     run_types, run_matrices = [], []
+    run_vsm_amax, run_refine = [], []
+
+    # Detect old checkpoint format (shared vsm_amax / refine)
+    has_per_run_vsm = f"vsm_amax_0" in x
+    has_per_run_refine = f"refine_0" in x
+    shared_vsm = float(x.get("vsm_amax", 0.0)) if not has_per_run_vsm else 0.0
+    shared_refine = int(x.get("refine", REFINE_NONE)) if not has_per_run_refine else REFINE_NONE
 
     for k in range(n_runs):
         run_gpo.append(float(x[f"gpo_{k}"]))
@@ -248,6 +271,8 @@ def decode_unified_params(x, max_runs: int):
         matrix_idx = int(x[f"matrix_{k}"])
         run_types.append(_matrix_map_int()[matrix_idx])
         run_matrices.append(_matrix_map_str()[matrix_idx])
+        run_vsm_amax.append(float(x[f"vsm_amax_{k}"]) if has_per_run_vsm else shared_vsm)
+        run_refine.append(int(x[f"refine_{k}"]) if has_per_run_refine else shared_refine)
 
     # --- Masking rules ---
 
@@ -274,12 +299,12 @@ def decode_unified_params(x, max_runs: int):
         "run_noise": run_noise,
         "run_types": run_types,
         "run_matrices": run_matrices,
-        "vsm_amax": vsm_amax,
+        "run_vsm_amax": run_vsm_amax,
+        "run_refine": run_refine,
         "seq_weights": seq_weights,
         "consistency_weight": consistency_weight,
         "consistency": consistency,
         "realign": realign,
-        "refine": refine,
         "min_support": min_support,
     }
 
@@ -294,20 +319,22 @@ def encode_unified_params(params, max_runs: int) -> dict:
             x[f"tgpe_{k}"] = params["run_tgpe"][k]
             x[f"noise_{k}"] = params["run_noise"][k]
             x[f"matrix_{k}"] = _matrix_map_int().index(params["run_types"][k])
+            x[f"vsm_amax_{k}"] = params["run_vsm_amax"][k]
+            x[f"refine_{k}"] = params["run_refine"][k]
         else:
             x[f"gpo_{k}"] = params["run_gpo"][0]
             x[f"gpe_{k}"] = params["run_gpe"][0]
             x[f"tgpe_{k}"] = params["run_tgpe"][0]
             x[f"noise_{k}"] = params["run_noise"][0]
             x[f"matrix_{k}"] = _matrix_map_int().index(params["run_types"][0])
+            x[f"vsm_amax_{k}"] = params["run_vsm_amax"][0]
+            x[f"refine_{k}"] = params["run_refine"][0]
 
-    x["vsm_amax"] = params["vsm_amax"]
     x["seq_weights"] = params["seq_weights"]
     x["consistency_weight"] = params["consistency_weight"]
     x["n_runs"] = params["n_runs"]
     x["consistency"] = params["consistency"]
     x["realign"] = params["realign"]
-    x["refine"] = params["refine"]
     x["min_support"] = params["min_support"]
     return x
 
@@ -321,17 +348,20 @@ def mode_label(params):
 def format_unified_short(params):
     """Compact one-line summary."""
     n_runs = params["n_runs"]
-    ref = REFINE_NAMES.get(params["refine"], "?")
 
     if n_runs == 1:
         mat = _matrix_names().get(params["run_types"][0], "?")
+        ref = REFINE_NAMES.get(params["run_refine"][0], "?")
         return (f"{mode_label(params)} {mat} gpo={params['run_gpo'][0]:.1f} "
-                f"vsm={params['vsm_amax']:.1f} sw={params['seq_weights']:.1f} "
+                f"vsm={params['run_vsm_amax'][0]:.1f} sw={params['seq_weights']:.1f} "
                 f"c={params['consistency']} re={params['realign']} ref={ref}")
     else:
-        return (f"{mode_label(params)} vsm={params['vsm_amax']:.1f} "
+        # Show per-run refine modes compactly
+        refs = "/".join(REFINE_NAMES.get(r, "?") for r in params["run_refine"])
+        vsms = "/".join(f"{v:.1f}" for v in params["run_vsm_amax"])
+        return (f"{mode_label(params)} vsm={vsms} "
                 f"sw={params['seq_weights']:.1f} c={params['consistency']} "
-                f"re={params['realign']} ref={ref} ms={params['min_support']}")
+                f"re={params['realign']} ref={refs} ms={params['min_support']}")
 
 
 def format_unified_long(params):
@@ -339,16 +369,16 @@ def format_unified_long(params):
     lines = [f"mode={mode_label(params)} n_runs={params['n_runs']}"]
     for k in range(params["n_runs"]):
         mat = _matrix_names().get(params["run_types"][k], "?")
+        ref = REFINE_LONG.get(params["run_refine"][k], "?")
         lines.append(f"  run_{k}: gpo={params['run_gpo'][k]:.3f} "
                      f"gpe={params['run_gpe'][k]:.3f} "
                      f"tgpe={params['run_tgpe'][k]:.3f} "
-                     f"noise={params['run_noise'][k]:.3f} {mat}")
-    ref = REFINE_LONG.get(params["refine"], "?")
-    lines.append(f"  vsm_amax={params['vsm_amax']:.3f} "
-                 f"seq_weights={params['seq_weights']:.3f}")
+                     f"noise={params['run_noise'][k]:.3f} {mat} "
+                     f"vsm={params['run_vsm_amax'][k]:.3f} ref={ref}")
+    lines.append(f"  seq_weights={params['seq_weights']:.3f}")
     lines.append(f"  consistency={params['consistency']} "
                  f"consistency_weight={params['consistency_weight']:.3f}")
-    lines.append(f"  realign={params['realign']} refine={ref} "
+    lines.append(f"  realign={params['realign']} "
                  f"min_support={params['min_support']}")
     return "\n".join(lines)
 
@@ -390,7 +420,6 @@ def evaluate_unified(params, cases, n_threads=1, quiet=True):
     """Run kalign with unified params on all cases, return mean metrics."""
     results_by_cat: Dict[str, list] = {}
     total_time = 0.0
-    n_runs = params["n_runs"]
 
     for case in cases:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -399,47 +428,30 @@ def evaluate_unified(params, cases, n_threads=1, quiet=True):
             try:
                 start = time.perf_counter()
 
-                if n_runs == 1:
-                    # Single-run path
-                    kalign.align_file_to_file(
-                        str(case.unaligned),
-                        str(output),
-                        format="fasta",
-                        seq_type=params["run_matrices"][0],
-                        gap_open=params["run_gpo"][0],
-                        gap_extend=params["run_gpe"][0],
-                        terminal_gap_extend=params["run_tgpe"][0],
-                        n_threads=n_threads,
-                        vsm_amax=params["vsm_amax"],
-                        seq_weights=params["seq_weights"],
-                        consistency=params["consistency"],
-                        consistency_weight=params["consistency_weight"],
-                        realign=params["realign"],
-                        refine=params["refine"],
-                        mode=None,
-                    )
-                else:
-                    # Ensemble path
-                    ensemble_custom_file_to_file(
-                        str(case.unaligned),
-                        str(output),
-                        run_gpo=params["run_gpo"],
-                        run_gpe=params["run_gpe"],
-                        run_tgpe=params["run_tgpe"],
-                        run_noise=params["run_noise"],
-                        run_types=params["run_types"],
-                        format="fasta",
-                        seq_type=_active_profile["seq_type_int"],
-                        seed=42,
-                        min_support=params["min_support"],
-                        refine=params["refine"],
-                        vsm_amax=params["vsm_amax"],
-                        realign=params["realign"],
-                        seq_weights=params["seq_weights"],
-                        n_threads=n_threads,
-                        consistency_anchors=params["consistency"],
-                        consistency_weight=params["consistency_weight"],
-                    )
+                # Always use ensemble_custom_file_to_file — it handles
+                # n_runs=1 just fine and is the only path that accepts
+                # all fine-grained optimizer parameters.
+                ensemble_custom_file_to_file(
+                    str(case.unaligned),
+                    str(output),
+                    run_gpo=params["run_gpo"],
+                    run_gpe=params["run_gpe"],
+                    run_tgpe=params["run_tgpe"],
+                    run_noise=params["run_noise"],
+                    run_types=params["run_types"],
+                    format="fasta",
+                    seq_type=_active_profile["seq_type_int"],
+                    seed=42,
+                    min_support=params["min_support"],
+                    realign=params["realign"],
+                    seq_weights=params["seq_weights"],
+                    n_threads=n_threads,
+                    consistency_anchors=params["consistency"],
+                    consistency_weight=params["consistency_weight"],
+                    # Per-run overrides
+                    run_vsm_amax=params["run_vsm_amax"],
+                    run_refine=params["run_refine"],
+                )
 
                 wall_time = time.perf_counter() - start
                 total_time += wall_time
@@ -597,19 +609,20 @@ class Dashboard:
     def _format_best_entry(self, label, e, delta_str):
         """Format a best-of entry with full parameter details."""
         p = e["params"]
-        ref = REFINE_NAMES.get(p.get("refine", 0), "?")
         header = f"{label}  {mode_label(p)}  {e['wall_time']:.0f}s  {delta_str}"
-        # Per-run gap penalties
+        # Per-run details
         run_parts = []
         for k in range(p["n_runs"]):
             mat = MATRIX_NAMES.get(p["run_types"][k], "?")
+            ref = REFINE_NAMES.get(p["run_refine"][k], "?")
             noise_str = f" n={p['run_noise'][k]:.2f}" if p["run_noise"][k] > 0 else ""
             run_parts.append(f"  R{k}: gpo={p['run_gpo'][k]:.2f} "
                              f"gpe={p['run_gpe'][k]:.2f} "
-                             f"tgpe={p['run_tgpe'][k]:.2f}{noise_str} {mat}")
-        shared = (f"  vsm={p['vsm_amax']:.2f} sw={p['seq_weights']:.2f} "
+                             f"tgpe={p['run_tgpe'][k]:.2f}{noise_str} {mat} "
+                             f"vsm={p['run_vsm_amax'][k]:.2f} ref={ref}")
+        shared = (f"  sw={p['seq_weights']:.2f} "
                   f"c={p['consistency']} cw={p['consistency_weight']:.2f} "
-                  f"re={p['realign']} ref={ref} ms={p['min_support']}")
+                  f"re={p['realign']} ms={p['min_support']}")
         return "\n".join([header] + run_parts + [shared])
 
     def _build_best_panel(self):
@@ -654,17 +667,17 @@ class Dashboard:
             p = entry.get("params", {})
             f1_style = "bold green" if entry["f1"] > bl_f1 else ""
             tc_style = "bold green" if entry["tc"] > bl_tc else ""
-            ref = REFINE_NAMES.get(p.get("refine", 0), "?")
+            refs = "/".join(REFINE_NAMES.get(r, "?") for r in p.get("run_refine", [0]))
 
             # Build detailed params string
             run_strs = []
             for k in range(p.get("n_runs", 1)):
                 mat = MATRIX_NAMES.get(p["run_types"][k], "?")
+                vsm = p["run_vsm_amax"][k]
                 run_strs.append(f"R{k}:{p['run_gpo'][k]:.1f}/{p['run_gpe'][k]:.2f}/"
-                                f"{p['run_tgpe'][k]:.2f}/{mat}")
+                                f"{p['run_tgpe'][k]:.2f}/{mat}/v{vsm:.1f}")
             runs = " ".join(run_strs)
-            shared = (f"vsm={p.get('vsm_amax', 0):.1f} "
-                      f"sw={p.get('seq_weights', 0):.1f} "
+            shared = (f"sw={p.get('seq_weights', 0):.1f} "
                       f"ms={p.get('min_support', 0)}")
             params_str = f"{runs} | {shared}"
 
@@ -676,7 +689,7 @@ class Dashboard:
                 f"{entry.get('wall_time', 0):.0f}s",
                 str(p.get("consistency", 0)),
                 str(p.get("realign", 0)),
-                ref,
+                refs,
                 params_str,
             )
         return table
@@ -701,14 +714,15 @@ class Dashboard:
         lines = []
         for e in self.recent_evals[-5:]:
             p = e.get("params", {})
-            ref = REFINE_NAMES.get(p.get("refine", 0), "?")
+            ref0 = REFINE_NAMES.get(p["run_refine"][0], "?") if p.get("run_refine") else "?"
             mat = MATRIX_NAMES.get(p["run_types"][0], "?") if p.get("run_types") else "?"
             gpo = p["run_gpo"][0] if p.get("run_gpo") else 0
+            vsm0 = p["run_vsm_amax"][0] if p.get("run_vsm_amax") else 0
             lines.append(f"F1={e['f1']:.4f} TC={e['tc']:.4f} "
                          f"t={e['wall_time']:.0f}s {mode_label(p)} "
                          f"gpo={gpo:.1f} {mat} "
-                         f"vsm={p.get('vsm_amax', 0):.1f} "
-                         f"c={p.get('consistency', 0)} re={p.get('realign', 0)} ref={ref}")
+                         f"vsm={vsm0:.1f} "
+                         f"c={p.get('consistency', 0)} re={p.get('realign', 0)} ref={ref0}")
         return Panel("\n".join(lines) if lines else "(none)", title="Recent")
 
     def _build_layout(self):
@@ -978,7 +992,7 @@ class GenerationCallback(Callback):
             raw_X = pop.get("X")
             pop_X = np.array([dict(d) for d in raw_X], dtype=object)
             ckpt = {
-                "format": "mixed_v1",
+                "format": "mixed_v2",
                 "pop_X": pop_X,
                 "pop_F": pop.get("F").copy(),
                 "pop_G": pop.get("G"),
@@ -1010,25 +1024,29 @@ BASELINE_CONFIGS_PROTEIN = {
     "fast": {
         "n_runs": 1,
         "run_gpo": [7.0], "run_gpe": [1.25], "run_tgpe": [1.0], "run_noise": [0.0],
-        "run_types": [PROTEIN_PFASUM60], "run_matrices": ["pfasum60"],
-        "vsm_amax": 2.0, "seq_weights": 0.0, "consistency_weight": 2.0,
-        "consistency": 0, "realign": 0, "refine": REFINE_NONE, "min_support": 0,
+        "run_types": [MATRIX_PFASUM60], "run_matrices": ["pfasum60"],
+        "run_vsm_amax": [2.0], "run_refine": [REFINE_NONE],
+        "seq_weights": 0.0, "consistency_weight": 2.0,
+        "consistency": 0, "realign": 0, "min_support": 0,
     },
     "accurate": {
         "n_runs": 1,
         "run_gpo": [8.472], "run_gpe": [0.554], "run_tgpe": [0.409], "run_noise": [0.0],
-        "run_types": [PROTEIN_PFASUM60], "run_matrices": ["pfasum60"],
-        "vsm_amax": 1.359, "seq_weights": 3.407, "consistency_weight": 1.167,
-        "consistency": 8, "realign": 2, "refine": REFINE_NONE, "min_support": 0,
+        "run_types": [MATRIX_PFASUM60], "run_matrices": ["pfasum60"],
+        "run_vsm_amax": [1.359], "run_refine": [REFINE_NONE],
+        "seq_weights": 3.407, "consistency_weight": 1.167,
+        "consistency": 8, "realign": 2, "min_support": 0,
     },
     "ensemble": {
         "n_runs": 3,
         "run_gpo": [7.0, 3.5, 10.5], "run_gpe": [1.25, 2.5, 0.625],
         "run_tgpe": [1.0, 2.0, 0.5], "run_noise": [0.0, 0.15, 0.15],
-        "run_types": [PROTEIN_PFASUM60, PROTEIN_PFASUM60, PROTEIN_PFASUM60],
+        "run_types": [MATRIX_PFASUM60, MATRIX_PFASUM60, MATRIX_PFASUM60],
         "run_matrices": ["pfasum60", "pfasum60", "pfasum60"],
-        "vsm_amax": 2.0, "seq_weights": 0.0, "consistency_weight": 2.0,
-        "consistency": 0, "realign": 1, "refine": REFINE_CONFIDENT, "min_support": 0,
+        "run_vsm_amax": [2.0, 2.0, 2.0],
+        "run_refine": [REFINE_CONFIDENT, REFINE_CONFIDENT, REFINE_CONFIDENT],
+        "seq_weights": 0.0, "consistency_weight": 2.0,
+        "consistency": 0, "realign": 1, "min_support": 0,
     },
 }
 
@@ -1036,24 +1054,28 @@ BASELINE_CONFIGS_RNA = {
     "fast": {
         "n_runs": 1,
         "run_gpo": [7.0], "run_gpe": [1.25], "run_tgpe": [1.0], "run_noise": [0.0],
-        "run_types": [RNA], "run_matrices": ["rna"],
-        "vsm_amax": 0.0, "seq_weights": 0.0, "consistency_weight": 2.0,
-        "consistency": 0, "realign": 0, "refine": REFINE_NONE, "min_support": 0,
+        "run_types": [MATRIX_RNA], "run_matrices": ["rna"],
+        "run_vsm_amax": [0.0], "run_refine": [REFINE_NONE],
+        "seq_weights": 0.0, "consistency_weight": 2.0,
+        "consistency": 0, "realign": 0, "min_support": 0,
     },
     "accurate": {
         "n_runs": 1,
         "run_gpo": [7.0], "run_gpe": [1.25], "run_tgpe": [1.0], "run_noise": [0.0],
-        "run_types": [RNA], "run_matrices": ["rna"],
-        "vsm_amax": 0.0, "seq_weights": 0.0, "consistency_weight": 2.0,
-        "consistency": 8, "realign": 2, "refine": REFINE_NONE, "min_support": 0,
+        "run_types": [MATRIX_RNA], "run_matrices": ["rna"],
+        "run_vsm_amax": [0.0], "run_refine": [REFINE_NONE],
+        "seq_weights": 0.0, "consistency_weight": 2.0,
+        "consistency": 8, "realign": 2, "min_support": 0,
     },
     "ensemble": {
         "n_runs": 3,
         "run_gpo": [7.0, 3.5, 10.5], "run_gpe": [1.25, 2.5, 0.625],
         "run_tgpe": [1.0, 2.0, 0.5], "run_noise": [0.0, 0.15, 0.15],
-        "run_types": [RNA, RNA, RNA], "run_matrices": ["rna", "rna", "rna"],
-        "vsm_amax": 0.0, "seq_weights": 0.0, "consistency_weight": 2.0,
-        "consistency": 0, "realign": 1, "refine": REFINE_CONFIDENT, "min_support": 0,
+        "run_types": [MATRIX_RNA, MATRIX_RNA, MATRIX_RNA], "run_matrices": ["rna", "rna", "rna"],
+        "run_vsm_amax": [0.0, 0.0, 0.0],
+        "run_refine": [REFINE_CONFIDENT, REFINE_CONFIDENT, REFINE_CONFIDENT],
+        "seq_weights": 0.0, "consistency_weight": 2.0,
+        "consistency": 0, "realign": 1, "min_support": 0,
     },
 }
 
@@ -1061,24 +1083,28 @@ BASELINE_CONFIGS_DNA = {
     "fast": {
         "n_runs": 1,
         "run_gpo": [7.0], "run_gpe": [1.25], "run_tgpe": [1.0], "run_noise": [0.0],
-        "run_types": [DNA], "run_matrices": ["dna"],
-        "vsm_amax": 0.0, "seq_weights": 0.0, "consistency_weight": 2.0,
-        "consistency": 0, "realign": 0, "refine": REFINE_NONE, "min_support": 0,
+        "run_types": [MATRIX_DNA], "run_matrices": ["dna"],
+        "run_vsm_amax": [0.0], "run_refine": [REFINE_NONE],
+        "seq_weights": 0.0, "consistency_weight": 2.0,
+        "consistency": 0, "realign": 0, "min_support": 0,
     },
     "accurate": {
         "n_runs": 1,
         "run_gpo": [7.0], "run_gpe": [1.25], "run_tgpe": [1.0], "run_noise": [0.0],
-        "run_types": [DNA], "run_matrices": ["dna"],
-        "vsm_amax": 0.0, "seq_weights": 0.0, "consistency_weight": 2.0,
-        "consistency": 8, "realign": 2, "refine": REFINE_NONE, "min_support": 0,
+        "run_types": [MATRIX_DNA], "run_matrices": ["dna"],
+        "run_vsm_amax": [0.0], "run_refine": [REFINE_NONE],
+        "seq_weights": 0.0, "consistency_weight": 2.0,
+        "consistency": 8, "realign": 2, "min_support": 0,
     },
     "ensemble": {
         "n_runs": 3,
         "run_gpo": [7.0, 3.5, 10.5], "run_gpe": [1.25, 2.5, 0.625],
         "run_tgpe": [1.0, 2.0, 0.5], "run_noise": [0.0, 0.15, 0.15],
-        "run_types": [DNA, DNA, DNA], "run_matrices": ["dna", "dna", "dna"],
-        "vsm_amax": 0.0, "seq_weights": 0.0, "consistency_weight": 2.0,
-        "consistency": 8, "realign": 1, "refine": REFINE_CONFIDENT, "min_support": 0,
+        "run_types": [MATRIX_DNA, MATRIX_DNA, MATRIX_DNA], "run_matrices": ["dna", "dna", "dna"],
+        "run_vsm_amax": [0.0, 0.0, 0.0],
+        "run_refine": [REFINE_CONFIDENT, REFINE_CONFIDENT, REFINE_CONFIDENT],
+        "seq_weights": 0.0, "consistency_weight": 2.0,
+        "consistency": 8, "realign": 1, "min_support": 0,
     },
 }
 
@@ -1287,11 +1313,15 @@ def main():
             console.print(f"[bold red]Checkpoint not found:[/] {resume_path}")
             return
         ckpt = load_checkpoint(resume_path)
-        if ckpt.get("format") != "mixed_v1":
+        ckpt_fmt = ckpt.get("format")
+        if ckpt_fmt not in ("mixed_v1", "mixed_v2"):
             console.print("[bold red]Cannot resume from old-format checkpoint.[/]")
             console.print("Old checkpoints used float arrays; new format uses mixed variables.")
             console.print("Please start a fresh optimization run (remove --resume).")
             return
+        if ckpt_fmt == "mixed_v1":
+            console.print("[bold yellow]Note:[/] resuming from v1 checkpoint. "
+                          "Old shared vsm_amax/refine will be expanded to per-run arrays.")
         if ckpt.get("max_runs") != max_runs:
             console.print(f"[bold red]max_runs mismatch:[/] checkpoint has "
                           f"{ckpt.get('max_runs')}, requested {max_runs}")
@@ -1495,16 +1525,16 @@ def main():
             f.write(f"    n_runs={p['n_runs']}\n")
             for run_k in range(p["n_runs"]):
                 mat = MATRIX_NAMES.get(p["run_types"][run_k], "?")
+                ref = REFINE_LONG.get(p["run_refine"][run_k], "?")
                 f.write(f"    run_{run_k}: gpo={p['run_gpo'][run_k]:.3f} "
                         f"gpe={p['run_gpe'][run_k]:.3f} "
                         f"tgpe={p['run_tgpe'][run_k]:.3f} "
-                        f"noise={p['run_noise'][run_k]:.3f} {mat}\n")
-            ref = REFINE_LONG.get(p["refine"], "?")
-            f.write(f"    vsm_amax={p['vsm_amax']:.3f} "
-                    f"seq_weights={p['seq_weights']:.3f}\n")
+                        f"noise={p['run_noise'][run_k]:.3f} {mat} "
+                        f"vsm={p['run_vsm_amax'][run_k]:.3f} ref={ref}\n")
+            f.write(f"    seq_weights={p['seq_weights']:.3f}\n")
             f.write(f"    consistency={p['consistency']} "
                     f"consistency_weight={p['consistency_weight']:.3f}\n")
-            f.write(f"    realign={p['realign']} refine={ref} "
+            f.write(f"    realign={p['realign']} "
                     f"min_support={p['min_support']}\n\n")
 
     console.print(f"Pareto front saved to {summary_path}")

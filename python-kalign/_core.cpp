@@ -69,251 +69,6 @@ static py::object extract_confidence(struct msa* msa_data, int numseq) {
     return result;
 }
 
-// Shared alignment helper — builds kalign_run_config and calls kalign_align_full.
-// All alignment paths go through the same function, eliminating routing bugs.
-static int run_alignment(struct msa* msa_data, int n_threads, int seq_type,
-                         float gap_open, float gap_extend, float terminal_gap_extend,
-                         int refine, int adaptive_budget,
-                         int ensemble, uint64_t ensemble_seed,
-                         float dist_scale, float vsm_amax,
-                         int min_support, int realign,
-                         const std::string& save_poar,
-                         const std::string& load_poar,
-                         float use_seq_weights = -1.0f,
-                         int consistency_anchors = 0, float consistency_weight = 2.0f)
-{
-    if (!load_poar.empty()) {
-        return kalign_consensus_from_poar(msa_data, load_poar.c_str(),
-                                          min_support > 0 ? min_support : 2);
-    }
-
-    struct kalign_run_config base = kalign_run_config_defaults();
-    base.type = seq_type;
-    base.gpo = gap_open;
-    base.gpe = gap_extend;
-    base.tgpe = terminal_gap_extend;
-    base.refine = refine;
-    base.adaptive_budget = adaptive_budget;
-    base.dist_scale = dist_scale;
-    base.vsm_amax = vsm_amax;
-    base.use_seq_weights = use_seq_weights;
-    base.consistency_anchors = consistency_anchors;
-    base.consistency_weight = consistency_weight;
-    base.realign = realign;
-
-    if (ensemble > 0) {
-        /* Ensemble path: resolve base gap penalties, then generate diversified runs.
-           We need resolved gap penalties for the scale factors to work.
-           Use kalign_ensemble (old path) which handles sentinel resolution internally,
-           OR resolve here and use kalign_align_full. We use the old kalign_ensemble
-           to maintain exact backward compatibility. */
-        const char* save_path = save_poar.empty() ? nullptr : save_poar.c_str();
-        return kalign_ensemble(msa_data, n_threads, seq_type, ensemble,
-                               gap_open, gap_extend, terminal_gap_extend,
-                               ensemble_seed, min_support, save_path,
-                               refine, dist_scale, vsm_amax, realign,
-                               use_seq_weights,
-                               consistency_anchors, consistency_weight);
-    }
-
-    /* Single-run path: all params go through kalign_align_full */
-    return kalign_align_full(msa_data, &base, 1, nullptr, n_threads);
-}
-
-// Main alignment function
-py::object align_sequences(
-    const std::vector<std::string>& sequences,
-    int seq_type = KALIGN_TYPE_UNDEFINED,
-    float gap_open = -1.0f,
-    float gap_extend = -1.0f,
-    float terminal_gap_extend = -1.0f,
-    int n_threads = 1,
-    int refine = KALIGN_REFINE_NONE,
-    int ensemble = 0,
-    int min_support = 0,
-    float seq_weights = -1.0f,
-    int consistency_anchors = 0, float consistency_weight = 2.0f,
-    float vsm_amax = -1.0f,
-    int realign = 0,
-    uint64_t ensemble_seed = 42
-) {
-    if (sequences.empty()) {
-        throw std::invalid_argument("Empty sequence list provided");
-    }
-
-    // Convert Python strings to C format
-    std::vector<char*> seq_ptrs;
-    std::vector<int> seq_lengths;
-    seq_ptrs.reserve(sequences.size());
-    seq_lengths.reserve(sequences.size());
-
-    for (const auto& seq : sequences) {
-        seq_ptrs.push_back(const_cast<char*>(seq.c_str()));
-        seq_lengths.push_back(static_cast<int>(seq.length()));
-    }
-
-    if (n_threads < 1) {
-        n_threads = 1;
-    }
-
-    // Build msa struct from input arrays
-    struct msa* msa_data = nullptr;
-    int result = kalign_arr_to_msa(seq_ptrs.data(), seq_lengths.data(),
-                                    static_cast<int>(sequences.size()), &msa_data);
-    if (result != 0 || !msa_data) {
-        throw std::runtime_error("Failed to create MSA from input sequences");
-    }
-    msa_data->quiet = 1;
-
-    // Route to appropriate alignment function
-    result = run_alignment(msa_data, n_threads, seq_type,
-                           gap_open, gap_extend, terminal_gap_extend,
-                           refine, 0,
-                           ensemble, ensemble_seed,
-                           0.0f, vsm_amax,
-                           min_support, realign,
-                           "", "",
-                           seq_weights,
-                           consistency_anchors, consistency_weight);
-
-    if (result != 0) {
-        kalign_free_msa(msa_data);
-        throw std::runtime_error("Kalign alignment failed with error code: " + std::to_string(result));
-    }
-
-    // Extract confidence data before converting to arrays (which frees the MSA)
-    py::object confidence = extract_confidence(msa_data, static_cast<int>(sequences.size()));
-
-    // Extract aligned sequences
-    char** aligned_seqs = nullptr;
-    int alignment_length = 0;
-    result = kalign_msa_to_arr(msa_data, &aligned_seqs, &alignment_length);
-    kalign_free_msa(msa_data);
-
-    if (result != 0 || !aligned_seqs) {
-        throw std::runtime_error("Failed to extract aligned sequences");
-    }
-
-    // Convert results back to Python
-    auto seqs = c_strings_to_python(aligned_seqs, static_cast<int>(sequences.size()), alignment_length);
-
-    // If ensemble was used and confidence data exists, return tuple
-    if (ensemble > 0 && !confidence.is_none()) {
-        return py::make_tuple(seqs, confidence);
-    }
-
-    // Otherwise return just sequences (backward compat)
-    return py::cast(seqs);
-}
-
-// File-based alignment function — returns (names, sequences) or (names, sequences, confidence)
-py::object align_from_file(
-    const std::string& input_file,
-    int seq_type = KALIGN_TYPE_UNDEFINED,
-    float gap_open = -1.0f,
-    float gap_extend = -1.0f,
-    float terminal_gap_extend = -1.0f,
-    int n_threads = 1,
-    int refine = KALIGN_REFINE_NONE,
-    int adaptive_budget = 0,
-    int ensemble = 0,
-    uint64_t ensemble_seed = 42,
-    float dist_scale = 0.0f,
-    float vsm_amax = -1.0f,
-    int min_support = 0,
-    int realign = 0,
-    const std::string& save_poar = "",
-    const std::string& load_poar = "",
-    float seq_weights = -1.0f,
-    int consistency_anchors = 0, float consistency_weight = 2.0f
-) {
-    struct msa* msa_data = nullptr;
-
-    // Read input file
-    int result = kalign_read_input(const_cast<char*>(input_file.c_str()), &msa_data, 1);
-    if (result != 0) {
-        throw std::runtime_error("Failed to read input file: " + input_file);
-    }
-
-    // Check if msa_data is NULL - this happens when the file format cannot be detected
-    if (!msa_data) {
-        throw std::runtime_error("Could not detect valid sequence format in file: " + input_file);
-    }
-
-    // Perform alignment
-    result = run_alignment(msa_data, n_threads, seq_type,
-                           gap_open, gap_extend, terminal_gap_extend,
-                           refine, adaptive_budget,
-                           ensemble, ensemble_seed,
-                           dist_scale, vsm_amax,
-                           min_support, realign,
-                           save_poar, load_poar,
-                           seq_weights,
-                           consistency_anchors, consistency_weight);
-    if (result != 0) {
-        kalign_free_msa(msa_data);
-        throw std::runtime_error("Kalign alignment failed with error code: " + std::to_string(result));
-    }
-
-    // Extract confidence data before writing (which doesn't preserve it)
-    py::object confidence = extract_confidence(msa_data, msa_data->numseq);
-
-    // Write to a temporary file so kalign_write_msa handles gap insertion
-    const char* tmpdir = std::getenv("TMPDIR");
-    if (!tmpdir) tmpdir = std::getenv("TMP");
-    if (!tmpdir) tmpdir = std::getenv("TEMP");
-    if (!tmpdir) tmpdir = "/tmp";
-    std::string temp_file = std::string(tmpdir) + "/kalign_output.fa";
-    result = kalign_write_msa(msa_data, const_cast<char*>(temp_file.c_str()), const_cast<char*>("fasta"));
-
-    kalign_free_msa(msa_data);
-
-    if (result != 0) {
-        throw std::runtime_error("Failed to write alignment results");
-    }
-
-    // Parse the FASTA file, capturing both headers (names) and sequences
-    std::ifstream file(temp_file);
-    std::vector<std::string> names;
-    std::vector<std::string> aligned_sequences;
-    std::string line, current_name, current_seq;
-
-    while (std::getline(file, line)) {
-        if (line.empty()) continue;
-
-        if (line[0] == '>') {
-            if (!current_seq.empty()) {
-                names.push_back(current_name);
-                aligned_sequences.push_back(current_seq);
-                current_seq.clear();
-            }
-            // Strip the '>' prefix; take everything up to the first whitespace as the name
-            current_name = line.substr(1);
-            auto ws = current_name.find_first_of(" \t");
-            if (ws != std::string::npos) {
-                current_name = current_name.substr(0, ws);
-            }
-        } else {
-            current_seq += line;
-        }
-    }
-
-    if (!current_seq.empty()) {
-        names.push_back(current_name);
-        aligned_sequences.push_back(current_seq);
-    }
-
-    // Clean up temp file
-    std::remove(temp_file.c_str());
-
-    // If confidence data exists, return 3-tuple
-    if (!confidence.is_none()) {
-        return py::make_tuple(names, aligned_sequences, confidence);
-    }
-
-    return py::make_tuple(names, aligned_sequences);
-}
-
 // Generate test sequences using DSSim
 std::vector<std::string> generate_test_sequences(
     int n_seq,
@@ -462,58 +217,6 @@ py::dict compare_detailed_with_mask_files(const std::string& reference_file,
     return d;
 }
 
-// Align sequences from input file and write result to output file, preserving all metadata
-void align_file_to_file(
-    const std::string& input_file,
-    const std::string& output_file,
-    const std::string& format = "fasta",
-    int seq_type = KALIGN_TYPE_UNDEFINED,
-    float gap_open = -1.0f,
-    float gap_extend = -1.0f,
-    float terminal_gap_extend = -1.0f,
-    int n_threads = 1,
-    int refine = KALIGN_REFINE_NONE,
-    int adaptive_budget = 0,
-    int ensemble = 0,
-    uint64_t ensemble_seed = 42,
-    float dist_scale = 0.0f,
-    float vsm_amax = -1.0f,
-    int min_support = 0,
-    int realign = 0,
-    const std::string& save_poar = "",
-    const std::string& load_poar = "",
-    float seq_weights = -1.0f,
-    int consistency_anchors = 0, float consistency_weight = 2.0f
-) {
-    struct msa* msa_data = nullptr;
-
-    int result = kalign_read_input(const_cast<char*>(input_file.c_str()), &msa_data, 1);
-    if (result != 0 || !msa_data) {
-        throw std::runtime_error("Failed to read input file: " + input_file);
-    }
-
-    result = run_alignment(msa_data, n_threads, seq_type,
-                           gap_open, gap_extend, terminal_gap_extend,
-                           refine, adaptive_budget,
-                           ensemble, ensemble_seed,
-                           dist_scale, vsm_amax,
-                           min_support, realign,
-                           save_poar, load_poar,
-                           seq_weights,
-                           consistency_anchors, consistency_weight);
-    if (result != 0) {
-        kalign_free_msa(msa_data);
-        throw std::runtime_error("Alignment failed with error code: " + std::to_string(result));
-    }
-
-    result = kalign_write_msa(msa_data, const_cast<char*>(output_file.c_str()), const_cast<char*>(format.c_str()));
-    kalign_free_msa(msa_data);
-
-    if (result != 0) {
-        throw std::runtime_error("Failed to write output file: " + output_file);
-    }
-}
-
 // Ensemble with per-run parameters — playground for optimization.
 // Each run gets its own gap penalties, matrix type, and tree noise.
 // Now uses kalign_align_full with per-run configs.
@@ -535,7 +238,15 @@ void ensemble_custom_file_to_file(
     float seq_weights = -1.0f,
     int n_threads = 1,
     int consistency_anchors = 0,
-    float consistency_weight = 2.0f
+    float consistency_weight = 2.0f,
+    // Per-run overrides: when non-empty, override the shared value per-run.
+    // Same pattern as run_types: empty = use shared value for all runs.
+    const std::vector<float>& run_vsm_amax = {},
+    const std::vector<float>& run_seq_weights = {},
+    const std::vector<int>& run_refine = {},
+    const std::vector<int>& run_realign = {},
+    const std::vector<int>& run_consistency_anchors = {},
+    const std::vector<float>& run_consistency_weight = {}
 ) {
     int n_runs = static_cast<int>(run_gpo.size());
     if (n_runs < 1) {
@@ -546,8 +257,27 @@ void ensemble_custom_file_to_file(
         static_cast<int>(run_noise.size()) != n_runs) {
         throw std::invalid_argument("All per-run arrays must have the same length");
     }
+    // Validate optional per-run arrays: must be empty or same length as run_gpo
     if (!run_types.empty() && static_cast<int>(run_types.size()) != n_runs) {
         throw std::invalid_argument("run_types must be empty or same length as run_gpo");
+    }
+    if (!run_vsm_amax.empty() && static_cast<int>(run_vsm_amax.size()) != n_runs) {
+        throw std::invalid_argument("run_vsm_amax must be empty or same length as run_gpo");
+    }
+    if (!run_seq_weights.empty() && static_cast<int>(run_seq_weights.size()) != n_runs) {
+        throw std::invalid_argument("run_seq_weights must be empty or same length as run_gpo");
+    }
+    if (!run_refine.empty() && static_cast<int>(run_refine.size()) != n_runs) {
+        throw std::invalid_argument("run_refine must be empty or same length as run_gpo");
+    }
+    if (!run_realign.empty() && static_cast<int>(run_realign.size()) != n_runs) {
+        throw std::invalid_argument("run_realign must be empty or same length as run_gpo");
+    }
+    if (!run_consistency_anchors.empty() && static_cast<int>(run_consistency_anchors.size()) != n_runs) {
+        throw std::invalid_argument("run_consistency_anchors must be empty or same length as run_gpo");
+    }
+    if (!run_consistency_weight.empty() && static_cast<int>(run_consistency_weight.size()) != n_runs) {
+        throw std::invalid_argument("run_consistency_weight must be empty or same length as run_gpo");
     }
 
     struct msa* msa_data = nullptr;
@@ -556,27 +286,27 @@ void ensemble_custom_file_to_file(
         throw std::runtime_error("Failed to read input file: " + input_file);
     }
 
-    /* Build per-run configs */
+    /* Build per-run configs.  Each optional per-run array overrides the
+       shared scalar when non-empty, following the run_types pattern. */
     std::vector<kalign_run_config> runs(n_runs);
     for (int k = 0; k < n_runs; k++) {
         runs[k] = kalign_run_config_defaults();
-        runs[k].type = (!run_types.empty()) ? run_types[k] : seq_type;
+        runs[k].matrix = (!run_types.empty()) ? run_types[k] : seq_type;
         runs[k].gpo = run_gpo[k];
         runs[k].gpe = run_gpe[k];
         runs[k].tgpe = run_tgpe[k];
         runs[k].tree_seed = seed + static_cast<uint64_t>(k);
         runs[k].tree_noise = run_noise[k];
-        runs[k].vsm_amax = vsm_amax;
+        runs[k].vsm_amax = (!run_vsm_amax.empty()) ? run_vsm_amax[k] : vsm_amax;
         runs[k].dist_scale = 0.0f;
-        runs[k].use_seq_weights = seq_weights;
-        runs[k].refine = refine;
-        runs[k].realign = realign;
-        runs[k].consistency_anchors = consistency_anchors;
-        runs[k].consistency_weight = consistency_weight;
+        runs[k].seq_weights = (!run_seq_weights.empty()) ? run_seq_weights[k] : seq_weights;
+        runs[k].refine = (!run_refine.empty()) ? run_refine[k] : refine;
+        runs[k].realign = (!run_realign.empty()) ? run_realign[k] : realign;
+        runs[k].consistency_anchors = (!run_consistency_anchors.empty()) ? run_consistency_anchors[k] : consistency_anchors;
+        runs[k].consistency_weight = (!run_consistency_weight.empty()) ? run_consistency_weight[k] : consistency_weight;
     }
 
     struct kalign_ensemble_config ens = kalign_ensemble_config_defaults();
-    ens.seed = seed;
     ens.min_support = min_support;
 
     result = kalign_align_full(msa_data, runs.data(), n_runs, &ens, n_threads);
@@ -594,13 +324,110 @@ void ensemble_custom_file_to_file(
     }
 }
 
-// Align using a named mode preset (fast/default/accurate).
-// The C library provides NSGA-III optimized protein presets.
-void align_file_to_file_mode(
-    const std::string& input_file,
-    const std::string& output_file,
+// Align in-memory sequences using a named mode preset.
+// Detects biotype from sequences and delegates to C preset system.
+py::object align_mode(
+    const std::vector<std::string>& sequences,
     const std::string& mode,
-    const std::string& format = "fasta",
+    int seq_type = KALIGN_TYPE_UNDEFINED,
+    float gap_open = -1.0f,
+    float gap_extend = -1.0f,
+    float terminal_gap_extend = -1.0f,
+    int n_threads = 1
+) {
+    if (sequences.empty()) {
+        throw std::invalid_argument("Empty sequence list provided");
+    }
+
+    std::vector<char*> seq_ptrs;
+    std::vector<int> seq_lengths;
+    seq_ptrs.reserve(sequences.size());
+    seq_lengths.reserve(sequences.size());
+    for (const auto& seq : sequences) {
+        seq_ptrs.push_back(const_cast<char*>(seq.c_str()));
+        seq_lengths.push_back(static_cast<int>(seq.length()));
+    }
+    if (n_threads < 1) n_threads = 1;
+
+    struct msa* msa_data = nullptr;
+    int result = kalign_arr_to_msa(seq_ptrs.data(), seq_lengths.data(),
+                                    static_cast<int>(sequences.size()), &msa_data);
+    if (result != 0 || !msa_data) {
+        throw std::runtime_error("Failed to create MSA from input sequences");
+    }
+    msa_data->quiet = 1;
+
+    /* Force biotype if caller specified one */
+    if (seq_type == KALIGN_MATRIX_DNA || seq_type == KALIGN_MATRIX_DNA_INTERNAL) {
+        msa_data->biotype = ALN_BIOTYPE_DNA;
+    } else if (seq_type == KALIGN_MATRIX_RNA) {
+        msa_data->biotype = ALN_BIOTYPE_DNA;  /* RNA uses DNA biotype internally */
+    } else if (seq_type != KALIGN_MATRIX_AUTO && seq_type != KALIGN_TYPE_UNDEFINED) {
+        msa_data->biotype = ALN_BIOTYPE_PROTEIN;
+    }
+
+    /* Detect biotype if not already set */
+    if (msa_data->biotype == ALN_BIOTYPE_UNDEF) {
+        result = detect_alphabet(msa_data);
+        if (result != 0) {
+            kalign_free_msa(msa_data);
+            throw std::runtime_error("Failed to detect sequence type");
+        }
+    }
+
+    /* Get preset configs */
+    struct kalign_run_config runs[KALIGN_MAX_PRESET_RUNS];
+    struct kalign_ensemble_config ens;
+    int n_runs = 0;
+
+    result = kalign_get_mode_preset(mode.c_str(), msa_data->biotype,
+                                     runs, &n_runs, &ens);
+    if (result != 0) {
+        kalign_free_msa(msa_data);
+        throw std::invalid_argument("Unknown mode: " + mode);
+    }
+
+    /* Apply user gap penalty overrides to all runs */
+    for (int k = 0; k < n_runs; k++) {
+        if (gap_open >= 0.0f) runs[k].gpo = gap_open;
+        if (gap_extend >= 0.0f) runs[k].gpe = gap_extend;
+        if (terminal_gap_extend >= 0.0f) runs[k].tgpe = terminal_gap_extend;
+    }
+
+    result = kalign_align_full(msa_data, runs, n_runs,
+                                n_runs > 1 ? &ens : nullptr, n_threads);
+    if (result != 0) {
+        kalign_free_msa(msa_data);
+        throw std::runtime_error("Alignment failed with error code: " + std::to_string(result));
+    }
+
+    py::object confidence = extract_confidence(msa_data, static_cast<int>(sequences.size()));
+
+    char** aligned_seqs = nullptr;
+    int alignment_length = 0;
+    result = kalign_msa_to_arr(msa_data, &aligned_seqs, &alignment_length);
+    kalign_free_msa(msa_data);
+
+    if (result != 0 || !aligned_seqs) {
+        throw std::runtime_error("Failed to extract aligned sequences");
+    }
+
+    auto seqs = c_strings_to_python(aligned_seqs, static_cast<int>(sequences.size()), alignment_length);
+
+    if (n_runs > 1 && !confidence.is_none()) {
+        return py::make_tuple(seqs, confidence);
+    }
+    return py::cast(seqs);
+}
+
+// Align from file using a named mode preset, returning (names, sequences).
+py::object align_from_file_mode(
+    const std::string& input_file,
+    const std::string& mode,
+    int seq_type = KALIGN_TYPE_UNDEFINED,
+    float gap_open = -1.0f,
+    float gap_extend = -1.0f,
+    float terminal_gap_extend = -1.0f,
     int n_threads = 1
 ) {
     struct msa* msa_data = nullptr;
@@ -609,14 +436,148 @@ void align_file_to_file_mode(
         throw std::runtime_error("Failed to read input file: " + input_file);
     }
 
+    /* Force biotype if caller specified one */
+    if (seq_type == KALIGN_MATRIX_DNA || seq_type == KALIGN_MATRIX_DNA_INTERNAL) {
+        msa_data->biotype = ALN_BIOTYPE_DNA;
+    } else if (seq_type == KALIGN_MATRIX_RNA) {
+        msa_data->biotype = ALN_BIOTYPE_DNA;
+    } else if (seq_type != KALIGN_MATRIX_AUTO && seq_type != KALIGN_TYPE_UNDEFINED) {
+        msa_data->biotype = ALN_BIOTYPE_PROTEIN;
+    }
+
+    if (msa_data->biotype == ALN_BIOTYPE_UNDEF) {
+        result = detect_alphabet(msa_data);
+        if (result != 0) {
+            kalign_free_msa(msa_data);
+            throw std::runtime_error("Failed to detect sequence type");
+        }
+    }
+
     struct kalign_run_config runs[KALIGN_MAX_PRESET_RUNS];
     struct kalign_ensemble_config ens;
     int n_runs = 0;
 
-    result = kalign_get_mode_preset(mode.c_str(), runs, &n_runs, &ens);
+    result = kalign_get_mode_preset(mode.c_str(), msa_data->biotype,
+                                     runs, &n_runs, &ens);
     if (result != 0) {
         kalign_free_msa(msa_data);
         throw std::invalid_argument("Unknown mode: " + mode);
+    }
+
+    for (int k = 0; k < n_runs; k++) {
+        if (gap_open >= 0.0f) runs[k].gpo = gap_open;
+        if (gap_extend >= 0.0f) runs[k].gpe = gap_extend;
+        if (terminal_gap_extend >= 0.0f) runs[k].tgpe = terminal_gap_extend;
+    }
+
+    result = kalign_align_full(msa_data, runs, n_runs,
+                                n_runs > 1 ? &ens : nullptr, n_threads);
+    if (result != 0) {
+        kalign_free_msa(msa_data);
+        throw std::runtime_error("Alignment failed with error code: " + std::to_string(result));
+    }
+
+    py::object confidence = extract_confidence(msa_data, msa_data->numseq);
+
+    /* Write to temp file to get gap-inserted FASTA output */
+    const char* tmpdir = std::getenv("TMPDIR");
+    if (!tmpdir) tmpdir = std::getenv("TMP");
+    if (!tmpdir) tmpdir = std::getenv("TEMP");
+    if (!tmpdir) tmpdir = "/tmp";
+    std::string temp_file = std::string(tmpdir) + "/kalign_output.fa";
+    result = kalign_write_msa(msa_data, const_cast<char*>(temp_file.c_str()),
+                               const_cast<char*>("fasta"));
+    kalign_free_msa(msa_data);
+
+    if (result != 0) {
+        throw std::runtime_error("Failed to write alignment results");
+    }
+
+    std::ifstream file(temp_file);
+    std::vector<std::string> names;
+    std::vector<std::string> aligned_sequences;
+    std::string line, current_name, current_seq;
+
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        if (line[0] == '>') {
+            if (!current_seq.empty()) {
+                names.push_back(current_name);
+                aligned_sequences.push_back(current_seq);
+                current_seq.clear();
+            }
+            current_name = line.substr(1);
+            auto ws = current_name.find_first_of(" \t");
+            if (ws != std::string::npos) current_name = current_name.substr(0, ws);
+        } else {
+            current_seq += line;
+        }
+    }
+    if (!current_seq.empty()) {
+        names.push_back(current_name);
+        aligned_sequences.push_back(current_seq);
+    }
+    std::remove(temp_file.c_str());
+
+    if (!confidence.is_none()) {
+        return py::make_tuple(names, aligned_sequences, confidence);
+    }
+    return py::make_tuple(names, aligned_sequences);
+}
+
+// Align file-to-file using a named mode preset (fast/default/accurate).
+// The C library provides NSGA-III optimized presets per biotype.
+void align_file_to_file_mode(
+    const std::string& input_file,
+    const std::string& output_file,
+    const std::string& mode,
+    const std::string& format = "fasta",
+    int n_threads = 1,
+    int seq_type = KALIGN_TYPE_UNDEFINED,
+    float gap_open = -1.0f,
+    float gap_extend = -1.0f,
+    float terminal_gap_extend = -1.0f
+) {
+    struct msa* msa_data = nullptr;
+    int result = kalign_read_input(const_cast<char*>(input_file.c_str()), &msa_data, 1);
+    if (result != 0 || !msa_data) {
+        throw std::runtime_error("Failed to read input file: " + input_file);
+    }
+
+    /* Force biotype if caller specified one */
+    if (seq_type == KALIGN_MATRIX_DNA || seq_type == KALIGN_MATRIX_DNA_INTERNAL) {
+        msa_data->biotype = ALN_BIOTYPE_DNA;
+    } else if (seq_type == KALIGN_MATRIX_RNA) {
+        msa_data->biotype = ALN_BIOTYPE_DNA;
+    } else if (seq_type != KALIGN_MATRIX_AUTO && seq_type != KALIGN_TYPE_UNDEFINED) {
+        msa_data->biotype = ALN_BIOTYPE_PROTEIN;
+    }
+
+    /* Detect biotype from sequences so we can select the right preset grid slot */
+    if (msa_data->biotype == ALN_BIOTYPE_UNDEF) {
+        result = detect_alphabet(msa_data);
+        if (result != 0) {
+            kalign_free_msa(msa_data);
+            throw std::runtime_error("Failed to detect sequence type");
+        }
+    }
+
+    struct kalign_run_config runs[KALIGN_MAX_PRESET_RUNS];
+    struct kalign_ensemble_config ens;
+    int n_runs = 0;
+
+    result = kalign_get_mode_preset(mode.c_str(), msa_data->biotype,
+                                     runs, &n_runs, &ens);
+    if (result != 0) {
+        kalign_free_msa(msa_data);
+        throw std::invalid_argument("Unknown mode: " + mode);
+    }
+
+    /* Apply user gap penalty overrides to all runs */
+    for (int k = 0; k < n_runs; k++) {
+        if (gap_open >= 0.0f) runs[k].gpo = gap_open;
+        if (gap_extend >= 0.0f) runs[k].gpe = gap_extend;
+        if (terminal_gap_extend >= 0.0f) runs[k].tgpe = terminal_gap_extend;
     }
 
     result = kalign_align_full(msa_data, runs, n_runs,
@@ -638,83 +599,6 @@ void align_file_to_file_mode(
 PYBIND11_MODULE(_core, m) {
     m.doc() = "Python bindings for Kalign multiple sequence alignment";
     
-    // Main alignment function
-    m.def("align", &align_sequences,
-          py::arg("sequences"),
-          py::arg("seq_type") = KALIGN_TYPE_UNDEFINED,
-          py::arg("gap_open") = -1.0f,
-          py::arg("gap_extend") = -1.0f,
-          py::arg("terminal_gap_extend") = -1.0f,
-          py::arg("n_threads") = 1,
-          py::arg("refine") = KALIGN_REFINE_NONE,
-          py::arg("ensemble") = 0,
-          py::arg("min_support") = 0,
-          py::arg("seq_weights") = -1.0f,
-          py::arg("consistency_anchors") = 0,
-          py::arg("consistency_weight") = 2.0f,
-          py::arg("vsm_amax") = -1.0f,
-          py::arg("realign") = 0,
-          py::arg("ensemble_seed") = (uint64_t)42,
-          R"pbdoc(
-          Align a list of sequences using Kalign.
-
-          Parameters
-          ----------
-          sequences : list of str
-              List of sequences to align
-          seq_type : int, optional
-              Sequence type (default: auto-detect)
-          gap_open : float, optional
-              Gap opening penalty (default: -1.0, uses Kalign defaults)
-          gap_extend : float, optional
-              Gap extension penalty (default: -1.0, uses Kalign defaults)
-          terminal_gap_extend : float, optional
-              Terminal gap extension penalty (default: -1.0, uses Kalign defaults)
-          n_threads : int, optional
-              Number of threads to use (default: 1)
-          refine : int, optional
-              Refinement mode (default: REFINE_NONE)
-          ensemble : int, optional
-              Number of ensemble runs (default: 0 = off)
-          min_support : int, optional
-              Explicit consensus threshold (default: 0 = auto)
-          vsm_amax : float, optional
-              Variable scoring matrix amplitude (default: -1.0, uses Kalign defaults)
-          realign : int, optional
-              Number of realignment iterations (default: 0 = off)
-          ensemble_seed : int, optional
-              RNG seed for ensemble (default: 42)
-
-          Returns
-          -------
-          list of str or tuple
-              When ensemble > 0: (aligned_seqs, confidence_dict)
-              Otherwise: aligned sequences
-          )pbdoc");
-    
-    // File-based alignment — returns (names, sequences) or (names, sequences, confidence)
-    m.def("align_from_file", &align_from_file,
-          py::arg("input_file"),
-          py::arg("seq_type") = KALIGN_TYPE_UNDEFINED,
-          py::arg("gap_open") = -1.0f,
-          py::arg("gap_extend") = -1.0f,
-          py::arg("terminal_gap_extend") = -1.0f,
-          py::arg("n_threads") = 1,
-          py::arg("refine") = KALIGN_REFINE_NONE,
-          py::arg("adaptive_budget") = 0,
-          py::arg("ensemble") = 0,
-          py::arg("ensemble_seed") = (uint64_t)42,
-          py::arg("dist_scale") = 0.0f,
-          py::arg("vsm_amax") = -1.0f,
-          py::arg("min_support") = 0,
-          py::arg("realign") = 0,
-          py::arg("save_poar") = "",
-          py::arg("load_poar") = "",
-          py::arg("seq_weights") = -1.0f,
-          py::arg("consistency_anchors") = 0,
-          py::arg("consistency_weight") = 2.0f,
-          "Align sequences from a file. Returns (names, sequences) or (names, sequences, confidence) tuple.");
-
     // Generate test sequences using DSSim
     m.def("generate_test_sequences", &generate_test_sequences,
           py::arg("n_seq"),
@@ -812,55 +696,6 @@ PYBIND11_MODULE(_core, m) {
               Keys: recall, precision, f1, tc, ref_pairs, test_pairs, common_pairs
           )pbdoc");
 
-    // Align file to file (preserves sequence names/metadata)
-    m.def("align_file_to_file", &align_file_to_file,
-          py::arg("input_file"),
-          py::arg("output_file"),
-          py::arg("format") = "fasta",
-          py::arg("seq_type") = KALIGN_TYPE_UNDEFINED,
-          py::arg("gap_open") = -1.0f,
-          py::arg("gap_extend") = -1.0f,
-          py::arg("terminal_gap_extend") = -1.0f,
-          py::arg("n_threads") = 1,
-          py::arg("refine") = KALIGN_REFINE_NONE,
-          py::arg("adaptive_budget") = 0,
-          py::arg("ensemble") = 0,
-          py::arg("ensemble_seed") = (uint64_t)42,
-          py::arg("dist_scale") = 0.0f,
-          py::arg("vsm_amax") = -1.0f,
-          py::arg("min_support") = 0,
-          py::arg("realign") = 0,
-          py::arg("save_poar") = "",
-          py::arg("load_poar") = "",
-          py::arg("seq_weights") = -1.0f,
-          py::arg("consistency_anchors") = 0,
-          py::arg("consistency_weight") = 2.0f,
-          R"pbdoc(
-          Align sequences from input file and write to output file.
-
-          Unlike align_from_file, this preserves all sequence metadata
-          (names, descriptions) which is required for MSA comparison.
-
-          Parameters
-          ----------
-          input_file : str
-              Path to input sequence file
-          output_file : str
-              Path to output alignment file
-          format : str, optional
-              Output format: "fasta", "msf", "clu" (default: "fasta")
-          seq_type : int, optional
-              Sequence type (default: auto-detect)
-          gap_open : float, optional
-              Gap opening penalty
-          gap_extend : float, optional
-              Gap extension penalty
-          terminal_gap_extend : float, optional
-              Terminal gap extension penalty
-          n_threads : int, optional
-              Number of threads (default: 1)
-          )pbdoc");
-
     // Ensemble with per-run parameters (optimization playground)
     m.def("ensemble_custom_file_to_file", &ensemble_custom_file_to_file,
           py::arg("input_file"),
@@ -881,11 +716,19 @@ PYBIND11_MODULE(_core, m) {
           py::arg("n_threads") = 1,
           py::arg("consistency_anchors") = 0,
           py::arg("consistency_weight") = 2.0f,
+          py::arg("run_vsm_amax") = std::vector<float>{},
+          py::arg("run_seq_weights") = std::vector<float>{},
+          py::arg("run_refine") = std::vector<int>{},
+          py::arg("run_realign") = std::vector<int>{},
+          py::arg("run_consistency_anchors") = std::vector<int>{},
+          py::arg("run_consistency_weight") = std::vector<float>{},
           R"pbdoc(
           Ensemble alignment with per-run parameters.
 
           Each run gets its own gap penalties, matrix type, and tree noise.
-          This is a playground for optimizing ensemble configurations.
+          Additional parameters can optionally be varied per-run by passing
+          arrays of the same length as run_gpo. When empty (default), the
+          shared scalar value is used for all runs.
 
           Parameters
           ----------
@@ -902,38 +745,95 @@ PYBIND11_MODULE(_core, m) {
           run_noise : list of float
               Per-run tree noise sigma values
           run_types : list of int, optional
-              Per-run matrix types (e.g. PROTEIN_PFASUM43, PROTEIN_PFASUM60, PROTEIN).
-              Empty = use seq_type for all runs.
+              Per-run matrix types. Empty = use seq_type for all runs.
+          run_vsm_amax : list of float, optional
+              Per-run VSM amplitude. Empty = use vsm_amax for all runs.
+          run_seq_weights : list of float, optional
+              Per-run profile rebalancing weight. Empty = use seq_weights for all.
+          run_refine : list of int, optional
+              Per-run refinement mode (REFINE_* constants). Empty = use refine for all.
+          run_realign : list of int, optional
+              Per-run realign iterations. Empty = use realign for all.
+          run_consistency_anchors : list of int, optional
+              Per-run consistency rounds. Empty = use consistency_anchors for all.
+          run_consistency_weight : list of float, optional
+              Per-run consistency weight. Empty = use consistency_weight for all.
           )pbdoc");
 
-    // Mode-based alignment (NSGA-III optimized presets)
+    // In-memory alignment using a named mode preset
+    m.def("align", &align_mode,
+          py::arg("sequences"),
+          py::arg("mode"),
+          py::arg("seq_type") = KALIGN_TYPE_UNDEFINED,
+          py::arg("gap_open") = -1.0f,
+          py::arg("gap_extend") = -1.0f,
+          py::arg("terminal_gap_extend") = -1.0f,
+          py::arg("n_threads") = 1,
+          "Align sequences using a named mode preset (fast/default/accurate).");
+    m.def("align_mode", &align_mode,
+          py::arg("sequences"),
+          py::arg("mode"),
+          py::arg("seq_type") = KALIGN_TYPE_UNDEFINED,
+          py::arg("gap_open") = -1.0f,
+          py::arg("gap_extend") = -1.0f,
+          py::arg("terminal_gap_extend") = -1.0f,
+          py::arg("n_threads") = 1,
+          "Alias for align(). Align sequences using a named mode preset.");
+
+    // File alignment returning (names, sequences) using a named mode preset
+    m.def("align_from_file", &align_from_file_mode,
+          py::arg("input_file"),
+          py::arg("mode"),
+          py::arg("seq_type") = KALIGN_TYPE_UNDEFINED,
+          py::arg("gap_open") = -1.0f,
+          py::arg("gap_extend") = -1.0f,
+          py::arg("terminal_gap_extend") = -1.0f,
+          py::arg("n_threads") = 1,
+          "Align from file using a named mode preset. Returns (names, sequences) tuple.");
+    m.def("align_from_file_mode", &align_from_file_mode,
+          py::arg("input_file"),
+          py::arg("mode"),
+          py::arg("seq_type") = KALIGN_TYPE_UNDEFINED,
+          py::arg("gap_open") = -1.0f,
+          py::arg("gap_extend") = -1.0f,
+          py::arg("terminal_gap_extend") = -1.0f,
+          py::arg("n_threads") = 1,
+          "Alias for align_from_file(). Align from file using a named mode preset.");
+
+    // File-to-file alignment using a named mode preset
+    m.def("align_file_to_file", &align_file_to_file_mode,
+          py::arg("input_file"),
+          py::arg("output_file"),
+          py::arg("mode"),
+          py::arg("format") = "fasta",
+          py::arg("n_threads") = 1,
+          py::arg("seq_type") = KALIGN_TYPE_UNDEFINED,
+          py::arg("gap_open") = -1.0f,
+          py::arg("gap_extend") = -1.0f,
+          py::arg("terminal_gap_extend") = -1.0f,
+          "Align file to file using a named mode preset (fast/default/accurate).");
     m.def("align_file_to_file_mode", &align_file_to_file_mode,
           py::arg("input_file"),
           py::arg("output_file"),
           py::arg("mode"),
           py::arg("format") = "fasta",
           py::arg("n_threads") = 1,
-          R"pbdoc(
-          Align sequences using a named mode preset.
+          py::arg("seq_type") = KALIGN_TYPE_UNDEFINED,
+          py::arg("gap_open") = -1.0f,
+          py::arg("gap_extend") = -1.0f,
+          py::arg("terminal_gap_extend") = -1.0f,
+          "Alias for align_file_to_file(). Align file to file using a named mode preset.");
 
-          Uses NSGA-III optimized protein presets with per-run
-          heterogeneous gap penalties and scoring matrices.
+    // Matrix constants (canonical names)
+    m.attr("MATRIX_AUTO") = KALIGN_MATRIX_AUTO;
+    m.attr("MATRIX_PFASUM43") = KALIGN_MATRIX_PFASUM43;
+    m.attr("MATRIX_PFASUM60") = KALIGN_MATRIX_PFASUM60;
+    m.attr("MATRIX_CORBLOSUM66") = KALIGN_MATRIX_CORBLOSUM66;
+    m.attr("MATRIX_DNA") = KALIGN_MATRIX_DNA;
+    m.attr("MATRIX_DNA_INTERNAL") = KALIGN_MATRIX_DNA_INTERNAL;
+    m.attr("MATRIX_RNA") = KALIGN_MATRIX_RNA;
 
-          Parameters
-          ----------
-          input_file : str
-              Path to input sequence file
-          output_file : str
-              Path to output alignment file
-          mode : str
-              One of "fast", "default", "accurate"
-          format : str, optional
-              Output format (default: "fasta")
-          n_threads : int, optional
-              Number of threads (default: 1)
-          )pbdoc");
-
-    // Constants for sequence types
+    // Backward compat: old names point to new values
     m.attr("DNA") = KALIGN_TYPE_DNA;
     m.attr("DNA_INTERNAL") = KALIGN_TYPE_DNA_INTERNAL;
     m.attr("RNA") = KALIGN_TYPE_RNA;

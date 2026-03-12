@@ -16,16 +16,29 @@
    #endif
 #endif
 
-#define KALIGN_TYPE_DNA 0
-#define KALIGN_TYPE_DNA_INTERNAL 1
-#define KALIGN_TYPE_RNA 2
-#define KALIGN_TYPE_PROTEIN 3
-#define KALIGN_TYPE_PROTEIN_DIVERGENT 4
-#define KALIGN_TYPE_PROTEIN_PFASUM43 5
-#define KALIGN_TYPE_PROTEIN_PFASUM60 6
-#define KALIGN_TYPE_PROTEIN_PFASUM_AUTO 7
-#define KALIGN_TYPE_UNDEFINED 8
-#define KALIGN_TYPE_PROTEIN_CORBLOSUM66 9
+/* Substitution matrix constants.
+   Every value maps to exactly one scoring table. No duplicates.
+   Value 4 is reserved for legacy GONNET (KALIGN_TYPE_PROTEIN_DIVERGENT). */
+#define KALIGN_MATRIX_AUTO         0  /* auto-select for biotype          */
+#define KALIGN_MATRIX_PFASUM43     1  /* 1/3 bit, divergent protein       */
+#define KALIGN_MATRIX_PFASUM60     2  /* 1/3 bit, moderate protein        */
+#define KALIGN_MATRIX_CORBLOSUM66  3  /* 1/3 bit, close protein           */
+#define KALIGN_MATRIX_DNA          5  /* DNA match/mismatch (+5/-4)       */
+#define KALIGN_MATRIX_DNA_INTERNAL 6  /* DNA internal (tgpe=8)            */
+#define KALIGN_MATRIX_RNA          7  /* RNA RIBOSUM-like (~160-383)      */
+
+/* Backward compatibility — old KALIGN_TYPE_* map to KALIGN_MATRIX_*.
+   KALIGN_TYPE_PROTEIN_DIVERGENT stays at 4 (GONNET, dead code). */
+#define KALIGN_TYPE_DNA              KALIGN_MATRIX_DNA
+#define KALIGN_TYPE_DNA_INTERNAL     KALIGN_MATRIX_DNA_INTERNAL
+#define KALIGN_TYPE_RNA              KALIGN_MATRIX_RNA
+#define KALIGN_TYPE_PROTEIN          KALIGN_MATRIX_PFASUM43
+#define KALIGN_TYPE_PROTEIN_DIVERGENT 4  /* GONNET — dead code, do not use */
+#define KALIGN_TYPE_PROTEIN_PFASUM43 KALIGN_MATRIX_PFASUM43
+#define KALIGN_TYPE_PROTEIN_PFASUM60 KALIGN_MATRIX_PFASUM60
+#define KALIGN_TYPE_PROTEIN_PFASUM_AUTO KALIGN_MATRIX_AUTO
+#define KALIGN_TYPE_UNDEFINED        KALIGN_MATRIX_AUTO
+#define KALIGN_TYPE_PROTEIN_CORBLOSUM66 KALIGN_MATRIX_CORBLOSUM66
 
 #define KALIGN_REFINE_NONE 0
 #define KALIGN_REFINE_ALL 1
@@ -139,22 +152,25 @@ EXTERN int kalign_generate_ensemble_runs(const struct kalign_run_config* base,
                                          int n_runs, uint64_t seed,
                                          struct kalign_run_config* out);
 
-/* Get a built-in mode preset (protein only).
+/* Get a built-in mode preset.
  *
  * Presets were derived from NSGA-III multi-objective optimization
  * (objectives: F1, TC, wall_time) with 5-fold cross-validation on
- * BAliBASE v4.
+ * BAliBASE v4 (protein) and BRAliBASE (RNA).
  *
- * mode: "fast", "default", or "accurate" (case-insensitive).
- *       NULL is treated as "default".
- * runs: caller-allocated array of at least KALIGN_MAX_PRESET_RUNS configs.
- * n_runs: filled with the number of runs in the preset.
- * ens: filled with ensemble config (only meaningful when *n_runs > 1).
+ * mode:    "fast", "default", or "accurate" (case-insensitive).
+ *          NULL is treated as "default".
+ * biotype: ALN_BIOTYPE_PROTEIN, ALN_BIOTYPE_DNA, or ALN_BIOTYPE_RNA.
+ *          Determines which preset grid slot to use.
+ * runs:    caller-allocated array of at least KALIGN_MAX_PRESET_RUNS configs.
+ * n_runs:  filled with the number of runs in the preset.
+ * ens:     filled with ensemble config (only meaningful when *n_runs > 1).
  *
  * Returns 0 on success, -1 if mode is unknown. */
 #define KALIGN_MAX_PRESET_RUNS 8
 
 EXTERN int kalign_get_mode_preset(const char *mode,
+                                   int biotype,
                                    struct kalign_run_config *runs,
                                    int *n_runs,
                                    struct kalign_ensemble_config *ens);

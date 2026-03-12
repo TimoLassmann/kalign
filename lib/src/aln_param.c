@@ -33,19 +33,20 @@ int aln_param_init(struct aln_param **aln_param,int biotype , int n_threads, int
                 }
         }
         if(biotype == ALN_BIOTYPE_DNA){
-                /* include/kalign/ */
                 switch (type) {
-                case KALIGN_TYPE_DNA:
+                case KALIGN_MATRIX_DNA:
                         set_subm_gaps_DNA(ap);
                         break;
-                case KALIGN_TYPE_DNA_INTERNAL:
+                case KALIGN_MATRIX_DNA_INTERNAL:
                         set_subm_gaps_DNA_internal(ap);
                         break;
-                case KALIGN_TYPE_RNA:
+                case KALIGN_MATRIX_RNA:
                         set_subm_gaps_RNA(ap);
                         break;
-                case KALIGN_TYPE_PROTEIN:
-                        ERROR_MSG("Detected DNA sequences but --type protein option was selected.");
+                case KALIGN_MATRIX_PFASUM43:
+                case KALIGN_MATRIX_PFASUM60:
+                case KALIGN_MATRIX_CORBLOSUM66:
+                        ERROR_MSG("Detected DNA sequences but a protein matrix was selected.");
                         break;
                 default:
                         set_subm_gaps_RNA(ap);
@@ -53,29 +54,23 @@ int aln_param_init(struct aln_param **aln_param,int biotype , int n_threads, int
                 }
         }else if(biotype == ALN_BIOTYPE_PROTEIN){
                 switch (type) {
-                case KALIGN_TYPE_PROTEIN:
+                case KALIGN_MATRIX_PFASUM43:
                         set_subm_gaps_PFASUM43(ap);
                         break;
-                case KALIGN_TYPE_PROTEIN_DIVERGENT:
-                         set_subm_gaps_gon250(ap);
-                        break;
-                case KALIGN_TYPE_PROTEIN_PFASUM43:
-                        set_subm_gaps_PFASUM43(ap);
-                        break;
-                case KALIGN_TYPE_PROTEIN_PFASUM60:
+                case KALIGN_MATRIX_PFASUM60:
                         set_subm_gaps_PFASUM60(ap);
                         break;
-                case KALIGN_TYPE_PROTEIN_CORBLOSUM66:
+                case KALIGN_MATRIX_CORBLOSUM66:
                         set_subm_gaps_CorBLOSUM66_13plus(ap);
                         break;
-                case KALIGN_TYPE_DNA:
-                        ERROR_MSG("Detected protein sequences but --type dna option was selected.");
+                case KALIGN_TYPE_PROTEIN_DIVERGENT:
+                        /* Legacy GONNET path — retained for backward compat */
+                        set_subm_gaps_gon250(ap);
                         break;
-                case KALIGN_TYPE_DNA_INTERNAL:
-                        ERROR_MSG("Detected protein sequences but --type internal  option was selected.");
-                        break;
-                case KALIGN_TYPE_RNA:
-                        ERROR_MSG("Detected protein sequences but --type rna option was selected.");
+                case KALIGN_MATRIX_DNA:
+                case KALIGN_MATRIX_DNA_INTERNAL:
+                case KALIGN_MATRIX_RNA:
+                        ERROR_MSG("Detected protein sequences but a nucleotide matrix was selected.");
                         break;
                 default:
                         set_subm_gaps_PFASUM43(ap);

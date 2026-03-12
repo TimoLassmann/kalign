@@ -29,23 +29,27 @@
 #define ALN_WRAP_IMPORT
 #include "aln_wrap.h"
 
-/* Resolve PFASUM_AUTO: pick PFASUM43 for divergent, PFASUM60 for closer.
-   Must be called after build_tree_kmeans which fills msa->seq_distances[]. */
-static int resolve_pfasum_auto(struct msa *msa, int *type)
+/* Resolve KALIGN_MATRIX_AUTO into a concrete matrix constant.
+   For protein: use length-ratio heuristic (PFASUM43 vs PFASUM60).
+   For DNA/RNA: pick the standard matrix for that biotype. */
+static int resolve_matrix_auto(struct msa *msa, int *type)
 {
         int i;
         int min_len, max_len;
         float len_ratio;
 
-        if(*type != KALIGN_TYPE_PROTEIN_PFASUM_AUTO){
-                return OK;
-        }
-        if(msa->biotype != ALN_BIOTYPE_PROTEIN){
-                *type = KALIGN_TYPE_PROTEIN_PFASUM43;
+        if(*type != KALIGN_MATRIX_AUTO){
                 return OK;
         }
 
-        /* Use sequence length ratio (max/min) to select matrix.
+        if(msa->biotype == ALN_BIOTYPE_DNA){
+                /* DNA biotype covers both DNA and RNA sequences.
+                   Default to RNA matrix (broader scoring range). */
+                *type = KALIGN_MATRIX_RNA;
+                return OK;
+        }
+
+        /* Protein: use sequence length ratio (max/min) to select matrix.
            Similar-length sequences (ratio < 1.5) prefer PFASUM43;
            high length variation (insertions/extensions) prefers PFASUM60. */
         min_len = msa->sequences[0]->len;
@@ -58,14 +62,14 @@ static int resolve_pfasum_auto(struct msa *msa, int *type)
         len_ratio = (min_len > 0) ? (float)max_len / (float)min_len : 1.0f;
 
         if(len_ratio < 1.5f){
-                *type = KALIGN_TYPE_PROTEIN_PFASUM43;
+                *type = KALIGN_MATRIX_PFASUM43;
         }else{
-                *type = KALIGN_TYPE_PROTEIN_PFASUM60;
+                *type = KALIGN_MATRIX_PFASUM60;
         }
         if(!msa->quiet){
                 LOG_MSG("Auto matrix: len_ratio=%.2f -> %s",
                         len_ratio,
-                        *type == KALIGN_TYPE_PROTEIN_PFASUM60 ? "PFASUM60" : "PFASUM43");
+                        *type == KALIGN_MATRIX_PFASUM60 ? "PFASUM60" : "PFASUM43");
         }
         return OK;
 }
@@ -182,7 +186,7 @@ int kalign_run_seeded(struct msa *msa, int n_threads, int type,
         }
 
         /* Resolve auto matrix selection using BPM distances */
-        RUN(resolve_pfasum_auto(msa, &type));
+        RUN(resolve_matrix_auto(msa, &type));
 
         /* align  */
         RUN(aln_param_init(&ap,
@@ -304,7 +308,7 @@ int kalign_run_dist_scale(struct msa *msa, int n_threads, int type,
                 RUN(convert_msa_to_internal(msa, ALPHA_ambigiousPROTEIN));
         }
 
-        RUN(resolve_pfasum_auto(msa, &type));
+        RUN(resolve_matrix_auto(msa, &type));
 
         RUN(aln_param_init(&ap,
                            msa->biotype,
@@ -402,7 +406,7 @@ int kalign_run_realign(struct msa *msa, int n_threads, int type,
                 RUN(convert_msa_to_internal(msa, ALPHA_ambigiousPROTEIN));
         }
 
-        RUN(resolve_pfasum_auto(msa, &type));
+        RUN(resolve_matrix_auto(msa, &type));
 
         RUN(aln_param_init(&ap,
                            msa->biotype,
@@ -559,7 +563,7 @@ int kalign_post_realign(struct msa *msa, int n_threads, int type,
         }
 
         /* seq_distances available from prior alignment */
-        RUN(resolve_pfasum_auto(msa, &type));
+        RUN(resolve_matrix_auto(msa, &type));
 
         RUN(aln_param_init(&ap,
                            msa->biotype,
@@ -682,29 +686,27 @@ ERROR:
 struct kalign_run_config kalign_run_config_defaults(void)
 {
         struct kalign_run_config cfg;
-        cfg.type = KALIGN_TYPE_UNDEFINED;
-        cfg.gpo = -1.0f;
-        cfg.gpe = -1.0f;
-        cfg.tgpe = -1.0f;
-        cfg.vsm_amax = -1.0f;
+        cfg.matrix = KALIGN_MATRIX_PFASUM43;
+        cfg.gpo = 7.0f;          /* PFASUM43 default */
+        cfg.gpe = 1.25f;
+        cfg.tgpe = 1.0f;
+        cfg.vsm_amax = 2.0f;     /* protein default */
+        cfg.seq_weights = 0.0f;
         cfg.dist_scale = 0.0f;
-        cfg.use_seq_weights = -1.0f;
-        cfg.consistency_anchors = 0;
-        cfg.consistency_weight = 2.0f;
         cfg.refine = KALIGN_REFINE_NONE;
         cfg.adaptive_budget = 0;
         cfg.realign = 0;
         cfg.tree_seed = 0;
         cfg.tree_noise = 0.0f;
+        cfg.consistency_anchors = 0;
+        cfg.consistency_weight = 2.0f;
         return cfg;
 }
 
 struct kalign_ensemble_config kalign_ensemble_config_defaults(void)
 {
         struct kalign_ensemble_config ens;
-        ens.seed = 42;
         ens.min_support = 0;
-        ens.save_poar = NULL;
         return ens;
 }
 
@@ -725,20 +727,20 @@ int kalign_align_full(struct msa* msa,
                 /* Single-run path */
                 const struct kalign_run_config* r = &runs[0];
                 if(r->realign > 0){
-                        RUN(kalign_run_realign(msa, n_threads, r->type,
+                        RUN(kalign_run_realign(msa, n_threads, r->matrix,
                                               r->gpo, r->gpe, r->tgpe,
                                               r->refine, r->adaptive_budget,
                                               r->dist_scale, r->vsm_amax,
-                                              r->realign, r->use_seq_weights,
+                                              r->realign, r->seq_weights,
                                               r->consistency_anchors,
                                               r->consistency_weight));
                 }else{
-                        RUN(kalign_run_seeded(msa, n_threads, r->type,
+                        RUN(kalign_run_seeded(msa, n_threads, r->matrix,
                                              r->gpo, r->gpe, r->tgpe,
                                              r->refine, r->adaptive_budget,
                                              r->tree_seed, r->tree_noise,
                                              r->dist_scale, r->vsm_amax,
-                                             r->use_seq_weights,
+                                             r->seq_weights,
                                              r->consistency_anchors,
                                              r->consistency_weight));
                 }
@@ -753,46 +755,41 @@ ERROR:
 /* NSGA-III optimized protein mode presets                                   */
 /* ======================================================================== */
 
-/* Helper: fill one run config with common preset values */
+/* Helper: fill one run config with preset values */
 static void preset_run(struct kalign_run_config *r,
-                        int type, float gpo, float gpe, float tgpe,
+                        int matrix, float gpo, float gpe, float tgpe,
                         float vsm_amax, float seq_weights,
                         int realign, int refine,
                         uint64_t seed, float noise)
 {
         *r = kalign_run_config_defaults();
-        r->type = type;
+        r->matrix = matrix;
         r->gpo = gpo;
         r->gpe = gpe;
         r->tgpe = tgpe;
         r->vsm_amax = vsm_amax;
-        r->use_seq_weights = seq_weights;
+        r->seq_weights = seq_weights;
         r->realign = realign;
         r->refine = refine;
-        r->consistency_anchors = 0;
-        r->consistency_weight = 1.0f;
         r->tree_seed = seed;
         r->tree_noise = noise;
 }
 
-int kalign_get_mode_preset(const char *mode,
-                            struct kalign_run_config *runs,
-                            int *n_runs,
-                            struct kalign_ensemble_config *ens)
+/* ---- Protein presets (NSGA-III optimized on BAliBASE v4) ---- */
+
+static int preset_protein(const char *m,
+                           struct kalign_run_config *runs,
+                           int *n_runs,
+                           struct kalign_ensemble_config *ens)
 {
-        const char *m = mode ? mode : "default";
-
-        *ens = kalign_ensemble_config_defaults();
-
         if(strcasecmp(m, "fast") == 0){
                 *n_runs = 1;
                 preset_run(&runs[0],
-                           KALIGN_TYPE_PROTEIN_PFASUM60,
-                           8.4087f, 0.5153f, 0.4927f,   /* gpo, gpe, tgpe */
-                           1.448f,                        /* vsm_amax */
-                           1.063f,                        /* seq_weights */
-                           0, KALIGN_REFINE_NONE,         /* realign, refine */
-                           42, 0.1623f);                   /* seed, noise */
+                           KALIGN_MATRIX_PFASUM60,
+                           8.4087f, 0.5153f, 0.4927f,
+                           1.448f, 1.063f,
+                           0, KALIGN_REFINE_NONE,
+                           42, 0.1623f);
                 return 0;
         }
 
@@ -803,19 +800,22 @@ int kalign_get_mode_preset(const char *mode,
                 int   ra   = 0;
                 int   ref  = KALIGN_REFINE_NONE;
 
-                preset_run(&runs[0], KALIGN_TYPE_PROTEIN_DIVERGENT,
+                /* BUG FIX: these were labeled "gonnet" in the optimizer
+                   but actually ran PFASUM43 (optimizer's matrix_map_int
+                   mapped index 2 → KALIGN_TYPE_PROTEIN = PFASUM43). */
+                preset_run(&runs[0], KALIGN_MATRIX_PFASUM43,
                            9.5703f, 0.6206f, 1.5751f,
                            vsm, sw, ra, ref, 42, 0.063f);
-                preset_run(&runs[1], KALIGN_TYPE_PROTEIN_PFASUM43,
+                preset_run(&runs[1], KALIGN_MATRIX_PFASUM43,
                            5.6154f, 0.5469f, 1.0163f,
                            vsm, sw, ra, ref, 43, 0.2828f);
-                preset_run(&runs[2], KALIGN_TYPE_PROTEIN_DIVERGENT,
+                preset_run(&runs[2], KALIGN_MATRIX_PFASUM43,
                            4.8979f, 1.3657f, 1.2367f,
                            vsm, sw, ra, ref, 44, 0.4046f);
-                preset_run(&runs[3], KALIGN_TYPE_PROTEIN_DIVERGENT,
+                preset_run(&runs[3], KALIGN_MATRIX_PFASUM43,
                            7.244f, 0.9013f, 0.7332f,
                            vsm, sw, ra, ref, 45, 0.3067f);
-                preset_run(&runs[4], KALIGN_TYPE_PROTEIN_PFASUM43,
+                preset_run(&runs[4], KALIGN_MATRIX_PFASUM43,
                            8.4354f, 1.8028f, 0.919f,
                            vsm, sw, ra, ref, 46, 0.1964f);
 
@@ -830,19 +830,19 @@ int kalign_get_mode_preset(const char *mode,
                 int   ra   = 2;
                 int   ref  = KALIGN_REFINE_NONE;
 
-                preset_run(&runs[0], KALIGN_TYPE_PROTEIN_DIVERGENT,
+                preset_run(&runs[0], KALIGN_MATRIX_PFASUM43,
                            13.1073f, 0.6667f, 0.613f,
                            vsm, sw, ra, ref, 42, 0.3472f);
-                preset_run(&runs[1], KALIGN_TYPE_PROTEIN_PFASUM43,
+                preset_run(&runs[1], KALIGN_MATRIX_PFASUM43,
                            7.3036f, 0.6285f, 2.8521f,
                            vsm, sw, ra, ref, 43, 0.2264f);
-                preset_run(&runs[2], KALIGN_TYPE_PROTEIN_PFASUM43,
+                preset_run(&runs[2], KALIGN_MATRIX_PFASUM43,
                            2.2452f, 2.0447f, 0.5878f,
                            vsm, sw, ra, ref, 44, 0.1481f);
-                preset_run(&runs[3], KALIGN_TYPE_PROTEIN_PFASUM43,
+                preset_run(&runs[3], KALIGN_MATRIX_PFASUM43,
                            3.9617f, 0.8429f, 0.5156f,
                            vsm, sw, ra, ref, 45, 0.4338f);
-                preset_run(&runs[4], KALIGN_TYPE_PROTEIN_PFASUM43,
+                preset_run(&runs[4], KALIGN_MATRIX_PFASUM43,
                            7.5402f, 1.8516f, 0.8772f,
                            vsm, sw, ra, ref, 46, 0.1979f);
 
@@ -851,4 +851,86 @@ int kalign_get_mode_preset(const char *mode,
         }
 
         return -1;
+}
+
+/* ---- DNA/RNA preset stubs (use matrix defaults, to be optimized) ---- */
+
+static int preset_dna(const char *m,
+                       struct kalign_run_config *runs,
+                       int *n_runs,
+                       struct kalign_ensemble_config *ens)
+{
+        /* All DNA modes use a single run with standard DNA matrix defaults.
+           To be replaced with optimized presets after benchmarking. */
+        (void)ens;
+        *n_runs = 1;
+        runs[0] = kalign_run_config_defaults();
+        runs[0].matrix = KALIGN_MATRIX_DNA;
+        runs[0].gpo = 8.0f;
+        runs[0].gpe = 6.0f;
+        runs[0].tgpe = 0.0f;
+        runs[0].vsm_amax = 0.0f;
+        runs[0].seq_weights = 0.0f;
+
+        if(strcasecmp(m, "fast") == 0){
+                return 0;
+        }
+        if(strcasecmp(m, "default") == 0){
+                return 0;
+        }
+        if(strcasecmp(m, "accurate") == 0){
+                return 0;
+        }
+        return -1;
+}
+
+static int preset_rna(const char *m,
+                       struct kalign_run_config *runs,
+                       int *n_runs,
+                       struct kalign_ensemble_config *ens)
+{
+        /* All RNA modes use a single run with standard RNA matrix defaults.
+           To be replaced with optimized presets after benchmarking. */
+        (void)ens;
+        *n_runs = 1;
+        runs[0] = kalign_run_config_defaults();
+        runs[0].matrix = KALIGN_MATRIX_RNA;
+        runs[0].gpo = 217.0f;
+        runs[0].gpe = 39.4f;
+        runs[0].tgpe = 292.6f;
+        runs[0].vsm_amax = 0.0f;
+        runs[0].seq_weights = 0.0f;
+
+        if(strcasecmp(m, "fast") == 0){
+                return 0;
+        }
+        if(strcasecmp(m, "default") == 0){
+                return 0;
+        }
+        if(strcasecmp(m, "accurate") == 0){
+                return 0;
+        }
+        return -1;
+}
+
+int kalign_get_mode_preset(const char *mode,
+                            int biotype,
+                            struct kalign_run_config *runs,
+                            int *n_runs,
+                            struct kalign_ensemble_config *ens)
+{
+        const char *m = mode ? mode : "default";
+
+        *ens = kalign_ensemble_config_defaults();
+
+        if(biotype == ALN_BIOTYPE_DNA){
+                /* Detect RNA from matrix type if needed.
+                   For now, DNA biotype covers both DNA and RNA.
+                   Use RNA presets when RNA matrix was explicitly requested,
+                   otherwise fall back to DNA presets. */
+                return preset_dna(m, runs, n_runs, ens);
+        }
+
+        /* Default: protein presets */
+        return preset_protein(m, runs, n_runs, ens);
 }
