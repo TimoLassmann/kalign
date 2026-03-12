@@ -46,8 +46,18 @@ Usage:
         --n-gen 150 --n-workers 56
 """
 
-import argparse
 import os
+# Must set OMP_NUM_THREADS before importing kalign (or any C extension that
+# uses OpenMP).  ProcessPoolExecutor uses fork(), and forked children inherit
+# the parent's OpenMP thread-pool state — but the pool threads are dead in the
+# child.  If OpenMP later tries to use them, the child segfaults.  Setting
+# this to "1" prevents the parent from ever creating extra threads, making
+# fork safe.  The actual per-alignment thread count is controlled by the
+# n_threads parameter passed to kalign at call time.
+if "OMP_NUM_THREADS" not in os.environ:
+    os.environ["OMP_NUM_THREADS"] = "1"
+
+import argparse
 import pickle
 import signal
 import sys
@@ -787,6 +797,8 @@ class Dashboard:
 def _eval_one_unified_fold(args_tuple):
     """Evaluate one (individual, fold) pair."""
     ind_idx, fold_idx, x, test_cases, n_threads, max_runs = args_tuple
+    import faulthandler, sys
+    faulthandler.enable(file=sys.stderr)
     params = decode_unified_params(x, max_runs)
     result = evaluate_unified(params, test_cases, n_threads, quiet=True)
     return ind_idx, fold_idx, params, result
@@ -795,6 +807,8 @@ def _eval_one_unified_fold(args_tuple):
 def _eval_baseline(args_tuple):
     """Evaluate one baseline configuration on a set of cases."""
     name, fi, bl_params, test_cases, n_threads = args_tuple
+    import faulthandler, sys
+    faulthandler.enable(file=sys.stderr)
     result = evaluate_unified(bl_params, test_cases, n_threads, quiet=True)
     return name, fi, result
 

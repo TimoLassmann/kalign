@@ -308,7 +308,7 @@ int set_sip_nsip(struct msa* msa)
         for (i =0;i < msa->num_profiles;i++){
                 msa->sip[i] = NULL;
                 msa->nsip[i] = 0;
-
+                msa->plen[i] = 0;
         }
 
         for(i = 0;i < msa->numseq;i++){
@@ -480,6 +480,7 @@ int kalign_arr_to_msa(char** input_sequences, int* len, int numseq,struct msa** 
                 seq->alloc_len = len[i]+1;
 
                 MMALLOC(seq->name, sizeof(char)* MSA_NAME_LEN);
+                snprintf(seq->name, MSA_NAME_LEN, "seq%d", i);
 
                 MMALLOC(seq->seq, sizeof(char) * seq->alloc_len);
                 MMALLOC(seq->s, sizeof(uint8_t) * seq->alloc_len);

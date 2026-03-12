@@ -594,6 +594,47 @@ void ensemble_custom_file_to_file(
     }
 }
 
+// Align using a named mode preset (fast/default/accurate).
+// The C library provides NSGA-III optimized protein presets.
+void align_file_to_file_mode(
+    const std::string& input_file,
+    const std::string& output_file,
+    const std::string& mode,
+    const std::string& format = "fasta",
+    int n_threads = 1
+) {
+    struct msa* msa_data = nullptr;
+    int result = kalign_read_input(const_cast<char*>(input_file.c_str()), &msa_data, 1);
+    if (result != 0 || !msa_data) {
+        throw std::runtime_error("Failed to read input file: " + input_file);
+    }
+
+    struct kalign_run_config runs[KALIGN_MAX_PRESET_RUNS];
+    struct kalign_ensemble_config ens;
+    int n_runs = 0;
+
+    result = kalign_get_mode_preset(mode.c_str(), runs, &n_runs, &ens);
+    if (result != 0) {
+        kalign_free_msa(msa_data);
+        throw std::invalid_argument("Unknown mode: " + mode);
+    }
+
+    result = kalign_align_full(msa_data, runs, n_runs,
+                                n_runs > 1 ? &ens : nullptr, n_threads);
+    if (result != 0) {
+        kalign_free_msa(msa_data);
+        throw std::runtime_error("Alignment failed with error code: " + std::to_string(result));
+    }
+
+    result = kalign_write_msa(msa_data, const_cast<char*>(output_file.c_str()),
+                               const_cast<char*>(format.c_str()));
+    kalign_free_msa(msa_data);
+
+    if (result != 0) {
+        throw std::runtime_error("Failed to write output file: " + output_file);
+    }
+}
+
 PYBIND11_MODULE(_core, m) {
     m.doc() = "Python bindings for Kalign multiple sequence alignment";
     
@@ -865,6 +906,33 @@ PYBIND11_MODULE(_core, m) {
               Empty = use seq_type for all runs.
           )pbdoc");
 
+    // Mode-based alignment (NSGA-III optimized presets)
+    m.def("align_file_to_file_mode", &align_file_to_file_mode,
+          py::arg("input_file"),
+          py::arg("output_file"),
+          py::arg("mode"),
+          py::arg("format") = "fasta",
+          py::arg("n_threads") = 1,
+          R"pbdoc(
+          Align sequences using a named mode preset.
+
+          Uses NSGA-III optimized protein presets with per-run
+          heterogeneous gap penalties and scoring matrices.
+
+          Parameters
+          ----------
+          input_file : str
+              Path to input sequence file
+          output_file : str
+              Path to output alignment file
+          mode : str
+              One of "fast", "default", "accurate"
+          format : str, optional
+              Output format (default: "fasta")
+          n_threads : int, optional
+              Number of threads (default: 1)
+          )pbdoc");
+
     // Constants for sequence types
     m.attr("DNA") = KALIGN_TYPE_DNA;
     m.attr("DNA_INTERNAL") = KALIGN_TYPE_DNA_INTERNAL;
@@ -874,6 +942,7 @@ PYBIND11_MODULE(_core, m) {
     m.attr("PROTEIN_PFASUM60") = KALIGN_TYPE_PROTEIN_PFASUM60;
     m.attr("PROTEIN_PFASUM_AUTO") = KALIGN_TYPE_PROTEIN_PFASUM_AUTO;
     m.attr("PROTEIN_DIVERGENT") = KALIGN_TYPE_PROTEIN_DIVERGENT;
+    m.attr("PROTEIN_CORBLOSUM66") = KALIGN_TYPE_PROTEIN_CORBLOSUM66;
     m.attr("AUTO") = KALIGN_TYPE_UNDEFINED;
 
     // Constants for refinement modes

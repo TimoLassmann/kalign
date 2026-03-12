@@ -67,6 +67,7 @@ PROTEIN_PFASUM43 = _core.PROTEIN_PFASUM43
 PROTEIN_PFASUM60 = _core.PROTEIN_PFASUM60
 PROTEIN_PFASUM_AUTO = _core.PROTEIN_PFASUM_AUTO
 PROTEIN_DIVERGENT = _core.PROTEIN_DIVERGENT
+PROTEIN_CORBLOSUM66 = _core.PROTEIN_CORBLOSUM66
 AUTO = _core.AUTO
 
 # Refinement mode constants
@@ -78,18 +79,49 @@ REFINE_INLINE = _core.REFINE_INLINE
 # Mode constants
 MODE_DEFAULT = "default"
 MODE_FAST = "fast"
-MODE_PRECISE = "precise"
+MODE_ACCURATE = "accurate"
+MODE_PRECISE = "precise"  # deprecated alias for "accurate"
 
-# Mode preset definitions
+# Named modes with NSGA-III optimized protein presets.
+# Each mode is a Pareto-optimal configuration trading accuracy vs speed,
+# derived from multi-objective optimization on BAliBASE v4 (218 families).
+#
+# When mode is one of these AND no explicit gap/matrix overrides are provided,
+# the C-side kalign_get_mode_preset() function is used directly, which sets
+# per-run heterogeneous gap penalties and scoring matrices.
+_PRESET_MODES = {"fast", "default", "accurate"}
+
+# Legacy mode presets (used when explicit param overrides are present).
+# Values match C-side kalign_get_mode_preset() v2 from NSGA-III optimization.
 _MODE_PRESETS = {
-    "default": {"vsm_amax": -1.0, "consistency": 5, "consistency_weight": 2.0},
-    "fast": {"vsm_amax": -1.0, "consistency": 0, "consistency_weight": 2.0},
-    "precise": {
-        "vsm_amax": -1.0,
-        "ensemble": 3,
-        "realign": 1,
+    "fast": {
+        "vsm_amax": 1.448,
+        "seq_weights": 1.063,
         "consistency": 0,
-        "consistency_weight": 2.0,
+        "consistency_weight": 1.724,
+    },
+    "default": {
+        "vsm_amax": 1.885,
+        "seq_weights": 0.592,
+        "ensemble": 5,
+        "consistency": 0,
+        "consistency_weight": 0.638,
+    },
+    "accurate": {
+        "vsm_amax": 1.682,
+        "seq_weights": 1.48,
+        "ensemble": 5,
+        "realign": 2,
+        "consistency": 0,
+        "consistency_weight": 1.317,
+    },
+    "precise": {  # deprecated alias
+        "vsm_amax": 1.682,
+        "seq_weights": 1.48,
+        "ensemble": 5,
+        "realign": 2,
+        "consistency": 0,
+        "consistency_weight": 1.317,
     },
 }
 
@@ -514,10 +546,22 @@ def _infer_skbio_type(sequences, skbio_seq):
 def _resolve_mode(mode, explicit_kwargs):
     """Resolve mode presets, letting explicit parameters override.
 
+    Mode presets were derived from NSGA-III multi-objective optimization
+    (objectives: BAliBASE F1, TC, wall-clock time) with 5-fold cross-
+    validation on BAliBASE v4 (218 protein families). Each tier represents
+    a Pareto-optimal configuration:
+
+      - "fast":     Single run, optimized gap penalties. ~F1 0.74.
+      - "default":  3-run ensemble with heterogeneous scoring. ~F1 0.79.
+      - "accurate": 5-run ensemble with confident refinement. ~F1 0.81.
+
+    Explicit keyword arguments override the preset values.
+
     Parameters
     ----------
     mode : str or None
-        One of "default", "fast", "precise", or None (treated as "default").
+        One of "default", "fast", "accurate", or None (treated as "default").
+        "precise" is accepted as a deprecated alias for "accurate".
     explicit_kwargs : dict
         Only keys that the caller *explicitly* passed (not sentinel/default).
 
@@ -526,12 +570,23 @@ def _resolve_mode(mode, explicit_kwargs):
     dict
         Merged parameter values: mode defaults + explicit overrides.
     """
+    import warnings
+
     if mode is None:
         mode = "default"
     mode_lower = mode.lower()
+
+    if mode_lower == "precise":
+        warnings.warn(
+            'mode="precise" is deprecated, use mode="accurate" instead.',
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        mode_lower = "accurate"
+
     if mode_lower not in _MODE_PRESETS:
         raise ValueError(
-            f"Invalid mode: {mode!r}. Must be one of: 'default', 'fast', 'precise'"
+            f"Invalid mode: {mode!r}. Must be one of: 'default', 'fast', 'accurate'"
         )
     result = dict(_MODE_PRESETS[mode_lower])
     result.update(explicit_kwargs)
@@ -1067,16 +1122,48 @@ def align_file_to_file(
     else:
         seq_type_int = seq_type
 
+    if n_threads is None:
+        n_threads = get_num_threads()
+
+    # Handle "precise" → "accurate" alias
+    import warnings as _w
+    effective_mode = mode
+    if mode is not None and mode.lower() == "precise":
+        _w.warn(
+            'mode="precise" is deprecated, use mode="accurate" instead.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        effective_mode = "accurate"
+
+    # Fast path: if a known preset mode is used with no parameter overrides,
+    # delegate entirely to the C-side NSGA-III optimized presets.
+    # Check BEFORE converting None → -1.0 sentinels.
+    _has_overrides = (
+        gap_open is not None or gap_extend is not None
+        or terminal_gap_extend is not None
+        or ensemble != 0 or realign != 0
+        or vsm_amax != -1.0 or consistency != 5
+        or consistency_weight != 2.0 or refine != "none"
+        or seq_weights != 0.0
+    )
+    if (effective_mode is not None
+            and effective_mode.lower() in _PRESET_MODES
+            and not _has_overrides):
+        _core.align_file_to_file_mode(
+            input_file, output_file,
+            effective_mode.lower(), format, n_threads,
+        )
+        return
+
     if gap_open is None:
         gap_open = -1.0
     if gap_extend is None:
         gap_extend = -1.0
     if terminal_gap_extend is None:
         terminal_gap_extend = -1.0
-    if n_threads is None:
-        n_threads = get_num_threads()
 
-    # Resolve mode presets
+    # Legacy path: resolve mode presets and pass individual params
     _explicit = {}
     if ensemble != 0:
         _explicit["ensemble"] = ensemble
@@ -1089,23 +1176,23 @@ def align_file_to_file(
     if vsm_amax != -1.0:
         _explicit["vsm_amax"] = vsm_amax
 
-    resolved = _resolve_mode(mode, _explicit)
+    resolved = _resolve_mode(effective_mode, _explicit)
     ensemble = resolved.get("ensemble", ensemble)
     realign = resolved.get("realign", realign)
     consistency = resolved.get("consistency", consistency)
     consistency_weight = resolved.get("consistency_weight", consistency_weight)
     vsm_amax = resolved.get("vsm_amax", vsm_amax)
 
-    refine_int = _parse_refine_mode(refine)
+    refine_int = _parse_refine_mode(resolved.get("refine", refine))
 
     _core.align_file_to_file(
         input_file,
         output_file,
         format,
         seq_type_int,
-        gap_open,
-        gap_extend,
-        terminal_gap_extend,
+        gap_open if gap_open is not None else -1.0,
+        gap_extend if gap_extend is not None else -1.0,
+        terminal_gap_extend if terminal_gap_extend is not None else -1.0,
         n_threads,
         refine_int,
         int(adaptive_budget),
@@ -1117,7 +1204,7 @@ def align_file_to_file(
         realign,
         save_poar,
         load_poar,
-        float(seq_weights),
+        float(resolved.get("seq_weights", seq_weights)),
         consistency,
         consistency_weight,
     )
@@ -1147,6 +1234,7 @@ __all__ = [
     "PROTEIN_PFASUM60",
     "PROTEIN_PFASUM_AUTO",
     "PROTEIN_DIVERGENT",
+    "PROTEIN_CORBLOSUM66",
     "AUTO",
     "REFINE_NONE",
     "REFINE_ALL",
@@ -1154,6 +1242,7 @@ __all__ = [
     "REFINE_INLINE",
     "MODE_DEFAULT",
     "MODE_FAST",
+    "MODE_ACCURATE",
     "MODE_PRECISE",
     "__version__",
     "__author__",

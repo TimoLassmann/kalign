@@ -25,6 +25,7 @@
 #define KALIGN_TYPE_PROTEIN_PFASUM60 6
 #define KALIGN_TYPE_PROTEIN_PFASUM_AUTO 7
 #define KALIGN_TYPE_UNDEFINED 8
+#define KALIGN_TYPE_PROTEIN_CORBLOSUM66 9
 
 #define KALIGN_REFINE_NONE 0
 #define KALIGN_REFINE_ALL 1
@@ -137,6 +138,26 @@ EXTERN int kalign_align_full(struct msa* msa,
 EXTERN int kalign_generate_ensemble_runs(const struct kalign_run_config* base,
                                          int n_runs, uint64_t seed,
                                          struct kalign_run_config* out);
+
+/* Get a built-in mode preset (protein only).
+ *
+ * Presets were derived from NSGA-III multi-objective optimization
+ * (objectives: F1, TC, wall_time) with 5-fold cross-validation on
+ * BAliBASE v4.
+ *
+ * mode: "fast", "default", or "accurate" (case-insensitive).
+ *       NULL is treated as "default".
+ * runs: caller-allocated array of at least KALIGN_MAX_PRESET_RUNS configs.
+ * n_runs: filled with the number of runs in the preset.
+ * ens: filled with ensemble config (only meaningful when *n_runs > 1).
+ *
+ * Returns 0 on success, -1 if mode is unknown. */
+#define KALIGN_MAX_PRESET_RUNS 8
+
+EXTERN int kalign_get_mode_preset(const char *mode,
+                                   struct kalign_run_config *runs,
+                                   int *n_runs,
+                                   struct kalign_ensemble_config *ens);
 
 #undef KALIGN_IMPORT
 #undef EXTERN

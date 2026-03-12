@@ -183,7 +183,13 @@ int alloc_tasks(struct aln_tasks** tasks,int numseq)
         for(i = 0; i < t->n_alloc_tasks;i++){
                 t->list[i] = NULL;
                 MMALLOC(t->list[i], sizeof(struct task));
+                t->list[i]->score = 0.0F;
                 t->list[i]->confidence = 0.0F;
+                t->list[i]->a = 0;
+                t->list[i]->b = 0;
+                t->list[i]->c = 0;
+                t->list[i]->p = 0;
+                t->list[i]->n = 0;
         }
 
         *tasks = t;

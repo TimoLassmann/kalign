@@ -1,5 +1,6 @@
 #include "tldevel.h"
 #include "tlmisc.h"
+#include <strings.h>
 #include "esl_stopwatch.h"
 #include "task.h"
 #include "msa_struct.h"
@@ -746,4 +747,108 @@ int kalign_align_full(struct msa* msa,
         return OK;
 ERROR:
         return FAIL;
+}
+
+/* ======================================================================== */
+/* NSGA-III optimized protein mode presets                                   */
+/* ======================================================================== */
+
+/* Helper: fill one run config with common preset values */
+static void preset_run(struct kalign_run_config *r,
+                        int type, float gpo, float gpe, float tgpe,
+                        float vsm_amax, float seq_weights,
+                        int realign, int refine,
+                        uint64_t seed, float noise)
+{
+        *r = kalign_run_config_defaults();
+        r->type = type;
+        r->gpo = gpo;
+        r->gpe = gpe;
+        r->tgpe = tgpe;
+        r->vsm_amax = vsm_amax;
+        r->use_seq_weights = seq_weights;
+        r->realign = realign;
+        r->refine = refine;
+        r->consistency_anchors = 0;
+        r->consistency_weight = 1.0f;
+        r->tree_seed = seed;
+        r->tree_noise = noise;
+}
+
+int kalign_get_mode_preset(const char *mode,
+                            struct kalign_run_config *runs,
+                            int *n_runs,
+                            struct kalign_ensemble_config *ens)
+{
+        const char *m = mode ? mode : "default";
+
+        *ens = kalign_ensemble_config_defaults();
+
+        if(strcasecmp(m, "fast") == 0){
+                *n_runs = 1;
+                preset_run(&runs[0],
+                           KALIGN_TYPE_PROTEIN_PFASUM60,
+                           8.4087f, 0.5153f, 0.4927f,   /* gpo, gpe, tgpe */
+                           1.448f,                        /* vsm_amax */
+                           1.063f,                        /* seq_weights */
+                           0, KALIGN_REFINE_NONE,         /* realign, refine */
+                           42, 0.1623f);                   /* seed, noise */
+                return 0;
+        }
+
+        if(strcasecmp(m, "default") == 0){
+                *n_runs = 5;
+                float vsm  = 1.885f;
+                float sw   = 0.592f;
+                int   ra   = 0;
+                int   ref  = KALIGN_REFINE_NONE;
+
+                preset_run(&runs[0], KALIGN_TYPE_PROTEIN_DIVERGENT,
+                           9.5703f, 0.6206f, 1.5751f,
+                           vsm, sw, ra, ref, 42, 0.063f);
+                preset_run(&runs[1], KALIGN_TYPE_PROTEIN_PFASUM43,
+                           5.6154f, 0.5469f, 1.0163f,
+                           vsm, sw, ra, ref, 43, 0.2828f);
+                preset_run(&runs[2], KALIGN_TYPE_PROTEIN_DIVERGENT,
+                           4.8979f, 1.3657f, 1.2367f,
+                           vsm, sw, ra, ref, 44, 0.4046f);
+                preset_run(&runs[3], KALIGN_TYPE_PROTEIN_DIVERGENT,
+                           7.244f, 0.9013f, 0.7332f,
+                           vsm, sw, ra, ref, 45, 0.3067f);
+                preset_run(&runs[4], KALIGN_TYPE_PROTEIN_PFASUM43,
+                           8.4354f, 1.8028f, 0.919f,
+                           vsm, sw, ra, ref, 46, 0.1964f);
+
+                ens->min_support = 3;
+                return 0;
+        }
+
+        if(strcasecmp(m, "accurate") == 0){
+                *n_runs = 5;
+                float vsm  = 1.682f;
+                float sw   = 1.48f;
+                int   ra   = 2;
+                int   ref  = KALIGN_REFINE_NONE;
+
+                preset_run(&runs[0], KALIGN_TYPE_PROTEIN_DIVERGENT,
+                           13.1073f, 0.6667f, 0.613f,
+                           vsm, sw, ra, ref, 42, 0.3472f);
+                preset_run(&runs[1], KALIGN_TYPE_PROTEIN_PFASUM43,
+                           7.3036f, 0.6285f, 2.8521f,
+                           vsm, sw, ra, ref, 43, 0.2264f);
+                preset_run(&runs[2], KALIGN_TYPE_PROTEIN_PFASUM43,
+                           2.2452f, 2.0447f, 0.5878f,
+                           vsm, sw, ra, ref, 44, 0.1481f);
+                preset_run(&runs[3], KALIGN_TYPE_PROTEIN_PFASUM43,
+                           3.9617f, 0.8429f, 0.5156f,
+                           vsm, sw, ra, ref, 45, 0.4338f);
+                preset_run(&runs[4], KALIGN_TYPE_PROTEIN_PFASUM43,
+                           7.5402f, 1.8516f, 0.8772f,
+                           vsm, sw, ra, ref, 46, 0.1979f);
+
+                ens->min_support = 3;
+                return 0;
+        }
+
+        return -1;
 }

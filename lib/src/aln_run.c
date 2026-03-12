@@ -114,6 +114,7 @@ void recursive_aln(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, ui
 
         ml->ap = ap;
         ml->mode = ALN_MODE_FULL;
+        ml->run_parallel = msa->run_parallel;
         do_align(msa,t,ml,c);
 
         active[local_t->a] = 0;

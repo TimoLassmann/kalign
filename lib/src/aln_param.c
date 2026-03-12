@@ -65,6 +65,9 @@ int aln_param_init(struct aln_param **aln_param,int biotype , int n_threads, int
                 case KALIGN_TYPE_PROTEIN_PFASUM60:
                         set_subm_gaps_PFASUM60(ap);
                         break;
+                case KALIGN_TYPE_PROTEIN_CORBLOSUM66:
+                        set_subm_gaps_CorBLOSUM66_13plus(ap);
+                        break;
                 case KALIGN_TYPE_DNA:
                         ERROR_MSG("Detected protein sequences but --type dna option was selected.");
                         break;

@@ -1,6 +1,7 @@
 #include "tldevel.h"
 
 #include <ctype.h>
+#include <string.h>
 #include "msa_struct.h"
 #include "msa_check.h"
 #include "msa_op.h"
@@ -25,6 +26,95 @@ struct detailed_pair_stats {
         int64_t common_scored; /* matches in scored columns → for recall */
         int64_t common_all;    /* all matches → for precision */
 };
+
+/* Sort key for robust sequence matching in MSA comparison.
+   Key = name + '\0' + ungapped_sequence, so sequences are sorted first
+   by name, then by biological content. This guarantees identical ordering
+   of ref and test MSAs regardless of gap patterns or duplicate names. */
+struct cmp_sort_entry {
+        struct msa_seq* seq;
+        char* key;
+        int key_len;
+};
+
+static int cmp_sort_by_key(const void *a, const void *b)
+{
+        const struct cmp_sort_entry* const *ea = a;
+        const struct cmp_sort_entry* const *eb = b;
+        int min_len = (*ea)->key_len < (*eb)->key_len ? (*ea)->key_len : (*eb)->key_len;
+        int r = memcmp((*ea)->key, (*eb)->key, min_len);
+        if(r != 0) return r;
+        return (*ea)->key_len - (*eb)->key_len;
+}
+
+/* Sort an MSA's sequences by name + ungapped sequence content.
+   Works on finalized alignments (seq->seq may contain gaps) and on
+   raw unaligned sequences alike.  Both ref and test get identical
+   ordering because the sort key ignores gap characters entirely. */
+static int sort_msa_for_comparison(struct msa* msa)
+{
+        struct cmp_sort_entry** entries = NULL;
+        int i, j;
+
+        MMALLOC(entries, sizeof(struct cmp_sort_entry*) * msa->numseq);
+        for(i = 0; i < msa->numseq; i++){
+                entries[i] = NULL;
+                MMALLOC(entries[i], sizeof(struct cmp_sort_entry));
+                entries[i]->seq = msa->sequences[i];
+                entries[i]->key = NULL;
+
+                /* Compute key length: name_len + 1 (separator) + ungapped_len */
+                int name_len = strnlen(msa->sequences[i]->name, MSA_NAME_LEN);
+                int seq_len = 0;
+                /* Count ungapped characters — works whether seq has gaps or not */
+                int scan_len = (msa->alnlen > 0) ? msa->alnlen : msa->sequences[i]->len;
+                for(j = 0; j < scan_len; j++){
+                        if(isalpha((int)msa->sequences[i]->seq[j])){
+                                seq_len++;
+                        }
+                }
+
+                entries[i]->key_len = name_len + 1 + seq_len;
+                MMALLOC(entries[i]->key, sizeof(char) * (entries[i]->key_len + 1));
+
+                /* Build key: name + '\0' separator + ungapped sequence */
+                memcpy(entries[i]->key, msa->sequences[i]->name, name_len);
+                entries[i]->key[name_len] = '\0';
+                int p = name_len + 1;
+                for(j = 0; j < scan_len; j++){
+                        char c = msa->sequences[i]->seq[j];
+                        if(isalpha((int)c)){
+                                entries[i]->key[p] = c;
+                                p++;
+                        }
+                }
+                entries[i]->key[p] = '\0';
+        }
+
+        qsort(entries, msa->numseq, sizeof(struct cmp_sort_entry*), cmp_sort_by_key);
+
+        for(i = 0; i < msa->numseq; i++){
+                msa->sequences[i] = entries[i]->seq;
+        }
+
+        for(i = 0; i < msa->numseq; i++){
+                MFREE(entries[i]->key);
+                MFREE(entries[i]);
+        }
+        MFREE(entries);
+        return OK;
+ERROR:
+        if(entries){
+                for(i = 0; i < msa->numseq; i++){
+                        if(entries[i]){
+                                MFREE(entries[i]->key);
+                                MFREE(entries[i]);
+                        }
+                }
+                MFREE(entries);
+        }
+        return FAIL;
+}
 
 
 static int compare_pair(char *seq1A, char *seq2A, char *seq1B, char *seq2B,
@@ -57,11 +147,8 @@ int kalign_msa_compare(struct msa *r, struct msa *t,  float *score)
                 t->alnlen = t->sequences[0]->len;
         }
 
-        RUN(kalign_check_msa(r,1));
-        RUN(kalign_check_msa(t,1));
-
-        kalign_sort_msa(r);
-        kalign_sort_msa(t);
+        RUN(sort_msa_for_comparison(r));
+        RUN(sort_msa_for_comparison(t));
 
         MMALLOC(stat, sizeof(struct cmp_stats));
         stat->identical_gaps = 0;
@@ -439,11 +526,8 @@ int kalign_msa_compare_detailed(struct msa *r, struct msa *t,
                 t->alnlen = t->sequences[0]->len;
         }
 
-        RUN(kalign_check_msa(r, 1));
-        RUN(kalign_check_msa(t, 1));
-
-        kalign_sort_msa(r);
-        kalign_sort_msa(t);
+        RUN(sort_msa_for_comparison(r));
+        RUN(sort_msa_for_comparison(t));
 
         ASSERT(r->alnlen > 0, "Reference alignment has length 0");
 
@@ -496,11 +580,8 @@ int kalign_msa_compare_with_mask(struct msa *r, struct msa *t,
                 t->alnlen = t->sequences[0]->len;
         }
 
-        RUN(kalign_check_msa(r, 1));
-        RUN(kalign_check_msa(t, 1));
-
-        kalign_sort_msa(r);
-        kalign_sort_msa(t);
+        RUN(sort_msa_for_comparison(r));
+        RUN(sort_msa_for_comparison(t));
 
         ASSERT(n_cols == r->alnlen,
                "Mask length (%d) != reference alignment length (%d)",

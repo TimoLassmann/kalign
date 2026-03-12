@@ -38,19 +38,29 @@ class AlignmentResult:
 def align_with_python_api(
     case: BenchmarkCase, output: Path, n_threads: int = 1, refine: str = "none",
     adaptive_budget: bool = False, ensemble: int = 0,
+    mode: Optional[str] = None,
 ) -> float:
     """Align using kalign Python API. Returns wall time in seconds."""
     start = time.perf_counter()
-    kalign.align_file_to_file(
-        str(case.unaligned),
-        str(output),
-        format="fasta",
-        seq_type=case.seq_type,
-        n_threads=n_threads,
-        refine=refine,
-        adaptive_budget=adaptive_budget,
-        ensemble=ensemble,
-    )
+    if mode is not None:
+        kalign.align_file_to_file(
+            str(case.unaligned),
+            str(output),
+            format="fasta",
+            n_threads=n_threads,
+            mode=mode,
+        )
+    else:
+        kalign.align_file_to_file(
+            str(case.unaligned),
+            str(output),
+            format="fasta",
+            seq_type=case.seq_type,
+            n_threads=n_threads,
+            refine=refine,
+            adaptive_budget=adaptive_budget,
+            ensemble=ensemble,
+        )
     return time.perf_counter() - start
 
 
@@ -193,6 +203,7 @@ def run_case(
     refine: str = "none",
     adaptive_budget: bool = False,
     ensemble: int = 0,
+    mode: Optional[str] = None,
 ) -> AlignmentResult:
     """Run alignment + scoring for a single benchmark case."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -200,7 +211,10 @@ def run_case(
 
         try:
             if method == "python_api":
-                wall_time = align_with_python_api(case, output, n_threads, refine, adaptive_budget, ensemble)
+                wall_time = align_with_python_api(
+                    case, output, n_threads, refine, adaptive_budget,
+                    ensemble, mode=mode,
+                )
             elif method == "cli":
                 wall_time = align_with_cli(case, output, binary, n_threads, refine, adaptive_budget, ensemble)
             elif method in EXTERNAL_TOOLS:
@@ -219,7 +233,7 @@ def run_case(
                 sp_score=sp_score,
                 wall_time=wall_time,
                 seq_type=case.seq_type,
-                refine="n/a" if is_external else refine,
+                refine="n/a" if is_external else (mode or refine),
                 ensemble=0 if is_external else ensemble,
                 recall=detailed["recall"],
                 precision=detailed["precision"],
@@ -235,7 +249,7 @@ def run_case(
                 sp_score=0.0,
                 wall_time=0.0,
                 seq_type=case.seq_type,
-                refine="n/a" if is_external else refine,
+                refine="n/a" if is_external else (mode or refine),
                 ensemble=0 if is_external else ensemble,
                 error=str(e),
             )
