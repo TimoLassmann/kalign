@@ -26,6 +26,9 @@
 #define KALIGN_MATRIX_DNA          5  /* DNA match/mismatch (+5/-4)       */
 #define KALIGN_MATRIX_DNA_INTERNAL 6  /* DNA internal (tgpe=8)            */
 #define KALIGN_MATRIX_RNA          7  /* RNA RIBOSUM-like (~160-383)      */
+#define KALIGN_MATRIX_NUC_1PAM    10  /* Kimura 1PAM, kappa=2 (close)    */
+#define KALIGN_MATRIX_NUC_20PAM   11  /* Kimura 20PAM, kappa=2 (moderate)*/
+#define KALIGN_MATRIX_NUC_200PAM  12  /* Kimura 200PAM, kappa=2 (distant)*/
 
 /* Backward compatibility — old KALIGN_TYPE_* map to KALIGN_MATRIX_*.
    KALIGN_TYPE_PROTEIN_DIVERGENT stays at 4 (GONNET, dead code). */

@@ -27,6 +27,7 @@ int alloc_msa(struct msa** msa, int numseq)
         m->sip = NULL;
         m->nsip = NULL;
         m->consistency_table = NULL;
+        m->poar_consistency = NULL;
 
 
         MMALLOC(m->sequences, sizeof(struct msa_seq*) * m->alloc_numseq);

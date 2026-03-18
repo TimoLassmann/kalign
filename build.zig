@@ -111,6 +111,7 @@ const kalign_lib_sources = [_][]const u8{
     "lib/src/poar.c",
     "lib/src/consensus_msa.c",
     "lib/src/anchor_consistency.c",
+    "lib/src/msa_consistency.c",
     "lib/src/ensemble.c",
 };
 

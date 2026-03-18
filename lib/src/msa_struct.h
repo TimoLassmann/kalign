@@ -50,6 +50,7 @@ struct msa{
         uint8_t biotype;
         int quiet;
         void* consistency_table;    /* struct consistency_table*, NULL when disabled */
+        void* poar_consistency;     /* struct poar_consistency_ctx*, NULL when disabled */
 };
 
 #undef MSA_STRUCT_IMPORT

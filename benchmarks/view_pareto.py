@@ -62,12 +62,12 @@ def build_pareto_df(ckpt: dict, max_runs: int) -> tuple[pd.DataFrame, dict]:
     """Build a DataFrame from checkpoint population.
 
     Returns (DataFrame, params_by_idx) where params_by_idx maps idx -> full decoded params.
-    Supports both mixed_v1 (dict-per-individual) and legacy (float array) checkpoints.
+    Supports mixed_v1 and mixed_v2 (dict-per-individual) checkpoints.
     """
-    if ckpt.get("format") != "mixed_v1":
+    if ckpt.get("format") not in ("mixed_v1", "mixed_v2"):
         raise ValueError(
             "Old-format checkpoint (float arrays). "
-            "Re-run the optimizer to generate a mixed_v1 checkpoint."
+            "Re-run the optimizer to generate a mixed_v1/v2 checkpoint."
         )
     pop_X = ckpt["pop_X"]
     pop_F = ckpt["pop_F"]
@@ -100,6 +100,13 @@ def build_pareto_df(ckpt: dict, max_runs: int) -> tuple[pd.DataFrame, dict]:
         # Summarize per-run refine/vsm for the table
         refs = "/".join(REFINE_LONG.get(r, "?") for r in params["run_refine"])
 
+        # Per-run summaries for hover
+        vsm_summary = "/".join(f"{v:.1f}" for v in params["run_vsm_amax"])
+        mat_summary = "/".join(
+            MATRIX_NAMES.get(params["run_types"][k], "?")
+            for k in range(params["n_runs"])
+        )
+
         rows.append({
             "idx": i,
             "f1": round(f1, 4),
@@ -107,15 +114,17 @@ def build_pareto_df(ckpt: dict, max_runs: int) -> tuple[pd.DataFrame, dict]:
             "wall_time": round(wt, 1),
             "mode": mode,
             "n_runs": params["n_runs"],
-            "vsm_amax_0": round(params["run_vsm_amax"][0], 3),
+            "vsm": vsm_summary,
+            "refine": refs,
+            "matrices": mat_summary,
             "seq_weights": round(params["seq_weights"], 3),
             "consistency": params["consistency"],
             "consistency_weight": round(params["consistency_weight"], 3),
             "realign": params["realign"],
-            "refine": refs,
             "min_support": params["min_support"],
             "run_details": "\n".join(run_details),
-            # Flattened run 0 params for color/hover
+            # Keep run-0 values for coloring
+            "vsm_amax_0": round(params["run_vsm_amax"][0], 3),
             "gpo_0": round(params["run_gpo"][0], 2),
             "gpe_0": round(params["run_gpe"][0], 2),
             "tgpe_0": round(params["run_tgpe"][0], 2),
@@ -311,7 +320,7 @@ def _format_tier_config(row) -> str:
             lines.append(f"# {line}")
     lines.append(f"config = {{")
     lines.append(f'    "n_runs": {row["n_runs"]},')
-    lines.append(f'    "vsm_amax_0": {row["vsm_amax_0"]},')
+    lines.append(f'    "vsm": "{row["vsm"]}",  # per-run')
     lines.append(f'    "seq_weights": {row["seq_weights"]},')
     lines.append(f'    "consistency": {row["consistency"]},')
     lines.append(f'    "consistency_weight": {row["consistency_weight"]},')
@@ -344,7 +353,7 @@ def create_app(ckpt_path: str, remote_path: str = "", refresh_sec: int = 30,
                     id="color-by",
                     options=[
                         {"label": "Mode", "value": "mode"},
-                        {"label": "VSM amax", "value": "vsm_amax_0"},
+                        {"label": "VSM amax (R0)", "value": "vsm_amax_0"},
                         {"label": "Seq weights", "value": "seq_weights"},
                         {"label": "Consistency", "value": "consistency"},
                         {"label": "Realign", "value": "realign"},
@@ -469,7 +478,7 @@ def create_app(ckpt_path: str, remote_path: str = "", refresh_sec: int = 30,
                 {"name": "F1", "id": "f1"},
                 {"name": "TC", "id": "tc"},
                 {"name": "Time", "id": "wall_time"},
-                {"name": "VSM", "id": "vsm_amax_0"},
+                {"name": "VSM", "id": "vsm"},
                 {"name": "SW", "id": "seq_weights"},
                 {"name": "C", "id": "consistency"},
                 {"name": "CW", "id": "consistency_weight"},
@@ -521,7 +530,8 @@ def create_app(ckpt_path: str, remote_path: str = "", refresh_sec: int = 30,
         hist_df = build_history_df(ckpt, mr)
         n_gen = ckpt.get("n_gen_completed", "?")
 
-        app._df_cache = {"df": df, "hist_df": hist_df, "mtime": mtime, "n_gen": n_gen, "params_by_idx": params_by_idx}  # type: ignore[attr-defined]
+        f_beta = ckpt.get("f_beta", 1.0)
+        app._df_cache = {"df": df, "hist_df": hist_df, "mtime": mtime, "n_gen": n_gen, "params_by_idx": params_by_idx, "f_beta": f_beta}  # type: ignore[attr-defined]
         return df, hist_df, mtime
 
     @app.callback(
@@ -557,15 +567,17 @@ def create_app(ckpt_path: str, remote_path: str = "", refresh_sec: int = 30,
 
         # Status
         n_gen = app._df_cache.get("n_gen", "?")
+        f_beta = app._df_cache.get("f_beta", 1.0)
+        obj_label = f"F{f_beta}" if f_beta != 1.0 else "F1"
         ago = time.time() - mtime if mtime else 0
         status = (f"Generation {n_gen} | {len(df)} individuals | "
-                  f"Best F1={df['f1'].max():.4f} | Best TC={df['tc'].max():.4f} | "
+                  f"Best {obj_label}={df['f1'].max():.4f} | Best TC={df['tc'].max():.4f} | "
                   f"Last update: {ago:.0f}s ago")
 
         # 2D scatter
-        hover_data = ["mode", "vsm_amax_0", "seq_weights", "consistency",
-                      "realign", "refine", "gpo_0", "gpe_0", "tgpe_0", "matrix_0",
-                      "min_support"]
+        hover_data = ["mode", "f1", "tc", "wall_time",
+                      "n_runs", "vsm", "refine", "matrices",
+                      "seq_weights", "consistency", "realign", "min_support"]
         fig2d = px.scatter(
             filtered, x=x_axis, y=y_axis, color=color_by,
             hover_data=hover_data,

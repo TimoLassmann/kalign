@@ -707,6 +707,8 @@ struct kalign_ensemble_config kalign_ensemble_config_defaults(void)
 {
         struct kalign_ensemble_config ens;
         ens.min_support = 0;
+        ens.consistency_merge = 0;
+        ens.consistency_merge_weight = 2.0f;
         return ens;
 }
 
@@ -775,77 +777,103 @@ static void preset_run(struct kalign_run_config *r,
         r->tree_noise = noise;
 }
 
-/* ---- Protein presets (NSGA-III optimized on BAliBASE v4) ---- */
+/* Helper: set shared consistency params on all runs */
+static void preset_consistency(struct kalign_run_config *runs, int n_runs,
+                                int anchors, float weight)
+{
+        for(int i = 0; i < n_runs; i++){
+                runs[i].consistency_anchors = anchors;
+                runs[i].consistency_weight = weight;
+        }
+}
+
+/* ---- Protein presets (NSGA-III optimized on BAliBASE v4, gen 41) ---- */
 
 static int preset_protein(const char *m,
                            struct kalign_run_config *runs,
                            int *n_runs,
                            struct kalign_ensemble_config *ens)
 {
+        /* fast: single run, ~34s on BAliBASE. F1=0.737 R=0.818 P=0.670 */
         if(strcasecmp(m, "fast") == 0){
                 *n_runs = 1;
                 preset_run(&runs[0],
                            KALIGN_MATRIX_PFASUM60,
-                           8.4087f, 0.5153f, 0.4927f,
-                           1.448f, 1.063f,
+                           8.626f, 0.843f, 0.433f,
+                           0.592f, 1.534f,
                            0, KALIGN_REFINE_NONE,
-                           42, 0.1623f);
+                           0, 0.0f);
                 return 0;
         }
 
+        /* default: single run with inline refinement, ~130s.
+           F1=0.750 R=0.779 P=0.724 */
         if(strcasecmp(m, "default") == 0){
-                *n_runs = 5;
-                float vsm  = 1.885f;
-                float sw   = 0.592f;
-                int   ra   = 0;
-                int   ref  = KALIGN_REFINE_NONE;
-
-                /* BUG FIX: these were labeled "gonnet" in the optimizer
-                   but actually ran PFASUM43 (optimizer's matrix_map_int
-                   mapped index 2 → KALIGN_TYPE_PROTEIN = PFASUM43). */
-                preset_run(&runs[0], KALIGN_MATRIX_PFASUM43,
-                           9.5703f, 0.6206f, 1.5751f,
-                           vsm, sw, ra, ref, 42, 0.063f);
-                preset_run(&runs[1], KALIGN_MATRIX_PFASUM43,
-                           5.6154f, 0.5469f, 1.0163f,
-                           vsm, sw, ra, ref, 43, 0.2828f);
-                preset_run(&runs[2], KALIGN_MATRIX_PFASUM43,
-                           4.8979f, 1.3657f, 1.2367f,
-                           vsm, sw, ra, ref, 44, 0.4046f);
-                preset_run(&runs[3], KALIGN_MATRIX_PFASUM43,
-                           7.244f, 0.9013f, 0.7332f,
-                           vsm, sw, ra, ref, 45, 0.3067f);
-                preset_run(&runs[4], KALIGN_MATRIX_PFASUM43,
-                           8.4354f, 1.8028f, 0.919f,
-                           vsm, sw, ra, ref, 46, 0.1964f);
-
-                ens->min_support = 3;
+                *n_runs = 1;
+                preset_run(&runs[0],
+                           KALIGN_MATRIX_PFASUM60,
+                           8.121f, 0.684f, 0.560f,
+                           1.661f, 2.356f,
+                           0, KALIGN_REFINE_INLINE,
+                           0, 0.0f);
+                preset_consistency(runs, 1, 1, 1.640f);
                 return 0;
         }
 
+        /* recall: 5-run ensemble optimized for recall, ~1175s.
+           F1=0.777 R=0.837 P=0.726 */
+        if(strcasecmp(m, "recall") == 0){
+                *n_runs = 5;
+                preset_run(&runs[0], KALIGN_MATRIX_CORBLOSUM66,
+                           5.416f, 1.071f, 1.620f,
+                           2.536f, 0.282f,
+                           1, KALIGN_REFINE_ALL, 42, 0.0f);
+                preset_run(&runs[1], KALIGN_MATRIX_CORBLOSUM66,
+                           12.091f, 1.024f, 1.284f,
+                           2.078f, 0.282f,
+                           1, KALIGN_REFINE_INLINE, 43, 0.0f);
+                preset_run(&runs[2], KALIGN_MATRIX_PFASUM60,
+                           6.970f, 2.919f, 0.632f,
+                           0.877f, 0.282f,
+                           1, KALIGN_REFINE_NONE, 44, 0.0f);
+                preset_run(&runs[3], KALIGN_MATRIX_PFASUM43,
+                           6.173f, 1.102f, 0.510f,
+                           1.276f, 0.282f,
+                           1, KALIGN_REFINE_ALL, 45, 0.0f);
+                preset_run(&runs[4], KALIGN_MATRIX_PFASUM43,
+                           5.278f, 1.764f, 1.088f,
+                           2.315f, 0.282f,
+                           1, KALIGN_REFINE_CONFIDENT, 46, 0.0f);
+                preset_consistency(runs, 5, 3, 2.120f);
+                ens->min_support = 0;
+                return 0;
+        }
+
+        /* accurate: 5-run ensemble optimized for F1, ~2005s.
+           F1=0.814 R=0.782 P=0.848 */
         if(strcasecmp(m, "accurate") == 0){
                 *n_runs = 5;
-                float vsm  = 1.682f;
-                float sw   = 1.48f;
-                int   ra   = 2;
-                int   ref  = KALIGN_REFINE_NONE;
-
                 preset_run(&runs[0], KALIGN_MATRIX_PFASUM43,
-                           13.1073f, 0.6667f, 0.613f,
-                           vsm, sw, ra, ref, 42, 0.3472f);
+                           8.682f, 0.650f, 1.465f,
+                           2.532f, 1.468f,
+                           1, KALIGN_REFINE_INLINE, 42, 0.0f);
                 preset_run(&runs[1], KALIGN_MATRIX_PFASUM43,
-                           7.3036f, 0.6285f, 2.8521f,
-                           vsm, sw, ra, ref, 43, 0.2264f);
-                preset_run(&runs[2], KALIGN_MATRIX_PFASUM43,
-                           2.2452f, 2.0447f, 0.5878f,
-                           vsm, sw, ra, ref, 44, 0.1481f);
-                preset_run(&runs[3], KALIGN_MATRIX_PFASUM43,
-                           3.9617f, 0.8429f, 0.5156f,
-                           vsm, sw, ra, ref, 45, 0.4338f);
+                           6.148f, 1.174f, 1.297f,
+                           2.011f, 1.468f,
+                           1, KALIGN_REFINE_ALL, 43, 0.0f);
+                preset_run(&runs[2], KALIGN_MATRIX_CORBLOSUM66,
+                           3.622f, 1.004f, 0.631f,
+                           0.872f, 1.468f,
+                           1, KALIGN_REFINE_CONFIDENT, 44, 0.0f);
+                preset_run(&runs[3], KALIGN_MATRIX_CORBLOSUM66,
+                           5.988f, 0.552f, 0.495f,
+                           1.914f, 1.468f,
+                           1, KALIGN_REFINE_CONFIDENT, 45, 0.0f);
                 preset_run(&runs[4], KALIGN_MATRIX_PFASUM43,
-                           7.5402f, 1.8516f, 0.8772f,
-                           vsm, sw, ra, ref, 46, 0.1979f);
-
+                           13.939f, 2.629f, 1.406f,
+                           1.830f, 1.468f,
+                           1, KALIGN_REFINE_NONE, 46, 0.0f);
+                preset_consistency(runs, 5, 8, 2.457f);
                 ens->min_support = 3;
                 return 0;
         }
@@ -853,63 +881,191 @@ static int preset_protein(const char *m,
         return -1;
 }
 
-/* ---- DNA/RNA preset stubs (use matrix defaults, to be optimized) ---- */
-
-static int preset_dna(const char *m,
-                       struct kalign_run_config *runs,
-                       int *n_runs,
-                       struct kalign_ensemble_config *ens)
-{
-        /* All DNA modes use a single run with standard DNA matrix defaults.
-           To be replaced with optimized presets after benchmarking. */
-        (void)ens;
-        *n_runs = 1;
-        runs[0] = kalign_run_config_defaults();
-        runs[0].matrix = KALIGN_MATRIX_DNA;
-        runs[0].gpo = 8.0f;
-        runs[0].gpe = 6.0f;
-        runs[0].tgpe = 0.0f;
-        runs[0].vsm_amax = 0.0f;
-        runs[0].seq_weights = 0.0f;
-
-        if(strcasecmp(m, "fast") == 0){
-                return 0;
-        }
-        if(strcasecmp(m, "default") == 0){
-                return 0;
-        }
-        if(strcasecmp(m, "accurate") == 0){
-                return 0;
-        }
-        return -1;
-}
+/* ---- RNA presets (NSGA-III optimized on BRAliBASE, gen 88) ----
+ *
+ * NOTE: fast ≈ recall (both single-run K200, nearly identical params).
+ *       RNA alignments are "easy" enough that a single run captures
+ *       most of the quality.  Kept separate for future tuning.
+ */
 
 static int preset_rna(const char *m,
                        struct kalign_run_config *runs,
                        int *n_runs,
                        struct kalign_ensemble_config *ens)
 {
-        /* All RNA modes use a single run with standard RNA matrix defaults.
-           To be replaced with optimized presets after benchmarking. */
-        (void)ens;
-        *n_runs = 1;
-        runs[0] = kalign_run_config_defaults();
-        runs[0].matrix = KALIGN_MATRIX_RNA;
-        runs[0].gpo = 217.0f;
-        runs[0].gpe = 39.4f;
-        runs[0].tgpe = 292.6f;
-        runs[0].vsm_amax = 0.0f;
-        runs[0].seq_weights = 0.0f;
-
+        /* fast: single run, ~5s on BRAliBASE. F1=0.828 R=0.832 P=0.825 */
         if(strcasecmp(m, "fast") == 0){
+                *n_runs = 1;
+                preset_run(&runs[0],
+                           KALIGN_MATRIX_NUC_200PAM,
+                           11.939f, 1.598f, 2.890f,
+                           0.636f, 1.363f,
+                           0, KALIGN_REFINE_INLINE,
+                           0, 0.0f);
+                preset_consistency(runs, 1, 3, 2.372f);
                 return 0;
         }
+
+        /* default: 3-run ensemble, ~8s. F1=0.835 R=0.804 P=0.869 */
         if(strcasecmp(m, "default") == 0){
+                *n_runs = 3;
+                preset_run(&runs[0], KALIGN_MATRIX_NUC_200PAM,
+                           19.633f, 0.582f, 2.974f,
+                           1.929f, 1.569f,
+                           0, KALIGN_REFINE_NONE, 42, 0.0f);
+                preset_run(&runs[1], KALIGN_MATRIX_NUC_200PAM,
+                           13.155f, 1.631f, 2.717f,
+                           0.733f, 1.569f,
+                           0, KALIGN_REFINE_NONE, 43, 0.0f);
+                preset_run(&runs[2], KALIGN_MATRIX_NUC_20PAM,
+                           18.052f, 0.391f, 2.316f,
+                           0.598f, 1.569f,
+                           0, KALIGN_REFINE_NONE, 44, 0.0f);
+                preset_consistency(runs, 3, 1, 2.636f);
+                ens->min_support = 2;
                 return 0;
         }
+
+        /* recall: single run, ~6s. F1=0.829 R=0.833 P=0.826 */
+        if(strcasecmp(m, "recall") == 0){
+                *n_runs = 1;
+                preset_run(&runs[0],
+                           KALIGN_MATRIX_NUC_200PAM,
+                           11.939f, 1.591f, 2.890f,
+                           0.065f, 1.363f,
+                           0, KALIGN_REFINE_CONFIDENT,
+                           0, 0.0f);
+                preset_consistency(runs, 1, 3, 2.572f);
+                return 0;
+        }
+
+        /* accurate: 3-run ensemble with realign, ~26s.
+           F1=0.836 R=0.811 P=0.863 */
         if(strcasecmp(m, "accurate") == 0){
+                *n_runs = 3;
+                preset_run(&runs[0], KALIGN_MATRIX_NUC_200PAM,
+                           10.799f, 1.389f, 2.718f,
+                           0.094f, 0.364f,
+                           2, KALIGN_REFINE_CONFIDENT, 42, 0.0f);
+                preset_run(&runs[1], KALIGN_MATRIX_NUC_200PAM,
+                           15.595f, 1.932f, 2.486f,
+                           0.190f, 0.364f,
+                           2, KALIGN_REFINE_ALL, 43, 0.0f);
+                preset_run(&runs[2], KALIGN_MATRIX_NUC_20PAM,
+                           14.749f, 1.041f, 2.450f,
+                           2.712f, 0.364f,
+                           2, KALIGN_REFINE_CONFIDENT, 44, 0.0f);
+                preset_consistency(runs, 3, 3, 2.634f);
+                ens->min_support = 2;
                 return 0;
         }
+
+        return -1;
+}
+
+/* ---- DNA presets (NSGA-III optimized on MDSA, gen 100) ----
+ *
+ * NOTE: default = accurate (optimizer converged on same solution).
+ *       DNA alignments are harder than RNA; even "fast" needs ens3+realign.
+ *       Kept separate for future tuning.
+ */
+
+static int preset_dna(const char *m,
+                       struct kalign_run_config *runs,
+                       int *n_runs,
+                       struct kalign_ensemble_config *ens)
+{
+        /* fast: 3-run ensemble with realign, ~18s on MDSA.
+           F1=0.764 R=0.741 P=0.788 */
+        if(strcasecmp(m, "fast") == 0){
+                *n_runs = 3;
+                preset_run(&runs[0], KALIGN_MATRIX_NUC_200PAM,
+                           19.660f, 0.600f, 2.690f,
+                           1.050f, 2.710f,
+                           1, KALIGN_REFINE_NONE, 42, 0.0f);
+                preset_run(&runs[1], KALIGN_MATRIX_NUC_200PAM,
+                           19.470f, 1.600f, 2.490f,
+                           0.140f, 2.710f,
+                           1, KALIGN_REFINE_CONFIDENT, 43, 0.0f);
+                preset_run(&runs[2], KALIGN_MATRIX_NUC_20PAM,
+                           17.200f, 3.810f, 2.770f,
+                           0.070f, 2.710f,
+                           1, KALIGN_REFINE_NONE, 44, 0.0f);
+                ens->min_support = 2;
+                return 0;
+        }
+
+        /* default: 3-run ensemble with realign, ~35s.
+           F1=0.775 R=0.737 P=0.816 */
+        if(strcasecmp(m, "default") == 0){
+                *n_runs = 3;
+                preset_run(&runs[0], KALIGN_MATRIX_NUC_200PAM,
+                           19.350f, 0.310f, 2.860f,
+                           1.450f, 1.830f,
+                           1, KALIGN_REFINE_INLINE, 42, 0.0f);
+                preset_run(&runs[1], KALIGN_MATRIX_NUC_200PAM,
+                           19.020f, 1.980f, 2.510f,
+                           0.490f, 1.830f,
+                           1, KALIGN_REFINE_CONFIDENT, 43, 0.0f);
+                preset_run(&runs[2], KALIGN_MATRIX_NUC_20PAM,
+                           17.850f, 3.000f, 2.450f,
+                           1.380f, 1.830f,
+                           1, KALIGN_REFINE_NONE, 44, 0.0f);
+                preset_consistency(runs, 3, 1, 0.780f);
+                ens->min_support = 2;
+                return 0;
+        }
+
+        /* recall: 5-run ensemble with realign, ~65s.
+           F1=0.765 R=0.760 P=0.770 */
+        if(strcasecmp(m, "recall") == 0){
+                *n_runs = 5;
+                preset_run(&runs[0], KALIGN_MATRIX_NUC_200PAM,
+                           19.370f, 0.660f, 2.650f,
+                           2.470f, 1.820f,
+                           1, KALIGN_REFINE_INLINE, 42, 0.0f);
+                preset_run(&runs[1], KALIGN_MATRIX_NUC_200PAM,
+                           19.110f, 1.580f, 2.490f,
+                           1.060f, 1.820f,
+                           1, KALIGN_REFINE_CONFIDENT, 43, 0.0f);
+                preset_run(&runs[2], KALIGN_MATRIX_NUC_200PAM,
+                           16.730f, 1.190f, 2.480f,
+                           0.360f, 1.820f,
+                           1, KALIGN_REFINE_CONFIDENT, 44, 0.0f);
+                preset_run(&runs[3], KALIGN_MATRIX_NUC_200PAM,
+                           16.730f, 4.090f, 2.200f,
+                           0.890f, 1.820f,
+                           1, KALIGN_REFINE_NONE, 45, 0.0f);
+                preset_run(&runs[4], KALIGN_MATRIX_NUC_200PAM,
+                           9.340f, 1.380f, 1.100f,
+                           1.400f, 1.820f,
+                           1, KALIGN_REFINE_CONFIDENT, 46, 0.0f);
+                preset_consistency(runs, 5, 1, 0.630f);
+                ens->min_support = 2;
+                return 0;
+        }
+
+        /* accurate: same as default (optimizer converged on same solution).
+           F1=0.775 R=0.737 P=0.816 */
+        if(strcasecmp(m, "accurate") == 0){
+                *n_runs = 3;
+                preset_run(&runs[0], KALIGN_MATRIX_NUC_200PAM,
+                           19.350f, 0.310f, 2.860f,
+                           1.450f, 1.830f,
+                           1, KALIGN_REFINE_INLINE, 42, 0.0f);
+                preset_run(&runs[1], KALIGN_MATRIX_NUC_200PAM,
+                           19.020f, 1.980f, 2.510f,
+                           0.490f, 1.830f,
+                           1, KALIGN_REFINE_CONFIDENT, 43, 0.0f);
+                preset_run(&runs[2], KALIGN_MATRIX_NUC_20PAM,
+                           17.850f, 3.000f, 2.450f,
+                           1.380f, 1.830f,
+                           1, KALIGN_REFINE_NONE, 44, 0.0f);
+                preset_consistency(runs, 3, 1, 0.780f);
+                ens->min_support = 2;
+                return 0;
+        }
+
         return -1;
 }
 
@@ -924,11 +1080,11 @@ int kalign_get_mode_preset(const char *mode,
         *ens = kalign_ensemble_config_defaults();
 
         if(biotype == ALN_BIOTYPE_DNA){
-                /* Detect RNA from matrix type if needed.
-                   For now, DNA biotype covers both DNA and RNA.
-                   Use RNA presets when RNA matrix was explicitly requested,
-                   otherwise fall back to DNA presets. */
-                return preset_dna(m, runs, n_runs, ens);
+                /* TODO: distinguish DNA vs RNA for better dispatch.
+                   Currently defaults to RNA presets. DNA presets are
+                   available via preset_dna() but need RNA detection
+                   (e.g. presence of U) to select automatically. */
+                return preset_rna(m, runs, n_runs, ens);
         }
 
         /* Default: protein presets */

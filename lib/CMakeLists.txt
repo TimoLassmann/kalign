@@ -54,6 +54,7 @@ set(source_files
   src/poar.c
   src/consensus_msa.c
   src/anchor_consistency.c
+  src/msa_consistency.c
   src/ensemble.c
 
   # src/coretralign.c

@@ -20,6 +20,7 @@
 /* #include "weave_alignment.h" */
 #include "sp_score.h"
 #include "anchor_consistency.h"
+#include "msa_consistency.h"
 
 #include <string.h>
 #include <float.h>
@@ -261,9 +262,11 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
 
         /* Compute consistency bonus for all merge types */
         {
-                struct consistency_table* ct = (struct consistency_table*)msa->consistency_table;
-                if(ct != NULL){
-                        int dp_row_node, dp_col_node, dp_rows, dp_cols;
+                int dp_row_node, dp_col_node, dp_rows, dp_cols;
+                int have_consistency = (msa->poar_consistency != NULL)
+                        || (msa->consistency_table != NULL);
+
+                if(have_consistency){
                         if(msa->nsip[a] == 1 && msa->nsip[b] == 1){
                                 if(m->len_a < m->len_b){
                                         dp_row_node = a; dp_rows = m->len_a;
@@ -287,9 +290,18 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                                         dp_col_node = a; dp_cols = m->len_a;
                                 }
                         }
-                        RUN(anchor_consistency_get_bonus_profile(ct, msa,
-                                dp_row_node, dp_rows, dp_col_node, dp_cols,
-                                &m->consistency));
+
+                        if(msa->poar_consistency != NULL){
+                                RUN(poar_consistency_get_bonus(
+                                        (struct poar_consistency_ctx*)msa->poar_consistency,
+                                        msa, dp_row_node, dp_rows, dp_col_node, dp_cols,
+                                        &m->consistency));
+                        }else{
+                                RUN(anchor_consistency_get_bonus_profile(
+                                        (struct consistency_table*)msa->consistency_table,
+                                        msa, dp_row_node, dp_rows, dp_col_node, dp_cols,
+                                        &m->consistency));
+                        }
                 }
         }
 
@@ -563,9 +575,11 @@ int do_align_inline_refine(struct msa* msa, struct aln_tasks* t,
         /* Compute consistency bonus for all merge types */
         m->consistency = NULL;
         {
-                struct consistency_table* ct = (struct consistency_table*)msa->consistency_table;
-                if(ct != NULL){
-                        int dp_row_node, dp_col_node, dp_rows, dp_cols;
+                int dp_row_node, dp_col_node, dp_rows, dp_cols;
+                int have_consistency = (msa->poar_consistency != NULL)
+                        || (msa->consistency_table != NULL);
+
+                if(have_consistency){
                         if(msa->nsip[a] == 1 && msa->nsip[b] == 1){
                                 if(len_a < len_b){
                                         dp_row_node = a; dp_rows = len_a;
@@ -589,9 +603,18 @@ int do_align_inline_refine(struct msa* msa, struct aln_tasks* t,
                                         dp_col_node = a; dp_cols = len_a;
                                 }
                         }
-                        RUN(anchor_consistency_get_bonus_profile(ct, msa,
-                                dp_row_node, dp_rows, dp_col_node, dp_cols,
-                                &m->consistency));
+
+                        if(msa->poar_consistency != NULL){
+                                RUN(poar_consistency_get_bonus(
+                                        (struct poar_consistency_ctx*)msa->poar_consistency,
+                                        msa, dp_row_node, dp_rows, dp_col_node, dp_cols,
+                                        &m->consistency));
+                        }else{
+                                RUN(anchor_consistency_get_bonus_profile(
+                                        (struct consistency_table*)msa->consistency_table,
+                                        msa, dp_row_node, dp_rows, dp_col_node, dp_cols,
+                                        &m->consistency));
+                        }
                 }
         }
 

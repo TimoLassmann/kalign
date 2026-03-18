@@ -298,7 +298,8 @@ MDSA_DIR = DOWNLOADS_DIR / "mdsa"
 # Skip PREFAB (all pairwise, 2 seqs — not useful for MSA benchmarking)
 MDSA_DATABASES = ["balibase", "oxbench", "smart"]
 MDSA_VERSION = "all"  # "100s" is too small (400 cases); "all" has 1,869 usable cases
-MDSA_MAX_SEQS = 500   # Skip very large families (SMART has up to 1,769 seqs)
+MDSA_MAX_SEQS = 15    # Cap for optimizer feasibility (~325 cases, ~3-4 days for 100 gens)
+MDSA_MAX_ALN_LEN = 400  # Skip families with very long reference alignments
 
 
 def mdsa_download() -> None:
@@ -409,6 +410,13 @@ def mdsa_cases() -> List[BenchmarkCase]:
             # Skip trivial pairwise cases
             if n_seqs < 3:
                 continue
+            # Skip families with very long alignments
+            aln_len = max(
+                (len(line.strip()) for line in open(ref) if not line.startswith(">")),
+                default=0,
+            )
+            if aln_len > MDSA_MAX_ALN_LEN:
+                continue
 
             cases.append(
                 BenchmarkCase(
@@ -426,6 +434,21 @@ def mdsa_cases() -> List[BenchmarkCase]:
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
+
+def _nucleotide_download() -> None:
+    """Download both BRAliBASE (RNA) and MDSA (DNA)."""
+    bralibase_download()
+    mdsa_download()
+
+
+def _nucleotide_is_available() -> bool:
+    return bralibase_is_available() and mdsa_is_available()
+
+
+def _nucleotide_cases() -> List[BenchmarkCase]:
+    """Combined BRAliBASE + MDSA cases for unified nucleotide optimization."""
+    return bralibase_cases() + mdsa_cases()
+
 
 DATASETS = {
     "balibase": {
@@ -447,6 +470,11 @@ DATASETS = {
         "download": mdsa_download,
         "is_available": mdsa_is_available,
         "cases": mdsa_cases,
+    },
+    "nucleotide": {
+        "download": _nucleotide_download,
+        "is_available": _nucleotide_is_available,
+        "cases": _nucleotide_cases,
     },
 }
 

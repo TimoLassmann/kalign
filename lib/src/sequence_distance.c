@@ -55,17 +55,11 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                 RUN(galloc(&dm,num_samples,num_samples));
                 for(i = 0; i < num_samples;i++){
 
-                        seq_a = msa->sequences[samples[i]]->s;// aln->s[samples[i]];
-                        len_a = msa->sequences[samples[i]]->len;//aln->sl[samples[i]];
+                        seq_a = msa->sequences[samples[i]]->s;
+                        len_a = msa->sequences[samples[i]]->len;
                         for(j = 0;j < num_samples;j++){
-                                //fprintf(stdout, "Working on %d %d\n", i,j);
-
-                                seq_b = msa->sequences[samples[j]]->s; //aln->s[ samples[j]];
-                                len_b = msa->sequences[samples[j]]->len;//aln->sl[selection[j]];
-                                /*dm[i][j] = MACRO_MIN(len_a, len_b) - MACRO_MIN(
-                                  bpm_256(seq_a, seq_b, len_a, len_b),
-                                  bpm_256(seq_b, seq_a, len_b, len_a)
-                                  );*/
+                                seq_b = msa->sequences[samples[j]]->s;
+                                len_b = msa->sequences[samples[j]]->len;
                                 dist = calc_distance(seq_a, seq_b, len_a, len_b);
                                 /* give shorter sequences a preference */
                                 int s = (len_a + len_b) / 2;

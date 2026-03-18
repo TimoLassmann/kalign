@@ -13,6 +13,8 @@ static int set_subm_gaps_PFASUM60(struct aln_param *ap);
 static int set_subm_gaps_DNA(struct aln_param *ap);
 static int set_subm_gaps_DNA_internal(struct aln_param *ap);
 static int set_subm_gaps_RNA(struct aln_param *ap);
+static int set_subm_gaps_nuc_kimura(struct aln_param *ap, float match,
+                                     float transition, float transversion);
 
 int aln_param_init(struct aln_param **aln_param,int biotype , int n_threads, int type, float gpo, float gpe, float tgpe)
 {
@@ -42,6 +44,15 @@ int aln_param_init(struct aln_param **aln_param,int biotype , int n_threads, int
                         break;
                 case KALIGN_MATRIX_RNA:
                         set_subm_gaps_RNA(ap);
+                        break;
+                case KALIGN_MATRIX_NUC_1PAM:
+                        set_subm_gaps_nuc_kimura(ap, 5.0f, -14.2f, -16.8f);
+                        break;
+                case KALIGN_MATRIX_NUC_20PAM:
+                        set_subm_gaps_nuc_kimura(ap, 5.0f, -4.6f, -7.2f);
+                        break;
+                case KALIGN_MATRIX_NUC_200PAM:
+                        set_subm_gaps_nuc_kimura(ap, 5.0f, 0.8f, -3.4f);
                         break;
                 case KALIGN_MATRIX_PFASUM43:
                 case KALIGN_MATRIX_PFASUM60:
@@ -357,6 +368,33 @@ int set_subm_gaps_RNA(struct aln_param* ap)
         ap->gpo = 217.0;
         ap->gpe = 39.4;
         ap->tgpe = 292.6;
+        return OK;
+}
+
+/* Kimura two-parameter nucleotide matrix.
+   Alphabet: A=0, C=1, G=2, T/U=3, N=4.
+   Transitions: A<->G, C<->T.  Transversions: all others.
+   Gap penalties use the same defaults as the DNA matrix. */
+int set_subm_gaps_nuc_kimura(struct aln_param *ap, float match,
+                              float transition, float transversion)
+{
+        int i, j;
+        /* Transition pairs: (0,2)=A-G, (2,0)=G-A, (1,3)=C-T, (3,1)=T-C */
+        for(i = 0; i < 5; i++){
+                for(j = 0; j < 5; j++){
+                        if(i == j){
+                                ap->subm[i][j] = match;
+                        }else if((i == 0 && j == 2) || (i == 2 && j == 0) ||
+                                 (i == 1 && j == 3) || (i == 3 && j == 1)){
+                                ap->subm[i][j] = transition;
+                        }else{
+                                ap->subm[i][j] = transversion;
+                        }
+                }
+        }
+        ap->gpo = 8.0f;
+        ap->gpe = 6.0f;
+        ap->tgpe = 0.0f;
         return OK;
 }
 

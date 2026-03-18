@@ -3,12 +3,14 @@
 
 Searches across kalign's entire operating range: from fast single-run alignment
 through consistency-enhanced single-run to multi-run ensemble with POAR consensus.
-Always uses three objectives: F1, TC, and wall time. The resulting 3D Pareto
-surface reveals the full speed/accuracy trade-off landscape in one run.
+Always uses three objectives: recall, precision, and wall time. The resulting 3D
+Pareto surface reveals the full speed/accuracy trade-off landscape in one run.
+Recall and precision are naturally in tension, yielding a richer Pareto front
+than F1+TC.
 
 Objectives (always 3):
-    1. Maximize F1 (category-averaged, held-out CV) -> pymoo minimizes -F1
-    2. Maximize TC (category-averaged, held-out CV) -> pymoo minimizes -TC
+    1. Maximize recall (category-averaged SP score, held-out CV)
+    2. Maximize precision (category-averaged, held-out CV)
     3. Minimize wall time (total CV evaluation time in seconds)
 
 Per-run decision variables (x max_runs slots):
@@ -101,6 +103,7 @@ from rich.text import Text  # type: ignore[import-untyped]
 from kalign._core import (  # type: ignore[import-untyped]
     MATRIX_PFASUM43, MATRIX_PFASUM60, MATRIX_CORBLOSUM66,
     MATRIX_DNA, MATRIX_RNA,
+    MATRIX_NUC_1PAM, MATRIX_NUC_20PAM, MATRIX_NUC_200PAM,
     REFINE_NONE, REFINE_ALL,
     REFINE_CONFIDENT, REFINE_INLINE, ensemble_custom_file_to_file,
 )
@@ -149,12 +152,12 @@ PARAM_PROFILES = {
         # seq_weights: 0 by default for RNA, search [0, 3]
         "shared_cont_lower": np.array([0.0, 0.0, 0.5]),
         "shared_cont_upper": np.array([3.0, 3.0, 5.0]),
-        # RNA has only one scoring type
-        "matrix_map_int": [MATRIX_RNA],
-        "matrix_map_str": ["rna"],
-        "matrix_names": {MATRIX_RNA: "RNA"},
-        "n_matrices": 1,
-        "seq_type_int": MATRIX_RNA,
+        # Kimura 1/20/200 PAM matrices (shared with DNA)
+        "matrix_map_int": [MATRIX_NUC_1PAM, MATRIX_NUC_20PAM, MATRIX_NUC_200PAM],
+        "matrix_map_str": ["nuc_1pam", "nuc_20pam", "nuc_200pam"],
+        "matrix_names": {MATRIX_NUC_1PAM: "K1", MATRIX_NUC_20PAM: "K20", MATRIX_NUC_200PAM: "K200"},
+        "n_matrices": 3,
+        "seq_type_int": MATRIX_NUC_200PAM,
         "seq_type_str": "rna",
         "max_consistency_idx": len(CONSISTENCY_MAP) - 1,  # full range
     },
@@ -163,13 +166,27 @@ PARAM_PROFILES = {
         "per_run_cont_upper": np.array([20.0, 5.0, 3.0, 0.5]),
         "shared_cont_lower": np.array([0.0, 0.0, 0.5]),
         "shared_cont_upper": np.array([3.0, 3.0, 5.0]),
-        "matrix_map_int": [MATRIX_DNA],
-        "matrix_map_str": ["dna"],
-        "matrix_names": {MATRIX_DNA: "DNA"},
-        "n_matrices": 1,
-        "seq_type_int": MATRIX_DNA,
+        # Kimura 1/20/200 PAM matrices (shared with RNA)
+        "matrix_map_int": [MATRIX_NUC_1PAM, MATRIX_NUC_20PAM, MATRIX_NUC_200PAM],
+        "matrix_map_str": ["nuc_1pam", "nuc_20pam", "nuc_200pam"],
+        "matrix_names": {MATRIX_NUC_1PAM: "K1", MATRIX_NUC_20PAM: "K20", MATRIX_NUC_200PAM: "K200"},
+        "n_matrices": 3,
+        "seq_type_int": MATRIX_NUC_200PAM,
         "seq_type_str": "dna",
         "max_consistency_idx": len(CONSISTENCY_MAP) - 1,  # full range
+    },
+    "nucleotide": {
+        "per_run_cont_lower": np.array([1.0, 0.2, 0.05, 0.0]),
+        "per_run_cont_upper": np.array([20.0, 5.0, 3.0, 0.5]),
+        "shared_cont_lower": np.array([0.0, 0.0, 0.5]),
+        "shared_cont_upper": np.array([3.0, 3.0, 5.0]),
+        "matrix_map_int": [MATRIX_NUC_1PAM, MATRIX_NUC_20PAM, MATRIX_NUC_200PAM],
+        "matrix_map_str": ["nuc_1pam", "nuc_20pam", "nuc_200pam"],
+        "matrix_names": {MATRIX_NUC_1PAM: "K1", MATRIX_NUC_20PAM: "K20", MATRIX_NUC_200PAM: "K200"},
+        "n_matrices": 3,
+        "seq_type_int": MATRIX_NUC_200PAM,
+        "seq_type_str": "nucleotide",
+        "max_consistency_idx": len(CONSISTENCY_MAP) - 1,
     },
 }
 
@@ -188,7 +205,10 @@ def _matrix_names(): return _active_profile["matrix_names"]
 # Legacy aliases (used in view_pareto.py etc.)
 MATRIX_MAP_INT = PARAM_PROFILES["protein"]["matrix_map_int"]
 MATRIX_MAP_STR = PARAM_PROFILES["protein"]["matrix_map_str"]
-MATRIX_NAMES = PARAM_PROFILES["protein"]["matrix_names"]
+# Combined matrix names across all profiles (used by dashboard)
+MATRIX_NAMES = {}
+for _prof in PARAM_PROFILES.values():
+    MATRIX_NAMES.update(_prof["matrix_names"])
 
 # Old constant names used in view_pareto.py and checkpoint data — keep for loading old checkpoints
 _OLD_MATRIX_COMPAT = {3: MATRIX_PFASUM43, 5: MATRIX_PFASUM43, 6: MATRIX_PFASUM60}
@@ -231,6 +251,8 @@ def get_vars(max_runs: int) -> dict:
     variables["consistency"] = Choice(options=consistency_options)
     variables["realign"] = Integer(bounds=(0, 2))
     variables["min_support"] = Integer(bounds=(0, max_runs))
+    variables["consistency_merge"] = Choice(options=[0, 1])
+    variables["consistency_merge_weight"] = Real(bounds=(0.5, 10.0))
 
     return variables
 
@@ -249,6 +271,8 @@ def decode_unified_params(x, max_runs: int):
     consistency = int(x["consistency"])
     realign = int(x["realign"])
     min_support_raw = int(x["min_support"])
+    consistency_merge = int(x.get("consistency_merge", 0))
+    consistency_merge_weight = float(x.get("consistency_merge_weight", 2.0))
 
     seq_weights = float(x["seq_weights"])
     consistency_weight = float(x["consistency_weight"])
@@ -291,6 +315,14 @@ def decode_unified_params(x, max_runs: int):
     if consistency == 0:
         consistency_weight = 1.0
 
+    # Single-run: no consistency merge (needs ensemble)
+    if n_runs == 1:
+        consistency_merge = 0
+
+    # When consistency_merge == 0, weight is irrelevant
+    if consistency_merge == 0:
+        consistency_merge_weight = 2.0
+
     return {
         "n_runs": n_runs,
         "run_gpo": run_gpo,
@@ -306,6 +338,8 @@ def decode_unified_params(x, max_runs: int):
         "consistency": consistency,
         "realign": realign,
         "min_support": min_support,
+        "consistency_merge": consistency_merge,
+        "consistency_merge_weight": consistency_merge_weight,
     }
 
 
@@ -336,6 +370,8 @@ def encode_unified_params(params, max_runs: int) -> dict:
     x["consistency"] = params["consistency"]
     x["realign"] = params["realign"]
     x["min_support"] = params["min_support"]
+    x["consistency_merge"] = params.get("consistency_merge", 0)
+    x["consistency_merge_weight"] = params.get("consistency_merge_weight", 2.0)
     return x
 
 
@@ -359,9 +395,10 @@ def format_unified_short(params):
         # Show per-run refine modes compactly
         refs = "/".join(REFINE_NAMES.get(r, "?") for r in params["run_refine"])
         vsms = "/".join(f"{v:.1f}" for v in params["run_vsm_amax"])
+        cm = "CM" if params.get("consistency_merge", 0) else "POAR"
         return (f"{mode_label(params)} vsm={vsms} "
                 f"sw={params['seq_weights']:.1f} c={params['consistency']} "
-                f"re={params['realign']} ref={refs} ms={params['min_support']}")
+                f"re={params['realign']} ref={refs} ms={params['min_support']} {cm}")
 
 
 def format_unified_long(params):
@@ -380,6 +417,9 @@ def format_unified_long(params):
                  f"consistency_weight={params['consistency_weight']:.3f}")
     lines.append(f"  realign={params['realign']} "
                  f"min_support={params['min_support']}")
+    if params.get("consistency_merge", 0):
+        lines.append(f"  consistency_merge=1 "
+                     f"consistency_merge_weight={params['consistency_merge_weight']:.3f}")
     return "\n".join(lines)
 
 
@@ -451,6 +491,9 @@ def evaluate_unified(params, cases, n_threads=1, quiet=True):
                     # Per-run overrides
                     run_vsm_amax=params["run_vsm_amax"],
                     run_refine=params["run_refine"],
+                    # MSA consistency merge
+                    consistency_merge=params.get("consistency_merge", 0),
+                    consistency_merge_weight=params.get("consistency_merge_weight", 2.0),
                 )
 
                 wall_time = time.perf_counter() - start
@@ -496,21 +539,35 @@ def evaluate_unified(params, cases, n_threads=1, quiet=True):
     }
 
 
+def fbeta_score(precision, recall, beta=1.0):
+    """Compute F-beta score: weights recall beta times more than precision."""
+    if precision + recall == 0:
+        return 0.0
+    b2 = beta * beta
+    return (1 + b2) * precision * recall / (b2 * precision + recall)
+
+
 def evaluate_cv(params, folds, n_threads=1, quiet=True):
     """Evaluate unified params using stratified k-fold CV."""
     fold_f1s = []
     fold_tcs = []
+    fold_recalls = []
+    fold_precisions = []
     total_time = 0.0
 
     for _, test in folds:
         result = evaluate_unified(params, test, n_threads, quiet)
         fold_f1s.append(result["f1"])
         fold_tcs.append(result["tc"])
+        fold_recalls.append(result["recall"])
+        fold_precisions.append(result["precision"])
         total_time += result["wall_time"]
 
     return {
         "f1": float(np.mean(fold_f1s)),
         "tc": float(np.mean(fold_tcs)),
+        "recall": float(np.mean(fold_recalls)),
+        "precision": float(np.mean(fold_precisions)),
         "f1_std": float(np.std(fold_f1s)),
         "tc_std": float(np.std(fold_tcs)),
         "fold_f1s": fold_f1s,
@@ -629,30 +686,28 @@ class Dashboard:
         lines = []
         if self.best_f1_entry:
             e = self.best_f1_entry
-            bl_f1 = max(bl["f1"] for bl in self.baselines.values()) if self.baselines else 0
-            delta = e["f1"] - bl_f1
             lines.append(self._format_best_entry(
-                f"Best F1: {e['f1']:.4f} TC={e['tc']:.4f}", e,
-                f"({delta:+.4f} vs best baseline)"))
+                f"Best Recall: {e.get('recall', 0):.4f}  F1={e['f1']:.4f}  "
+                f"P={e.get('precision', 0):.3f}  TC={e.get('tc', 0):.4f}", e, ""))
         if self.best_tc_entry:
             e = self.best_tc_entry
-            bl_tc = max(bl["tc"] for bl in self.baselines.values()) if self.baselines else 0
-            delta = e["tc"] - bl_tc
             lines.append(self._format_best_entry(
-                f"Best TC: {e['tc']:.4f} F1={e['f1']:.4f}", e,
-                f"({delta:+.4f} vs best baseline)"))
+                f"Best Prec:   {e.get('precision', 0):.4f}  F1={e['f1']:.4f}  "
+                f"R={e.get('recall', 0):.3f}  TC={e.get('tc', 0):.4f}", e, ""))
         if self.fastest_entry:
             e = self.fastest_entry
             lines.append(self._format_best_entry(
-                f"Fastest: {e['wall_time']:.1f}s F1={e['f1']:.4f}", e, ""))
+                f"Fastest: {e['wall_time']:.1f}s  F1={e['f1']:.4f}  "
+                f"R={e.get('recall', 0):.3f}  P={e.get('precision', 0):.3f}", e, ""))
         return Panel("\n".join(lines) if lines else "(no data yet)", title="Best by Objective")
 
     def _build_pareto_table(self):
         table = Table(title="Pareto Front (top 12 by F1)", box=None, padding=(0, 1))
         table.add_column("#", style="dim", width=2)
         table.add_column("Mode", width=6)
+        table.add_column("Recall", justify="right", width=6)
+        table.add_column("Prec", justify="right", width=6)
         table.add_column("F1", justify="right", width=6)
-        table.add_column("TC", justify="right", width=6)
         table.add_column("Time", justify="right", width=5)
         table.add_column("c", width=2)
         table.add_column("re", width=2)
@@ -660,13 +715,13 @@ class Dashboard:
         table.add_column("Params", no_wrap=True)
 
         sorted_front = sorted(self.pareto_front, key=lambda x: -x["f1"])[:12]
-        bl_f1 = max(bl["f1"] for bl in self.baselines.values()) if self.baselines else 0
-        bl_tc = max(bl["tc"] for bl in self.baselines.values()) if self.baselines else 0
+        bl_recall = max(bl.get("recall", 0) for bl in self.baselines.values()) if self.baselines else 0
+        bl_prec = max(bl.get("precision", 0) for bl in self.baselines.values()) if self.baselines else 0
 
         for i, entry in enumerate(sorted_front):
             p = entry.get("params", {})
-            f1_style = "bold green" if entry["f1"] > bl_f1 else ""
-            tc_style = "bold green" if entry["tc"] > bl_tc else ""
+            r_style = "bold green" if entry.get("recall", 0) > bl_recall else ""
+            p_style = "bold green" if entry.get("precision", 0) > bl_prec else ""
             refs = "/".join(REFINE_NAMES.get(r, "?") for r in p.get("run_refine", [0]))
 
             # Build detailed params string
@@ -677,15 +732,17 @@ class Dashboard:
                 run_strs.append(f"R{k}:{p['run_gpo'][k]:.1f}/{p['run_gpe'][k]:.2f}/"
                                 f"{p['run_tgpe'][k]:.2f}/{mat}/v{vsm:.1f}")
             runs = " ".join(run_strs)
+            cm = " CM" if p.get("consistency_merge", 0) else ""
             shared = (f"sw={p.get('seq_weights', 0):.1f} "
-                      f"ms={p.get('min_support', 0)}")
+                      f"ms={p.get('min_support', 0)}{cm}")
             params_str = f"{runs} | {shared}"
 
             table.add_row(
                 str(i),
                 mode_label(p),
-                Text(f"{entry['f1']:.4f}", style=f1_style),
-                Text(f"{entry['tc']:.4f}", style=tc_style),
+                Text(f"{entry.get('recall', 0):.4f}", style=r_style),
+                Text(f"{entry.get('precision', 0):.4f}", style=p_style),
+                f"{entry['f1']:.4f}",
                 f"{entry.get('wall_time', 0):.0f}s",
                 str(p.get("consistency", 0)),
                 str(p.get("realign", 0)),
@@ -707,7 +764,9 @@ class Dashboard:
         lines = []
         for h in self.gen_history[-6:]:
             lines.append(f"Gen {h['gen']:3d}: F1={h['best_f1']:.4f}  "
-                         f"TC={h['best_tc']:.4f}  n_pareto={h['n_pareto']}")
+                         f"R={h.get('best_recall', 0):.4f}  "
+                         f"P={h.get('best_prec', 0):.4f}  "
+                         f"n_pareto={h['n_pareto']}")
         return Panel("\n".join(lines) if lines else "(no data)", title="Trend")
 
     def _build_recent_panel(self):
@@ -760,20 +819,23 @@ class Dashboard:
         self.refresh()
 
     def on_eval_end(self, params: dict, cv_result: dict):
-        f1 = cv_result["f1"]
-        tc = cv_result["tc"]
+        recall = cv_result.get("recall", 0.0)
+        precision = cv_result.get("precision", 0.0)
+        f1 = fbeta_score(precision, recall, 1.0)
+        tc = cv_result.get("tc", 0.0)
         wt = cv_result.get("wall_time", 0.0)
 
-        entry = {"params": params, "f1": f1, "tc": tc, "wall_time": wt}
+        entry = {"params": params, "f1": f1, "tc": tc, "wall_time": wt,
+                 "recall": recall, "precision": precision}
         self.recent_evals.append(entry)
         if len(self.recent_evals) > 5:
             self.recent_evals.pop(0)
 
-        if f1 > self.best_f1:
-            self.best_f1 = f1
+        if recall > self.best_f1:  # reuse field for best recall
+            self.best_f1 = recall
             self.best_f1_entry = entry
-        if tc > self.best_tc:
-            self.best_tc = tc
+        if precision > self.best_tc:  # reuse field for best precision
+            self.best_tc = precision
             self.best_tc_entry = entry
         if wt < self.fastest and f1 > 0.5:
             self.fastest = wt
@@ -791,12 +853,14 @@ class Dashboard:
     def on_gen_end(self, gen: int, pareto_front: List[dict]):
         self.pareto_front = pareto_front
 
+        best_recall = max((s.get("recall", 0) for s in pareto_front), default=0.0)
+        best_prec = max((s.get("precision", 0) for s in pareto_front), default=0.0)
         best_f1_in_gen = max((s["f1"] for s in pareto_front), default=0.0)
-        best_tc_in_gen = max((s["tc"] for s in pareto_front), default=0.0)
         self.gen_history.append({
             "gen": gen,
             "best_f1": best_f1_in_gen,
-            "best_tc": best_tc_in_gen,
+            "best_recall": best_recall,
+            "best_prec": best_prec,
             "n_pareto": len(pareto_front),
         })
 
@@ -845,16 +909,17 @@ class UnifiedCVProblem(Problem):
     """3-objective optimization with stratified CV evaluation."""
 
     def __init__(self, folds, max_runs: int, n_threads=1, n_workers=1,
-                 dashboard: Optional[Dashboard] = None):
+                 dashboard: Optional[Dashboard] = None, f_beta: float = 1.0):
         super().__init__(
             vars=get_vars(max_runs),
-            n_obj=3,  # always 3: -F1, -TC, time
+            n_obj=3,  # always 3: -recall, -precision, time
         )
         self.folds = folds
         self.max_runs = max_runs
         self.n_threads = n_threads
         self.n_workers = n_workers
         self.dashboard = dashboard
+        self.f_beta = f_beta
         self.eval_count = 0
         self.history: List[dict] = []
 
@@ -910,12 +975,16 @@ class UnifiedCVProblem(Problem):
 
                     fold_f1s = [fold_results[ind_idx][fi]["f1"] for fi in range(n_folds)]
                     fold_tcs = [fold_results[ind_idx][fi]["tc"] for fi in range(n_folds)]
+                    fold_recalls = [fold_results[ind_idx][fi]["recall"] for fi in range(n_folds)]
+                    fold_precisions = [fold_results[ind_idx][fi]["precision"] for fi in range(n_folds)]
                     total_time = sum(fold_results[ind_idx][fi]["wall_time"]
                                      for fi in range(n_folds))
 
                     cv_result = {
                         "f1": float(np.mean(fold_f1s)),
                         "tc": float(np.mean(fold_tcs)),
+                        "recall": float(np.mean(fold_recalls)),
+                        "precision": float(np.mean(fold_precisions)),
                         "f1_std": float(np.std(fold_f1s)),
                         "tc_std": float(np.std(fold_tcs)),
                         "fold_f1s": fold_f1s,
@@ -936,8 +1005,10 @@ class UnifiedCVProblem(Problem):
             pool.shutdown(wait=False)
 
     def _record(self, i, F, params, cv_result):
-        F[i, 0] = -cv_result["f1"]
-        F[i, 1] = -cv_result["tc"]
+        fb = fbeta_score(cv_result["precision"], cv_result["recall"], self.f_beta)
+        cv_result["fbeta"] = fb
+        F[i, 0] = -cv_result["recall"]
+        F[i, 1] = -cv_result["precision"]
         F[i, 2] = cv_result["wall_time"]
 
         self.history.append({
@@ -974,10 +1045,15 @@ class GenerationCallback(Callback):
         if algorithm.opt is not None and len(algorithm.opt) > 0:
             for ind in algorithm.opt:
                 params = decode_unified_params(ind.X, self.max_runs)
+                recall = -ind.F[0]
+                precision = -ind.F[1]
+                f1 = fbeta_score(precision, recall, 1.0)
                 entry = {
                     "params": params,
-                    "f1": -ind.F[0],
-                    "tc": -ind.F[1],
+                    "recall": recall,
+                    "precision": precision,
+                    "f1": f1,
+                    "tc": 0.0,  # not an objective; filled from cv_result if available
                     "wall_time": ind.F[2],
                 }
                 pareto.append(entry)
@@ -1002,6 +1078,7 @@ class GenerationCallback(Callback):
                 "pop_size": len(pop),
                 "max_runs": self.max_runs,
                 "profile": _active_profile.get("seq_type_str", "protein"),
+                "f_beta": self.problem.f_beta if self.problem else 1.0,
             }
             tmp = self.checkpoint_path.with_suffix(".tmp")
             with open(tmp, "wb") as f:
@@ -1010,9 +1087,39 @@ class GenerationCallback(Callback):
 
 
 def load_checkpoint(path: Path):
-    """Load a generation checkpoint."""
+    """Load a generation checkpoint.
+
+    Backfills missing keys for new decision variables so old checkpoints
+    remain compatible with the current variable space.
+    """
     with open(path, "rb") as f:
         ckpt = pickle.load(f)  # noqa: S301
+
+    # Backfill new variables added after the checkpoint was saved.
+    # Each individual in pop_X is a dict of decision variables.
+    # pymoo's crossover directly indexes parent.X[var_name], so ALL
+    # variables in get_vars() must exist in every individual dict.
+    max_runs = ckpt.get("max_runs", 5)
+    pop_X = ckpt.get("pop_X")
+    if pop_X is not None:
+        for x in pop_X:
+            if not isinstance(x, dict):
+                continue
+
+            # v1 → v2: shared vsm_amax/refine → per-run arrays
+            if "vsm_amax_0" not in x:
+                shared_vsm = float(x.get("vsm_amax", 0.0))
+                shared_ref = int(x.get("refine", REFINE_NONE))
+                for k in range(max_runs):
+                    x[f"vsm_amax_{k}"] = shared_vsm
+                    x[f"refine_{k}"] = shared_ref
+
+            # MSA consistency merge (added v3.6)
+            if "consistency_merge" not in x:
+                x["consistency_merge"] = 0
+            if "consistency_merge_weight" not in x:
+                x["consistency_merge_weight"] = 2.0
+
     return ckpt
 
 
@@ -1112,7 +1219,7 @@ def get_baseline_configs(dataset: str) -> dict:
     """Return baseline configs appropriate for the dataset."""
     if dataset == "bralibase":
         return BASELINE_CONFIGS_RNA
-    if dataset == "mdsa":
+    if dataset in ("mdsa", "nucleotide"):
         return BASELINE_CONFIGS_DNA
     return BASELINE_CONFIGS_PROTEIN
 
@@ -1147,11 +1254,17 @@ def main():
                         help="Name for this run (creates subdirectory)")
     parser.add_argument("--no-dashboard", action="store_true",
                         help="Disable rich dashboard, use plain text output")
+    parser.add_argument("--f-beta", type=float, default=1.0,
+                        help="F-beta weight for recall vs precision. "
+                             "1.0=standard F1, 1.5=recall-weighted, 2.0=F2 (default: 1.0)")
     parser.add_argument("--dataset", type=str, default="balibase",
-                        choices=["balibase", "bralibase", "mdsa"],
+                        choices=["balibase", "bralibase", "mdsa", "nucleotide"],
                         help="Benchmark dataset (default: balibase)")
     parser.add_argument("--resume", type=str, default=None,
                         help="Resume from a generation checkpoint file (.pkl)")
+    parser.add_argument("--seed-from", type=str, default=None,
+                        help="Seed initial population from another checkpoint (e.g. a beta=1.0 run). "
+                             "Parameters are kept, fitness is re-evaluated with current settings.")
     args = parser.parse_args()
 
     console = Console()
@@ -1175,9 +1288,44 @@ def main():
             console.print("Downloading MDSA...")
             mdsa_download()
         cases = mdsa_cases()
+    elif args.dataset == "nucleotide":
+        set_active_profile("nucleotide")
+        if not bralibase_is_available():
+            console.print("Downloading BRAliBASE...")
+            bralibase_download()
+        if not mdsa_is_available():
+            console.print("Downloading MDSA...")
+            mdsa_download()
+        cases = bralibase_cases() + mdsa_cases()
+        console.print(f"  Combined: {len([c for c in cases if c.seq_type == 'rna'])} RNA + "
+                      f"{len([c for c in cases if c.seq_type == 'dna'])} DNA cases")
     else:
         console.print(f"[bold red]Unknown dataset: {args.dataset}[/]")
         return
+
+    # --- Run configuration banner ---
+    variables = get_vars(args.max_runs)
+    var_names = sorted(variables.keys())
+    has_cm = "consistency_merge" in variables
+    console.print()
+    console.print("[bold cyan]=" * 72)
+    console.print("[bold cyan]  Kalign Unified Optimizer")
+    console.print("[bold cyan]=" * 72)
+    console.print(f"  Dataset:     [bold]{args.dataset}[/] ({_active_profile['seq_type_str']})")
+    console.print(f"  Pop size:    {args.pop_size}   Generations: {args.n_gen}")
+    console.print(f"  Workers:     {args.n_workers}   Threads/eval: {args.n_threads}")
+    console.print(f"  Max runs:    {args.max_runs}")
+    console.print(f"  Objectives:  recall, precision, time")
+    console.print(f"  Variables:   {len(var_names)}")
+    console.print(f"  Resume:      {args.resume or 'no'}")
+    console.print(f"  Seed from:   {args.seed_from or 'no'}")
+    cm_status = "[bold green]ENABLED[/]" if has_cm else "[bold red]DISABLED[/]"
+    console.print(f"  Consistency merge: {cm_status}")
+    if has_cm:
+        console.print(f"    - consistency_merge: Choice([0, 1])")
+        console.print(f"    - consistency_merge_weight: Real([0.5, 10.0])")
+    console.print("[bold cyan]" + "-" * 72)
+    console.print()
 
     console.print(f"Loaded [bold]{len(cases)}[/] {args.dataset} cases "
                   f"(profile: {_active_profile['seq_type_str']})")
@@ -1208,8 +1356,6 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     max_runs = args.max_runs
-    n_var = len(get_vars(max_runs))
-    console.print(f"\nDecision vector: {n_var} variables (max_runs={max_runs})")
 
     # --- Baseline evaluations (parallelized) ---
     bl_configs = get_baseline_configs(args.dataset)
@@ -1282,12 +1428,17 @@ def main():
             max_runs=max_runs,
         )
 
+    if args.f_beta != 1.0:
+        console.print(f"[bold yellow]Using F-beta objective with β={args.f_beta}[/] "
+                      f"(recall weighted {args.f_beta}x more than precision)")
+
     problem = UnifiedCVProblem(
         folds=folds,
         max_runs=max_runs,
         n_threads=args.n_threads,
         n_workers=args.n_workers,
         dashboard=dashboard,
+        f_beta=args.f_beta,
     )
 
     checkpoint_path = output_dir / "gen_checkpoint.pkl"
@@ -1368,10 +1519,46 @@ def main():
         if pop_size < n_ref:
             console.print(f"[bold yellow]Warning:[/] pop_size ({pop_size}) < reference "
                           f"directions ({n_ref}). Consider --pop-size {n_ref} or larger.")
+
+        # Seed from another checkpoint (parameters only, fitness will be re-evaluated)
+        seed_sampling = MixedVariableSampling()
+        if args.seed_from:
+            seed_path = Path(args.seed_from)
+            if not seed_path.exists():
+                console.print(f"[bold red]Seed checkpoint not found:[/] {seed_path}")
+                return
+            seed_ckpt = load_checkpoint(seed_path)
+            seed_X = seed_ckpt["pop_X"]
+            seed_beta = seed_ckpt.get("f_beta", 1.0)
+            console.print(f"[bold green]Seeding[/] initial population with {len(seed_X)} "
+                          f"individuals from {seed_path.name} (was β={seed_beta})")
+            # Take up to pop_size individuals, sorted by original fitness (best first)
+            seed_F = seed_ckpt["pop_F"]
+            # Sort by first objective (best = most negative)
+            order = np.argsort(seed_F[:, 0])
+            seed_X = seed_X[order][:pop_size]
+
+            # Inject diversity for new binary variables: flip ~25% of
+            # ensemble individuals to consistency_merge=1 so the optimizer
+            # can compare both paths from the start.
+            n_flipped = 0
+            for idx, x in enumerate(seed_X):
+                if not isinstance(x, dict):
+                    continue
+                if int(x.get("n_runs", 1)) > 1 and idx % 4 == 0:
+                    x["consistency_merge"] = 1
+                    n_flipped += 1
+            if n_flipped:
+                console.print(f"  Flipped {n_flipped} individuals to consistency_merge=1")
+
+            # Create unevaluated population — pymoo will evaluate with new f_beta
+            seed_pop = Population.new("X", seed_X)
+            seed_sampling = seed_pop
+
         algorithm = NSGA3(
             ref_dirs=ref_dirs,
             pop_size=pop_size,
-            sampling=MixedVariableSampling(),
+            sampling=seed_sampling,
             mating=mixed_mating,
             eliminate_duplicates=mixed_dedup,
         )
@@ -1407,32 +1594,38 @@ def main():
     pareto_configs = []
     for i, (x, f) in enumerate(zip(res.X, res.F)):
         params = decode_unified_params(x, max_runs)
-        f1 = -f[0]
-        tc = -f[1]
+        recall = -f[0]
+        precision = -f[1]
         wt = f[2]
-        pareto_configs.append({"params": params, "f1_cv": f1, "tc_cv": tc, "wall_time": wt})
+        f1 = fbeta_score(precision, recall, 1.0)
+        pareto_configs.append({
+            "params": params, "recall_cv": recall, "prec_cv": precision,
+            "f1_cv": f1, "wall_time": wt,
+        })
 
     # Print Pareto front
     table = Table(title="Pareto Front (sorted by CV F1)")
     table.add_column("#", style="dim", width=3)
     table.add_column("Mode", width=6)
-    table.add_column("CV F1", justify="right")
-    table.add_column("CV TC", justify="right")
+    table.add_column("Recall", justify="right")
+    table.add_column("Prec", justify="right")
+    table.add_column("F1", justify="right")
     table.add_column("Time", justify="right")
     table.add_column("Parameters")
 
     sorted_pareto = sorted(pareto_configs, key=lambda x: -x["f1_cv"])
-    bl_best_f1 = max(bl["f1"] for bl in baselines.values())
-    bl_best_tc = max(bl["tc"] for bl in baselines.values())
+    bl_best_recall = max(bl.get("recall", 0) for bl in baselines.values())
+    bl_best_prec = max(bl.get("precision", 0) for bl in baselines.values())
 
     for i, cfg in enumerate(sorted_pareto[:30]):
-        f1_style = "bold green" if cfg["f1_cv"] > bl_best_f1 else ""
-        tc_style = "bold green" if cfg["tc_cv"] > bl_best_tc else ""
+        r_style = "bold green" if cfg.get("recall_cv", 0) > bl_best_recall else ""
+        p_style = "bold green" if cfg.get("prec_cv", 0) > bl_best_prec else ""
         table.add_row(
             str(i),
             mode_label(cfg["params"]),
-            Text(f"{cfg['f1_cv']:.4f}", style=f1_style),
-            Text(f"{cfg['tc_cv']:.4f}", style=tc_style),
+            Text(f"{cfg.get('recall_cv', 0):.4f}", style=r_style),
+            Text(f"{cfg.get('prec_cv', 0):.4f}", style=p_style),
+            f"{cfg['f1_cv']:.4f}",
             f"{cfg['wall_time']:.0f}s",
             format_unified_short(cfg["params"]),
         )
@@ -1456,11 +1649,10 @@ def main():
     for i, cfg in enumerate(top3):
         full_result = evaluate_unified(cfg["params"], cases, args.n_threads)
         console.print(f"\n  [{i}] {mode_label(cfg['params'])}  "
-                      f"CV F1={cfg['f1_cv']:.4f} -> Full F1={full_result['f1']:.4f}  "
-                      f"CV TC={cfg['tc_cv']:.4f} -> Full TC={full_result['tc']:.4f}")
+                      f"CV R={cfg.get('recall_cv', 0):.4f} P={cfg.get('prec_cv', 0):.4f} "
+                      f"F1={cfg['f1_cv']:.4f} -> Full F1={full_result['f1']:.4f}")
         gap_f1 = full_result["f1"] - cfg["f1_cv"]
-        gap_tc = full_result["tc"] - cfg["tc_cv"]
-        console.print(f"    Overfit check: F1 {gap_f1:+.4f}  TC {gap_tc:+.4f}")
+        console.print(f"    Overfit check: F1 {gap_f1:+.4f}")
         for cat, v in sorted(full_result["per_category"].items()):
             console.print(f"      {cat}: F1={v['f1']:.4f} TC={v['tc']:.4f} (n={v['n']})")
         console.print(f"    {format_unified_long(cfg['params'])}")
@@ -1474,7 +1666,8 @@ def main():
     if fast_candidates:
         best_fast = fast_candidates[0]
         console.print(f"\n  [bold]Fast[/] (< 15s): F1={best_fast['f1_cv']:.4f} "
-                      f"TC={best_fast['tc_cv']:.4f} Time={best_fast['wall_time']:.0f}s")
+                      f"R={best_fast.get('recall_cv', 0):.4f} P={best_fast.get('prec_cv', 0):.4f} "
+                      f"Time={best_fast['wall_time']:.0f}s")
         console.print(f"    {format_unified_short(best_fast['params'])}")
 
     # Default: best F1 among solutions under 60s
@@ -1482,13 +1675,15 @@ def main():
     if default_candidates:
         best_default = default_candidates[0]
         console.print(f"\n  [bold]Default[/] (< 60s): F1={best_default['f1_cv']:.4f} "
-                      f"TC={best_default['tc_cv']:.4f} Time={best_default['wall_time']:.0f}s")
+                      f"R={best_default.get('recall_cv', 0):.4f} P={best_default.get('prec_cv', 0):.4f} "
+                      f"Time={best_default['wall_time']:.0f}s")
         console.print(f"    {format_unified_short(best_default['params'])}")
 
     # Accurate: best F1 overall
     best_overall = sorted_pareto[0]
     console.print(f"\n  [bold]Accurate[/] (best F1): F1={best_overall['f1_cv']:.4f} "
-                  f"TC={best_overall['tc_cv']:.4f} Time={best_overall['wall_time']:.0f}s")
+                  f"R={best_overall.get('recall_cv', 0):.4f} P={best_overall.get('prec_cv', 0):.4f} "
+                  f"Time={best_overall['wall_time']:.0f}s")
     console.print(f"    {format_unified_short(best_overall['params'])}")
 
     # --- Save ---
@@ -1509,7 +1704,7 @@ def main():
 
     summary_path = output_dir / "pareto_front.txt"
     with open(summary_path, "w") as f:
-        f.write(f"# Unified kalign optimization (NSGA-II, 3 objectives: F1, TC, time)\n")
+        f.write(f"# Unified kalign optimization (NSGA-III, 3 objectives: recall, precision, time)\n")
         f.write(f"# pop_size={args.pop_size} n_gen={args.n_gen} max_runs={max_runs} "
                 f"n_folds={k} seed={args.seed}\n")
         f.write(f"# Baselines:\n")
@@ -1520,8 +1715,11 @@ def main():
 
         for i, cfg in enumerate(sorted_pareto):
             p = cfg["params"]
-            f.write(f"[{i}] mode={mode_label(p)} CV_F1={cfg['f1_cv']:.4f} "
-                    f"CV_TC={cfg['tc_cv']:.4f} Time={cfg['wall_time']:.0f}s\n")
+            f.write(f"[{i}] mode={mode_label(p)} "
+                    f"R={cfg.get('recall_cv', cfg.get('f1_cv', 0)):.4f} "
+                    f"P={cfg.get('prec_cv', cfg.get('tc_cv', 0)):.4f} "
+                    f"F1={cfg.get('f1_cv', 0):.4f} "
+                    f"Time={cfg['wall_time']:.0f}s\n")
             f.write(f"    n_runs={p['n_runs']}\n")
             for run_k in range(p["n_runs"]):
                 mat = MATRIX_NAMES.get(p["run_types"][run_k], "?")
@@ -1535,7 +1733,11 @@ def main():
             f.write(f"    consistency={p['consistency']} "
                     f"consistency_weight={p['consistency_weight']:.3f}\n")
             f.write(f"    realign={p['realign']} "
-                    f"min_support={p['min_support']}\n\n")
+                    f"min_support={p['min_support']}\n")
+            if p.get("consistency_merge", 0):
+                f.write(f"    consistency_merge=1 "
+                        f"consistency_merge_weight={p['consistency_merge_weight']:.3f}\n")
+            f.write("\n")
 
     console.print(f"Pareto front saved to {summary_path}")
 

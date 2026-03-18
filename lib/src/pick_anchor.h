@@ -14,6 +14,7 @@
 
 struct msa;
 EXTERN int* pick_anchor(struct msa* msa, int* n);
+EXTERN int* pick_anchor_n(struct msa* msa, int requested, int* n);
 
 
 #undef PICK_ANCHOR_IMPORT

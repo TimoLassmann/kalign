@@ -11,6 +11,8 @@
 #include "aln_wrap.h"
 #include "poar.h"
 #include "consensus_msa.h"
+#include "anchor_consistency.h"
+#include "msa_consistency.h"
 
 #include "kalign/kalign.h"
 #include "kalign/kalign_config.h"
@@ -894,103 +896,154 @@ int kalign_ensemble_from_configs(struct msa* msa,
 
         /* POAR save removed from ensemble_config — debug feature */
 
-        /* Determine min_support */
+        /* Determine merge strategy */
         int min_support = (ens != NULL) ? ens->min_support : 0;
+        int use_consistency_merge = (ens != NULL) ? ens->consistency_merge : 0;
 
-        if(min_support > 0){
-                RUN(build_consensus_from_poar(poar, msa, numseq, min_support,
-                                              &consensus_msa));
-                use_consensus = 1;
-                if(!msa->quiet){
-                        LOG_MSG("  Using consensus alignment (min_support=%d)", min_support);
-                }
-        }else{
-                double consensus_score = 0.0;
-                int min_sup = (n_runs + 2) / 3;
-                if(min_sup < 2) min_sup = 2;
+        if(use_consistency_merge){
+                /* ---- POAR consistency merge path ----
+                 * Use the already-built POAR table as a source of pairwise
+                 * residue consistency scores for a fresh progressive alignment.
+                 * Uses best_k's gap penalties and matrix. */
+                float cm_weight = (ens != NULL) ? ens->consistency_merge_weight : 2.0f;
+                struct poar_consistency_ctx poar_ctx;
+                poar_ctx.poar = poar;
+                poar_ctx.n_runs = n_runs;
+                poar_ctx.weight = cm_weight;
 
-                RUN(build_consensus_from_poar(poar, msa, numseq, min_sup,
-                                              &consensus_msa));
-
-                RUN(score_single_msa(consensus_msa, poar, numseq, n_runs,
-                                     &consensus_score));
-
-                if(!msa->quiet){
-                        LOG_MSG("  Consensus score: %.1f (selection: %.1f)",
-                                consensus_score, scores[best_k]);
-                }
-
-                if(consensus_score > scores[best_k]){
-                        use_consensus = 1;
-                        if(!msa->quiet){
-                                LOG_MSG("  Using consensus alignment");
-                        }
-                }else{
-                        kalign_free_msa(consensus_msa);
-                        consensus_msa = NULL;
-                        if(!msa->quiet){
-                                LOG_MSG("  Keeping selection winner");
-                        }
-                }
-        }
-
-        /* Post-selection refinement: re-run the winner with REFINE_CONFIDENT */
-        if(!use_consensus){
                 copy = NULL;
                 RUN(msa_cpy(&copy, msa));
-                copy->quiet = 1;
+                copy->quiet = msa->quiet ? 1 : 0;
+
+                /* Attach POAR consistency context — the progressive alignment
+                   will pick it up via msa->poar_consistency in aln_run.c */
+                copy->poar_consistency = &poar_ctx;
 
                 if(!msa->quiet){
-                        LOG_MSG("  Refining run %d...", best_k + 1);
+                        LOG_MSG("  Consistency merge (weight=%.1f) using run %d params",
+                                cm_weight, best_k + 1);
                 }
 
-                /* Post-selection refinement always uses REFINE_CONFIDENT and
-                   the winning run's parameters (matching old behavior). */
+                /* Run a fresh progressive alignment with best_k's params.
+                   No additional anchor consistency or realign — the POAR
+                   consistency signal is the main guide. */
                 RUN(kalign_run_seeded(copy, n_threads, runs[best_k].matrix,
                                       runs[best_k].gpo, runs[best_k].gpe,
                                       runs[best_k].tgpe,
-                                      KALIGN_REFINE_CONFIDENT, 0,
-                                      runs[best_k].tree_seed, runs[best_k].tree_noise,
-                                      runs[best_k].dist_scale, runs[best_k].vsm_amax,
-                                      runs[best_k].seq_weights,
-                                      runs[best_k].consistency_anchors,
-                                      runs[best_k].consistency_weight));
+                                      KALIGN_REFINE_NONE, 0,
+                                      0, 0.0f,  /* deterministic tree */
+                                      runs[best_k].dist_scale,
+                                      runs[best_k].vsm_amax,
+                                      0.0f,     /* no seq_weights in ensemble */
+                                      0, 0.0f   /* no anchor consistency */));
 
-                double refined_score = 0.0;
-                RUN(score_single_msa(copy, poar, numseq, n_runs,
-                                     &refined_score));
+                /* Clear the non-owning pointer before freeing the copy */
+                copy->poar_consistency = NULL;
 
-                if(!msa->quiet){
-                        LOG_MSG("  Refined score: %.1f (was %.1f)",
-                                refined_score, scores[best_k]);
-                }
+                RUN(copy_alignment_to_msa(msa, copy, numseq));
+                kalign_free_msa(copy);
+                copy = NULL;
 
-                if(refined_score > scores[best_k]){
-                        kalign_free_msa(alignments[best_k]);
-                        alignments[best_k] = copy;
-                        copy = NULL;
+        }else{
+                /* ---- POAR consensus / selection path (existing) ---- */
+
+                if(min_support > 0){
+                        RUN(build_consensus_from_poar(poar, msa, numseq, min_support,
+                                                      &consensus_msa));
+                        use_consensus = 1;
                         if(!msa->quiet){
-                                LOG_MSG("  Using refined alignment");
+                                LOG_MSG("  Using consensus alignment (min_support=%d)", min_support);
                         }
                 }else{
-                        kalign_free_msa(copy);
-                        copy = NULL;
+                        double consensus_score = 0.0;
+                        int min_sup = (n_runs + 2) / 3;
+                        if(min_sup < 2) min_sup = 2;
+
+                        RUN(build_consensus_from_poar(poar, msa, numseq, min_sup,
+                                                      &consensus_msa));
+
+                        RUN(score_single_msa(consensus_msa, poar, numseq, n_runs,
+                                             &consensus_score));
+
                         if(!msa->quiet){
-                                LOG_MSG("  Keeping original alignment");
+                                LOG_MSG("  Consensus score: %.1f (selection: %.1f)",
+                                        consensus_score, scores[best_k]);
                         }
+
+                        if(consensus_score > scores[best_k]){
+                                use_consensus = 1;
+                                if(!msa->quiet){
+                                        LOG_MSG("  Using consensus alignment");
+                                }
+                        }else{
+                                kalign_free_msa(consensus_msa);
+                                consensus_msa = NULL;
+                                if(!msa->quiet){
+                                        LOG_MSG("  Keeping selection winner");
+                                }
+                        }
+                }
+
+                /* Post-selection refinement: re-run the winner with REFINE_CONFIDENT */
+                if(!use_consensus){
+                        copy = NULL;
+                        RUN(msa_cpy(&copy, msa));
+                        copy->quiet = 1;
+
+                        if(!msa->quiet){
+                                LOG_MSG("  Refining run %d...", best_k + 1);
+                        }
+
+                        RUN(kalign_run_seeded(copy, n_threads, runs[best_k].matrix,
+                                              runs[best_k].gpo, runs[best_k].gpe,
+                                              runs[best_k].tgpe,
+                                              KALIGN_REFINE_CONFIDENT, 0,
+                                              runs[best_k].tree_seed, runs[best_k].tree_noise,
+                                              runs[best_k].dist_scale, runs[best_k].vsm_amax,
+                                              runs[best_k].seq_weights,
+                                              runs[best_k].consistency_anchors,
+                                              runs[best_k].consistency_weight));
+
+                        double refined_score = 0.0;
+                        RUN(score_single_msa(copy, poar, numseq, n_runs,
+                                             &refined_score));
+
+                        if(!msa->quiet){
+                                LOG_MSG("  Refined score: %.1f (was %.1f)",
+                                        refined_score, scores[best_k]);
+                        }
+
+                        if(refined_score > scores[best_k]){
+                                kalign_free_msa(alignments[best_k]);
+                                alignments[best_k] = copy;
+                                copy = NULL;
+                                if(!msa->quiet){
+                                        LOG_MSG("  Using refined alignment");
+                                }
+                        }else{
+                                kalign_free_msa(copy);
+                                copy = NULL;
+                                if(!msa->quiet){
+                                        LOG_MSG("  Keeping original alignment");
+                                }
+                        }
+                }
+
+                MFREE(scores);
+                scores = NULL;
+
+                if(use_consensus){
+                        RUN(copy_alignment_to_msa(msa, consensus_msa, numseq));
+                        kalign_free_msa(consensus_msa);
+                        consensus_msa = NULL;
+                }else{
+                        RUN(copy_alignment_to_msa(msa, alignments[best_k], numseq));
                 }
         }
 
-        MFREE(scores);
-        scores = NULL;
-
-        /* Copy the winning alignment back into the original MSA */
-        if(use_consensus){
-                RUN(copy_alignment_to_msa(msa, consensus_msa, numseq));
-                kalign_free_msa(consensus_msa);
-                consensus_msa = NULL;
-        }else{
-                RUN(copy_alignment_to_msa(msa, alignments[best_k], numseq));
+        if(scores){
+                MFREE(scores);
+                scores = NULL;
         }
 
         RUN(compute_residue_confidence(poar, msa));

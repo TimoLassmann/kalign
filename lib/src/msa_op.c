@@ -458,6 +458,7 @@ int kalign_arr_to_msa(char** input_sequences, int* len, int numseq,struct msa** 
         msa->seq_weights = NULL;
         msa->run_parallel = 0;
         msa->consistency_table = NULL;
+        msa->poar_consistency = NULL;
         msa->quiet = 1;
         MMALLOC(msa->sequences, sizeof(struct msa_seq*) * msa->alloc_numseq);
 

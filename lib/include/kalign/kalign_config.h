@@ -29,6 +29,8 @@ struct kalign_run_config {
    Only used when n_runs > 1. */
 struct kalign_ensemble_config {
         int min_support;             /* POAR consensus threshold (0 = auto)           */
+        int consistency_merge;       /* 0 = POAR (default), 1 = MSA consistency merge */
+        float consistency_merge_weight; /* MSA consistency bonus weight (default: 2.0)*/
 };
 
 #endif

@@ -84,7 +84,7 @@ MODE_ACCURATE = "accurate"
 MODE_PRECISE = "precise"  # deprecated alias for "accurate"
 
 # Valid preset modes (resolved by C library)
-_PRESET_MODES = {"fast", "default", "accurate"}
+_PRESET_MODES = {"fast", "default", "recall", "accurate"}
 
 # Global thread control
 _thread_local = threading.local()

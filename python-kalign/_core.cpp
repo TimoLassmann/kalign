@@ -246,7 +246,9 @@ void ensemble_custom_file_to_file(
     const std::vector<int>& run_refine = {},
     const std::vector<int>& run_realign = {},
     const std::vector<int>& run_consistency_anchors = {},
-    const std::vector<float>& run_consistency_weight = {}
+    const std::vector<float>& run_consistency_weight = {},
+    int consistency_merge = 0,
+    float consistency_merge_weight = 2.0f
 ) {
     int n_runs = static_cast<int>(run_gpo.size());
     if (n_runs < 1) {
@@ -308,6 +310,8 @@ void ensemble_custom_file_to_file(
 
     struct kalign_ensemble_config ens = kalign_ensemble_config_defaults();
     ens.min_support = min_support;
+    ens.consistency_merge = consistency_merge;
+    ens.consistency_merge_weight = consistency_merge_weight;
 
     result = kalign_align_full(msa_data, runs.data(), n_runs, &ens, n_threads);
     if (result != 0) {
@@ -358,7 +362,9 @@ py::object align_mode(
     msa_data->quiet = 1;
 
     /* Force biotype if caller specified one */
-    if (seq_type == KALIGN_MATRIX_DNA || seq_type == KALIGN_MATRIX_DNA_INTERNAL) {
+    if (seq_type == KALIGN_MATRIX_DNA || seq_type == KALIGN_MATRIX_DNA_INTERNAL ||
+        seq_type == KALIGN_MATRIX_NUC_1PAM || seq_type == KALIGN_MATRIX_NUC_20PAM ||
+        seq_type == KALIGN_MATRIX_NUC_200PAM) {
         msa_data->biotype = ALN_BIOTYPE_DNA;
     } else if (seq_type == KALIGN_MATRIX_RNA) {
         msa_data->biotype = ALN_BIOTYPE_DNA;  /* RNA uses DNA biotype internally */
@@ -722,6 +728,8 @@ PYBIND11_MODULE(_core, m) {
           py::arg("run_realign") = std::vector<int>{},
           py::arg("run_consistency_anchors") = std::vector<int>{},
           py::arg("run_consistency_weight") = std::vector<float>{},
+          py::arg("consistency_merge") = 0,
+          py::arg("consistency_merge_weight") = 2.0f,
           R"pbdoc(
           Ensemble alignment with per-run parameters.
 
@@ -832,6 +840,9 @@ PYBIND11_MODULE(_core, m) {
     m.attr("MATRIX_DNA") = KALIGN_MATRIX_DNA;
     m.attr("MATRIX_DNA_INTERNAL") = KALIGN_MATRIX_DNA_INTERNAL;
     m.attr("MATRIX_RNA") = KALIGN_MATRIX_RNA;
+    m.attr("MATRIX_NUC_1PAM") = KALIGN_MATRIX_NUC_1PAM;
+    m.attr("MATRIX_NUC_20PAM") = KALIGN_MATRIX_NUC_20PAM;
+    m.attr("MATRIX_NUC_200PAM") = KALIGN_MATRIX_NUC_200PAM;
 
     // Backward compat: old names point to new values
     m.attr("DNA") = KALIGN_TYPE_DNA;

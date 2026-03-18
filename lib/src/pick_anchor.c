@@ -1,84 +1,125 @@
 #include "tldevel.h"
 #include "msa_struct.h"
+#include "bpm.h"
 
-#define  PICK_ANCHOR_IMPORT
+#define PICK_ANCHOR_IMPORT
 #include "pick_anchor.h"
 
+#define DEFAULT_NUM_ANCHORS 32
 
-struct sort_struct{
-        int len;
-        int id;
-};
+/* Farthest-first anchor selection.
+ *
+ * Picks K diverse anchor sequences by greedily selecting the sequence
+ * most distant (by BPM edit distance) from all already-selected anchors.
+ * This ensures the anchors span the full diversity of the dataset.
+ *
+ * Cost: K * N BPM calls — microseconds for typical inputs.
+ */
+static int* pick_anchor_farthest_first(struct msa* msa, int K, int* n_out)
+{
+        int numseq = msa->numseq;
+        int* anchors = NULL;
+        float* min_dist = NULL;   /* min distance from each seq to any anchor */
+        int i, k;
 
-int sort_by_len(const void *a, const void *b);
+        if(K > numseq) K = numseq;
+        if(K < 1) K = 1;
 
-int* select_seqs(struct msa* msa, int num_anchor);
+        MMALLOC(anchors, sizeof(int) * K);
+        MMALLOC(min_dist, sizeof(float) * numseq);
+
+        /* Pick first anchor: median-length sequence.
+           Sort would be overkill — just find the sequence closest
+           to the mean length. */
+        {
+                float mean_len = 0.0f;
+                float best_diff = 1e30f;
+                int best_idx = 0;
+                for(i = 0; i < numseq; i++){
+                        mean_len += (float)msa->sequences[i]->len;
+                }
+                mean_len /= (float)numseq;
+                for(i = 0; i < numseq; i++){
+                        float diff = (float)msa->sequences[i]->len - mean_len;
+                        if(diff < 0) diff = -diff;
+                        if(diff < best_diff){
+                                best_diff = diff;
+                                best_idx = i;
+                        }
+                }
+                anchors[0] = best_idx;
+        }
+
+        /* Initialize min_dist: BPM distance from each seq to first anchor */
+        {
+                uint8_t* anchor_s = msa->sequences[anchors[0]]->s;
+                int anchor_len = msa->sequences[anchors[0]]->len;
+                for(i = 0; i < numseq; i++){
+                        uint8_t* si = msa->sequences[i]->s;
+                        int li = msa->sequences[i]->len;
+                        if(li > anchor_len){
+                                min_dist[i] = (float)BPM(si, anchor_s, li, anchor_len);
+                        }else{
+                                min_dist[i] = (float)BPM(anchor_s, si, anchor_len, li);
+                        }
+                }
+                min_dist[anchors[0]] = -1.0f;  /* mark as selected */
+        }
+
+        /* Farthest-first: pick remaining K-1 anchors */
+        for(k = 1; k < K; k++){
+                /* Find the sequence with largest min_dist */
+                float best_min = -1.0f;
+                int best_idx = 0;
+                for(i = 0; i < numseq; i++){
+                        if(min_dist[i] > best_min){
+                                best_min = min_dist[i];
+                                best_idx = i;
+                        }
+                }
+                anchors[k] = best_idx;
+                min_dist[best_idx] = -1.0f;  /* mark as selected */
+
+                /* Update min_dist with new anchor */
+                uint8_t* anchor_s = msa->sequences[best_idx]->s;
+                int anchor_len = msa->sequences[best_idx]->len;
+                for(i = 0; i < numseq; i++){
+                        if(min_dist[i] < 0.0f) continue;  /* already selected */
+                        uint8_t* si = msa->sequences[i]->s;
+                        int li = msa->sequences[i]->len;
+                        float d;
+                        if(li > anchor_len){
+                                d = (float)BPM(si, anchor_s, li, anchor_len);
+                        }else{
+                                d = (float)BPM(anchor_s, si, anchor_len, li);
+                        }
+                        if(d < min_dist[i]){
+                                min_dist[i] = d;
+                        }
+                }
+        }
+
+        MFREE(min_dist);
+        *n_out = K;
+        return anchors;
+ERROR:
+        if(anchors) MFREE(anchors);
+        if(min_dist) MFREE(min_dist);
+        return NULL;
+}
 
 int* pick_anchor(struct msa* msa, int* n)
 {
-        int* anchors = NULL;
-        int num_anchor = 0;
-
         ASSERT(msa != NULL, "No alignment.");
-
-        /* num_anchor = MACRO_MAX(MACRO_MIN(32, msa->numseq), (int) pow(log2((double) msa->numseq), 2.0)); */
-        num_anchor = MACRO_MIN(32, msa->numseq);
-        RUNP(anchors = select_seqs(msa, num_anchor));
-        *n = num_anchor;
-        return anchors;
+        return pick_anchor_farthest_first(msa, DEFAULT_NUM_ANCHORS, n);
 ERROR:
         return NULL;
 }
 
-int* select_seqs(struct msa* msa, int num_anchor)
+int* pick_anchor_n(struct msa* msa, int requested, int* n)
 {
-        struct sort_struct** seq_sort = NULL;
-        int* anchors = NULL;
-        int i,stride;
-
-        MMALLOC(seq_sort, sizeof(struct sort_struct*) * msa->numseq);
-        for(i = 0; i < msa->numseq;i++){
-                seq_sort[i] = NULL;
-                MMALLOC(seq_sort[i], sizeof(struct sort_struct));
-                seq_sort[i]->id = i;
-                seq_sort[i]->len = msa->sequences[i]->len;//  aln->sl[i];
-        }
-
-        qsort(seq_sort, msa->numseq, sizeof(struct sort_struct*),sort_by_len);
-        /* for(i = 0; i < msa->numseq;i++){ */
-        /* fprintf(stdout,"%d\t%d  id: %d \n", seq_sort[i]->id,seq_sort[i]->len,seq_sort[i]->id); */
-        /* } */
-
-
-        //fprintf(stdout,"%d\t seeds\n", num_anchor);
-
-        MMALLOC(anchors, sizeof(int) * num_anchor);
-        stride = msa->numseq / num_anchor;
-//        fprintf(stdout,"%d\tstride\n", stride);
-        //c = 0;
-        for(i = 0; i < num_anchor;i++){
-                anchors[i] = seq_sort[i*stride]->id;
-                /* LOG_MSG("Anchor: %d",anchors[i] ); */
-        }
-        ASSERT(i == num_anchor,"Cound not select all anchors\tnum_anchor:%d\t numseq:%d",num_anchor,msa->numseq);
-
-        for(i = 0; i < msa->numseq;i++){
-                MFREE(seq_sort[i]);
-        }
-        MFREE(seq_sort);
-        return anchors;
+        ASSERT(msa != NULL, "No alignment.");
+        return pick_anchor_farthest_first(msa, requested, n);
 ERROR:
         return NULL;
-}
-
-int sort_by_len(const void *a, const void *b)
-{
-        struct sort_struct* const *one = a;
-        struct sort_struct* const *two = b;
-
-        if((*one)->len > (*two)->len){
-                return -1;
-        }else{
-                return 1;
-        }
 }
