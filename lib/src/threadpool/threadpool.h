@@ -132,6 +132,14 @@ void tp_group_destroy(tp_group_t *group);
 void tp_parallel_for(threadpool_t *pool, int start, int end,
                      void (*fn)(int start, int end, void *arg), void *arg);
 
+/* Like tp_parallel_for, but limits parallelism so each chunk has at least
+ * min_chunk_size iterations.  Useful for controlling overhead when per-iteration
+ * work is very small.  min_chunk_size <= 1 is equivalent to tp_parallel_for. */
+void tp_parallel_for_chunked(threadpool_t *pool, int start, int end,
+                              int min_chunk_size,
+                              void (*fn)(int start, int end, void *arg),
+                              void *arg);
+
 #ifdef __cplusplus
 }
 #endif

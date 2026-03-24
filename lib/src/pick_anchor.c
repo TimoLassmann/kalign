@@ -2,6 +2,47 @@
 #include "msa_struct.h"
 #include "bpm.h"
 
+#ifdef USE_THREADPOOL
+#include "threadpool.h"
+
+struct anchor_dist_ctx {
+        struct msa_seq** seqs;
+        float* min_dist;
+        uint8_t* anchor_s;
+        int anchor_len;
+};
+
+static void anchor_init_fn(int start, int end, void *arg)
+{
+        struct anchor_dist_ctx *c = (struct anchor_dist_ctx *)arg;
+        for (int i = start; i < end; i++) {
+                uint8_t *si = c->seqs[i]->s;
+                int li = c->seqs[i]->len;
+                if (li > c->anchor_len)
+                        c->min_dist[i] = (float)BPM(si, c->anchor_s, li, c->anchor_len);
+                else
+                        c->min_dist[i] = (float)BPM(c->anchor_s, si, c->anchor_len, li);
+        }
+}
+
+static void anchor_update_fn(int start, int end, void *arg)
+{
+        struct anchor_dist_ctx *c = (struct anchor_dist_ctx *)arg;
+        for (int i = start; i < end; i++) {
+                if (c->min_dist[i] < 0.0f) continue;
+                uint8_t *si = c->seqs[i]->s;
+                int li = c->seqs[i]->len;
+                float d;
+                if (li > c->anchor_len)
+                        d = (float)BPM(si, c->anchor_s, li, c->anchor_len);
+                else
+                        d = (float)BPM(c->anchor_s, si, c->anchor_len, li);
+                if (d < c->min_dist[i])
+                        c->min_dist[i] = d;
+        }
+}
+#endif
+
 #define PICK_ANCHOR_IMPORT
 #include "pick_anchor.h"
 
@@ -54,6 +95,12 @@ static int* pick_anchor_farthest_first(struct msa* msa, int K, int* n_out)
         {
                 uint8_t* anchor_s = msa->sequences[anchors[0]]->s;
                 int anchor_len = msa->sequences[anchors[0]]->len;
+#ifdef USE_THREADPOOL
+                if(msa->pool && numseq >= KALIGN_DIST_MIN_SEQS){
+                        struct anchor_dist_ctx ctx = { msa->sequences, min_dist, anchor_s, anchor_len };
+                        tp_parallel_for_chunked(msa->pool, 0, numseq, KALIGN_PFOR_MIN_CHUNK, anchor_init_fn, &ctx);
+                }else{
+#endif
                 for(i = 0; i < numseq; i++){
                         uint8_t* si = msa->sequences[i]->s;
                         int li = msa->sequences[i]->len;
@@ -63,6 +110,9 @@ static int* pick_anchor_farthest_first(struct msa* msa, int K, int* n_out)
                                 min_dist[i] = (float)BPM(anchor_s, si, anchor_len, li);
                         }
                 }
+#ifdef USE_THREADPOOL
+                }
+#endif
                 min_dist[anchors[0]] = -1.0f;  /* mark as selected */
         }
 
@@ -83,6 +133,12 @@ static int* pick_anchor_farthest_first(struct msa* msa, int K, int* n_out)
                 /* Update min_dist with new anchor */
                 uint8_t* anchor_s = msa->sequences[best_idx]->s;
                 int anchor_len = msa->sequences[best_idx]->len;
+#ifdef USE_THREADPOOL
+                if(msa->pool && numseq >= KALIGN_DIST_MIN_SEQS){
+                        struct anchor_dist_ctx ctx = { msa->sequences, min_dist, anchor_s, anchor_len };
+                        tp_parallel_for_chunked(msa->pool, 0, numseq, KALIGN_PFOR_MIN_CHUNK, anchor_update_fn, &ctx);
+                }else{
+#endif
                 for(i = 0; i < numseq; i++){
                         if(min_dist[i] < 0.0f) continue;  /* already selected */
                         uint8_t* si = msa->sequences[i]->s;
@@ -97,6 +153,9 @@ static int* pick_anchor_farthest_first(struct msa* msa, int K, int* n_out)
                                 min_dist[i] = d;
                         }
                 }
+#ifdef USE_THREADPOOL
+                }
+#endif
         }
 
         MFREE(min_dist);

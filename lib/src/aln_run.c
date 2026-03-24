@@ -6,6 +6,9 @@
 #ifdef HAVE_OPENMP
 #include <omp.h>
 #endif
+#ifdef USE_THREADPOOL
+#include "threadpool.h"
+#endif
 
 #include "task.h"
 
@@ -41,6 +44,22 @@ static void recursive_aln_inline(struct msa* msa, struct aln_tasks*t, struct aln
 /* static int SampleWithoutReplacement(struct rng_state* rng, int N, int n,int* samples); */
 /* static int int_cmp(const void *a, const void *b); */
 
+#ifdef USE_THREADPOOL
+struct recursive_aln_arg {
+        struct msa *msa;
+        struct aln_tasks *t;
+        struct aln_param *ap;
+        uint8_t *active;
+        int c;
+};
+
+static void recursive_aln_task(void *arg)
+{
+        struct recursive_aln_arg *a = (struct recursive_aln_arg *)arg;
+        recursive_aln(a->msa, a->t, a->ap, a->active, a->c);
+}
+#endif
+
 int create_msa_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
 {
         int i;
@@ -63,9 +82,11 @@ int create_msa_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
                 msa->run_parallel = 0;
         }
 
+#if !defined(USE_THREADPOOL)
 #ifdef HAVE_OPENMP
 #pragma omp parallel
 #pragma omp single nowait
+#endif
 #endif
         recursive_aln(msa, t, ap, active, t->n_tasks-1);
 
@@ -93,6 +114,19 @@ void recursive_aln(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, ui
         a = local_t->a - msa->numseq;
         b = local_t->b - msa->numseq;
 
+#ifdef USE_THREADPOOL
+        {
+                struct recursive_aln_arg arg_a = { msa, t, ap, active, a };
+                struct recursive_aln_arg arg_b = { msa, t, ap, active, b };
+                tp_group_t *g = tp_group_create(ap->pool);
+                if(!active[local_t->a] && local_t->a >= msa->numseq)
+                        tp_group_submit(g, recursive_aln_task, &arg_a);
+                if(!active[local_t->b] && local_t->b >= msa->numseq)
+                        tp_group_submit(g, recursive_aln_task, &arg_b);
+                tp_group_wait(g);
+                tp_group_destroy(g);
+        }
+#else
         if(!active[local_t->a] && local_t->a >= msa->numseq){
 #ifdef HAVE_OPENMP
 #pragma omp task shared(msa,t,ap,active) firstprivate(a)
@@ -108,6 +142,7 @@ void recursive_aln(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, ui
 #ifdef HAVE_OPENMP
 #pragma omp taskwait
 #endif
+#endif
 
         struct aln_mem* ml = NULL;
 
@@ -116,6 +151,9 @@ void recursive_aln(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, ui
         ml->ap = ap;
         ml->mode = ALN_MODE_FULL;
         ml->run_parallel = msa->run_parallel;
+#ifdef USE_THREADPOOL
+        ml->pool = ap->pool;
+#endif
         do_align(msa,t,ml,c);
 
         active[local_t->a] = 0;

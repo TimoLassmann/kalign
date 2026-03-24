@@ -78,8 +78,9 @@ REFINE_CONFIDENT = _core.REFINE_CONFIDENT
 REFINE_INLINE = _core.REFINE_INLINE
 
 # Mode constants
-MODE_DEFAULT = "default"
 MODE_FAST = "fast"
+MODE_DEFAULT = "default"
+MODE_RECALL = "recall"
 MODE_ACCURATE = "accurate"
 MODE_PRECISE = "precise"  # deprecated alias for "accurate"
 
@@ -705,8 +706,9 @@ __all__ = [
     "REFINE_ALL",
     "REFINE_CONFIDENT",
     "REFINE_INLINE",
-    "MODE_DEFAULT",
     "MODE_FAST",
+    "MODE_DEFAULT",
+    "MODE_RECALL",
     "MODE_ACCURATE",
     "MODE_PRECISE",
     "__version__",

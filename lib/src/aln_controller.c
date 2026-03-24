@@ -2,8 +2,6 @@
 
 #include "tldevel.h"
 
-
-
 #include "aln_param.h"
 #include "aln_struct.h"
 
@@ -12,9 +10,19 @@
 #include "aln_seqprofile.h"
 #include "aln_profileprofile.h"
 
+#ifdef USE_THREADPOOL
+#include "threadpool.h"
+
+static void wrap_seqseq_fwd(void *arg)      { aln_seqseq_foward((struct aln_mem *)arg); }
+static void wrap_seqseq_bwd(void *arg)      { aln_seqseq_backward((struct aln_mem *)arg); }
+static void wrap_profprof_fwd(void *arg)    { aln_profileprofile_foward((struct aln_mem *)arg); }
+static void wrap_profprof_bwd(void *arg)    { aln_profileprofile_backward((struct aln_mem *)arg); }
+static void wrap_seqprof_fwd(void *arg)     { aln_seqprofile_foward((struct aln_mem *)arg); }
+static void wrap_seqprof_bwd(void *arg)     { aln_seqprofile_backward((struct aln_mem *)arg); }
+#endif
+
 #define ALN_CONTROLLER_IMPORT
 #include "aln_controller.h"
-
 
 static int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int meet,int transition, uint8_t serial);
 
@@ -61,6 +69,42 @@ int aln_runner(struct aln_mem* m)
         m->enda_2 = old_cor[1];
 
         /* fprintf(stderr,"Forward:%d-%d	%d-%d\n",m->starta,m->enda,m->startb,m->endb); */
+#ifdef USE_THREADPOOL
+        if(m->run_parallel && m->pool){
+                tp_group_t *g = tp_group_create(m->pool);
+                if(m->seq1){
+                        tp_group_submit(g, wrap_seqseq_fwd, m);
+                        tp_group_submit(g, wrap_seqseq_bwd, m);
+                        tp_group_wait(g);
+                        aln_seqseq_meetup(m,old_cor,&meet,&transition,&score);
+                }else if(m->prof2){
+                        tp_group_submit(g, wrap_profprof_fwd, m);
+                        tp_group_submit(g, wrap_profprof_bwd, m);
+                        tp_group_wait(g);
+                        aln_profileprofile_meetup(m,old_cor,&meet,&transition,&score);
+                }else{
+                        tp_group_submit(g, wrap_seqprof_fwd, m);
+                        tp_group_submit(g, wrap_seqprof_bwd, m);
+                        tp_group_wait(g);
+                        aln_seqprofile_meetup(m,old_cor,&meet,&transition,&score);
+                }
+                tp_group_destroy(g);
+        }else{
+                if(m->seq1){
+                        aln_seqseq_foward(m);
+                        aln_seqseq_backward(m);
+                        aln_seqseq_meetup(m,old_cor,&meet,&transition,&score);
+                }else if(m->prof2){
+                        aln_profileprofile_foward(m);
+                        aln_profileprofile_backward(m);
+                        aln_profileprofile_meetup(m,old_cor,&meet,&transition,&score);
+                }else{
+                        aln_seqprofile_foward(m);
+                        aln_seqprofile_backward(m);
+                        aln_seqprofile_meetup(m,old_cor,&meet,&transition,&score);
+                }
+        }
+#else
 #ifdef HAVE_OPENMP
 #pragma omp parallel
 #pragma omp single nowait
@@ -71,7 +115,6 @@ int aln_runner(struct aln_mem* m)
 #pragma omp task shared(m) if(m->run_parallel)
 #endif
                         aln_seqseq_foward(m);
-
 #ifdef HAVE_OPENMP
 #pragma omp task shared(m) if(m->run_parallel)
 #endif
@@ -109,6 +152,7 @@ int aln_runner(struct aln_mem* m)
                 }
 #ifdef HAVE_OPENMP
         }
+#endif
 #endif
 
         if(m->mode == ALN_MODE_SCORE_ONLY){

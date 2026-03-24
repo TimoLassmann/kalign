@@ -35,6 +35,7 @@
 
 #include <pthread.h>
 #include <stdatomic.h>
+#include <stdint.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -654,14 +655,22 @@ static void pfor_worker(void *arg)
 
 #define MAX_STACK_CHUNKS 64
 
-void tp_parallel_for(threadpool_t *pool, int start, int end,
-                     void (*fn)(int, int, void *), void *arg)
+void tp_parallel_for_chunked(threadpool_t *pool, int start, int end,
+                              int min_chunk_size,
+                              void (*fn)(int, int, void *), void *arg)
 {
     if (start >= end) return;
 
     int n       = end - start;
     int nchunks = pool->nworkers + 1;
     if (nchunks > n) nchunks = n;
+
+    /* Limit parallelism so each chunk has at least min_chunk_size iterations */
+    if (min_chunk_size > 1) {
+        int max_chunks = (n + min_chunk_size - 1) / min_chunk_size;
+        if (nchunks > max_chunks) nchunks = max_chunks;
+    }
+    if (nchunks <= 1) { fn(start, end, arg); return; }
 
     struct pfor_chunk stack_chunks[MAX_STACK_CHUNKS];
     struct pfor_chunk *chunks = stack_chunks;
@@ -706,4 +715,10 @@ void tp_parallel_for(threadpool_t *pool, int start, int end,
         fn(serial_from, end, arg);
 
     if (heap) free(chunks);
+}
+
+void tp_parallel_for(threadpool_t *pool, int start, int end,
+                     void (*fn)(int, int, void *), void *arg)
+{
+    tp_parallel_for_chunked(pool, start, end, 1, fn, arg);
 }

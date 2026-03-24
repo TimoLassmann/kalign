@@ -531,7 +531,7 @@ py::object align_from_file_mode(
     return py::make_tuple(names, aligned_sequences);
 }
 
-// Align file-to-file using a named mode preset (fast/default/accurate).
+// Align file-to-file using a named mode preset (fast/default/recall/accurate).
 // The C library provides NSGA-III optimized presets per biotype.
 void align_file_to_file_mode(
     const std::string& input_file,
@@ -777,7 +777,7 @@ PYBIND11_MODULE(_core, m) {
           py::arg("gap_extend") = -1.0f,
           py::arg("terminal_gap_extend") = -1.0f,
           py::arg("n_threads") = 1,
-          "Align sequences using a named mode preset (fast/default/accurate).");
+          "Align sequences using a named mode preset (fast/default/recall/accurate).");
     m.def("align_mode", &align_mode,
           py::arg("sequences"),
           py::arg("mode"),
@@ -819,7 +819,7 @@ PYBIND11_MODULE(_core, m) {
           py::arg("gap_open") = -1.0f,
           py::arg("gap_extend") = -1.0f,
           py::arg("terminal_gap_extend") = -1.0f,
-          "Align file to file using a named mode preset (fast/default/accurate).");
+          "Align file to file using a named mode preset (fast/default/recall/accurate).");
     m.def("align_file_to_file_mode", &align_file_to_file_mode,
           py::arg("input_file"),
           py::arg("output_file"),
@@ -861,4 +861,5 @@ PYBIND11_MODULE(_core, m) {
     m.attr("REFINE_ALL") = KALIGN_REFINE_ALL;
     m.attr("REFINE_CONFIDENT") = KALIGN_REFINE_CONFIDENT;
     m.attr("REFINE_INLINE") = KALIGN_REFINE_INLINE;
+
 }

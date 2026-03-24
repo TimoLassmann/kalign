@@ -11,13 +11,15 @@
 #endif
 #endif
 
-/* #define KALIGN_DNA 0 */
-/* #define KALIGN_DNA_INTERNAL 1 */
-/* #define KALIGN_RNA 2 */
-/* #define KALIGN_PROTEIN 3 */
+#ifdef USE_THREADPOOL
+typedef struct threadpool threadpool_t;
+#endif
 
 struct aln_param{
         int nthreads;
+#ifdef USE_THREADPOOL
+        threadpool_t *pool;   /* shared pool for all parallel work */
+#endif
         /* actual parameters  */
         float** subm;
         float gpo;

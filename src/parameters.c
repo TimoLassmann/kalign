@@ -16,7 +16,7 @@
 static int get_default_thread_count(void)
 {
         int cores = 1;
-        
+
 #ifdef HAVE_OPENMP
         cores = omp_get_num_procs();
 #elif defined(_WIN32)
@@ -27,11 +27,11 @@ static int get_default_thread_count(void)
         cores = sysconf(_SC_NPROCESSORS_ONLN);
         if (cores <= 0) cores = 1;
 #endif
-        
+
         if (cores > 1) cores = cores - 1;
         if (cores > 16) cores = 16;
         if (cores < 1) cores = 1;
-        
+
         return cores;
 }
 
@@ -39,42 +39,27 @@ struct parameters*init_param(void)
 {
         struct parameters* param = NULL;
         MMALLOC(param, sizeof(struct parameters));
-        param->dist_method = KALIGNDIST_BPM;
-        param->aln_param_file = NULL;
-        param->param_set = -1;
         param->infile = NULL;
         param->num_infiles = 0;
         param->input = NULL;
         param->outfile = NULL;
         param->format = NULL;
-        param->reformat = 0;
-        param->rename = 0;
         param->help_flag = 0;
         param->dump_internal = 0;
-
         param->type = -1;
-
         param->gpo = -1.0;
         param->gpe = -1.0;
         param->tgpe = -1.0;
-        param->matadd = 0.0F;
-        param->chaos = 0;
         param->nthreads = get_default_thread_count();
+        param->min_support = 0;
+        param->load_poar = NULL;
+        param->mode = NULL;
+        param->quiet = 0;
+        param->out_format = 0;
+        param->reformat = 0;
+        param->rename = 0;
         param->clean = 0;
         param->unalign = 0;
-        param->refine = KALIGN_REFINE_NONE;
-        param->adaptive_budget = 0;
-        param->ensemble = 0;
-        param->ensemble_seed = 42;
-        param->min_support = 0;
-        param->save_poar = NULL;
-        param->load_poar = NULL;
-        param->consistency_anchors = 5;
-        param->consistency_weight = 2.0f;
-        param->realign = 0;
-        param->vsm_amax = -1.0f;  /* sentinel: use C defaults */
-        param->mode = 0;  /* 0=default, 1=fast, 2=precise */
-        param->quiet = 0;
         return param;
 ERROR:
         free_parameters(param);

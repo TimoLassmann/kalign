@@ -65,7 +65,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mode",
         default="default",
-        choices=["fast", "default", "accurate"],
+        choices=["fast", "default", "recall", "accurate"],
         help="Alignment mode preset (default: default).",
     )
     parser.add_argument(

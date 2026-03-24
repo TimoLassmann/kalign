@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#ifdef USE_THREADPOOL
+typedef struct threadpool threadpool_t;
+#endif
+
 #ifdef MSA_STRUCT_IMPORT
 #define EXTERN
 #else
@@ -40,6 +44,9 @@ struct msa{
         int* nsip;
         int* plen;
         uint8_t run_parallel;
+#ifdef USE_THREADPOOL
+        threadpool_t *pool;
+#endif
         int numseq;
         int num_profiles;
         int alloc_numseq;

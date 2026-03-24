@@ -457,6 +457,9 @@ int kalign_arr_to_msa(char** input_sequences, int* len, int numseq,struct msa** 
         msa->col_confidence = NULL;
         msa->seq_weights = NULL;
         msa->run_parallel = 0;
+#ifdef USE_THREADPOOL
+        msa->pool = NULL;
+#endif
         msa->consistency_table = NULL;
         msa->poar_consistency = NULL;
         msa->quiet = 1;
@@ -597,4 +600,10 @@ int make_linear_sequence(struct msa_seq* seq, char* linear_seq)
         linear_seq[f] = 0;
         ///fprintf(stdout,"LINEAR:%s\n",linear_seq);
         return OK;
+}
+
+int kalign_msa_get_biotype(struct msa *msa)
+{
+        if(!msa) return ALN_BIOTYPE_UNDEF;
+        return msa->biotype;
 }

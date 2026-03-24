@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#ifdef USE_THREADPOOL
+typedef struct threadpool threadpool_t;
+#endif
+
 #define ALN_MODE_SCORE_ONLY 2
 #define ALN_MODE_FULL 1
 
@@ -26,6 +30,9 @@ struct aln_mem{
         int* path;
         int* tmp_path;
         uint8_t run_parallel;
+#ifdef USE_THREADPOOL
+        threadpool_t *pool;
+#endif
         int alloc_path_len;
         float score;
         float margin_sum;       /* accumulated meetup margins */

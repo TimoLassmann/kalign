@@ -2,6 +2,9 @@
 #ifdef HAVE_OPENMP
 #include <omp.h>
 #endif
+#ifdef USE_THREADPOOL
+#include "threadpool.h"
+#endif
 
 #ifdef HAVE_AVX2
 #include <xmmintrin.h>
@@ -57,6 +60,38 @@ static int bisecting_kmeans(struct msa* msa, struct node** ret_n,
 static int split(const float * const * dm, int *samples, int num_anchors, int num_samples,
                  int seed_pick, struct kmeans_result **ret);
 static int split2(const float * const * dm,const int* samples, const int num_anchors,const int num_samples,const int seed_pick,struct kmeans_result** ret);
+
+#ifdef USE_THREADPOOL
+/* Wrapper args for threadpool task submission */
+struct split2_task_arg {
+        const float *const *dm;
+        const int *samples;
+        int num_anchors;
+        int num_samples;
+        int seed_idx;
+        struct kmeans_result **res;
+};
+
+static void split2_task_fn(void *arg)
+{
+        struct split2_task_arg *a = (struct split2_task_arg *)arg;
+        split2(a->dm, a->samples, a->num_anchors, a->num_samples, a->seed_idx, a->res);
+}
+
+struct bisect_task_arg {
+        struct msa *msa;
+        struct node **ret_n;
+        const float *const *dm;
+        int *samples;
+        int num_samples;
+};
+
+static void bisect_task_fn(void *arg)
+{
+        struct bisect_task_arg *a = (struct bisect_task_arg *)arg;
+        bisecting_kmeans(a->msa, a->ret_n, a->dm, a->samples, a->num_samples);
+}
+#endif
 
 static inline int cmp_floats(const float a, const float b);
 
@@ -131,9 +166,11 @@ int build_tree_kmeans_noisy(struct msa* msa, struct aln_tasks** tasks,
                 LOG_MSG("Building guide tree.");
         }
 
+#if !defined(USE_THREADPOOL)
 #ifdef HAVE_OPENMP
 #pragma omp parallel
 #pragma omp single nowait
+#endif
 #endif
         bisecting_kmeans(msa, &root, (const float * const *)dm, samples, numseq);
 
@@ -224,9 +261,11 @@ int build_tree_kmeans(struct msa* msa, struct aln_tasks** tasks)
         /* if(n_threads == 1){ */
         /*         RUN(bisecting_kmeans_serial(msa,&root, dm, samples, numseq)); */
         /* }else{ */
+#if !defined(USE_THREADPOOL)
 #ifdef HAVE_OPENMP
 #pragma omp parallel
 #pragma omp single nowait
+#endif
 #endif
         bisecting_kmeans(msa,&root, (const float * const *)dm, samples, numseq);
         /* } */
@@ -287,17 +326,35 @@ int bisecting_kmeans(struct msa* msa, struct node** ret_n, const float * const *
         int num_l,num_r;
 
         /* LOG_MSG("num_samples: %d", num_samples); */
-        num_anchors = MACRO_MIN(32, msa->numseq);
 
-        if(num_samples < KALIGN_KMEANS_UPGMA_THRESHOLD){
-                float** dm = NULL;
-                RUNP(dm = d_estimation(msa, samples, num_samples,1));// anchors, num_anchors,1));
-                n = upgma(dm,samples, num_samples);
+        /* Base cases: 0 or 1 samples cannot be split further */
+        if(num_samples <= 0){
+                return OK;
+        }
+        if(num_samples == 1){
+                n = alloc_node();
+                n->id = samples[0];
                 *ret_n = n;
-                gfree(dm);
                 MFREE(samples);
                 return OK;
-                //return n;
+        }
+
+        num_anchors = MACRO_MIN(32, msa->numseq);
+
+        /* K-means needs at least 3 samples for a non-degenerate bisection.
+           Floor the threshold to 3 so UPGMA handles tiny inputs safely. */
+        {
+                int threshold = KALIGN_KMEANS_UPGMA_THRESHOLD;
+                if(threshold < 3) threshold = 3;
+                if(num_samples < threshold){
+                        float** dm_local = NULL;
+                        RUNP(dm_local = d_estimation(msa, samples, num_samples,1));
+                        n = upgma(dm_local, samples, num_samples);
+                        *ret_n = n;
+                        gfree(dm_local);
+                        MFREE(samples);
+                        return OK;
+                }
         }
 
         /* else if(num_samples < 1000){ */
@@ -321,24 +378,43 @@ int bisecting_kmeans(struct msa* msa, struct node** ret_n, const float * const *
         for(i = 0;i < tries;i += 4){
                 change = 0;
 
+#ifdef USE_THREADPOOL
+                {
+                        struct split2_task_arg args[4];
+                        for (int t = 0; t < 4; t++) {
+                                args[t].dm = dm;
+                                args[t].samples = samples;
+                                args[t].num_anchors = num_anchors;
+                                args[t].num_samples = num_samples;
+                                args[t].seed_idx = ((i + t) * step) % num_samples;
+                                args[t].res = &res[t];
+                        }
+                        tp_group_t *g = tp_group_create(msa->pool);
+                        for (int t = 0; t < 4; t++)
+                                tp_group_submit(g, split2_task_fn, &args[t]);
+                        tp_group_wait(g);
+                        tp_group_destroy(g);
+                }
+#else
 #ifdef HAVE_OPENMP
 #pragma omp task shared(dm,samples,num_anchors, num_samples,i,step,res)
 #endif
-                split2(dm,samples,num_anchors, num_samples, (i)*step, &res[0]);
+                split2(dm,samples,num_anchors, num_samples, ((i)*step) % num_samples, &res[0]);
 #ifdef HAVE_OPENMP
 #pragma omp task shared(dm,samples,num_anchors, num_samples,i,step,res)
 #endif
-                split2(dm,samples,num_anchors, num_samples, (i+ 1)*step, &res[1]);
+                split2(dm,samples,num_anchors, num_samples, ((i+ 1)*step) % num_samples, &res[1]);
 #ifdef HAVE_OPENMP
 #pragma omp task shared(dm,samples,num_anchors, num_samples,i,step,res)
 #endif
-                split2(dm,samples,num_anchors, num_samples, (i+ 2)*step, &res[2]);
+                split2(dm,samples,num_anchors, num_samples, ((i+ 2)*step) % num_samples, &res[2]);
 #ifdef HAVE_OPENMP
 #pragma omp task shared(dm,samples,num_anchors, num_samples,i,step,res)
 #endif
-                split2(dm,samples,num_anchors, num_samples, (i+ 3)*step, &res[3]);
+                split2(dm,samples,num_anchors, num_samples, ((i+ 3)*step) % num_samples, &res[3]);
 #ifdef HAVE_OPENMP
 #pragma omp taskwait
+#endif
 #endif
 
                 for(j = 0; j < 4;j++){
@@ -382,9 +458,17 @@ int bisecting_kmeans(struct msa* msa, struct node** ret_n, const float * const *
         MFREE(samples);
         n = alloc_node();
 
-/* #ifdef HAVE_OPENMP */
-/* #pragma omp parallel //num_threads(2) */
-/* #pragma omp single nowait */
+#ifdef USE_THREADPOOL
+        {
+                struct bisect_task_arg left_arg  = { msa, &n->left,  dm, sl, num_l };
+                struct bisect_task_arg right_arg = { msa, &n->right, dm, sr, num_r };
+                tp_group_t *g = tp_group_create(msa->pool);
+                tp_group_submit(g, bisect_task_fn, &left_arg);
+                tp_group_submit(g, bisect_task_fn, &right_arg);
+                tp_group_wait(g);
+                tp_group_destroy(g);
+        }
+#else
 #ifdef HAVE_OPENMP
 #pragma omp task shared(msa,n,dm)
 #endif
@@ -397,6 +481,7 @@ int bisecting_kmeans(struct msa* msa, struct node** ret_n, const float * const *
 
 #ifdef HAVE_OPENMP
 #pragma omp taskwait
+#endif
 #endif
 
         *ret_n =n;
@@ -422,7 +507,7 @@ ERROR:
 
 /*         num_anchors = MACRO_MIN(32, msa->numseq); */
 
-/*         if(num_samples < KALIGN_KMEANS_UPGMA_THRESHOLD){ */
+/*         if(num_samples < msa->kmeans_upgma_threshold){ */
 /*                 float** dm = NULL; */
 /*                 RUNP(dm = d_estimation(msa, samples, num_samples,1));// anchors, num_anchors,1)); */
 /*                 n = upgma(dm,samples, num_samples); */

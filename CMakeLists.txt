@@ -61,14 +61,18 @@ include(GNUInstallDirs)
 include(CTest)
 include(CheckCSourceRuns)
 
-option(USE_OPENMP    "Use OpenMP for parallelization" ON)
+option(USE_OPENMP      "Use OpenMP for parallelization" OFF)
+option(USE_THREADPOOL  "Use built-in threadpool instead of OpenMP" ON)
 option(ENABLE_SSE    "Enable compile-time SSE4.1 support." ON)
 option(ENABLE_AVX    "Enable compile-time AVX support."    ON)
 option(ENABLE_AVX2   "Enable compile-time AVX2 support."   ON)
 
 # Performance tuning parameters
-set(KALIGN_ALN_SERIAL_THRESHOLD "250" CACHE STRING "Alignment positions threshold below which to use serial instead of parallel processing")
-set(KALIGN_KMEANS_UPGMA_THRESHOLD "50" CACHE STRING "Number of sequences threshold below which to use UPGMA instead of parallel k-means")
+# Threadpool parallelization thresholds (all settings in one place)
+set(KALIGN_ALN_SERIAL_THRESHOLD "500" CACHE STRING "Hirschberg DP width below which to run serial")
+set(KALIGN_KMEANS_UPGMA_THRESHOLD "50" CACHE STRING "Sequence count below which to use UPGMA instead of parallel k-means")
+set(KALIGN_DIST_MIN_SEQS "50" CACHE STRING "Minimum sequences to parallelize distance/anchor computations")
+set(KALIGN_PFOR_MIN_CHUNK "10" CACHE STRING "Minimum iterations per chunk in tp_parallel_for")
 
 # option(ENABLE_FMA    "Enable compile-time FMA support."    ON)
 # option(ENABLE_AVX512 "Enable compile-time AVX512 support." ON)
@@ -96,6 +100,20 @@ if(USE_OPENMP)
   endif(OPENMP_FOUND OR OpenMP_FOUND)
 endif(USE_OPENMP)
 
+# Built-in threadpool (alternative to OpenMP)
+if(USE_THREADPOOL)
+  if(USE_OPENMP AND (OPENMP_FOUND OR OpenMP_FOUND))
+    message(WARNING "Both USE_OPENMP and USE_THREADPOOL are ON. Threadpool takes precedence.")
+  endif()
+  find_package(Threads QUIET)
+  if(Threads_FOUND)
+    add_definitions(-DUSE_THREADPOOL)
+    message(STATUS "Built-in threadpool is enabled.")
+  else()
+    set(USE_THREADPOOL OFF)
+    message(STATUS "pthreads not found — falling back to serial execution.")
+  endif()
+endif()
 
 if (ENABLE_SSE)
   #
@@ -199,6 +217,8 @@ endif(HAVE_AVX2)
 # Add performance tuning parameters as compile definitions
 add_definitions(-DKALIGN_ALN_SERIAL_THRESHOLD=${KALIGN_ALN_SERIAL_THRESHOLD})
 add_definitions(-DKALIGN_KMEANS_UPGMA_THRESHOLD=${KALIGN_KMEANS_UPGMA_THRESHOLD})
+add_definitions(-DKALIGN_DIST_MIN_SEQS=${KALIGN_DIST_MIN_SEQS})
+add_definitions(-DKALIGN_PFOR_MIN_CHUNK=${KALIGN_PFOR_MIN_CHUNK})
 
 add_subdirectory(lib)
 add_subdirectory(src)
@@ -223,8 +243,10 @@ if(BUILD_PYTHON_MODULE)
         # Link against the static kalign library
         target_link_libraries(_core PRIVATE kalign_static)
 
-        # Link OpenMP if found
-        if(OpenMP_CXX_FOUND)
+        # Link OpenMP or threadpool
+        if(USE_THREADPOOL)
+            target_link_libraries(_core PRIVATE Threads::Threads)
+        elseif(OpenMP_CXX_FOUND)
             target_link_libraries(_core PRIVATE OpenMP::OpenMP_CXX)
         endif()
 

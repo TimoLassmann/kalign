@@ -50,16 +50,22 @@ RUN cd /tmp && \
 COPY . /kalign
 WORKDIR /kalign
 
-RUN mkdir -p build && cd build && \
-    cmake -DCMAKE_BUILD_TYPE=Release .. && \
+# Build kalign twice: threadpool and OpenMP
+RUN mkdir cbuild-tp && cd cbuild-tp && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DUSE_OPENMP=OFF -DUSE_THREADPOOL=ON .. && \
+    make -j"$(nproc)"
+
+RUN mkdir cbuild-omp && cd cbuild-omp && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DUSE_OPENMP=ON -DUSE_THREADPOOL=OFF .. && \
     make -j"$(nproc)"
 
 # ---------- Python environment ----------
 RUN python3 -m venv /venv
-ENV PATH="/venv/bin:/kalign/build/src:$PATH"
+ENV PATH="/venv/bin:/kalign/cbuild-tp/src:$PATH"
 
 RUN pip install --no-cache-dir uv && \
-    uv pip install --no-cache -e ".[benchmark]"
+    uv pip install --no-cache -e ".[benchmark]" \
+      --config-settings='cmake.args=-DUSE_OPENMP=OFF;-DUSE_THREADPOOL=ON'
 
 # ---------- Verify tools ----------
 RUN which kalign && which clustalo && which mafft && which muscle
@@ -72,7 +78,8 @@ COPY zig-out/kalign-linux-aarch64 /usr/local/bin/kalign
 RUN chmod +x /usr/local/bin/kalign
 
 # Rebuild Python module with latest source (uses cached venv layer)
-RUN uv pip install --no-cache -e ".[benchmark]"
+RUN uv pip install --no-cache -e ".[benchmark]" \
+      --config-settings='cmake.args=-DUSE_OPENMP=OFF;-DUSE_THREADPOOL=ON'
 
 EXPOSE 8050
 

@@ -26,6 +26,10 @@
 #include <omp.h>
 #endif
 
+#ifdef USE_THREADPOOL
+#include "threadpool.h"
+#endif
+
 #define ALN_WRAP_IMPORT
 #include "aln_wrap.h"
 
@@ -170,9 +174,13 @@ int kalign_run_seeded(struct msa *msa, int n_threads, int type,
 
         RUN(alloc_tasks(&tasks, msa->numseq));
 
-#ifdef HAVE_OPENMP
+#ifdef USE_THREADPOOL
+        threadpool_t *pool = tp_create(n_threads);
+        msa->pool = pool;
+#elif defined(HAVE_OPENMP)
         omp_set_num_threads(n_threads);
 #endif
+
         /* Build guide tree - noisy variant if seed != 0 */
         if(tree_seed != 0 && tree_noise > 0.0f){
                 RUN(build_tree_kmeans_noisy(msa, &tasks, tree_seed, tree_noise));
@@ -196,6 +204,10 @@ int kalign_run_seeded(struct msa *msa, int n_threads, int type,
                            gpo,
                            gpe,
                            tgpe));
+#ifdef USE_THREADPOOL
+        ap->pool = pool;
+#endif
+
         ap->adaptive_budget = adaptive_budget;
         if(use_seq_weights >= 0.0f){
                 ap->use_seq_weights = use_seq_weights;
@@ -256,6 +268,10 @@ int kalign_run_seeded(struct msa *msa, int n_threads, int type,
 
         aln_param_free(ap);
         free_tasks(tasks);
+#ifdef USE_THREADPOOL
+        msa->pool = NULL;
+        tp_destroy(pool);
+#endif
         return OK;
 ERROR:
         if(msa->consistency_table){
@@ -264,6 +280,10 @@ ERROR:
         }
         aln_param_free(ap);
         free_tasks(tasks);
+#ifdef USE_THREADPOOL
+        msa->pool = NULL;
+        tp_destroy(pool);
+#endif
         return FAIL;
 }
 
@@ -299,9 +319,13 @@ int kalign_run_dist_scale(struct msa *msa, int n_threads, int type,
 
         RUN(alloc_tasks(&tasks, msa->numseq));
 
-#ifdef HAVE_OPENMP
+#ifdef USE_THREADPOOL
+        threadpool_t *pool = tp_create(n_threads);
+        msa->pool = pool;
+#elif defined(HAVE_OPENMP)
         omp_set_num_threads(n_threads);
 #endif
+
         RUN(build_tree_kmeans(msa, &tasks));
 
         if(msa->biotype == ALN_BIOTYPE_PROTEIN){
@@ -317,6 +341,10 @@ int kalign_run_dist_scale(struct msa *msa, int n_threads, int type,
                            gpo,
                            gpe,
                            tgpe));
+#ifdef USE_THREADPOOL
+        ap->pool = pool;
+#endif
+
         ap->adaptive_budget = adaptive_budget;
         if(use_seq_weights >= 0.0f){
                 ap->use_seq_weights = use_seq_weights;
@@ -358,10 +386,18 @@ int kalign_run_dist_scale(struct msa *msa, int n_threads, int type,
 
         aln_param_free(ap);
         free_tasks(tasks);
+#ifdef USE_THREADPOOL
+        msa->pool = NULL;
+        tp_destroy(pool);
+#endif
         return OK;
 ERROR:
         aln_param_free(ap);
         free_tasks(tasks);
+#ifdef USE_THREADPOOL
+        msa->pool = NULL;
+        tp_destroy(pool);
+#endif
         return FAIL;
 }
 
@@ -396,9 +432,13 @@ int kalign_run_realign(struct msa *msa, int n_threads, int type,
 
         RUN(alloc_tasks(&tasks, msa->numseq));
 
-#ifdef HAVE_OPENMP
+#ifdef USE_THREADPOOL
+        threadpool_t *pool = tp_create(n_threads);
+        msa->pool = pool;
+#elif defined(HAVE_OPENMP)
         omp_set_num_threads(n_threads);
 #endif
+
         /* Initial guide tree from BPM anchor distances */
         RUN(build_tree_kmeans(msa, &tasks));
 
@@ -415,6 +455,10 @@ int kalign_run_realign(struct msa *msa, int n_threads, int type,
                            gpo,
                            gpe,
                            tgpe));
+#ifdef USE_THREADPOOL
+        ap->pool = pool;
+#endif
+
         ap->adaptive_budget = adaptive_budget;
         if(use_seq_weights >= 0.0f){
                 ap->use_seq_weights = use_seq_weights;
@@ -532,6 +576,10 @@ int kalign_run_realign(struct msa *msa, int n_threads, int type,
 
         aln_param_free(ap);
         free_tasks(tasks);
+#ifdef USE_THREADPOOL
+        msa->pool = NULL;
+        tp_destroy(pool);
+#endif
         return OK;
 ERROR:
         if(msa->consistency_table){
@@ -540,6 +588,10 @@ ERROR:
         }
         aln_param_free(ap);
         free_tasks(tasks);
+#ifdef USE_THREADPOOL
+        msa->pool = NULL;
+        tp_destroy(pool);
+#endif
         return FAIL;
 }
 
@@ -572,6 +624,13 @@ int kalign_post_realign(struct msa *msa, int n_threads, int type,
                            gpo,
                            gpe,
                            tgpe));
+#ifdef USE_THREADPOOL
+        threadpool_t *pool = tp_create(n_threads);
+        msa->pool = pool;
+        ap->pool = pool;
+#elif defined(HAVE_OPENMP)
+        omp_set_num_threads(n_threads);
+#endif
         ap->adaptive_budget = adaptive_budget;
         if(use_seq_weights >= 0.0f){
                 ap->use_seq_weights = use_seq_weights;
@@ -580,10 +639,6 @@ int kalign_post_realign(struct msa *msa, int n_threads, int type,
         if(vsm_amax >= 0.0f){
                 ap->vsm_amax = vsm_amax;
         }
-
-#ifdef HAVE_OPENMP
-        omp_set_num_threads(n_threads);
-#endif
 
         DECLARE_TIMER(t1);
         if(!msa->quiet){
@@ -672,10 +727,18 @@ int kalign_post_realign(struct msa *msa, int n_threads, int type,
 
         aln_param_free(ap);
         free_tasks(tasks);
+#ifdef USE_THREADPOOL
+        msa->pool = NULL;
+        tp_destroy(pool);
+#endif
         return OK;
 ERROR:
         aln_param_free(ap);
         if(tasks) free_tasks(tasks);
+#ifdef USE_THREADPOOL
+        msa->pool = NULL;
+        tp_destroy(pool);
+#endif
         return FAIL;
 }
 

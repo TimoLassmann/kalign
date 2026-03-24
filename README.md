@@ -13,7 +13,7 @@ alignment approach with multi-threading support.
 
 ### From source
 
-Prerequisites: C compiler (GCC or Clang), CMake 3.18+, optionally OpenMP.
+Prerequisites: C compiler (GCC or Clang), CMake 3.18+.
 
 ```bash
 mkdir build && cd build
@@ -23,7 +23,11 @@ make test
 make install
 ```
 
-On macOS, `brew install libomp` for OpenMP support.
+Kalign uses a built-in thread pool for parallelization (requires pthreads, available on all POSIX systems). If pthreads is not available, it falls back to serial execution. To use OpenMP instead:
+
+```bash
+cmake -DUSE_OPENMP=ON -DUSE_THREADPOOL=OFF ..
+```
 
 ### Zig build (alternative)
 
@@ -47,47 +51,43 @@ See [README-python.md](README-python.md) for the full Python documentation.
 kalign -i <input> -o <output>
 ```
 
-Kalign v3.5 has three modes:
+Kalign has four mode presets, optimized for protein and nucleotide sequences:
 
 | Mode | Flag | Description |
 |------|------|-------------|
-| default | (none) | Best general-purpose. |
-| fast | `--fast` | Fastest. Same as kalign v3.4. |
-| precise | `--precise` | Highest accuracy, ~10x slower. |
+| fast | `--mode fast` | Single run, fastest. |
+| default | `--mode default` | Single run with consistency anchors (default). |
+| recall | `--mode recall` | Ensemble, optimized for recall. |
+| accurate | `--mode accurate` | Ensemble, highest precision. |
 
 ### Examples
 
 ```bash
-# Align sequences
+# Align sequences (default mode)
 kalign -i sequences.fa -o aligned.fa
 
 # Fast mode
-kalign --fast -i sequences.fa -o aligned.fa
+kalign --mode fast -i sequences.fa -o aligned.fa
 
-# Precise mode (ensemble + realign)
-kalign --precise -i sequences.fa -o aligned.fa
+# Accurate mode (ensemble)
+kalign --mode accurate -i sequences.fa -o aligned.fa
 
 # Read from stdin
 cat input.fa | kalign -i - -o aligned.fa
 
 # Combine multiple input files
 kalign seqsA.fa seqsB.fa -o combined.fa
-
-# Save ensemble consensus for re-thresholding
-kalign --precise -i seqs.fa -o out.fa --save-poar consensus.poar
-kalign -i seqs.fa -o out2.fa --load-poar consensus.poar --min-support 3
 ```
 
 ### Options
 
 ```
+--mode         Mode preset: fast, default, recall, accurate. [default]
 --format       Output format: fasta, msf, clu. [fasta]
 --type         Sequence type: protein, dna, rna, divergent. [auto]
---gpo          Gap open penalty. [auto]
---gpe          Gap extension penalty. [auto]
---tgpe         Terminal gap extension penalty. [auto]
---ensemble N   Run N ensemble alignments. [off]
---refine       Refinement: none, all, confident. [none]
+--gpo          Gap open penalty (overrides preset). [auto]
+--gpe          Gap extension penalty (overrides preset). [auto]
+--tgpe         Terminal gap extension penalty (overrides preset). [auto]
 -n             Number of threads. [auto]
 ```
 

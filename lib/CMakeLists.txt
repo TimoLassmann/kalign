@@ -61,17 +61,26 @@ set(source_files
   # src/test.h
   )
 
+# Add threadpool source when enabled
+if(USE_THREADPOOL)
+  list(APPEND source_files src/threadpool/threadpool.c)
+endif()
+
 add_library(${PROJECT_NAME}_OBJ OBJECT ${source_files})
 
-if(OpenMP_C_FOUND)  
+if(OpenMP_C_FOUND AND NOT USE_THREADPOOL)
   target_link_libraries(${PROJECT_NAME}_OBJ PRIVATE OpenMP::OpenMP_C)
-endif(OpenMP_C_FOUND)
+endif()
 
+if(USE_THREADPOOL)
+  target_link_libraries(${PROJECT_NAME}_OBJ PRIVATE Threads::Threads)
+endif()
 
 target_include_directories(${PROJECT_NAME}_OBJ
   PRIVATE
   ${CMAKE_CURRENT_BINARY_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/threadpool
   )
 
 target_compile_definitions(${PROJECT_NAME}_OBJ PRIVATE KALIGN_PACKAGE_VERSION=\"${KALIGN_PACKAGE_VERSION}\")
@@ -127,11 +136,12 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME} PRIVATE m)
 
-if(OpenMP_C_FOUND)
+if(OpenMP_C_FOUND AND NOT USE_THREADPOOL)
   target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_C)
 endif()
-
-
+if(USE_THREADPOOL)
+  target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads)
+endif()
 
 add_library(${PROJECT_NAME}_static STATIC
   ${public_header_files}
@@ -164,8 +174,11 @@ target_include_directories(${PROJECT_NAME}_static
 
 target_link_libraries(${PROJECT_NAME}_static PRIVATE m)
 
-if(OpenMP_C_FOUND)
+if(OpenMP_C_FOUND AND NOT USE_THREADPOOL)
   target_link_libraries(${PROJECT_NAME}_static PRIVATE OpenMP::OpenMP_C)
+endif()
+if(USE_THREADPOOL)
+  target_link_libraries(${PROJECT_NAME}_static PRIVATE Threads::Threads)
 endif()
 
 

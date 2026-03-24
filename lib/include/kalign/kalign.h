@@ -122,6 +122,9 @@ EXTERN int kalign_consensus_from_poar(struct msa* msa,
 /* Memory */
 EXTERN void kalign_free_msa(struct msa* msa);
 
+/* Query MSA properties */
+EXTERN int kalign_msa_get_biotype(struct msa *msa);
+
 /* Auxillary...  */
 EXTERN int reformat_settings_msa(struct msa *msa, int rename, int unalign);
 

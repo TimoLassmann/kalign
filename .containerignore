@@ -1,8 +1,6 @@
 .git
 build
-build-asan
-build-debug
-build-release
+build-*
 benchmarks/data
 benchmarks/results
 __pycache__

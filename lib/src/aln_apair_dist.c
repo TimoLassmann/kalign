@@ -1,10 +1,36 @@
 #include "tldevel.h"
 #include "msa_struct.h"
 
+#ifdef USE_THREADPOOL
+#include "threadpool.h"
+#endif
+
 #define ALN_APAIR_DIST_IMPORT
 #include "aln_apair_dist.h"
 
 static float pairwise_identity_dist(const char* a, const char* b, int alnlen);
+
+#ifdef USE_THREADPOOL
+struct apair_ctx {
+        struct msa_seq** seqs;
+        float** dm;
+        int n;
+        int alnlen;
+};
+
+static void apair_row_fn(int row_start, int row_end, void *arg)
+{
+        struct apair_ctx *c = (struct apair_ctx *)arg;
+        for (int i = row_start; i < row_end; i++) {
+                const char *seq_i = c->seqs[i]->seq;
+                for (int j = i + 1; j < c->n; j++) {
+                        float d = pairwise_identity_dist(seq_i, c->seqs[j]->seq, c->alnlen);
+                        c->dm[i][j] = d;
+                        c->dm[j][i] = d;
+                }
+        }
+}
+#endif
 
 int compute_aln_pairwise_dist(struct msa* msa, float*** dm_ptr)
 {
@@ -26,6 +52,12 @@ int compute_aln_pairwise_dist(struct msa* msa, float*** dm_ptr)
                 dm[i][i] = 0.0f;
         }
 
+#ifdef USE_THREADPOOL
+        if(msa->pool && n >= KALIGN_DIST_MIN_SEQS){
+                struct apair_ctx ctx = { msa->sequences, dm, n, msa->alnlen };
+                tp_parallel_for_chunked(msa->pool, 0, n - 1, KALIGN_PFOR_MIN_CHUNK, apair_row_fn, &ctx);
+        }else{
+#endif
         for(i = 0; i < n - 1; i++){
                 const char* seq_i = msa->sequences[i]->seq;
                 for(j = i + 1; j < n; j++){
@@ -35,6 +67,9 @@ int compute_aln_pairwise_dist(struct msa* msa, float*** dm_ptr)
                         dm[j][i] = d;
                 }
         }
+#ifdef USE_THREADPOOL
+        }
+#endif
 
         *dm_ptr = dm;
         return OK;

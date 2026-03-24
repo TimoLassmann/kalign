@@ -7,6 +7,10 @@
 
 #include "msa_struct.h"
 
+#ifdef USE_THREADPOOL
+#include "threadpool.h"
+#endif
+
 #define SEQUENCE_DISTANCE_IMPORT
 #include "sequence_distance.h"
 
@@ -16,6 +20,32 @@
 
 /* #include "misc.h" */
 #include "bpm.h"
+
+#ifdef USE_THREADPOOL
+struct dist_row_ctx {
+        struct msa_seq** seqs;
+        float** dm;
+        int* samples;
+        int num_samples;
+};
+
+static void dist_row_fn(int row_start, int row_end, void *arg)
+{
+        struct dist_row_ctx *c = (struct dist_row_ctx *)arg;
+        for (int r = row_start; r < row_end; r++) {
+                uint8_t *s1 = c->seqs[r]->s;
+                int l1 = c->seqs[r]->len;
+                for (int k = 0; k < c->num_samples; k++) {
+                        uint8_t *s2 = c->seqs[c->samples[k]]->s;
+                        int l2 = c->seqs[c->samples[k]]->len;
+                        c->dm[r][k] = calc_distance(s1, s2, l1, l2);
+                        int avg = (l1 + l2) / 2;
+                        float add = MACRO_MIN(10000.0, avg) / 10000.0;
+                        c->dm[r][k] += add;
+                }
+        }
+}
+#endif
 
 #define NODESIZE 16
 
@@ -98,8 +128,17 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                 }
 
                 struct msa_seq** s = msa->sequences;
+
+#ifdef USE_THREADPOOL
+                if(msa->pool && numseq >= KALIGN_DIST_MIN_SEQS){
+                        struct dist_row_ctx ctx = { s, dm, samples, num_samples };
+                        tp_parallel_for_chunked(msa->pool, 0, numseq, KALIGN_PFOR_MIN_CHUNK, dist_row_fn, &ctx);
+                }else{
+#endif
+#if !defined(USE_THREADPOOL)
 #ifdef HAVE_OPENMP
 #pragma omp parallel for shared(dm, s) private(i, j) collapse(2) schedule(static)
+#endif
 #endif
                 for(i = 0; i < numseq;i++){
                         for(j = 0;j < num_samples;j++){
@@ -112,16 +151,14 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                 s2 = s[samples[j]]->s;
                                 l2 = s[samples[j]]->len;
                                 dm[i][j] = calc_distance(s1,s2,l1,l2);
-                                int s = (l1 + l2) / 2;
-                                float add = MACRO_MIN(10000.0, s) / 10000.0;
+                                int sv = (l1 + l2) / 2;
+                                float add = MACRO_MIN(10000.0, sv) / 10000.0;
                                 dm[i][j] += add;
-                                /* fprintf(stdout,"%f ",dm[i][j]); */
-                                /* dm[i][j] += (float)MACRO_MIN(l1, l2) / (float)MACRO_MAX(l1, l2); */
-                                /* dm[i][j] = dm[i][j] / (float) MACRO_MIN(l1, l2); */
-                                //dm[i][j] = dist;
                         }
-                        /* fprintf(stdout,"\n"); */
                 }
+#ifdef USE_THREADPOOL
+                }
+#endif
                 /* fprintf(stdout,"\n"); */
 
 
