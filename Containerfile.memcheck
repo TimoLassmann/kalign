@@ -1,0 +1,80 @@
+# Kalign Memory Debugging Container
+#
+# Linux-based container with ASAN (detect_leaks), Valgrind, and glibc
+# for finding memory bugs that don't manifest on macOS.
+#
+# Build:
+#   podman build -f Containerfile.memcheck -t kalign-memcheck .
+#
+# Run ASAN stress test:
+#   podman run -it kalign-memcheck /kalign/run_memcheck.sh asan
+#
+# Run Valgrind stress test:
+#   podman run -it kalign-memcheck /kalign/run_memcheck.sh valgrind
+#
+# Run Python stress test with ASAN:
+#   podman run -it kalign-memcheck /kalign/run_memcheck.sh python
+#
+# Interactive shell:
+#   podman run -it kalign-memcheck bash
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# System dependencies + debugging tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake g++ git curl \
+    python3 python3-pip python3-venv python3-dev \
+    valgrind \
+    pkg-config \
+    libomp-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---------- Copy kalign source ----------
+COPY . /kalign
+WORKDIR /kalign
+
+# ---------- Build 1: ASAN build (for C tests + Python module) ----------
+RUN mkdir -p build-asan && cd build-asan && \
+    cmake -DCMAKE_BUILD_TYPE=ASAN -DBUILD_PYTHON_MODULE=OFF .. && \
+    make -j"$(nproc)"
+
+# ---------- Build 2: Debug build (for Valgrind — no ASAN) ----------
+RUN mkdir -p build-debug && cd build-debug && \
+    cmake -DCMAKE_BUILD_TYPE=Debug -DBUILD_PYTHON_MODULE=OFF .. && \
+    make -j"$(nproc)"
+
+# ---------- Build 3: Release build (for Python module) ----------
+RUN mkdir -p build-release && cd build-release && \
+    cmake -DCMAKE_BUILD_TYPE=Release .. && \
+    make -j"$(nproc)"
+
+# ---------- Python environment ----------
+RUN python3 -m venv /venv
+ENV PATH="/venv/bin:$PATH"
+
+RUN pip install --no-cache-dir uv && \
+    cd /kalign && uv pip install --no-cache -e .
+
+# ---------- Compile C stress test (ASAN) ----------
+RUN cc -fsanitize=address -O0 -g -DDEBUG \
+    -I/kalign/lib/include -I/kalign/lib/src \
+    /kalign/tests/memcheck_stress.c \
+    -L/kalign/build-asan/lib -lkalign_static -ltldevel \
+    -fopenmp -lm \
+    -o /kalign/build-asan/memcheck_stress
+
+# ---------- Compile C stress test (Debug, for Valgrind) ----------
+RUN cc -O0 -g -DDEBUG \
+    -I/kalign/lib/include -I/kalign/lib/src \
+    /kalign/tests/memcheck_stress.c \
+    -L/kalign/build-debug/lib -lkalign_static -ltldevel \
+    -fopenmp -lm \
+    -o /kalign/build-debug/memcheck_stress
+
+# ---------- Entry script ----------
+COPY tests/run_memcheck.sh /kalign/run_memcheck.sh
+RUN chmod +x /kalign/run_memcheck.sh
+
+CMD ["/kalign/run_memcheck.sh", "all"]
