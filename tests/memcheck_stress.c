@@ -2,7 +2,7 @@
  *
  * Exercises all major code paths repeatedly to surface memory bugs:
  * - In-memory alignment (kalign_arr_to_msa path)
- * - File-based alignment (kalign_read_input path)
+ * - File-based alignment (kalign_align_full path)
  * - Realignment iterations
  * - Refinement (confident, inline)
  * - Ensemble alignment with consensus
@@ -10,20 +10,6 @@
  * - Consistency anchors
  * - VSM + seq_weights
  * - Align + write + read-back + compare (full benchmark loop)
- *
- * Compile with ASAN:
- *   cc -fsanitize=address -O0 -g -DDEBUG \
- *     -I../lib/include -I../lib/src \
- *     memcheck_stress.c \
- *     -L../build-asan/lib -lkalign_static -ltldevel \
- *     -fopenmp -lm -o memcheck_stress
- *
- * Compile for Valgrind:
- *   cc -O0 -g -DDEBUG \
- *     -I../lib/include -I../lib/src \
- *     memcheck_stress.c \
- *     -L../build-debug/lib -lkalign_static -ltldevel \
- *     -fopenmp -lm -o memcheck_stress
  */
 
 #include <stdio.h>
@@ -97,7 +83,8 @@ static int test_file_align(const char* input, int n)
         int ret = kalign_read_input((char*)input, &msa, 1);
         if (ret != 0 || !msa) { fprintf(stderr, "  read failed iter %d\n", i); return 1; }
         msa->quiet = 1;
-        ret = kalign_run(msa, 1, KALIGN_TYPE_UNDEFINED, -1.0f, -1.0f, -1.0f, KALIGN_REFINE_NONE, 0);
+        struct kalign_run_config cfg = kalign_run_config_defaults();
+        ret = kalign_align_full(msa, &cfg, 1, NULL, 1);
         if (ret != 0) { fprintf(stderr, "  align failed iter %d\n", i); kalign_free_msa(msa); return 1; }
         kalign_free_msa(msa);
     }
@@ -112,10 +99,9 @@ static int test_realign(const char* input, int n)
         int ret = kalign_read_input((char*)input, &msa, 1);
         if (ret != 0 || !msa) return 1;
         msa->quiet = 1;
-        ret = kalign_run_realign(msa, 1, KALIGN_TYPE_UNDEFINED,
-                                 -1.0f, -1.0f, -1.0f,
-                                 KALIGN_REFINE_NONE, 0,
-                                 0.0f, -1.0f, 1, -1.0f, 0, 2.0f);
+        struct kalign_run_config cfg = kalign_run_config_defaults();
+        cfg.realign = 1;
+        ret = kalign_align_full(msa, &cfg, 1, NULL, 1);
         if (ret != 0) { kalign_free_msa(msa); return 1; }
         kalign_free_msa(msa);
     }
@@ -130,8 +116,9 @@ static int test_refine(const char* input, int n)
         int ret = kalign_read_input((char*)input, &msa, 1);
         if (ret != 0 || !msa) return 1;
         msa->quiet = 1;
-        ret = kalign_run(msa, 1, KALIGN_TYPE_UNDEFINED, -1.0f, -1.0f, -1.0f,
-                         KALIGN_REFINE_CONFIDENT, 0);
+        struct kalign_run_config cfg = kalign_run_config_defaults();
+        cfg.refine = KALIGN_REFINE_CONFIDENT;
+        ret = kalign_align_full(msa, &cfg, 1, NULL, 1);
         if (ret != 0) { kalign_free_msa(msa); return 1; }
         kalign_free_msa(msa);
     }
@@ -184,11 +171,14 @@ static int test_ensemble(const char* input, int n)
         int ret = kalign_read_input((char*)input, &msa, 1);
         if (ret != 0 || !msa) return 1;
         msa->quiet = 1;
-        ret = kalign_ensemble(msa, 1, KALIGN_TYPE_UNDEFINED,
-                              3, -1.0f, -1.0f, -1.0f,
-                              42, 0, NULL,
-                              KALIGN_REFINE_NONE, 0.0f, -1.0f,
-                              0, -1.0f, 0, 2.0f);
+        struct kalign_run_config runs[3];
+        for (int k = 0; k < 3; k++) {
+            runs[k] = kalign_run_config_defaults();
+            runs[k].tree_seed = 42 + (uint64_t)k;
+            runs[k].tree_noise = (k > 0) ? 0.2f : 0.0f;
+        }
+        struct kalign_ensemble_config ens = kalign_ensemble_config_defaults();
+        ret = kalign_align_full(msa, runs, 3, &ens, 1);
         if (ret != 0) { kalign_free_msa(msa); return 1; }
         kalign_free_msa(msa);
     }
@@ -204,8 +194,8 @@ static int test_benchmark_loop(const char* input, const char* ref_file, int n)
         int ret = kalign_read_input((char*)input, &msa, 1);
         if (ret != 0 || !msa) return 1;
         msa->quiet = 1;
-        ret = kalign_run(msa, 1, KALIGN_TYPE_UNDEFINED, -1.0f, -1.0f, -1.0f,
-                         KALIGN_REFINE_NONE, 0);
+        struct kalign_run_config cfg = kalign_run_config_defaults();
+        ret = kalign_align_full(msa, &cfg, 1, NULL, 1);
         if (ret != 0) { kalign_free_msa(msa); return 1; }
         ret = kalign_write_msa(msa, tmpfile, "fasta");
         kalign_free_msa(msa);
@@ -247,11 +237,10 @@ static int test_consistency(const char* input, int n)
         int ret = kalign_read_input((char*)input, &msa, 1);
         if (ret != 0 || !msa) return 1;
         msa->quiet = 1;
-        ret = kalign_run_seeded(msa, 1, KALIGN_TYPE_UNDEFINED,
-                                -1.0f, -1.0f, -1.0f,
-                                KALIGN_REFINE_NONE, 0,
-                                0, 0.0f, 0.0f, -1.0f, -1.0f,
-                                3, 2.0f);
+        struct kalign_run_config cfg = kalign_run_config_defaults();
+        cfg.consistency_anchors = 3;
+        cfg.consistency_weight = 2.0f;
+        ret = kalign_align_full(msa, &cfg, 1, NULL, 1);
         if (ret != 0) { kalign_free_msa(msa); return 1; }
         kalign_free_msa(msa);
     }
@@ -266,11 +255,16 @@ static int test_ensemble_realign(const char* input, int n)
         int ret = kalign_read_input((char*)input, &msa, 1);
         if (ret != 0 || !msa) return 1;
         msa->quiet = 1;
-        ret = kalign_ensemble(msa, 1, KALIGN_TYPE_UNDEFINED,
-                              3, -1.0f, -1.0f, -1.0f,
-                              42, 0, NULL,
-                              KALIGN_REFINE_CONFIDENT, 0.0f, -1.0f,
-                              1, -1.0f, 0, 2.0f);
+        struct kalign_run_config runs[3];
+        for (int k = 0; k < 3; k++) {
+            runs[k] = kalign_run_config_defaults();
+            runs[k].realign = 1;
+            runs[k].refine = KALIGN_REFINE_CONFIDENT;
+            runs[k].tree_seed = 42 + (uint64_t)k;
+            runs[k].tree_noise = (k > 0) ? 0.2f : 0.0f;
+        }
+        struct kalign_ensemble_config ens = kalign_ensemble_config_defaults();
+        ret = kalign_align_full(msa, runs, 3, &ens, 1);
         if (ret != 0) { kalign_free_msa(msa); return 1; }
         kalign_free_msa(msa);
     }
@@ -285,11 +279,18 @@ static int test_ensemble_vsm_sw(const char* input, int n)
         int ret = kalign_read_input((char*)input, &msa, 1);
         if (ret != 0 || !msa) return 1;
         msa->quiet = 1;
-        ret = kalign_ensemble(msa, 1, KALIGN_TYPE_UNDEFINED,
-                              3, -1.0f, -1.0f, -1.0f,
-                              42, 0, NULL,
-                              KALIGN_REFINE_CONFIDENT, 0.0f, 2.0f,
-                              1, 1.0f, 0, 2.0f);
+        struct kalign_run_config runs[3];
+        for (int k = 0; k < 3; k++) {
+            runs[k] = kalign_run_config_defaults();
+            runs[k].vsm_amax = 2.0f;
+            runs[k].seq_weights = 1.0f;
+            runs[k].realign = 1;
+            runs[k].refine = KALIGN_REFINE_CONFIDENT;
+            runs[k].tree_seed = 42 + (uint64_t)k;
+            runs[k].tree_noise = (k > 0) ? 0.2f : 0.0f;
+        }
+        struct kalign_ensemble_config ens = kalign_ensemble_config_defaults();
+        ret = kalign_align_full(msa, runs, 3, &ens, 1);
         if (ret != 0) { kalign_free_msa(msa); return 1; }
         kalign_free_msa(msa);
     }
@@ -304,8 +305,9 @@ static int test_inline_refine(const char* input, int n)
         int ret = kalign_read_input((char*)input, &msa, 1);
         if (ret != 0 || !msa) return 1;
         msa->quiet = 1;
-        ret = kalign_run(msa, 1, KALIGN_TYPE_UNDEFINED, -1.0f, -1.0f, -1.0f,
-                         KALIGN_REFINE_INLINE, 0);
+        struct kalign_run_config cfg = kalign_run_config_defaults();
+        cfg.refine = KALIGN_REFINE_INLINE;
+        ret = kalign_align_full(msa, &cfg, 1, NULL, 1);
         if (ret != 0) { kalign_free_msa(msa); return 1; }
         kalign_free_msa(msa);
     }
@@ -330,11 +332,12 @@ static int test_param_sweep(const char* input, int n)
         int ret = kalign_read_input((char*)input, &msa, 1);
         if (ret != 0 || !msa) return 1;
         msa->quiet = 1;
-        ret = kalign_run_seeded(msa, 1, KALIGN_TYPE_UNDEFINED,
-                                -1.0f, -1.0f, -1.0f,
-                                KALIGN_REFINE_NONE, 0,
-                                0, 0.0f, 0.0f, vsm, sw,
-                                cons, 2.0f);
+        struct kalign_run_config cfg = kalign_run_config_defaults();
+        cfg.vsm_amax = vsm;
+        cfg.seq_weights = sw;
+        cfg.consistency_anchors = cons;
+        cfg.consistency_weight = 2.0f;
+        ret = kalign_align_full(msa, &cfg, 1, NULL, 1);
         if (ret != 0) { kalign_free_msa(msa); return 1; }
         kalign_free_msa(msa);
     }

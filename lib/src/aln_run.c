@@ -58,6 +58,21 @@ static void recursive_aln_task(void *arg)
         struct recursive_aln_arg *a = (struct recursive_aln_arg *)arg;
         recursive_aln(a->msa, a->t, a->ap, a->active, a->c);
 }
+
+struct recursive_aln_inline_arg {
+        struct msa *msa;
+        struct aln_tasks *t;
+        struct aln_param *ap;
+        uint8_t *active;
+        int c;
+        int n_trials;
+};
+
+static void recursive_aln_inline_task(void *arg)
+{
+        struct recursive_aln_inline_arg *a = (struct recursive_aln_inline_arg *)arg;
+        recursive_aln_inline(a->msa, a->t, a->ap, a->active, a->c, a->n_trials);
+}
 #endif
 
 int create_msa_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
@@ -510,9 +525,20 @@ int create_msa_tree_inline_refine(struct msa* msa, struct aln_param* ap,
                 active[i] = 0;
         }
 
-        /* Inline refine is sequential — multi-trial per edge isn't thread-safe */
-        msa->run_parallel = 0;
+        /* Tree-level fork-join is safe (sibling edges are independent).
+           Multi-trial loop within each edge stays serial.
+           Hirschberg fwd/bwd parallelism enabled via run_parallel. */
+        msa->run_parallel = 1;
+        if(ap->nthreads == 1){
+                msa->run_parallel = 0;
+        }
 
+#if !defined(USE_THREADPOOL)
+#ifdef HAVE_OPENMP
+#pragma omp parallel
+#pragma omp single nowait
+#endif
+#endif
         recursive_aln_inline(msa, t, ap, active, t->n_tasks - 1, n_trials);
 
         MFREE(active);
@@ -535,17 +561,46 @@ void recursive_aln_inline(struct msa* msa, struct aln_tasks* t,
         a = local_t->a - msa->numseq;
         b = local_t->b - msa->numseq;
 
+        /* Fork-join: sibling subtrees are independent — same pattern as recursive_aln */
+#ifdef USE_THREADPOOL
+        {
+                struct recursive_aln_inline_arg arg_a = { msa, t, ap, active, a, n_trials };
+                struct recursive_aln_inline_arg arg_b = { msa, t, ap, active, b, n_trials };
+                tp_group_t *g = tp_group_create(ap->pool);
+                if(!active[local_t->a] && local_t->a >= msa->numseq)
+                        tp_group_submit(g, recursive_aln_inline_task, &arg_a);
+                if(!active[local_t->b] && local_t->b >= msa->numseq)
+                        tp_group_submit(g, recursive_aln_inline_task, &arg_b);
+                tp_group_wait(g);
+                tp_group_destroy(g);
+        }
+#else
         if(!active[local_t->a] && local_t->a >= msa->numseq){
+#ifdef HAVE_OPENMP
+#pragma omp task shared(msa,t,ap,active) firstprivate(a,n_trials)
+#endif
                 recursive_aln_inline(msa, t, ap, active, a, n_trials);
         }
         if(!active[local_t->b] && local_t->b >= msa->numseq){
+#ifdef HAVE_OPENMP
+#pragma omp task shared(msa,t,ap,active) firstprivate(b,n_trials)
+#endif
                 recursive_aln_inline(msa, t, ap, active, b, n_trials);
         }
+#ifdef HAVE_OPENMP
+#pragma omp taskwait
+#endif
+#endif
 
+        /* After children complete: align this edge (multi-trial stays serial) */
         struct aln_mem* ml = NULL;
         alloc_aln_mem(&ml, 256);
         ml->ap = ap;
         ml->mode = ALN_MODE_FULL;
+        ml->run_parallel = msa->run_parallel;
+#ifdef USE_THREADPOOL
+        ml->pool = ap->pool;
+#endif
 
         do_align_inline_refine(msa, t, ml, c, n_trials);
 

@@ -6,6 +6,10 @@
 #include "msa_alloc.h"
 #include "poar.h"
 
+#ifdef USE_THREADPOOL
+#include "threadpool/threadpool.h"
+#endif
+
 #define CONSENSUS_MSA_IMPORT
 #include "consensus_msa.h"
 
@@ -369,10 +373,72 @@ ERROR:
         return FAIL;
 }
 
+#ifdef USE_THREADPOOL
+struct cand_count_ctx {
+        struct poar_table* table;
+        int numseq;
+        int min_support;
+        int* row_counts;
+};
+
+static void cand_count_chunk(int start, int end, void* arg)
+{
+        struct cand_count_ctx* c = (struct cand_count_ctx*)arg;
+        for(int i = start; i < end; i++){
+                int count = 0;
+                for(int j = i + 1; j < c->numseq; j++){
+                        int pidx = pair_index(i, j, c->numseq);
+                        struct poar_pair* pp = c->table->pairs[pidx];
+                        for(int e = 0; e < pp->n_entries; e++){
+                                if(popcount32(pp->entries[e].support) >= c->min_support){
+                                        count++;
+                                }
+                        }
+                }
+                c->row_counts[i] = count;
+        }
+}
+
+struct cand_fill_ctx {
+        struct poar_table* table;
+        int numseq;
+        int min_support;
+        int* seq_offsets;
+        int* row_offsets;
+        struct merge_candidate* candidates;
+};
+
+static void cand_fill_chunk(int start, int end, void* arg)
+{
+        struct cand_fill_ctx* c = (struct cand_fill_ctx*)arg;
+        for(int i = start; i < end; i++){
+                int pos = c->row_offsets[i];
+                for(int j = i + 1; j < c->numseq; j++){
+                        int pidx = pair_index(i, j, c->numseq);
+                        struct poar_pair* pp = c->table->pairs[pidx];
+                        for(int e = 0; e < pp->n_entries; e++){
+                                int support = popcount32(pp->entries[e].support);
+                                if(support >= c->min_support){
+                                        uint32_t key = pp->entries[e].key;
+                                        c->candidates[pos].elem_i = c->seq_offsets[i] + (int)(key >> 20);
+                                        c->candidates[pos].elem_j = c->seq_offsets[j] + (int)(key & 0xFFFFF);
+                                        c->candidates[pos].support = support;
+                                        pos++;
+                                }
+                        }
+                }
+        }
+}
+#endif
+
 int build_consensus(struct poar_table* table,
                     int* seq_lengths, int numseq,
                     int min_support,
-                    struct msa* out_msa)
+                    struct msa* out_msa
+#ifdef USE_THREADPOOL
+                    , threadpool_t* pool
+#endif
+                    )
 {
         struct uf_set* uf = NULL;
         int* seq_offsets = NULL;
@@ -409,28 +475,64 @@ int build_consensus(struct poar_table* table,
            in descending support order so higher-confidence pairs merge first */
         {
                 int n_candidates = 0;
-                int alloc_candidates = 1024;
                 struct merge_candidate *candidates = NULL;
 
-                MMALLOC(candidates, sizeof(*candidates) * alloc_candidates);
+#ifdef USE_THREADPOOL
+                if(pool != NULL && numseq > 16){
+                        /* Two-pass parallel: count then fill */
+                        int* row_counts = NULL;
+                        int* row_offsets = NULL;
+                        MMALLOC(row_counts, sizeof(int) * numseq);
+                        MMALLOC(row_offsets, sizeof(int) * numseq);
 
-                for(i = 0; i < numseq - 1; i++){
-                        for(j = i + 1; j < numseq; j++){
-                                int pidx = pair_index(i, j, numseq);
-                                struct poar_pair* pp = table->pairs[pidx];
+                        struct cand_count_ctx cc = { table, numseq, min_support, row_counts };
+                        tp_parallel_for(pool, 0, numseq - 1, cand_count_chunk, &cc);
+                        row_counts[numseq - 1] = 0;
 
-                                for(int e = 0; e < pp->n_entries; e++){
-                                        int support = popcount32(pp->entries[e].support);
-                                        if(support >= min_support){
-                                                if(n_candidates >= alloc_candidates){
-                                                        alloc_candidates *= 2;
-                                                        MREALLOC(candidates, sizeof(*candidates) * alloc_candidates);
+                        /* Prefix sum for offsets */
+                        row_offsets[0] = 0;
+                        for(i = 1; i < numseq; i++){
+                                row_offsets[i] = row_offsets[i-1] + row_counts[i-1];
+                        }
+                        n_candidates = row_offsets[numseq-1] + row_counts[numseq-1];
+
+                        if(n_candidates > 0){
+                                MMALLOC(candidates, sizeof(*candidates) * n_candidates);
+                                struct cand_fill_ctx cf = {
+                                        table, numseq, min_support,
+                                        seq_offsets, row_offsets, candidates
+                                };
+                                tp_parallel_for(pool, 0, numseq - 1, cand_fill_chunk, &cf);
+                        }else{
+                                MMALLOC(candidates, sizeof(*candidates) * 1);
+                        }
+
+                        MFREE(row_counts);
+                        MFREE(row_offsets);
+                }else
+#endif
+                {
+                        int alloc_candidates = 1024;
+                        MMALLOC(candidates, sizeof(*candidates) * alloc_candidates);
+
+                        for(i = 0; i < numseq - 1; i++){
+                                for(j = i + 1; j < numseq; j++){
+                                        int pidx = pair_index(i, j, numseq);
+                                        struct poar_pair* pp = table->pairs[pidx];
+
+                                        for(int e = 0; e < pp->n_entries; e++){
+                                                int support = popcount32(pp->entries[e].support);
+                                                if(support >= min_support){
+                                                        if(n_candidates >= alloc_candidates){
+                                                                alloc_candidates *= 2;
+                                                                MREALLOC(candidates, sizeof(*candidates) * alloc_candidates);
+                                                        }
+                                                        uint32_t key = pp->entries[e].key;
+                                                        candidates[n_candidates].elem_i = seq_offsets[i] + (int)(key >> 20);
+                                                        candidates[n_candidates].elem_j = seq_offsets[j] + (int)(key & 0xFFFFF);
+                                                        candidates[n_candidates].support = support;
+                                                        n_candidates++;
                                                 }
-                                                uint32_t key = pp->entries[e].key;
-                                                candidates[n_candidates].elem_i = seq_offsets[i] + (int)(key >> 20);
-                                                candidates[n_candidates].elem_j = seq_offsets[j] + (int)(key & 0xFFFFF);
-                                                candidates[n_candidates].support = support;
-                                                n_candidates++;
                                         }
                                 }
                         }
@@ -561,8 +663,69 @@ ERROR:
    - confidence = sum(supports) / (n_residue_pairs * n_alignments)
    Gaps get confidence 0.0.
    Column confidence = mean of residue confidences in that column. */
+#ifdef USE_THREADPOOL
+struct confidence_ctx {
+        struct poar_table* table;
+        struct pos_matrix* pm;
+        struct msa* msa;
+        int numseq;
+        int alnlen;
+        int n_alignments;
+};
+
+static void confidence_chunk(int start, int end, void* arg)
+{
+        struct confidence_ctx* c = (struct confidence_ctx*)arg;
+        int j, col;
+        for(int i = start; i < end; i++){
+                for(col = 0; col < c->alnlen; col++){
+                        int ri = c->pm->col_to_res[i][col];
+                        if(ri < 0){
+                                c->msa->sequences[i]->confidence[col] = 0.0f;
+                                continue;
+                        }
+                        double sum_support = 0.0;
+                        int n_pairs = 0;
+                        for(j = 0; j < c->numseq; j++){
+                                if(j == i) continue;
+                                int rj = c->pm->col_to_res[j][col];
+                                if(rj < 0) continue;
+                                int si = i < j ? i : j;
+                                int sj = i < j ? j : i;
+                                int pidx = pair_index(si, sj, c->numseq);
+                                struct poar_pair* pp = c->table->pairs[pidx];
+                                int orig_i = i < j ? ri : rj;
+                                int orig_j = i < j ? rj : ri;
+                                uint32_t key = ((uint32_t)orig_i << 20) | (uint32_t)orig_j;
+                                int lo = 0, hi = pp->n_entries, support = 0;
+                                while(lo < hi){
+                                        int mid = lo + (hi - lo) / 2;
+                                        if(pp->entries[mid].key < key) lo = mid + 1;
+                                        else if(pp->entries[mid].key == key){
+                                                support = popcount32(pp->entries[mid].support);
+                                                break;
+                                        }else hi = mid;
+                                }
+                                sum_support += (double)support;
+                                n_pairs++;
+                        }
+                        if(n_pairs > 0 && c->n_alignments > 0){
+                                c->msa->sequences[i]->confidence[col] =
+                                        (float)(sum_support / ((double)n_pairs * (double)c->n_alignments));
+                        }else{
+                                c->msa->sequences[i]->confidence[col] = 0.0f;
+                        }
+                }
+        }
+}
+#endif
+
 int compute_residue_confidence(struct poar_table* table,
-                               struct msa* aligned_msa)
+                               struct msa* aligned_msa
+#ifdef USE_THREADPOOL
+                               , threadpool_t* pool
+#endif
+                               )
 {
         struct pos_matrix* pm = NULL;
         int numseq = aligned_msa->numseq;
@@ -603,6 +766,15 @@ int compute_residue_confidence(struct poar_table* table,
         MMALLOC(aligned_msa->col_confidence, sizeof(float) * alnlen);
 
         /* Compute per-residue confidence */
+#ifdef USE_THREADPOOL
+        if(pool != NULL && numseq > 16){
+                struct confidence_ctx ctx = {
+                        table, pm, aligned_msa, numseq, alnlen, n_alignments
+                };
+                tp_parallel_for(pool, 0, numseq, confidence_chunk, &ctx);
+        }else
+#endif
+        {
         for(i = 0; i < numseq; i++){
                 for(col = 0; col < alnlen; col++){
                         int ri = pm->col_to_res[i][col];
@@ -658,6 +830,7 @@ int compute_residue_confidence(struct poar_table* table,
                         }
                 }
         }
+        } /* end serial fallback */
 
         /* Compute per-column confidence: mean over non-gap residues */
         for(col = 0; col < alnlen; col++){
@@ -691,45 +864,108 @@ ERROR:
    agreeing. Summing these gives expected correct pairs.
    This rewards both high recall (many pairs) and high precision
    (pairs with broad agreement). */
+#ifdef USE_THREADPOOL
+struct score_poar_ctx {
+        struct poar_table* table;
+        struct pos_matrix* pm;
+        int numseq;
+        int alnlen;
+        double denom;
+        double* row_scores;
+};
+
+static void score_poar_chunk(int start, int end, void* arg)
+{
+        struct score_poar_ctx* c = (struct score_poar_ctx*)arg;
+        int j, col;
+        for(int i = start; i < end; i++){
+                double row_sum = 0.0;
+                for(j = i + 1; j < c->numseq; j++){
+                        int pidx = pair_index(i, j, c->numseq);
+                        struct poar_pair* pp = c->table->pairs[pidx];
+                        for(col = 0; col < c->alnlen; col++){
+                                int ri = c->pm->col_to_res[i][col];
+                                int rj = c->pm->col_to_res[j][col];
+                                if(ri >= 0 && rj >= 0){
+                                        uint32_t key = ((uint32_t)ri << 20) | (uint32_t)rj;
+                                        int lo = 0, hi = pp->n_entries, support = 0;
+                                        while(lo < hi){
+                                                int mid = lo + (hi - lo) / 2;
+                                                if(pp->entries[mid].key < key) lo = mid + 1;
+                                                else if(pp->entries[mid].key == key){
+                                                        support = popcount32(pp->entries[mid].support);
+                                                        break;
+                                                }else hi = mid;
+                                        }
+                                        row_sum += (double)(support - 1) / c->denom;
+                                }
+                        }
+                }
+                c->row_scores[i] = row_sum;
+        }
+}
+#endif
+
 int score_alignment_poar(struct poar_table* table,
                          struct pos_matrix* pm,
                          int numseq,
                          int n_alignments,
-                         double* out_score)
+                         double* out_score
+#ifdef USE_THREADPOOL
+                         , threadpool_t* pool
+#endif
+                         )
 {
         double total_score = 0.0;
-        int i, j, col;
-        int alnlen = pm->alnlen;
+        int i;
         double denom = (n_alignments > 1) ? (double)(n_alignments - 1) : 1.0;
 
-        for(i = 0; i < numseq - 1; i++){
-                for(j = i + 1; j < numseq; j++){
-                        int pidx = pair_index(i, j, numseq);
-                        struct poar_pair* pp = table->pairs[pidx];
+#ifdef USE_THREADPOOL
+        if(pool != NULL && numseq > 16){
+                double* row_scores = NULL;
+                MMALLOC(row_scores, sizeof(double) * numseq);
+                for(i = 0; i < numseq; i++) row_scores[i] = 0.0;
 
-                        for(col = 0; col < alnlen; col++){
-                                int ri = pm->col_to_res[i][col];
-                                int rj = pm->col_to_res[j][col];
-                                if(ri >= 0 && rj >= 0){
-                                        uint32_t key = ((uint32_t)ri << 20) | (uint32_t)rj;
+                struct score_poar_ctx ctx = {
+                        table, pm, numseq, pm->alnlen, denom, row_scores
+                };
+                tp_parallel_for(pool, 0, numseq - 1, score_poar_chunk, &ctx);
 
-                                        /* Binary search in sorted entries */
-                                        int lo = 0;
-                                        int hi = pp->n_entries;
-                                        int support = 0;
-                                        while(lo < hi){
-                                                int mid = lo + (hi - lo) / 2;
-                                                if(pp->entries[mid].key < key){
-                                                        lo = mid + 1;
-                                                }else if(pp->entries[mid].key == key){
-                                                        support = popcount32(pp->entries[mid].support);
-                                                        break;
-                                                }else{
-                                                        hi = mid;
+                for(i = 0; i < numseq - 1; i++){
+                        total_score += row_scores[i];
+                }
+                MFREE(row_scores);
+
+                *out_score = total_score;
+                return OK;
+        ERROR:
+                if(row_scores) MFREE(row_scores);
+                return FAIL;
+        }
+#endif
+        {
+                int j, col;
+                int alnlen = pm->alnlen;
+                for(i = 0; i < numseq - 1; i++){
+                        for(j = i + 1; j < numseq; j++){
+                                int pidx = pair_index(i, j, numseq);
+                                struct poar_pair* pp = table->pairs[pidx];
+                                for(col = 0; col < alnlen; col++){
+                                        int ri = pm->col_to_res[i][col];
+                                        int rj = pm->col_to_res[j][col];
+                                        if(ri >= 0 && rj >= 0){
+                                                uint32_t key = ((uint32_t)ri << 20) | (uint32_t)rj;
+                                                int lo = 0, hi = pp->n_entries, support = 0;
+                                                while(lo < hi){
+                                                        int mid = lo + (hi - lo) / 2;
+                                                        if(pp->entries[mid].key < key) lo = mid + 1;
+                                                        else if(pp->entries[mid].key == key){
+                                                                support = popcount32(pp->entries[mid].support);
+                                                                break;
+                                                        }else hi = mid;
                                                 }
+                                                total_score += (double)(support - 1) / denom;
                                         }
-                                        /* support includes self; subtract 1 for other-agreement */
-                                        total_score += (double)(support - 1) / denom;
                                 }
                         }
                 }

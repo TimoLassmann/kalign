@@ -63,8 +63,11 @@ int test_consistency(int num_tests, int numseq,int dna,int seed)
                 msa_cpy(&m2, m);
                 msa_shuffle_seq(m, rng);
                 msa_shuffle_seq(m2, rng);
-                kalign_run(m, t1, KALIGN_TYPE_UNDEFINED,0.0,0.0,0.0, 0, 0);
-                kalign_run(m2, t2, KALIGN_TYPE_UNDEFINED,0.0,0.0,0.0, 0, 0);
+                {
+                        struct kalign_run_config cfg = kalign_run_config_defaults();
+                        kalign_align_full(m, &cfg, 1, NULL, t1);
+                        kalign_align_full(m2, &cfg, 1, NULL, t2);
+                }
 
                 kalign_msa_compare(m, m2, &score);
                 if(score != 100.0f){

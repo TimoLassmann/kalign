@@ -15,8 +15,11 @@ int main(int argc, char *argv[])
                 fprintf(stdout,"reading from %s\n", argv[i]);
                 kalign_read_input(argv[i], &msa,1);
         }
-        /* Align seqences */
-        kalign_run(msa,1 , -1, -1, -1 , -1, 0, 0);
+        /* Align sequences */
+        {
+                struct kalign_run_config cfg = kalign_run_config_defaults();
+                kalign_align_full(msa, &cfg, 1, NULL, 1);
+        }
         /* write alignment in clustal format */
         kalign_write_msa(msa, "test.clu", "clu");
         /* write alignment in aligned fasta format */

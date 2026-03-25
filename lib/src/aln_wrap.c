@@ -118,50 +118,34 @@ ERROR:
         return FAIL;
 }
 
-int kalign(char **seq, int *len, int numseq,int n_threads, int type, float gpo, float gpe, float tgpe, char ***aligned, int *out_aln_len)
-{
-        struct msa *msa = NULL;
-        RUN(kalign_arr_to_msa(seq, len,numseq, &msa));
+/* ======================================================================== */
+/* kalign_single_run — unified internal entry point for one alignment run.   */
+/*                                                                           */
+/* Handles the full pipeline: input check, sort, alphabet conversion, tree   */
+/* building, alignment, refinement, and optional realign iterations.          */
+/*                                                                           */
+/* The caller owns msa->pool (if USE_THREADPOOL).  This function does NOT    */
+/* create or destroy the threadpool — it reads msa->pool for parallel work.  */
+/* ======================================================================== */
 
-        msa->quiet = 1;
-        if(n_threads < 1){
-                n_threads = 1;
-        }
-        RUN(kalign_run(msa,n_threads, type,  gpo, gpe, tgpe, KALIGN_REFINE_NONE, 0));
-
-        RUN(kalign_msa_to_arr(msa, aligned, out_aln_len));
-
-        kalign_free_msa(msa);
-
-        return OK;
-ERROR:
-        if(msa){
-                kalign_free_msa(msa);
-        }
-        return FAIL;
-}
-
-int kalign_run_seeded(struct msa *msa, int n_threads, int type,
-                      float gpo, float gpe, float tgpe,
-                      int refine, int adaptive_budget,
-                      uint64_t tree_seed, float tree_noise,
-                      float dist_scale, float vsm_amax,
-                      float use_seq_weights,
-                      int consistency_anchors, float consistency_weight)
+int kalign_single_run(struct msa *msa,
+                      const struct kalign_run_config *cfg,
+                      int n_threads)
 {
         struct aln_tasks* tasks = NULL;
         struct aln_param* ap = NULL;
-        /* This also adds the ranks of the sequences !  */
+        int type;
+        int iter;
+
+        /* Input check (also sets ranks) */
         RUN(kalign_essential_input_check(msa, 0));
 
-        /* If already aligned unalign ! */
         if(msa->aligned != ALN_STATUS_UNALIGNED){
                 RUN(dealign_msa(msa));
         }
-        /* Make sure sequences are in order  */
         RUN(msa_sort_len_name(msa));
 
-        /* Convert into internal representation  */
+        /* Convert to reduced alphabet for tree building */
         if(msa->biotype == ALN_BIOTYPE_DNA){
                 msa->L = ALPHA_defDNA;
                 RUN(convert_msa_to_internal(msa, ALPHA_defDNA));
@@ -174,61 +158,49 @@ int kalign_run_seeded(struct msa *msa, int n_threads, int type,
 
         RUN(alloc_tasks(&tasks, msa->numseq));
 
-#ifdef USE_THREADPOOL
-        threadpool_t *pool = tp_create(n_threads);
-        msa->pool = pool;
-#elif defined(HAVE_OPENMP)
+#if !defined(USE_THREADPOOL) && defined(HAVE_OPENMP)
         omp_set_num_threads(n_threads);
 #endif
 
-        /* Build guide tree - noisy variant if seed != 0 */
-        if(tree_seed != 0 && tree_noise > 0.0f){
-                RUN(build_tree_kmeans_noisy(msa, &tasks, tree_seed, tree_noise));
+        /* Build guide tree — noisy variant for ensemble diversity */
+        if(cfg->tree_seed != 0 && cfg->tree_noise > 0.0f){
+                RUN(build_tree_kmeans_noisy(msa, &tasks, cfg->tree_seed, cfg->tree_noise));
         }else{
                 RUN(build_tree_kmeans(msa, &tasks));
         }
 
-        /* Convert to full alphabet after having converted to reduced alphabet for tree building above  */
+        /* Convert to full alphabet for alignment */
         if(msa->biotype == ALN_BIOTYPE_PROTEIN){
                 RUN(convert_msa_to_internal(msa, ALPHA_ambigiousPROTEIN));
         }
 
         /* Resolve auto matrix selection using BPM distances */
+        type = cfg->matrix;
         RUN(resolve_matrix_auto(msa, &type));
 
-        /* align  */
-        RUN(aln_param_init(&ap,
-                           msa->biotype,
-                           n_threads,
-                           type,
-                           gpo,
-                           gpe,
-                           tgpe));
+        /* Init alignment parameters from config */
+        RUN(aln_param_init(&ap, msa->biotype, n_threads, type,
+                           cfg->gpo, cfg->gpe, cfg->tgpe));
 #ifdef USE_THREADPOOL
-        ap->pool = pool;
+        ap->pool = msa->pool;
 #endif
 
-        ap->adaptive_budget = adaptive_budget;
-        if(use_seq_weights >= 0.0f){
-                ap->use_seq_weights = use_seq_weights;
-        }
-        if(dist_scale > 0.0f){
-                ap->dist_scale = dist_scale;
-        }
-        if(vsm_amax >= 0.0f){
-                ap->vsm_amax = vsm_amax;
-        }
+        /* Apply config overrides (config values are concrete, not sentinels) */
+        ap->adaptive_budget = cfg->adaptive_budget;
+        ap->use_seq_weights = cfg->seq_weights;
+        ap->dist_scale = cfg->dist_scale;
+        ap->vsm_amax = cfg->vsm_amax;
 
         if(ap->use_seq_weights > 0.0f){
                 RUN(compute_tree_weights(msa, tasks));
         }
 
         /* Build anchor consistency table if requested */
-        if(consistency_anchors > 0){
-                ap->consistency_anchors = consistency_anchors;
-                ap->consistency_weight = consistency_weight;
-                RUN(anchor_consistency_build(msa, ap, consistency_anchors,
-                                             consistency_weight,
+        if(cfg->consistency_anchors > 0){
+                ap->consistency_anchors = cfg->consistency_anchors;
+                ap->consistency_weight = cfg->consistency_weight;
+                RUN(anchor_consistency_build(msa, ap, cfg->consistency_anchors,
+                                             cfg->consistency_weight,
                                              (struct consistency_table**)&msa->consistency_table));
         }
 
@@ -238,315 +210,89 @@ int kalign_run_seeded(struct msa *msa, int n_threads, int type,
         }
         START_TIMER(t1);
 
-        if(refine == KALIGN_REFINE_INLINE){
+        /* Initial alignment */
+        if(cfg->refine == KALIGN_REFINE_INLINE){
                 RUN(create_msa_tree_inline_refine(msa, ap, tasks, 3));
         }else{
                 RUN(create_msa_tree(msa, ap, tasks));
         }
         msa->aligned = ALN_STATUS_ALIGNED;
 
-        /* Optional iterative refinement (two-pass approach) */
-        if(refine != KALIGN_REFINE_NONE && refine != KALIGN_REFINE_INLINE){
-                RUN(refine_alignment(msa, ap, tasks, refine));
-        }
-
-        /* Free consistency table AFTER refinement */
-        if(msa->consistency_table){
-                anchor_consistency_free((struct consistency_table*)msa->consistency_table);
-                msa->consistency_table = NULL;
-        }
-
-        RUN(finalise_alignment(msa));
-
-        RUN(msa_sort_rank(msa));
-
-        STOP_TIMER(t1);
-        if(!msa->quiet){
-                GET_TIMING(t1);
-        }
-        DESTROY_TIMER(t1);
-
-        aln_param_free(ap);
-        free_tasks(tasks);
-#ifdef USE_THREADPOOL
-        msa->pool = NULL;
-        tp_destroy(pool);
-#endif
-        return OK;
-ERROR:
-        if(msa->consistency_table){
-                anchor_consistency_free((struct consistency_table*)msa->consistency_table);
-                msa->consistency_table = NULL;
-        }
-        aln_param_free(ap);
-        free_tasks(tasks);
-#ifdef USE_THREADPOOL
-        msa->pool = NULL;
-        tp_destroy(pool);
-#endif
-        return FAIL;
-}
-
-int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, float tgpe, int refine, int adaptive_budget)
-{
-        return kalign_run_seeded(msa, n_threads, type, gpo, gpe, tgpe, refine, adaptive_budget, 0, 0.0f, 0.0f, -1.0f, -1.0f, 0, 2.0f);
-}
-
-int kalign_run_dist_scale(struct msa *msa, int n_threads, int type,
-                          float gpo, float gpe, float tgpe,
-                          int refine, int adaptive_budget,
-                          float dist_scale, float vsm_amax,
-                          float use_seq_weights)
-{
-        struct aln_tasks* tasks = NULL;
-        struct aln_param* ap = NULL;
-        RUN(kalign_essential_input_check(msa, 0));
-
-        if(msa->aligned != ALN_STATUS_UNALIGNED){
-                RUN(dealign_msa(msa));
-        }
-        RUN(msa_sort_len_name(msa));
-
-        if(msa->biotype == ALN_BIOTYPE_DNA){
-                msa->L = ALPHA_defDNA;
-                RUN(convert_msa_to_internal(msa, ALPHA_defDNA));
-        }else if(msa->biotype == ALN_BIOTYPE_PROTEIN){
-                msa->L = ALPHA_redPROTEIN;
-                RUN(convert_msa_to_internal(msa, ALPHA_redPROTEIN));
-        }else{
-                ERROR_MSG("Unable to determine what alphabet to use.");
-        }
-
-        RUN(alloc_tasks(&tasks, msa->numseq));
-
-#ifdef USE_THREADPOOL
-        threadpool_t *pool = tp_create(n_threads);
-        msa->pool = pool;
-#elif defined(HAVE_OPENMP)
-        omp_set_num_threads(n_threads);
-#endif
-
-        RUN(build_tree_kmeans(msa, &tasks));
-
-        if(msa->biotype == ALN_BIOTYPE_PROTEIN){
-                RUN(convert_msa_to_internal(msa, ALPHA_ambigiousPROTEIN));
-        }
-
-        RUN(resolve_matrix_auto(msa, &type));
-
-        RUN(aln_param_init(&ap,
-                           msa->biotype,
-                           n_threads,
-                           type,
-                           gpo,
-                           gpe,
-                           tgpe));
-#ifdef USE_THREADPOOL
-        ap->pool = pool;
-#endif
-
-        ap->adaptive_budget = adaptive_budget;
-        if(use_seq_weights >= 0.0f){
-                ap->use_seq_weights = use_seq_weights;
-        }
-        ap->dist_scale = dist_scale;
-        if(vsm_amax >= 0.0f){
-                ap->vsm_amax = vsm_amax;
-        }
-
-        if(ap->use_seq_weights > 0.0f){
-                RUN(compute_tree_weights(msa, tasks));
-        }
-
-        DECLARE_TIMER(t1);
-        if(!msa->quiet){
-                LOG_MSG("Aligning (dist_scale=%.2f, vsm_amax=%.2f)", dist_scale, vsm_amax);
-        }
-        START_TIMER(t1);
-
-        if(refine == KALIGN_REFINE_INLINE){
-                RUN(create_msa_tree_inline_refine(msa, ap, tasks, 3));
-        }else{
-                RUN(create_msa_tree(msa, ap, tasks));
-        }
-        msa->aligned = ALN_STATUS_ALIGNED;
-
-        if(refine != KALIGN_REFINE_NONE && refine != KALIGN_REFINE_INLINE){
-                RUN(refine_alignment(msa, ap, tasks, refine));
-        }
-
-        RUN(finalise_alignment(msa));
-        RUN(msa_sort_rank(msa));
-
-        STOP_TIMER(t1);
-        if(!msa->quiet){
-                GET_TIMING(t1);
-        }
-        DESTROY_TIMER(t1);
-
-        aln_param_free(ap);
-        free_tasks(tasks);
-#ifdef USE_THREADPOOL
-        msa->pool = NULL;
-        tp_destroy(pool);
-#endif
-        return OK;
-ERROR:
-        aln_param_free(ap);
-        free_tasks(tasks);
-#ifdef USE_THREADPOOL
-        msa->pool = NULL;
-        tp_destroy(pool);
-#endif
-        return FAIL;
-}
-
-int kalign_run_realign(struct msa *msa, int n_threads, int type,
-                       float gpo, float gpe, float tgpe,
-                       int refine, int adaptive_budget,
-                       float dist_scale, float vsm_amax,
-                       int realign_iterations,
-                       float use_seq_weights,
-                       int consistency_anchors, float consistency_weight)
-{
-        struct aln_tasks* tasks = NULL;
-        struct aln_param* ap = NULL;
-        int iter;
-
-        RUN(kalign_essential_input_check(msa, 0));
-
-        if(msa->aligned != ALN_STATUS_UNALIGNED){
-                RUN(dealign_msa(msa));
-        }
-        RUN(msa_sort_len_name(msa));
-
-        if(msa->biotype == ALN_BIOTYPE_DNA){
-                msa->L = ALPHA_defDNA;
-                RUN(convert_msa_to_internal(msa, ALPHA_defDNA));
-        }else if(msa->biotype == ALN_BIOTYPE_PROTEIN){
-                msa->L = ALPHA_redPROTEIN;
-                RUN(convert_msa_to_internal(msa, ALPHA_redPROTEIN));
-        }else{
-                ERROR_MSG("Unable to determine what alphabet to use.");
-        }
-
-        RUN(alloc_tasks(&tasks, msa->numseq));
-
-#ifdef USE_THREADPOOL
-        threadpool_t *pool = tp_create(n_threads);
-        msa->pool = pool;
-#elif defined(HAVE_OPENMP)
-        omp_set_num_threads(n_threads);
-#endif
-
-        /* Initial guide tree from BPM anchor distances */
-        RUN(build_tree_kmeans(msa, &tasks));
-
-        if(msa->biotype == ALN_BIOTYPE_PROTEIN){
-                RUN(convert_msa_to_internal(msa, ALPHA_ambigiousPROTEIN));
-        }
-
-        RUN(resolve_matrix_auto(msa, &type));
-
-        RUN(aln_param_init(&ap,
-                           msa->biotype,
-                           n_threads,
-                           type,
-                           gpo,
-                           gpe,
-                           tgpe));
-#ifdef USE_THREADPOOL
-        ap->pool = pool;
-#endif
-
-        ap->adaptive_budget = adaptive_budget;
-        if(use_seq_weights >= 0.0f){
-                ap->use_seq_weights = use_seq_weights;
-        }
-        ap->dist_scale = dist_scale;
-        if(vsm_amax >= 0.0f){
-                ap->vsm_amax = vsm_amax;
-        }
-
-        if(ap->use_seq_weights > 0.0f){
-                RUN(compute_tree_weights(msa, tasks));
-        }
-
-        /* Build anchor consistency table if requested */
-        if(consistency_anchors > 0){
-                ap->consistency_anchors = consistency_anchors;
-                ap->consistency_weight = consistency_weight;
-                RUN(anchor_consistency_build(msa, ap, consistency_anchors,
-                                             consistency_weight,
-                                             (struct consistency_table**)&msa->consistency_table));
-        }
-
-        DECLARE_TIMER(t1);
-        if(!msa->quiet){
-                LOG_MSG("Aligning (realign=%d, dist_scale=%.2f, vsm_amax=%.2f)",
-                        realign_iterations, dist_scale, vsm_amax);
-        }
-        START_TIMER(t1);
-
-        /* First alignment with BPM-based guide tree */
-        if(refine == KALIGN_REFINE_INLINE){
-                RUN(create_msa_tree_inline_refine(msa, ap, tasks, 3));
-        }else{
-                RUN(create_msa_tree(msa, ap, tasks));
-        }
-        msa->aligned = ALN_STATUS_ALIGNED;
-
-        /* Iterative realignment: align -> compute distances -> new tree -> re-align */
-        for(iter = 0; iter < realign_iterations; iter++){
+        /* Iterative realignment: align → N×K anchor distances → bisecting
+           k-means tree → dealign → re-encode → re-align.
+           Sequences stay aligned until after tree build so the identity
+           distance callback can read gap characters from seq->seq. */
+        for(iter = 0; iter < cfg->realign; iter++){
                 float** dm = NULL;
+                int* realign_anchors = NULL;
+                int n_realign_anchors = 0;
                 int si;
 
-                /* Finalize to get character sequences with gap characters */
                 RUN(finalise_alignment(msa));
 
-                /* Compute NxN pairwise identity distances from alignment */
-                RUN(compute_aln_pairwise_dist(msa, &dm));
+                /* Select K diverse anchors and compute N×K distances
+                   (sequences still aligned — gap chars in seq->seq). */
+                RUN(pick_anchor_from_alignment(msa, REALIGN_NUM_ANCHORS,
+                                               &realign_anchors,
+                                               &n_realign_anchors));
+                RUN(compute_aln_anchor_dist(msa, realign_anchors,
+                                             n_realign_anchors, &dm));
+                MFREE(realign_anchors);
 
-                /* Remove gaps, reset alignment status.
-                   dealign_msa zeroes the gaps[] array but does NOT strip '-'
-                   from seq->seq (which was linearized by finalise_alignment).
-                   We must rebuild seq->seq without gap characters. */
-                RUN(dealign_msa(msa));
-                for(si = 0; si < msa->numseq; si++){
-                        struct msa_seq* seq = msa->sequences[si];
-                        int r, w = 0;
-                        for(r = 0; seq->seq[r] != '\0'; r++){
-                                if(seq->seq[r] != '-'){
-                                        seq->seq[w++] = seq->seq[r];
-                                }
-                        }
-                        seq->seq[w] = '\0';
-                        seq->len = w;
-                }
-
-                /* Re-encode internal representation for alignment */
-                if(msa->biotype == ALN_BIOTYPE_DNA){
-                        RUN(convert_msa_to_internal(msa, ALPHA_defDNA));
-                }else if(msa->biotype == ALN_BIOTYPE_PROTEIN){
-                        RUN(convert_msa_to_internal(msa, ALPHA_ambigiousPROTEIN));
-                }
-
-                /* Reset profile tracking */
-                RUN(set_sip_nsip(msa));
-
-                /* Rebuild guide tree from alignment-derived distances */
+                /* Rebuild guide tree via bisecting k-means.
+                   The leaf-cluster callback uses identity distances from
+                   the aligned sequences (seq->seq still has gap chars). */
                 free_tasks(tasks);
                 tasks = NULL;
                 RUN(alloc_tasks(&tasks, msa->numseq));
-                RUN(build_tree_from_pairwise(msa, &tasks, dm));
-                free_aln_dm(dm, msa->numseq);
+                RUN(build_tree_kmeans_from_dm(msa, &tasks, dm,
+                                              n_realign_anchors,
+                                              aln_identity_pair_dist));
+
+                /* Free N×K matrix (AVX2-aware) */
+                {
+                        int fi;
+                        for(fi = 0; fi < msa->numseq; fi++){
+                                if(dm[fi]){
+#ifdef HAVE_AVX2
+                                        _mm_free(dm[fi]);
+#else
+                                        MFREE(dm[fi]);
+#endif
+                                }
+                        }
+                        MFREE(dm);
+                }
+
+                /* NOW dealign: strip gap characters from seq->seq. */
+                RUN(dealign_msa(msa));
+                for(si = 0; si < msa->numseq; si++){
+                        struct msa_seq* seq = msa->sequences[si];
+                        int r, w = 0;
+                        for(r = 0; seq->seq[r] != '\0'; r++){
+                                if(seq->seq[r] != '-'){
+                                        seq->seq[w++] = seq->seq[r];
+                                }
+                        }
+                        seq->seq[w] = '\0';
+                        seq->len = w;
+                }
+
+                /* Re-encode for alignment */
+                if(msa->biotype == ALN_BIOTYPE_DNA){
+                        RUN(convert_msa_to_internal(msa, ALPHA_defDNA));
+                }else if(msa->biotype == ALN_BIOTYPE_PROTEIN){
+                        RUN(convert_msa_to_internal(msa, ALPHA_ambigiousPROTEIN));
+                }
+
+                RUN(set_sip_nsip(msa));
 
                 if(ap->use_seq_weights > 0.0f){
                         RUN(compute_tree_weights(msa, tasks));
                 }
 
                 /* Re-align with new tree */
-                if(refine == KALIGN_REFINE_INLINE){
+                if(cfg->refine == KALIGN_REFINE_INLINE){
                         RUN(create_msa_tree_inline_refine(msa, ap, tasks, 3));
                 }else{
                         RUN(create_msa_tree(msa, ap, tasks));
@@ -554,9 +300,9 @@ int kalign_run_realign(struct msa *msa, int n_threads, int type,
                 msa->aligned = ALN_STATUS_ALIGNED;
         }
 
-        /* Refinement after all realign iterations (two-pass, skip for inline) */
-        if(refine != KALIGN_REFINE_NONE && refine != KALIGN_REFINE_INLINE){
-                RUN(refine_alignment(msa, ap, tasks, refine));
+        /* Two-pass refinement after the final alignment pass */
+        if(cfg->refine != KALIGN_REFINE_NONE && cfg->refine != KALIGN_REFINE_INLINE){
+                RUN(refine_alignment(msa, ap, tasks, cfg->refine));
         }
 
         /* Free consistency table AFTER refinement */
@@ -576,169 +322,43 @@ int kalign_run_realign(struct msa *msa, int n_threads, int type,
 
         aln_param_free(ap);
         free_tasks(tasks);
-#ifdef USE_THREADPOOL
-        msa->pool = NULL;
-        tp_destroy(pool);
-#endif
         return OK;
 ERROR:
-        if(msa->consistency_table){
+        if(msa && msa->consistency_table){
                 anchor_consistency_free((struct consistency_table*)msa->consistency_table);
                 msa->consistency_table = NULL;
         }
         aln_param_free(ap);
-        free_tasks(tasks);
-#ifdef USE_THREADPOOL
-        msa->pool = NULL;
-        tp_destroy(pool);
-#endif
+        if(tasks) free_tasks(tasks);
         return FAIL;
 }
 
-int kalign_post_realign(struct msa *msa, int n_threads, int type,
-                        float gpo, float gpe, float tgpe,
-                        int refine, int adaptive_budget,
-                        float dist_scale, float vsm_amax,
-                        int realign_iterations,
-                        float use_seq_weights)
+/* Legacy entry point — thin wrapper around kalign_align_full */
+int kalign(char **seq, int *len, int numseq, int n_threads, int type,
+           float gpo, float gpe, float tgpe, char ***aligned, int *out_aln_len)
 {
-        struct aln_tasks* tasks = NULL;
-        struct aln_param* ap = NULL;
-        int iter;
+        struct msa *msa = NULL;
+        struct kalign_run_config cfg;
 
-        ASSERT(msa != NULL, "No MSA");
-        ASSERT(realign_iterations > 0, "Need at least 1 realign iteration");
-
-        /* Detect biotype if not set */
-        if(msa->biotype == ALN_BIOTYPE_UNDEF){
-                RUN(detect_alphabet(msa));
+        RUN(kalign_arr_to_msa(seq, len, numseq, &msa));
+        msa->quiet = 1;
+        if(n_threads < 1){
+                n_threads = 1;
         }
 
-        /* seq_distances available from prior alignment */
-        RUN(resolve_matrix_auto(msa, &type));
+        cfg = kalign_run_config_defaults();
+        cfg.matrix = type;
+        cfg.gpo = gpo;
+        cfg.gpe = gpe;
+        cfg.tgpe = tgpe;
 
-        RUN(aln_param_init(&ap,
-                           msa->biotype,
-                           n_threads,
-                           type,
-                           gpo,
-                           gpe,
-                           tgpe));
-#ifdef USE_THREADPOOL
-        threadpool_t *pool = tp_create(n_threads);
-        msa->pool = pool;
-        ap->pool = pool;
-#elif defined(HAVE_OPENMP)
-        omp_set_num_threads(n_threads);
-#endif
-        ap->adaptive_budget = adaptive_budget;
-        if(use_seq_weights >= 0.0f){
-                ap->use_seq_weights = use_seq_weights;
-        }
-        ap->dist_scale = dist_scale;
-        if(vsm_amax >= 0.0f){
-                ap->vsm_amax = vsm_amax;
-        }
+        RUN(kalign_align_full(msa, &cfg, 1, NULL, n_threads));
 
-        DECLARE_TIMER(t1);
-        if(!msa->quiet){
-                LOG_MSG("Post-realign (%d iterations, vsm_amax=%.2f)",
-                        realign_iterations, ap->vsm_amax);
-        }
-        START_TIMER(t1);
-
-        for(iter = 0; iter < realign_iterations; iter++){
-                float** dm = NULL;
-                int si;
-
-                /* Finalize if not already (first iter may already be FINAL from ensemble) */
-                if(msa->aligned != ALN_STATUS_FINAL){
-                        RUN(finalise_alignment(msa));
-                }
-
-                /* Compute NxN pairwise identity distances from alignment */
-                RUN(compute_aln_pairwise_dist(msa, &dm));
-
-                /* Strip gap characters from seq->seq and fix seq->len.
-                   Consensus alignment may have set len to alignment length,
-                   so we recompute from the ungapped sequence.
-                   We also zero gaps[] and reset alignment status manually
-                   (rather than calling dealign_msa which uses the possibly
-                   wrong len to bound the gaps[] loop). */
-                for(si = 0; si < msa->numseq; si++){
-                        struct msa_seq* seq = msa->sequences[si];
-                        int r, w = 0;
-                        for(r = 0; seq->seq[r] != '\0'; r++){
-                                if(seq->seq[r] != '-'){
-                                        seq->seq[w++] = seq->seq[r];
-                                }
-                        }
-                        seq->seq[w] = '\0';
-                        seq->len = w;
-                        /* Zero gaps array (len+1 entries) */
-                        for(r = 0; r <= w; r++){
-                                seq->gaps[r] = 0;
-                        }
-                }
-                msa->aligned = ALN_STATUS_UNALIGNED;
-
-                /* Re-encode to internal representation */
-                if(msa->biotype == ALN_BIOTYPE_DNA){
-                        RUN(convert_msa_to_internal(msa, ALPHA_defDNA));
-                }else if(msa->biotype == ALN_BIOTYPE_PROTEIN){
-                        RUN(convert_msa_to_internal(msa, ALPHA_ambigiousPROTEIN));
-                }
-
-                /* Reset profile tracking */
-                RUN(set_sip_nsip(msa));
-
-                /* Build UPGMA tree from alignment-derived distances */
-                if(tasks){ free_tasks(tasks); tasks = NULL; }
-                RUN(alloc_tasks(&tasks, msa->numseq));
-                RUN(build_tree_from_pairwise(msa, &tasks, dm));
-                free_aln_dm(dm, msa->numseq);
-
-                if(ap->use_seq_weights > 0.0f){
-                        RUN(compute_tree_weights(msa, tasks));
-                }
-
-                /* Re-align with new tree */
-                if(refine == KALIGN_REFINE_INLINE){
-                        RUN(create_msa_tree_inline_refine(msa, ap, tasks, 3));
-                }else{
-                        RUN(create_msa_tree(msa, ap, tasks));
-                }
-                msa->aligned = ALN_STATUS_ALIGNED;
-        }
-
-        /* Refinement after all realign iterations (two-pass, skip for inline) */
-        if(refine != KALIGN_REFINE_NONE && refine != KALIGN_REFINE_INLINE){
-                RUN(refine_alignment(msa, ap, tasks, refine));
-        }
-
-        RUN(finalise_alignment(msa));
-        RUN(msa_sort_rank(msa));
-
-        STOP_TIMER(t1);
-        if(!msa->quiet){
-                GET_TIMING(t1);
-        }
-        DESTROY_TIMER(t1);
-
-        aln_param_free(ap);
-        free_tasks(tasks);
-#ifdef USE_THREADPOOL
-        msa->pool = NULL;
-        tp_destroy(pool);
-#endif
+        RUN(kalign_msa_to_arr(msa, aligned, out_aln_len));
+        kalign_free_msa(msa);
         return OK;
 ERROR:
-        aln_param_free(ap);
-        if(tasks) free_tasks(tasks);
-#ifdef USE_THREADPOOL
-        msa->pool = NULL;
-        tp_destroy(pool);
-#endif
+        if(msa) kalign_free_msa(msa);
         return FAIL;
 }
 
@@ -781,38 +401,39 @@ int kalign_align_full(struct msa* msa,
                       const struct kalign_ensemble_config* ens,
                       int n_threads)
 {
+#ifdef USE_THREADPOOL
+        threadpool_t *pool = NULL;
+#endif
+
         ASSERT(msa != NULL, "No MSA");
         ASSERT(runs != NULL, "No run configs");
         ASSERT(n_runs >= 1, "n_runs must be >= 1");
 
+        if(n_threads < 1) n_threads = 1;
+
+#ifdef USE_THREADPOOL
+        pool = tp_create(n_threads);
+        msa->pool = pool;
+#elif defined(HAVE_OPENMP)
+        omp_set_num_threads(n_threads);
+#endif
+
         if(n_runs > 1){
-                /* Ensemble path */
                 RUN(kalign_ensemble_from_configs(msa, runs, n_runs, ens, n_threads));
         }else{
-                /* Single-run path */
-                const struct kalign_run_config* r = &runs[0];
-                if(r->realign > 0){
-                        RUN(kalign_run_realign(msa, n_threads, r->matrix,
-                                              r->gpo, r->gpe, r->tgpe,
-                                              r->refine, r->adaptive_budget,
-                                              r->dist_scale, r->vsm_amax,
-                                              r->realign, r->seq_weights,
-                                              r->consistency_anchors,
-                                              r->consistency_weight));
-                }else{
-                        RUN(kalign_run_seeded(msa, n_threads, r->matrix,
-                                             r->gpo, r->gpe, r->tgpe,
-                                             r->refine, r->adaptive_budget,
-                                             r->tree_seed, r->tree_noise,
-                                             r->dist_scale, r->vsm_amax,
-                                             r->seq_weights,
-                                             r->consistency_anchors,
-                                             r->consistency_weight));
-                }
+                RUN(kalign_single_run(msa, &runs[0], n_threads));
         }
 
+#ifdef USE_THREADPOOL
+        msa->pool = NULL;
+        tp_destroy(pool);
+#endif
         return OK;
 ERROR:
+#ifdef USE_THREADPOOL
+        msa->pool = NULL;
+        tp_destroy(pool);
+#endif
         return FAIL;
 }
 

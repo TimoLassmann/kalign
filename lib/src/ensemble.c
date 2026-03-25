@@ -49,36 +49,6 @@ static struct ensemble_params run_params[] = {
 #define N_RUN_PARAMS 12
 
 /* ---------------------------------------------------------------------------
- * Helper: resolve_run_params
- *
- * Given base gap penalties and a run index, compute the run-specific
- * gap-open, gap-extend, terminal-gap-extend, seed, and noise values.
- * Run 0 always uses defaults (deterministic, no noise).
- * ------------------------------------------------------------------------- */
-static void resolve_run_params(float base_gpo, float base_gpe, float base_tgpe,
-                               int k, uint64_t seed,
-                               float* out_gpo, float* out_gpe, float* out_tgpe,
-                               uint64_t* out_seed, float* out_noise)
-{
-        if(k == 0){
-                /* Run 0: default params, deterministic */
-                *out_gpo = base_gpo;
-                *out_gpe = base_gpe;
-                *out_tgpe = base_tgpe;
-                *out_seed = 0;
-                *out_noise = 0.0f;
-        }else{
-                /* Subsequent runs: independent per-penalty scaling + tree noise */
-                struct ensemble_params ep = run_params[k % N_RUN_PARAMS];
-                *out_gpo = base_gpo * ep.gpo_scale;
-                *out_gpe = base_gpe * ep.gpe_scale;
-                *out_tgpe = base_tgpe * ep.tgpe_scale;
-                *out_seed = seed + (uint64_t)k;
-                *out_noise = ep.noise;
-        }
-}
-
-/* ---------------------------------------------------------------------------
  * Helper: score_alignments
  *
  * Score all N alignments against the POAR table.  Returns the scores
@@ -88,7 +58,11 @@ static void resolve_run_params(float base_gpo, float base_gpe, float base_tgpe,
 static int score_alignments(struct msa** alignments,
                             struct poar_table* poar,
                             int numseq, int n_runs, int quiet,
-                            double** out_scores, int* out_best_k)
+                            double** out_scores, int* out_best_k
+#ifdef USE_THREADPOOL
+                            , threadpool_t* pool
+#endif
+                            )
 {
         struct pos_matrix* pm = NULL;
         double* scores = NULL;
@@ -105,7 +79,11 @@ static int score_alignments(struct msa** alignments,
                 }
 
                 RUN(pos_matrix_from_msa(&pm, aln_seqs, numseq, alignments[k]->alnlen));
+#ifdef USE_THREADPOOL
+                RUN(score_alignment_poar(poar, pm, numseq, n_runs, &scores[k], pool));
+#else
                 RUN(score_alignment_poar(poar, pm, numseq, n_runs, &scores[k]));
+#endif
 
                 if(!quiet){
                         LOG_MSG("  Run %d score: %.1f", k + 1, scores[k]);
@@ -145,7 +123,11 @@ ERROR:
 static int build_consensus_from_poar(struct poar_table* poar,
                                      struct msa* msa,
                                      int numseq, int min_support,
-                                     struct msa** out_consensus)
+                                     struct msa** out_consensus
+#ifdef USE_THREADPOOL
+                                     , threadpool_t* pool
+#endif
+                                     )
 {
         struct msa* consensus_msa = NULL;
         int* seq_lens = NULL;
@@ -157,7 +139,11 @@ static int build_consensus_from_poar(struct poar_table* poar,
                 seq_lens[i] = msa->sequences[i]->len;
         }
 
+#ifdef USE_THREADPOOL
+        RUN(build_consensus(poar, seq_lens, numseq, min_support, consensus_msa, pool));
+#else
         RUN(build_consensus(poar, seq_lens, numseq, min_support, consensus_msa));
+#endif
         MFREE(seq_lens);
 
         *out_consensus = consensus_msa;
@@ -199,7 +185,11 @@ ERROR:
  * out_score.  This avoids repeating the aln_seqs + pos_matrix pattern.
  * ------------------------------------------------------------------------- */
 static int score_single_msa(struct msa* aln, struct poar_table* poar,
-                            int numseq, int n_runs, double* out_score)
+                            int numseq, int n_runs, double* out_score
+#ifdef USE_THREADPOOL
+                            , threadpool_t* pool
+#endif
+                            )
 {
         struct pos_matrix* pm = NULL;
         char** aln_seqs = NULL;
@@ -210,7 +200,11 @@ static int score_single_msa(struct msa* aln, struct poar_table* poar,
         }
 
         RUN(pos_matrix_from_msa(&pm, aln_seqs, numseq, aln->alnlen));
+#ifdef USE_THREADPOOL
+        RUN(score_alignment_poar(poar, pm, numseq, n_runs, out_score, pool));
+#else
         RUN(score_alignment_poar(poar, pm, numseq, n_runs, out_score));
+#endif
 
         pos_matrix_free(pm);
         MFREE(aln_seqs);
@@ -221,534 +215,31 @@ ERROR:
         return FAIL;
 }
 
-/* ======================================================================== */
+/* kalign_ensemble and kalign_ensemble_custom removed —
+   use kalign_align_full with per-run configs instead. */
 
-int kalign_ensemble(struct msa* msa, int n_threads, int type,
-                    int n_runs, float gpo, float gpe, float tgpe,
-                    uint64_t seed, int min_support,
-                    const char* save_poar_path,
-                    int refine, float dist_scale, float vsm_amax,
-                    int realign, float use_seq_weights,
-                    int consistency_anchors, float consistency_weight)
+/* ---- Parallel ensemble run support ---- */
+#ifdef USE_THREADPOOL
+#include "threadpool/threadpool.h"
+
+struct ensemble_run_arg {
+        struct msa* copy;
+        const struct kalign_run_config* cfg;
+        int n_threads;
+        int error;
+};
+
+static void ensemble_run_task_fn(void* arg)
 {
-        struct msa* copy = NULL;
-        struct msa* consensus_msa = NULL;
-        struct msa** alignments = NULL;
-        struct poar_table* poar = NULL;
-        struct pos_matrix* pm = NULL;
-        struct aln_param* ap = NULL;
-        double* scores = NULL;
-        int numseq;
-        int k;
-        int best_k = 0;
-        int use_consensus = 0;
-        float base_gpo, base_gpe, base_tgpe;
-
-        ASSERT(msa != NULL, "No MSA");
-        ASSERT(n_runs >= 1, "n_runs must be >= 1");
-
-        /* Seq_weights hurts ensemble performance (POAR consensus already
-           handles profile imbalance).  Default to OFF in ensemble mode. */
-        if(use_seq_weights < 0.0f){
-                use_seq_weights = 0.0f;
+        struct ensemble_run_arg* ra = (struct ensemble_run_arg*)arg;
+        if(kalign_single_run(ra->copy, ra->cfg, ra->n_threads) != 0){
+                ra->error = 1;
         }
-
-        /* Essential input check + detect alphabet */
-        RUN(kalign_essential_input_check(msa, 0));
-
-        numseq = msa->numseq;
-
-        DECLARE_TIMER(t_ensemble);
-        if(!msa->quiet){
-                LOG_MSG("Ensemble alignment with %d runs", n_runs);
-        }
-        START_TIMER(t_ensemble);
-
-        /* Resolve default gap penalties using aln_param_init.
-           We need to detect biotype first. */
-        if(msa->biotype == ALN_BIOTYPE_UNDEF){
-                RUN(detect_alphabet(msa));
-        }
-
-        /* Use aln_param_init to resolve defaults */
-        RUN(aln_param_init(&ap, msa->biotype, n_threads, type, gpo, gpe, tgpe));
-        base_gpo = ap->gpo;
-        base_gpe = ap->gpe;
-        base_tgpe = ap->tgpe;
-        aln_param_free(ap);
-        ap = NULL;
-
-        /* Allocate POAR table and array to store completed alignments */
-        RUN(poar_table_alloc(&poar, numseq));
-        MMALLOC(alignments, sizeof(struct msa*) * n_runs);
-        for(k = 0; k < n_runs; k++){
-                alignments[k] = NULL;
-        }
-
-        /* Run N alignments, extract POARs, and keep each alignment */
-        for(k = 0; k < n_runs; k++){
-                float run_gpo, run_gpe, run_tgpe, run_noise;
-                uint64_t run_seed;
-
-                resolve_run_params(base_gpo, base_gpe, base_tgpe, k, seed,
-                                   &run_gpo, &run_gpe, &run_tgpe,
-                                   &run_seed, &run_noise);
-
-                /* Deep-copy MSA */
-                copy = NULL;
-                RUN(msa_cpy(&copy, msa));
-                copy->quiet = 1;
-
-                if(!msa->quiet){
-                        LOG_MSG("  Run %d/%d (gpo=%.1f gpe=%.1f tgpe=%.1f noise=%.2f)",
-                                k + 1, n_runs, run_gpo, run_gpe, run_tgpe, run_noise);
-                }
-
-                /* Run alignment */
-                if(realign > 0){
-                        RUN(kalign_run_realign(copy, n_threads, type,
-                                              run_gpo, run_gpe, run_tgpe,
-                                              refine, 0,
-                                              dist_scale, vsm_amax,
-                                              realign, use_seq_weights,
-                                              consistency_anchors, consistency_weight));
-                }else{
-                        RUN(kalign_run_seeded(copy, n_threads, type,
-                                              run_gpo, run_gpe, run_tgpe,
-                                              refine, 0,
-                                              run_seed, run_noise,
-                                              dist_scale, vsm_amax,
-                                              use_seq_weights,
-                                              consistency_anchors, consistency_weight));
-                }
-
-                /* Extract POARs from the finalized alignment */
-                char** aln_seqs = NULL;
-                MMALLOC(aln_seqs, sizeof(char*) * numseq);
-                for(int i = 0; i < numseq; i++){
-                        aln_seqs[i] = copy->sequences[i]->seq;
-                }
-
-                RUN(pos_matrix_from_msa(&pm, aln_seqs, numseq, copy->alnlen));
-                RUN(extract_poars(poar, pm, k));
-
-                pos_matrix_free(pm);
-                pm = NULL;
-                MFREE(aln_seqs);
-
-                /* Keep this alignment for scoring later */
-                alignments[k] = copy;
-                copy = NULL;
-        }
-
-        /* Score all alignments and select the best */
-        RUN(score_alignments(alignments, poar, numseq, n_runs, msa->quiet,
-                             &scores, &best_k));
-
-        if(!msa->quiet){
-                LOG_MSG("  Selected run %d (score=%.1f)", best_k + 1, scores[best_k]);
-        }
-
-        /* Save POAR table if requested */
-        if(save_poar_path != NULL){
-                RUN(poar_table_write(poar, save_poar_path));
-                if(!msa->quiet){
-                        LOG_MSG("  Saved POAR table to %s", save_poar_path);
-                }
-        }
-
-        /* When min_support > 0: explicit consensus threshold, skip selection.
-           When min_support == 0: auto behavior (selection vs consensus). */
-        if(min_support > 0){
-                /* Explicit consensus: force consensus path */
-                RUN(build_consensus_from_poar(poar, msa, numseq, min_support,
-                                              &consensus_msa));
-                use_consensus = 1;
-                if(!msa->quiet){
-                        LOG_MSG("  Using consensus alignment (min_support=%d)", min_support);
-                }
-        }else{
-                /* Try consensus approach: build a new alignment from POAR table.
-                   This can combine correct pairs from multiple runs, potentially
-                   outperforming any single run. */
-                double consensus_score = 0.0;
-                int min_sup = (n_runs + 2) / 3;
-                if(min_sup < 2) min_sup = 2;
-
-                RUN(build_consensus_from_poar(poar, msa, numseq, min_sup,
-                                              &consensus_msa));
-
-                /* Score consensus against POAR table */
-                RUN(score_single_msa(consensus_msa, poar, numseq, n_runs,
-                                     &consensus_score));
-
-                if(!msa->quiet){
-                        LOG_MSG("  Consensus score: %.1f (selection: %.1f)",
-                                consensus_score, scores[best_k]);
-                }
-
-                if(consensus_score > scores[best_k]){
-                        use_consensus = 1;
-                        if(!msa->quiet){
-                                LOG_MSG("  Using consensus alignment");
-                        }
-                }else{
-                        kalign_free_msa(consensus_msa);
-                        consensus_msa = NULL;
-                        if(!msa->quiet){
-                                LOG_MSG("  Keeping selection winner");
-                        }
-                }
-        }
-
-        /* Post-selection refinement: only when using selection (not consensus),
-           re-run the winner with REFINE_CONFIDENT and keep if it scores higher. */
-        if(!use_consensus){
-                float ref_gpo, ref_gpe, ref_tgpe, ref_noise;
-                uint64_t ref_seed;
-
-                resolve_run_params(base_gpo, base_gpe, base_tgpe, best_k, seed,
-                                   &ref_gpo, &ref_gpe, &ref_tgpe,
-                                   &ref_seed, &ref_noise);
-
-                copy = NULL;
-                RUN(msa_cpy(&copy, msa));
-                copy->quiet = 1;
-
-                if(!msa->quiet){
-                        LOG_MSG("  Refining run %d...", best_k + 1);
-                }
-
-                RUN(kalign_run_seeded(copy, n_threads, type,
-                                      ref_gpo, ref_gpe, ref_tgpe,
-                                      KALIGN_REFINE_CONFIDENT, 0,
-                                      ref_seed, ref_noise,
-                                      dist_scale, vsm_amax,
-                                      use_seq_weights,
-                                      consistency_anchors, consistency_weight));
-
-                /* Score the refined alignment against the same POAR table */
-                double refined_score = 0.0;
-                RUN(score_single_msa(copy, poar, numseq, n_runs,
-                                     &refined_score));
-
-                if(!msa->quiet){
-                        LOG_MSG("  Refined score: %.1f (was %.1f)",
-                                refined_score, scores[best_k]);
-                }
-
-                if(refined_score > scores[best_k]){
-                        kalign_free_msa(alignments[best_k]);
-                        alignments[best_k] = copy;
-                        copy = NULL;
-                        if(!msa->quiet){
-                                LOG_MSG("  Using refined alignment");
-                        }
-                }else{
-                        kalign_free_msa(copy);
-                        copy = NULL;
-                        if(!msa->quiet){
-                                LOG_MSG("  Keeping original alignment");
-                        }
-                }
-        }
-
-        MFREE(scores);
-        scores = NULL;
-
-        /* Copy the winning alignment back into the original MSA */
-        if(use_consensus){
-                RUN(copy_alignment_to_msa(msa, consensus_msa, numseq));
-                kalign_free_msa(consensus_msa);
-                consensus_msa = NULL;
-        }else{
-                RUN(copy_alignment_to_msa(msa, alignments[best_k], numseq));
-        }
-
-        /* Compute per-residue and per-column confidence from POAR table */
-        RUN(compute_residue_confidence(poar, msa));
-
-        /* Sort back to original rank order */
-        RUN(msa_sort_rank(msa));
-
-        STOP_TIMER(t_ensemble);
-        if(!msa->quiet){
-                GET_TIMING(t_ensemble);
-        }
-        DESTROY_TIMER(t_ensemble);
-
-        /* Free all alignments */
-        for(k = 0; k < n_runs; k++){
-                if(alignments[k]) kalign_free_msa(alignments[k]);
-        }
-        MFREE(alignments);
-        poar_table_free(poar);
-        return OK;
-ERROR:
-        if(copy) kalign_free_msa(copy);
-        if(consensus_msa) kalign_free_msa(consensus_msa);
-        if(pm) pos_matrix_free(pm);
-        if(alignments){
-                for(k = 0; k < n_runs; k++){
-                        if(alignments[k]) kalign_free_msa(alignments[k]);
-                }
-                MFREE(alignments);
-        }
-        poar_table_free(poar);
-        if(scores) MFREE(scores);
-        if(ap) aln_param_free(ap);
-        return FAIL;
 }
+#endif
 
 /* ======================================================================== */
-/* kalign_ensemble_custom: like kalign_ensemble but with per-run parameters.
- *
- * Instead of a hardcoded scale-factor table, each run gets its own
- * gap penalties, matrix type, and tree noise via arrays.
- *
- * run_gpo[n_runs], run_gpe[n_runs], run_tgpe[n_runs]: per-run gap penalties
- * run_types[n_runs]: per-run matrix type (KALIGN_TYPE_PROTEIN, _PFASUM43, etc.)
- *                    Pass NULL to use the same 'type' for all runs.
- * run_noise[n_runs]: per-run tree noise sigma
- *
- * All other parameters (vsm_amax, realign, consistency, etc.) are shared
- * across runs — they affect *how* each alignment is computed, not *what*
- * gap/matrix parameters it uses.
- */
-int kalign_ensemble_custom(struct msa* msa, int n_threads, int type,
-                           int n_runs,
-                           const float* run_gpo,
-                           const float* run_gpe,
-                           const float* run_tgpe,
-                           const int* run_types,
-                           const float* run_noise,
-                           uint64_t seed, int min_support,
-                           int refine, float vsm_amax,
-                           int realign, float use_seq_weights,
-                           int consistency_anchors, float consistency_weight)
-{
-        struct msa* copy = NULL;
-        struct msa* consensus_msa = NULL;
-        struct msa** alignments = NULL;
-        struct poar_table* poar = NULL;
-        struct pos_matrix* pm = NULL;
-        double* scores = NULL;
-        int numseq;
-        int k;
-        int best_k = 0;
-        int use_consensus = 0;
 
-        ASSERT(msa != NULL, "No MSA");
-        ASSERT(n_runs >= 1, "n_runs must be >= 1");
-        ASSERT(run_gpo != NULL, "run_gpo is NULL");
-        ASSERT(run_gpe != NULL, "run_gpe is NULL");
-        ASSERT(run_tgpe != NULL, "run_tgpe is NULL");
-        ASSERT(run_noise != NULL, "run_noise is NULL");
-
-        if(use_seq_weights < 0.0f){
-                use_seq_weights = 0.0f;
-        }
-
-        RUN(kalign_essential_input_check(msa, 0));
-
-        numseq = msa->numseq;
-
-        DECLARE_TIMER(t_ensemble);
-        if(!msa->quiet){
-                LOG_MSG("Custom ensemble alignment with %d runs", n_runs);
-        }
-        START_TIMER(t_ensemble);
-
-        if(msa->biotype == ALN_BIOTYPE_UNDEF){
-                RUN(detect_alphabet(msa));
-        }
-
-        RUN(poar_table_alloc(&poar, numseq));
-        MMALLOC(alignments, sizeof(struct msa*) * n_runs);
-        for(k = 0; k < n_runs; k++){
-                alignments[k] = NULL;
-        }
-
-        for(k = 0; k < n_runs; k++){
-                int run_type = (run_types != NULL) ? run_types[k] : type;
-                uint64_t run_seed = seed + (uint64_t)k;
-
-                copy = NULL;
-                RUN(msa_cpy(&copy, msa));
-                copy->quiet = 1;
-
-                if(!msa->quiet){
-                        LOG_MSG("  Run %d/%d (gpo=%.2f gpe=%.2f tgpe=%.2f noise=%.2f type=%d)",
-                                k + 1, n_runs, run_gpo[k], run_gpe[k], run_tgpe[k],
-                                run_noise[k], run_type);
-                }
-
-                if(realign > 0){
-                        RUN(kalign_run_realign(copy, n_threads, run_type,
-                                              run_gpo[k], run_gpe[k], run_tgpe[k],
-                                              refine, 0,
-                                              0.0f, vsm_amax,
-                                              realign, use_seq_weights,
-                                              consistency_anchors, consistency_weight));
-                }else{
-                        RUN(kalign_run_seeded(copy, n_threads, run_type,
-                                              run_gpo[k], run_gpe[k], run_tgpe[k],
-                                              refine, 0,
-                                              run_seed, run_noise[k],
-                                              0.0f, vsm_amax,
-                                              use_seq_weights,
-                                              consistency_anchors, consistency_weight));
-                }
-
-                char** aln_seqs = NULL;
-                MMALLOC(aln_seqs, sizeof(char*) * numseq);
-                for(int i = 0; i < numseq; i++){
-                        aln_seqs[i] = copy->sequences[i]->seq;
-                }
-
-                RUN(pos_matrix_from_msa(&pm, aln_seqs, numseq, copy->alnlen));
-                RUN(extract_poars(poar, pm, k));
-
-                pos_matrix_free(pm);
-                pm = NULL;
-                MFREE(aln_seqs);
-
-                alignments[k] = copy;
-                copy = NULL;
-        }
-
-        RUN(score_alignments(alignments, poar, numseq, n_runs, msa->quiet,
-                             &scores, &best_k));
-
-        if(!msa->quiet){
-                LOG_MSG("  Selected run %d (score=%.1f)", best_k + 1, scores[best_k]);
-        }
-
-        if(min_support > 0){
-                RUN(build_consensus_from_poar(poar, msa, numseq, min_support,
-                                              &consensus_msa));
-                use_consensus = 1;
-                if(!msa->quiet){
-                        LOG_MSG("  Using consensus alignment (min_support=%d)", min_support);
-                }
-        }else{
-                double consensus_score = 0.0;
-                int min_sup = (n_runs + 2) / 3;
-                if(min_sup < 2) min_sup = 2;
-
-                RUN(build_consensus_from_poar(poar, msa, numseq, min_sup,
-                                              &consensus_msa));
-
-                RUN(score_single_msa(consensus_msa, poar, numseq, n_runs,
-                                     &consensus_score));
-
-                if(!msa->quiet){
-                        LOG_MSG("  Consensus score: %.1f (selection: %.1f)",
-                                consensus_score, scores[best_k]);
-                }
-
-                if(consensus_score > scores[best_k]){
-                        use_consensus = 1;
-                        if(!msa->quiet){
-                                LOG_MSG("  Using consensus alignment");
-                        }
-                }else{
-                        kalign_free_msa(consensus_msa);
-                        consensus_msa = NULL;
-                        if(!msa->quiet){
-                                LOG_MSG("  Keeping selection winner");
-                        }
-                }
-        }
-
-        /* Post-selection refinement */
-        if(!use_consensus){
-                int ref_type = (run_types != NULL) ? run_types[best_k] : type;
-                uint64_t ref_seed = seed + (uint64_t)best_k;
-
-                copy = NULL;
-                RUN(msa_cpy(&copy, msa));
-                copy->quiet = 1;
-
-                if(!msa->quiet){
-                        LOG_MSG("  Refining run %d...", best_k + 1);
-                }
-
-                RUN(kalign_run_seeded(copy, n_threads, ref_type,
-                                      run_gpo[best_k], run_gpe[best_k], run_tgpe[best_k],
-                                      KALIGN_REFINE_CONFIDENT, 0,
-                                      ref_seed, run_noise[best_k],
-                                      0.0f, vsm_amax,
-                                      use_seq_weights,
-                                      consistency_anchors, consistency_weight));
-
-                double refined_score = 0.0;
-                RUN(score_single_msa(copy, poar, numseq, n_runs,
-                                     &refined_score));
-
-                if(!msa->quiet){
-                        LOG_MSG("  Refined score: %.1f (was %.1f)",
-                                refined_score, scores[best_k]);
-                }
-
-                if(refined_score > scores[best_k]){
-                        kalign_free_msa(alignments[best_k]);
-                        alignments[best_k] = copy;
-                        copy = NULL;
-                        if(!msa->quiet){
-                                LOG_MSG("  Using refined alignment");
-                        }
-                }else{
-                        kalign_free_msa(copy);
-                        copy = NULL;
-                        if(!msa->quiet){
-                                LOG_MSG("  Keeping original alignment");
-                        }
-                }
-        }
-
-        MFREE(scores);
-        scores = NULL;
-
-        if(use_consensus){
-                RUN(copy_alignment_to_msa(msa, consensus_msa, numseq));
-                kalign_free_msa(consensus_msa);
-                consensus_msa = NULL;
-        }else{
-                RUN(copy_alignment_to_msa(msa, alignments[best_k], numseq));
-        }
-
-        RUN(compute_residue_confidence(poar, msa));
-        RUN(msa_sort_rank(msa));
-
-        STOP_TIMER(t_ensemble);
-        if(!msa->quiet){
-                GET_TIMING(t_ensemble);
-        }
-        DESTROY_TIMER(t_ensemble);
-
-        for(k = 0; k < n_runs; k++){
-                if(alignments[k]) kalign_free_msa(alignments[k]);
-        }
-        MFREE(alignments);
-        poar_table_free(poar);
-        return OK;
-ERROR:
-        if(copy) kalign_free_msa(copy);
-        if(consensus_msa) kalign_free_msa(consensus_msa);
-        if(pm) pos_matrix_free(pm);
-        if(alignments){
-                for(k = 0; k < n_runs; k++){
-                        if(alignments[k]) kalign_free_msa(alignments[k]);
-                }
-                MFREE(alignments);
-        }
-        poar_table_free(poar);
-        if(scores) MFREE(scores);
-        return FAIL;
-}
-
-/* ======================================================================== */
 /* kalign_generate_ensemble_runs: expand base config into N diversified runs.
  *
  * IMPORTANT: base.gpo/gpe/tgpe must be resolved (non-sentinel) values.
@@ -836,67 +327,143 @@ int kalign_ensemble_from_configs(struct msa* msa,
                 alignments[k] = NULL;
         }
 
-        /* Run N alignments */
-        for(k = 0; k < n_runs; k++){
-                copy = NULL;
-                RUN(msa_cpy(&copy, msa));
-                copy->quiet = 1;
+        /* Phase timing instrumentation */
+        DECLARE_TIMER(t_phase);
 
-                if(!msa->quiet){
-                        LOG_MSG("  Run %d/%d (gpo=%.1f gpe=%.1f tgpe=%.1f noise=%.2f)",
-                                k + 1, n_runs,
-                                runs[k].gpo, runs[k].gpe, runs[k].tgpe,
-                                runs[k].tree_noise);
+        /* Run N alignments concurrently — all runs share the one global
+           threadpool, giving the pool N× more tasks to keep workers busy.
+           POAR extraction is sequential (sorted insert not thread-safe). */
+        START_TIMER(t_phase);
+#ifdef USE_THREADPOOL
+        if(msa->pool != NULL && n_runs > 1){
+                struct ensemble_run_arg* run_args = NULL;
+                MMALLOC(run_args, sizeof(struct ensemble_run_arg) * n_runs);
+
+                for(k = 0; k < n_runs; k++){
+                        run_args[k].copy = NULL;
+                        RUN(msa_cpy(&run_args[k].copy, msa));
+                        run_args[k].copy->quiet = 1;
+                        run_args[k].copy->pool = msa->pool;
+                        run_args[k].cfg = &runs[k];
+                        run_args[k].n_threads = n_threads;
+                        run_args[k].error = 0;
+
+                        if(!msa->quiet){
+                                LOG_MSG("  Run %d/%d (gpo=%.1f gpe=%.1f tgpe=%.1f noise=%.2f)",
+                                        k + 1, n_runs,
+                                        runs[k].gpo, runs[k].gpe, runs[k].tgpe,
+                                        runs[k].tree_noise);
+                        }
                 }
 
-                if(runs[k].realign > 0){
-                        RUN(kalign_run_realign(copy, n_threads, runs[k].matrix,
-                                              runs[k].gpo, runs[k].gpe, runs[k].tgpe,
-                                              runs[k].refine, 0,
-                                              runs[k].dist_scale, runs[k].vsm_amax,
-                                              runs[k].realign, runs[k].seq_weights,
-                                              runs[k].consistency_anchors,
-                                              runs[k].consistency_weight));
-                }else{
-                        RUN(kalign_run_seeded(copy, n_threads, runs[k].matrix,
-                                              runs[k].gpo, runs[k].gpe, runs[k].tgpe,
-                                              runs[k].refine, 0,
-                                              runs[k].tree_seed, runs[k].tree_noise,
-                                              runs[k].dist_scale, runs[k].vsm_amax,
-                                              runs[k].seq_weights,
-                                              runs[k].consistency_anchors,
-                                              runs[k].consistency_weight));
+                /* Fork all runs into the shared pool */
+                {
+                        tp_group_t *g = tp_group_create(msa->pool);
+                        for(k = 0; k < n_runs; k++){
+                                tp_group_submit(g, ensemble_run_task_fn, &run_args[k]);
+                        }
+                        tp_group_wait(g);
+                        tp_group_destroy(g);
                 }
 
-                /* Extract POARs from the finalized alignment */
-                char** aln_seqs = NULL;
-                MMALLOC(aln_seqs, sizeof(char*) * numseq);
-                for(int i = 0; i < numseq; i++){
-                        aln_seqs[i] = copy->sequences[i]->seq;
+                /* Check for errors and collect results */
+                for(k = 0; k < n_runs; k++){
+                        if(run_args[k].error){
+                                for(int j = 0; j < n_runs; j++){
+                                        if(run_args[j].copy) kalign_free_msa(run_args[j].copy);
+                                }
+                                MFREE(run_args);
+                                ERROR_MSG("Ensemble run %d failed", k + 1);
+                        }
+                        alignments[k] = run_args[k].copy;
+                        run_args[k].copy = NULL;
                 }
+                MFREE(run_args);
 
-                RUN(pos_matrix_from_msa(&pm, aln_seqs, numseq, copy->alnlen));
-                RUN(extract_poars(poar, pm, k));
+                /* Extract POARs sequentially */
+                for(k = 0; k < n_runs; k++){
+                        char** aln_seqs = NULL;
+                        MMALLOC(aln_seqs, sizeof(char*) * numseq);
+                        for(int i = 0; i < numseq; i++){
+                                aln_seqs[i] = alignments[k]->sequences[i]->seq;
+                        }
+                        RUN(pos_matrix_from_msa(&pm, aln_seqs, numseq, alignments[k]->alnlen));
+                        {
+#ifdef USE_THREADPOOL
+                                int _ep_ret = extract_poars(poar, pm, k, msa->pool);
+#else
+                                int _ep_ret = extract_poars(poar, pm, k);
+#endif
+                                if(_ep_ret != OK) goto ERROR;
+                        }
+                        pos_matrix_free(pm);
+                        pm = NULL;
+                        MFREE(aln_seqs);
+                }
+        }else
+#endif
+        {
+                /* Sequential fallback (no threadpool or single run) */
+                for(k = 0; k < n_runs; k++){
+                        copy = NULL;
+                        RUN(msa_cpy(&copy, msa));
+                        copy->quiet = 1;
+#ifdef USE_THREADPOOL
+                        copy->pool = msa->pool;
+#endif
+                        if(!msa->quiet){
+                                LOG_MSG("  Run %d/%d (gpo=%.1f gpe=%.1f tgpe=%.1f noise=%.2f)",
+                                        k + 1, n_runs,
+                                        runs[k].gpo, runs[k].gpe, runs[k].tgpe,
+                                        runs[k].tree_noise);
+                        }
+                        RUN(kalign_single_run(copy, &runs[k], n_threads));
 
-                pos_matrix_free(pm);
-                pm = NULL;
-                MFREE(aln_seqs);
+                        char** aln_seqs = NULL;
+                        MMALLOC(aln_seqs, sizeof(char*) * numseq);
+                        for(int i = 0; i < numseq; i++){
+                                aln_seqs[i] = copy->sequences[i]->seq;
+                        }
+                        RUN(pos_matrix_from_msa(&pm, aln_seqs, numseq, copy->alnlen));
+                        {
+#ifdef USE_THREADPOOL
+                                int _ep_ret = extract_poars(poar, pm, k, msa->pool);
+#else
+                                int _ep_ret = extract_poars(poar, pm, k);
+#endif
+                                if(_ep_ret != OK) goto ERROR;
+                        }
+                        pos_matrix_free(pm);
+                        pm = NULL;
+                        MFREE(aln_seqs);
 
-                alignments[k] = copy;
-                copy = NULL;
+                        alignments[k] = copy;
+                        copy = NULL;
+                }
         }
 
+        STOP_TIMER(t_phase);
+        if(!msa->quiet){ LOG_MSG("  [time] alignment runs + POAR extraction: "); GET_TIMING(t_phase); }
+
         /* Score all alignments and select the best */
+        START_TIMER(t_phase);
+        #ifdef USE_THREADPOOL
+        RUN(score_alignments(alignments, poar, numseq, n_runs, msa->quiet,
+                             &scores, &best_k, msa->pool));
+#else
         RUN(score_alignments(alignments, poar, numseq, n_runs, msa->quiet,
                              &scores, &best_k));
+#endif
 
         if(!msa->quiet){
                 LOG_MSG("  Selected run %d (score=%.1f)", best_k + 1, scores[best_k]);
         }
 
-        /* POAR save removed from ensemble_config — debug feature */
+        STOP_TIMER(t_phase);
+        if(!msa->quiet){ LOG_MSG("  [time] scoring:                         "); GET_TIMING(t_phase); }
 
         /* Determine merge strategy */
+        START_TIMER(t_phase);
         int min_support = (ens != NULL) ? ens->min_support : 0;
         int use_consistency_merge = (ens != NULL) ? ens->consistency_merge : 0;
 
@@ -927,15 +494,19 @@ int kalign_ensemble_from_configs(struct msa* msa,
                 /* Run a fresh progressive alignment with best_k's params.
                    No additional anchor consistency or realign — the POAR
                    consistency signal is the main guide. */
-                RUN(kalign_run_seeded(copy, n_threads, runs[best_k].matrix,
-                                      runs[best_k].gpo, runs[best_k].gpe,
-                                      runs[best_k].tgpe,
-                                      KALIGN_REFINE_NONE, 0,
-                                      0, 0.0f,  /* deterministic tree */
-                                      runs[best_k].dist_scale,
-                                      runs[best_k].vsm_amax,
-                                      0.0f,     /* no seq_weights in ensemble */
-                                      0, 0.0f   /* no anchor consistency */));
+                {
+                        struct kalign_run_config cm_cfg = runs[best_k];
+                        cm_cfg.refine = KALIGN_REFINE_NONE;
+                        cm_cfg.tree_seed = 0;
+                        cm_cfg.tree_noise = 0.0f;
+                        cm_cfg.seq_weights = 0.0f;
+                        cm_cfg.consistency_anchors = 0;
+                        cm_cfg.realign = 0;
+#ifdef USE_THREADPOOL
+                        copy->pool = msa->pool;
+#endif
+                        RUN(kalign_single_run(copy, &cm_cfg, n_threads));
+                }
 
                 /* Clear the non-owning pointer before freeing the copy */
                 copy->poar_consistency = NULL;
@@ -948,8 +519,13 @@ int kalign_ensemble_from_configs(struct msa* msa,
                 /* ---- POAR consensus / selection path (existing) ---- */
 
                 if(min_support > 0){
+                        #ifdef USE_THREADPOOL
+                        RUN(build_consensus_from_poar(poar, msa, numseq, min_support,
+                                                      &consensus_msa, msa->pool));
+                        #else
                         RUN(build_consensus_from_poar(poar, msa, numseq, min_support,
                                                       &consensus_msa));
+                        #endif
                         use_consensus = 1;
                         if(!msa->quiet){
                                 LOG_MSG("  Using consensus alignment (min_support=%d)", min_support);
@@ -959,11 +535,21 @@ int kalign_ensemble_from_configs(struct msa* msa,
                         int min_sup = (n_runs + 2) / 3;
                         if(min_sup < 2) min_sup = 2;
 
+                        #ifdef USE_THREADPOOL
+                        RUN(build_consensus_from_poar(poar, msa, numseq, min_sup,
+                                                      &consensus_msa, msa->pool));
+                        #else
                         RUN(build_consensus_from_poar(poar, msa, numseq, min_sup,
                                                       &consensus_msa));
+                        #endif
 
+                        #ifdef USE_THREADPOOL
+                        RUN(score_single_msa(consensus_msa, poar, numseq, n_runs,
+                                             &consensus_score, msa->pool));
+                        #else
                         RUN(score_single_msa(consensus_msa, poar, numseq, n_runs,
                                              &consensus_score));
+                        #endif
 
                         if(!msa->quiet){
                                 LOG_MSG("  Consensus score: %.1f (selection: %.1f)",
@@ -986,27 +572,30 @@ int kalign_ensemble_from_configs(struct msa* msa,
 
                 /* Post-selection refinement: re-run the winner with REFINE_CONFIDENT */
                 if(!use_consensus){
+                        struct kalign_run_config ref_cfg = runs[best_k];
+                        ref_cfg.refine = KALIGN_REFINE_CONFIDENT;
+
                         copy = NULL;
                         RUN(msa_cpy(&copy, msa));
                         copy->quiet = 1;
+#ifdef USE_THREADPOOL
+                        copy->pool = msa->pool;
+#endif
 
                         if(!msa->quiet){
                                 LOG_MSG("  Refining run %d...", best_k + 1);
                         }
 
-                        RUN(kalign_run_seeded(copy, n_threads, runs[best_k].matrix,
-                                              runs[best_k].gpo, runs[best_k].gpe,
-                                              runs[best_k].tgpe,
-                                              KALIGN_REFINE_CONFIDENT, 0,
-                                              runs[best_k].tree_seed, runs[best_k].tree_noise,
-                                              runs[best_k].dist_scale, runs[best_k].vsm_amax,
-                                              runs[best_k].seq_weights,
-                                              runs[best_k].consistency_anchors,
-                                              runs[best_k].consistency_weight));
+                        RUN(kalign_single_run(copy, &ref_cfg, n_threads));
 
                         double refined_score = 0.0;
+                        #ifdef USE_THREADPOOL
+                        RUN(score_single_msa(copy, poar, numseq, n_runs,
+                                             &refined_score, msa->pool));
+                        #else
                         RUN(score_single_msa(copy, poar, numseq, n_runs,
                                              &refined_score));
+                        #endif
 
                         if(!msa->quiet){
                                 LOG_MSG("  Refined score: %.1f (was %.1f)",
@@ -1046,7 +635,18 @@ int kalign_ensemble_from_configs(struct msa* msa,
                 scores = NULL;
         }
 
+        STOP_TIMER(t_phase);
+        if(!msa->quiet){ LOG_MSG("  [time] consensus/selection:             "); GET_TIMING(t_phase); }
+
+        START_TIMER(t_phase);
+        #ifdef USE_THREADPOOL
+        RUN(compute_residue_confidence(poar, msa, msa->pool));
+#else
         RUN(compute_residue_confidence(poar, msa));
+#endif
+        STOP_TIMER(t_phase);
+        if(!msa->quiet){ LOG_MSG("  [time] confidence:                      "); GET_TIMING(t_phase); }
+
         RUN(msa_sort_rank(msa));
 
         STOP_TIMER(t_ensemble);
@@ -1054,6 +654,7 @@ int kalign_ensemble_from_configs(struct msa* msa,
                 GET_TIMING(t_ensemble);
         }
         DESTROY_TIMER(t_ensemble);
+        DESTROY_TIMER(t_phase);
 
         for(k = 0; k < n_runs; k++){
                 if(alignments[k]) kalign_free_msa(alignments[k]);
@@ -1102,8 +703,18 @@ int kalign_consensus_from_poar(struct msa* msa,
         }
 
         /* Build consensus at given min_support threshold */
-        RUN(build_consensus_from_poar(poar, msa, numseq, min_support,
-                                       &consensus_msa));
+        #ifdef USE_THREADPOOL
+                        RUN(build_consensus_from_poar(poar, msa, numseq, min_support,
+                                                      &consensus_msa, msa->pool));
+#else
+                        #ifdef USE_THREADPOOL
+                        RUN(build_consensus_from_poar(poar, msa, numseq, min_support,
+                                                      &consensus_msa, msa->pool));
+                        #else
+                        RUN(build_consensus_from_poar(poar, msa, numseq, min_support,
+                                                      &consensus_msa));
+                        #endif
+#endif
 
         /* Copy consensus alignment back into original MSA */
         RUN(copy_alignment_to_msa(msa, consensus_msa, numseq));
@@ -1111,7 +722,11 @@ int kalign_consensus_from_poar(struct msa* msa,
         consensus_msa = NULL;
 
         /* Compute per-residue and per-column confidence */
+        #ifdef USE_THREADPOOL
+        RUN(compute_residue_confidence(poar, msa, msa->pool));
+#else
         RUN(compute_residue_confidence(poar, msa));
+#endif
 
         RUN(msa_sort_rank(msa));
 

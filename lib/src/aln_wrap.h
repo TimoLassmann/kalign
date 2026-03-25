@@ -18,34 +18,12 @@
 
 struct msa;
 
-EXTERN int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, float tgpe, int refine, int adaptive_budget);
-EXTERN int kalign_run_seeded(struct msa *msa, int n_threads, int type,
-                             float gpo, float gpe, float tgpe,
-                             int refine, int adaptive_budget,
-                             uint64_t tree_seed, float tree_noise,
-                             float dist_scale, float vsm_amax,
-                             float use_seq_weights,
-                             int consistency_anchors, float consistency_weight);
-EXTERN int kalign_run_realign(struct msa *msa, int n_threads, int type,
-                              float gpo, float gpe, float tgpe,
-                              int refine, int adaptive_budget,
-                              float dist_scale, float vsm_amax,
-                              int realign_iterations,
-                              float use_seq_weights,
-                              int consistency_anchors, float consistency_weight);
-
-EXTERN int kalign_run_dist_scale(struct msa *msa, int n_threads, int type,
-                                  float gpo, float gpe, float tgpe,
-                                  int refine, int adaptive_budget,
-                                  float dist_scale, float vsm_amax,
-                                  float use_seq_weights);
-
-EXTERN int kalign_post_realign(struct msa *msa, int n_threads, int type,
-                               float gpo, float gpe, float tgpe,
-                               int refine, int adaptive_budget,
-                               float dist_scale, float vsm_amax,
-                               int realign_iterations,
-                               float use_seq_weights);
+/* Internal single-run entry point.  Caller must set msa->pool before
+   calling (if USE_THREADPOOL is enabled).  Does NOT create or destroy
+   the threadpool.  Used by kalign_align_full and ensemble.c. */
+EXTERN int kalign_single_run(struct msa *msa,
+                             const struct kalign_run_config *cfg,
+                             int n_threads);
 
 EXTERN struct kalign_run_config kalign_run_config_defaults(void);
 EXTERN struct kalign_ensemble_config kalign_ensemble_config_defaults(void);

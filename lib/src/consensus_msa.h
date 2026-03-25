@@ -15,6 +15,27 @@ struct poar_table;
 struct pos_matrix;
 struct msa;
 
+#ifdef USE_THREADPOOL
+typedef struct threadpool threadpool_t;
+
+EXTERN int build_consensus(struct poar_table* table,
+                           int* seq_lengths, int numseq,
+                           int min_support,
+                           struct msa* out_msa,
+                           threadpool_t* pool);
+
+EXTERN int score_alignment_poar(struct poar_table* table,
+                                struct pos_matrix* pm,
+                                int numseq,
+                                int n_alignments,
+                                double* out_score,
+                                threadpool_t* pool);
+
+EXTERN int compute_residue_confidence(struct poar_table* table,
+                                      struct msa* aligned_msa,
+                                      threadpool_t* pool);
+#else
+
 EXTERN int build_consensus(struct poar_table* table,
                            int* seq_lengths, int numseq,
                            int min_support,
@@ -28,6 +49,7 @@ EXTERN int score_alignment_poar(struct poar_table* table,
 
 EXTERN int compute_residue_confidence(struct poar_table* table,
                                       struct msa* aligned_msa);
+#endif
 
 #undef CONSENSUS_MSA_IMPORT
 #undef EXTERN

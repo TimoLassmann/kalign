@@ -60,60 +60,10 @@ EXTERN int kalign_write_msa(struct msa *msa, char *outfile, char *format);
 /* EXTERN int kalign_arr_to_msa(char **input_sequences, int *len, int numseq, struct msa **multiple_aln); */
 
 
+/* Legacy C API — thin wrapper around kalign_align_full */
 EXTERN int kalign(char **seq, int *len, int numseq, int n_threads, int type,
                   float gpo, float gpe, float tgpe, char ***aligned,
                   int *out_aln_len);
-
-EXTERN int kalign_run(struct msa *msa, int n_threads, int type, float gpo, float gpe, float tgpe, int refine, int adaptive_budget);
-
-EXTERN int kalign_run_seeded(struct msa *msa, int n_threads, int type,
-                             float gpo, float gpe, float tgpe,
-                             int refine, int adaptive_budget,
-                             uint64_t tree_seed, float tree_noise,
-                             float dist_scale, float vsm_amax,
-                             float use_seq_weights,
-                             int consistency_anchors, float consistency_weight);
-
-EXTERN int kalign_run_dist_scale(struct msa *msa, int n_threads, int type,
-                                  float gpo, float gpe, float tgpe,
-                                  int refine, int adaptive_budget,
-                                  float dist_scale, float vsm_amax,
-                                  float use_seq_weights);
-
-EXTERN int kalign_run_realign(struct msa *msa, int n_threads, int type,
-                              float gpo, float gpe, float tgpe,
-                              int refine, int adaptive_budget,
-                              float dist_scale, float vsm_amax,
-                              int realign_iterations,
-                              float use_seq_weights,
-                              int consistency_anchors, float consistency_weight);
-
-EXTERN int kalign_post_realign(struct msa *msa, int n_threads, int type,
-                               float gpo, float gpe, float tgpe,
-                               int refine, int adaptive_budget,
-                               float dist_scale, float vsm_amax,
-                               int realign_iterations,
-                               float use_seq_weights);
-
-EXTERN int kalign_ensemble(struct msa* msa, int n_threads, int type,
-                           int n_runs, float gpo, float gpe, float tgpe,
-                           uint64_t seed, int min_support,
-                           const char* save_poar_path,
-                           int refine, float dist_scale, float vsm_amax,
-                           int realign, float use_seq_weights,
-                           int consistency_anchors, float consistency_weight);
-
-EXTERN int kalign_ensemble_custom(struct msa* msa, int n_threads, int type,
-                                  int n_runs,
-                                  const float* run_gpo,
-                                  const float* run_gpe,
-                                  const float* run_tgpe,
-                                  const int* run_types,
-                                  const float* run_noise,
-                                  uint64_t seed, int min_support,
-                                  int refine, float vsm_amax,
-                                  int realign, float use_seq_weights,
-                                  int consistency_anchors, float consistency_weight);
 
 EXTERN int kalign_consensus_from_poar(struct msa* msa,
                                       const char* poar_path,

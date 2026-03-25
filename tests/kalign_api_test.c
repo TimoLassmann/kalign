@@ -1,17 +1,17 @@
 /*
  * kalign_api_test.c — comprehensive tests for the kalign public C API.
  *
- * Covers the functions not exercised by the existing test suite:
- *   - kalign_run_seeded()        (VSM, consistency, tree seed/noise)
- *   - kalign_run_dist_scale()    (VSM, seq_weights)
- *   - kalign_run_realign()       (realign iterations)
- *   - kalign_post_realign()      (post-align realign)
- *   - kalign_run()               with refine modes
+ * Tests the unified kalign_align_full entry point with various configs:
+ *   - Single run with refine modes
+ *   - VSM + seq_weights via run config
+ *   - Seeded tree + consistency anchors
+ *   - Realign iterations
+ *   - Ensemble alignment
  *   - kalign_msa_compare_detailed()
  *   - kalign_msa_compare_with_mask()
  *   - kalign_check_msa()
  *   - reformat_settings_msa()
- *   - kalign_write_msa()         round-trip fasta
+ *   - kalign_write_msa() round-trip fasta
  *
  * Each test:
  *   1. Reads input from the file passed as argv[1]
@@ -36,7 +36,6 @@
 /* helpers                                                             */
 /* ------------------------------------------------------------------ */
 
-/* Count non-gap characters in an aligned sequence string. */
 static int count_residues(const char *seq)
 {
         int n = 0;
@@ -46,7 +45,6 @@ static int count_residues(const char *seq)
         return n;
 }
 
-/* Record the ungapped lengths of all sequences before alignment. */
 static int *snapshot_lengths(struct msa *m)
 {
         int *lens = malloc(sizeof(int) * m->numseq);
@@ -57,11 +55,6 @@ static int *snapshot_lengths(struct msa *m)
         return lens;
 }
 
-/* Verify basic alignment invariants:
- *   - alnlen > 0
- *   - every seq string has length == alnlen
- *   - every seq preserves its original residue count
- * Returns 0 on success, -1 on failure.  */
 static int verify_alignment(struct msa *m, int *orig_lens, const char *label)
 {
         if (m->alnlen <= 0) {
@@ -91,7 +84,6 @@ static int verify_alignment(struct msa *m, int *orig_lens, const char *label)
         return 0;
 }
 
-/* Read input, returning a fresh MSA. Caller must free with kalign_free_msa. */
 static struct msa *read_input(const char *path)
 {
         struct msa *m = NULL;
@@ -102,13 +94,19 @@ static struct msa *read_input(const char *path)
         return m;
 }
 
+/* Helper: run a single alignment with default config */
+static int align_default(struct msa *msa)
+{
+        struct kalign_run_config cfg = kalign_run_config_defaults();
+        return kalign_align_full(msa, &cfg, 1, NULL, 1);
+}
+
 /* ------------------------------------------------------------------ */
 /* individual test functions                                           */
 /* ------------------------------------------------------------------ */
 
 static int test_run_with_refine(const char *input)
 {
-        /* Test KALIGN_REFINE_ALL and KALIGN_REFINE_CONFIDENT */
         int modes[] = {KALIGN_REFINE_ALL, KALIGN_REFINE_CONFIDENT};
         const char *names[] = {"REFINE_ALL", "REFINE_CONFIDENT"};
 
@@ -117,9 +115,11 @@ static int test_run_with_refine(const char *input)
                 if (!msa) return -1;
                 int *lens = snapshot_lengths(msa);
 
-                int rv = kalign_run(msa, 1, -1, -1, -1, -1, modes[m], 0);
+                struct kalign_run_config cfg = kalign_run_config_defaults();
+                cfg.refine = modes[m];
+                int rv = kalign_align_full(msa, &cfg, 1, NULL, 1);
                 if (rv != 0) {
-                        fprintf(stderr, "  kalign_run(%s) returned %d\n", names[m], rv);
+                        fprintf(stderr, "  kalign_align_full(%s) returned %d\n", names[m], rv);
                         free(lens);
                         kalign_free_msa(msa);
                         return -1;
@@ -142,11 +142,12 @@ static int test_run_dist_scale(const char *input)
         if (!msa) return -1;
         int *lens = snapshot_lengths(msa);
 
-        /* vsm_amax=2.0, seq_weights=1.0 */
-        int rv = kalign_run_dist_scale(msa, 1, -1, -1, -1, -1, 0, 0,
-                                       0.0f, 2.0f, 1.0f);
+        struct kalign_run_config cfg = kalign_run_config_defaults();
+        cfg.vsm_amax = 2.0f;
+        cfg.seq_weights = 1.0f;
+        int rv = kalign_align_full(msa, &cfg, 1, NULL, 1);
         if (rv != 0) {
-                fprintf(stderr, "  kalign_run_dist_scale returned %d\n", rv);
+                fprintf(stderr, "  align_full(vsm+sw) returned %d\n", rv);
                 free(lens);
                 kalign_free_msa(msa);
                 return -1;
@@ -168,11 +169,14 @@ static int test_run_seeded(const char *input)
         if (!msa) return -1;
         int *lens = snapshot_lengths(msa);
 
-        /* tree_seed=42, tree_noise=0, vsm_amax=2.0, consistency_anchors=5 */
-        int rv = kalign_run_seeded(msa, 1, -1, -1, -1, -1, 0, 0,
-                                   42, 0.0f, 0.0f, 2.0f, 0.0f, 5, 2.0f);
+        struct kalign_run_config cfg = kalign_run_config_defaults();
+        cfg.tree_seed = 42;
+        cfg.vsm_amax = 2.0f;
+        cfg.consistency_anchors = 5;
+        cfg.consistency_weight = 2.0f;
+        int rv = kalign_align_full(msa, &cfg, 1, NULL, 1);
         if (rv != 0) {
-                fprintf(stderr, "  kalign_run_seeded returned %d\n", rv);
+                fprintf(stderr, "  align_full(seeded+consistency) returned %d\n", rv);
                 free(lens);
                 kalign_free_msa(msa);
                 return -1;
@@ -194,11 +198,12 @@ static int test_run_realign(const char *input)
         if (!msa) return -1;
         int *lens = snapshot_lengths(msa);
 
-        /* realign_iterations=1, vsm_amax=2.0 */
-        int rv = kalign_run_realign(msa, 1, -1, -1, -1, -1, 0, 0,
-                                    0.0f, 2.0f, 1, 0.0f, 0, 2.0f);
+        struct kalign_run_config cfg = kalign_run_config_defaults();
+        cfg.vsm_amax = 2.0f;
+        cfg.realign = 1;
+        int rv = kalign_align_full(msa, &cfg, 1, NULL, 1);
         if (rv != 0) {
-                fprintf(stderr, "  kalign_run_realign returned %d\n", rv);
+                fprintf(stderr, "  align_full(realign=1) returned %d\n", rv);
                 free(lens);
                 kalign_free_msa(msa);
                 return -1;
@@ -214,53 +219,26 @@ static int test_run_realign(const char *input)
         return 0;
 }
 
-static int test_post_realign(const char *input)
-{
-        /* First do a normal alignment, then post-realign the result */
-        struct msa *msa = read_input(input);
-        if (!msa) return -1;
-        int *lens = snapshot_lengths(msa);
-
-        int rv = kalign_run(msa, 1, -1, -1, -1, -1, 0, 0);
-        if (rv != 0) {
-                fprintf(stderr, "  initial kalign_run returned %d\n", rv);
-                free(lens);
-                kalign_free_msa(msa);
-                return -1;
-        }
-
-        rv = kalign_post_realign(msa, 1, -1, -1, -1, -1, 0, 0,
-                                 0.0f, 0.0f, 1, 0.0f);
-        if (rv != 0) {
-                fprintf(stderr, "  kalign_post_realign returned %d\n", rv);
-                free(lens);
-                kalign_free_msa(msa);
-                return -1;
-        }
-        if (verify_alignment(msa, lens, "post_realign") != 0) {
-                free(lens);
-                kalign_free_msa(msa);
-                return -1;
-        }
-        fprintf(stdout, "  post_realign: OK (alnlen=%d)\n", msa->alnlen);
-        free(lens);
-        kalign_free_msa(msa);
-        return 0;
-}
-
 static int test_ensemble_with_realign(const char *input)
 {
         struct msa *msa = read_input(input);
         if (!msa) return -1;
         int *lens = snapshot_lengths(msa);
 
-        /* ensemble=3, vsm=2.0, realign=1, refine=CONFIDENT */
-        int rv = kalign_ensemble(msa, 1, -1, 3, -1.0f, -1.0f, -1.0f,
-                                 42, 0, NULL,
-                                 KALIGN_REFINE_CONFIDENT, 0.0f, 2.0f,
-                                 1, 0.0f, 0, 2.0f);
+        /* 3-run ensemble with realign and refine */
+        struct kalign_run_config runs[3];
+        for (int i = 0; i < 3; i++) {
+                runs[i] = kalign_run_config_defaults();
+                runs[i].vsm_amax = 2.0f;
+                runs[i].realign = 1;
+                runs[i].refine = KALIGN_REFINE_CONFIDENT;
+                runs[i].tree_seed = 42 + (uint64_t)i;
+                runs[i].tree_noise = (i > 0) ? 0.2f : 0.0f;
+        }
+        struct kalign_ensemble_config ens = kalign_ensemble_config_defaults();
+        int rv = kalign_align_full(msa, runs, 3, &ens, 1);
         if (rv != 0) {
-                fprintf(stderr, "  kalign_ensemble+realign returned %d\n", rv);
+                fprintf(stderr, "  align_full(ensemble+realign) returned %d\n", rv);
                 free(lens);
                 kalign_free_msa(msa);
                 return -1;
@@ -270,7 +248,7 @@ static int test_ensemble_with_realign(const char *input)
                 kalign_free_msa(msa);
                 return -1;
         }
-        /* Also check col_confidence */
+        /* Check col_confidence */
         if (msa->col_confidence == NULL) {
                 fprintf(stderr, "  [ens+realign] FAIL: col_confidence is NULL\n");
                 free(lens);
@@ -294,13 +272,12 @@ static int test_ensemble_with_realign(const char *input)
 
 static int test_compare_detailed(const char *input)
 {
-        /* Align, then compare to self — should get perfect scores */
         struct msa *ref = read_input(input);
         struct msa *test_msa = read_input(input);
         if (!ref || !test_msa) return -1;
 
-        kalign_run(ref, 1, -1, -1, -1, -1, 0, 0);
-        kalign_run(test_msa, 1, -1, -1, -1, -1, 0, 0);
+        align_default(ref);
+        align_default(test_msa);
 
         struct poar_score out;
         memset(&out, 0, sizeof(out));
@@ -312,7 +289,6 @@ static int test_compare_detailed(const char *input)
                 return -1;
         }
 
-        /* Self-comparison: recall, precision, f1 should all be 1.0 */
         if (fabs(out.recall - 1.0) > 0.001) {
                 fprintf(stderr, "  FAIL: recall=%.4f (expected 1.0)\n", out.recall);
                 kalign_free_msa(ref);
@@ -365,10 +341,9 @@ static int test_compare_with_mask(const char *input)
         struct msa *test_msa = read_input(input);
         if (!ref || !test_msa) return -1;
 
-        kalign_run(ref, 1, -1, -1, -1, -1, 0, 0);
-        kalign_run(test_msa, 1, -1, -1, -1, -1, 0, 0);
+        align_default(ref);
+        align_default(test_msa);
 
-        /* Create a mask that includes all columns */
         int n_cols = ref->alnlen;
         int *mask = malloc(sizeof(int) * n_cols);
         if (!mask) {
@@ -389,7 +364,6 @@ static int test_compare_with_mask(const char *input)
                 return -1;
         }
 
-        /* All columns masked in → same as full comparison → perfect scores */
         if (fabs(out.recall - 1.0) > 0.001 || fabs(out.precision - 1.0) > 0.001) {
                 fprintf(stderr, "  FAIL: mask-all recall=%.4f prec=%.4f\n", out.recall, out.precision);
                 free(mask);
@@ -398,7 +372,7 @@ static int test_compare_with_mask(const char *input)
                 return -1;
         }
 
-        /* Now test with partial mask (first half only) */
+        /* Test with partial mask */
         for (int i = n_cols / 2; i < n_cols; i++) mask[i] = 0;
         memset(&out, 0, sizeof(out));
         rv = kalign_msa_compare_with_mask(ref, test_msa, mask, n_cols, &out);
@@ -409,7 +383,6 @@ static int test_compare_with_mask(const char *input)
                 kalign_free_msa(test_msa);
                 return -1;
         }
-        /* Partial mask self-compare should still give perfect scores */
         if (fabs(out.recall - 1.0) > 0.001) {
                 fprintf(stderr, "  FAIL: partial mask recall=%.4f\n", out.recall);
                 free(mask);
@@ -430,8 +403,6 @@ static int test_check_msa(const char *input)
         struct msa *msa = read_input(input);
         if (!msa) return -1;
 
-        /* kalign_check_msa checks for duplicate sequences.
-         * Our test files shouldn't have exact duplicates. */
         msa->quiet = 1;
         int rv = kalign_check_msa(msa, 0);
         if (rv != 0) {
@@ -449,22 +420,19 @@ static int test_reformat_settings(const char *input)
         struct msa *msa = read_input(input);
         if (!msa) return -1;
 
-        /* First align so we have gaps */
-        int rv = kalign_run(msa, 1, -1, -1, -1, -1, 0, 0);
+        int rv = align_default(msa);
         if (rv != 0) {
                 fprintf(stderr, "  initial align failed\n");
                 kalign_free_msa(msa);
                 return -1;
         }
 
-        /* Test rename */
         rv = reformat_settings_msa(msa, 1, 0);
         if (rv != 0) {
                 fprintf(stderr, "  reformat_settings_msa(rename) returned %d\n", rv);
                 kalign_free_msa(msa);
                 return -1;
         }
-        /* Verify names were changed to SEQ1, SEQ2, etc. */
         for (int i = 0; i < msa->numseq; i++) {
                 char expected[32];
                 snprintf(expected, sizeof(expected), "SEQ%d", i + 1);
@@ -477,16 +445,12 @@ static int test_reformat_settings(const char *input)
         }
         fprintf(stdout, "  reformat rename: OK\n");
 
-        /* Test unalign — zeroes the gaps[] array and sets status to unaligned.
-         * Note: dealign_msa operates on the internal gaps[] representation,
-         * not on seq->seq (which holds finalised text with '-' chars). */
         rv = reformat_settings_msa(msa, 0, 1);
         if (rv != 0) {
                 fprintf(stderr, "  reformat_settings_msa(unalign) returned %d\n", rv);
                 kalign_free_msa(msa);
                 return -1;
         }
-        /* After unalign, all gaps[] entries should be zero */
         for (int i = 0; i < msa->numseq; i++) {
                 for (int j = 0; j <= msa->sequences[i]->len; j++) {
                         if (msa->sequences[i]->gaps[j] != 0) {
@@ -505,11 +469,10 @@ static int test_reformat_settings(const char *input)
 
 static int test_write_roundtrip(const char *input)
 {
-        /* Align, write to fasta, read back, compare */
         struct msa *msa = read_input(input);
         if (!msa) return -1;
 
-        int rv = kalign_run(msa, 1, -1, -1, -1, -1, 0, 0);
+        int rv = align_default(msa);
         if (rv != 0) {
                 kalign_free_msa(msa);
                 return -1;
@@ -523,7 +486,6 @@ static int test_write_roundtrip(const char *input)
                 return -1;
         }
 
-        /* Read it back */
         struct msa *msa2 = NULL;
         rv = kalign_read_input((char *)tmpfile, &msa2, 1);
         if (rv != 0 || msa2 == NULL) {
@@ -533,7 +495,6 @@ static int test_write_roundtrip(const char *input)
                 return -1;
         }
 
-        /* Compare: same number of sequences, same alignment content */
         if (msa->numseq != msa2->numseq) {
                 fprintf(stderr, "  FAIL: numseq %d vs %d\n", msa->numseq, msa2->numseq);
                 kalign_free_msa(msa);
@@ -542,7 +503,6 @@ static int test_write_roundtrip(const char *input)
                 return -1;
         }
 
-        /* Use kalign_msa_compare for a real score check */
         float score = 0;
         rv = kalign_msa_compare(msa, msa2, &score);
         if (rv != 0) {
@@ -586,17 +546,16 @@ int main(int argc, char *argv[])
                 const char *name;
                 int (*fn)(const char *);
         } tests[] = {
-                {"kalign_run + refine",            test_run_with_refine},
-                {"kalign_run_dist_scale (VSM)",    test_run_dist_scale},
-                {"kalign_run_seeded (consistency)", test_run_seeded},
-                {"kalign_run_realign",             test_run_realign},
-                {"kalign_post_realign",            test_post_realign},
-                {"kalign_ensemble + realign",      test_ensemble_with_realign},
-                {"kalign_msa_compare_detailed",    test_compare_detailed},
-                {"kalign_msa_compare_with_mask",   test_compare_with_mask},
-                {"kalign_check_msa",               test_check_msa},
-                {"reformat_settings_msa",          test_reformat_settings},
-                {"write fasta roundtrip",          test_write_roundtrip},
+                {"kalign_align_full + refine",      test_run_with_refine},
+                {"VSM + seq_weights",               test_run_dist_scale},
+                {"seeded tree + consistency",        test_run_seeded},
+                {"realign iterations",              test_run_realign},
+                {"ensemble + realign",              test_ensemble_with_realign},
+                {"kalign_msa_compare_detailed",     test_compare_detailed},
+                {"kalign_msa_compare_with_mask",    test_compare_with_mask},
+                {"kalign_check_msa",                test_check_msa},
+                {"reformat_settings_msa",           test_reformat_settings},
+                {"write fasta roundtrip",           test_write_roundtrip},
         };
 
         int n_tests = (int)(sizeof(tests) / sizeof(tests[0]));

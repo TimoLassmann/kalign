@@ -47,7 +47,14 @@ EXTERN void poar_table_free(struct poar_table* table);
 EXTERN int pos_matrix_from_msa(struct pos_matrix** pm, char** seqs, int numseq, int alnlen);
 EXTERN void pos_matrix_free(struct pos_matrix* pm);
 
-EXTERN int extract_poars(struct poar_table* table, struct pos_matrix* pm, int aln_idx);
+#ifdef USE_THREADPOOL
+typedef struct threadpool threadpool_t;
+EXTERN int extract_poars(struct poar_table* table, struct pos_matrix* pm,
+                         int aln_idx, threadpool_t* pool);
+#else
+EXTERN int extract_poars(struct poar_table* table, struct pos_matrix* pm,
+                         int aln_idx);
+#endif
 
 EXTERN int poar_table_write(struct poar_table* table, const char* path);
 EXTERN int poar_table_read(struct poar_table** table, const char* path);

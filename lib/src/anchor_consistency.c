@@ -10,6 +10,10 @@
 #include "aln_setup.h"
 #include "aln_controller.h"
 
+#ifdef USE_THREADPOOL
+#include "threadpool/threadpool.h"
+#endif
+
 #define ANCHOR_CONSISTENCY_IMPORT
 #include "anchor_consistency.h"
 
@@ -197,6 +201,87 @@ ERROR:
         return FAIL;
 }
 
+/* Serial build: each sequence i aligns against all K anchors */
+static int anchor_build_serial(struct msa* msa, struct aln_param* ap,
+                                struct consistency_table* ct)
+{
+        int N = ct->numseq;
+        int K = ct->n_anchors;
+        int i, k;
+
+        for(i = 0; i < N; i++){
+                int len_i = msa->sequences[i]->len;
+                for(k = 0; k < K; k++){
+                        int ak = ct->anchor_ids[k];
+                        ct->map_lengths[i * K + k] = len_i;
+
+                        if(i == ak){
+                                int p;
+                                MMALLOC(ct->pos_maps[i * K + k], sizeof(int) * len_i);
+                                for(p = 0; p < len_i; p++){
+                                        ct->pos_maps[i * K + k][p] = p;
+                                }
+                        }else{
+                                RUN(pairwise_align_map(ap,
+                                                       msa->sequences[i]->s, len_i,
+                                                       msa->sequences[ak]->s, msa->sequences[ak]->len,
+                                                       &ct->pos_maps[i * K + k]));
+                        }
+                }
+        }
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+#ifdef USE_THREADPOOL
+/* Context for parallel anchor build */
+struct anchor_par_ctx {
+        struct msa* msa;
+        struct aln_param* ap;
+        struct consistency_table* ct;
+        int error;  /* set non-zero on failure */
+};
+
+static void anchor_build_chunk(int start, int end, void* arg)
+{
+        struct anchor_par_ctx* ctx = (struct anchor_par_ctx*)arg;
+        struct msa* msa = ctx->msa;
+        struct aln_param* ap = ctx->ap;
+        struct consistency_table* ct = ctx->ct;
+        int K = ct->n_anchors;
+        int i, k;
+
+        for(i = start; i < end; i++){
+                int len_i = msa->sequences[i]->len;
+                for(k = 0; k < K; k++){
+                        int ak = ct->anchor_ids[k];
+                        ct->map_lengths[i * K + k] = len_i;
+
+                        if(i == ak){
+                                /* Identity map — no allocation can fail in practice
+                                   but we must handle it gracefully */
+                                int* map = malloc(sizeof(int) * len_i);
+                                if(!map){ ctx->error = 1; return; }
+                                for(int p = 0; p < len_i; p++){
+                                        map[p] = p;
+                                }
+                                ct->pos_maps[i * K + k] = map;
+                        }else{
+                                /* Pairwise alignment: each thread does its own DP */
+                                if(pairwise_align_map(ap,
+                                                      msa->sequences[i]->s, len_i,
+                                                      msa->sequences[ak]->s, msa->sequences[ak]->len,
+                                                      &ct->pos_maps[i * K + k]) != OK){
+                                        ctx->error = 1;
+                                        return;
+                                }
+                        }
+                }
+        }
+}
+#endif /* USE_THREADPOOL */
+
 int anchor_consistency_build(struct msa* msa, struct aln_param* ap,
                              int n_anchors, float weight,
                              struct consistency_table** ct_out)
@@ -204,7 +289,7 @@ int anchor_consistency_build(struct msa* msa, struct aln_param* ap,
         struct consistency_table* ct = NULL;
         int N = msa->numseq;
         int K = n_anchors;
-        int i, k;
+        int i;
 
         if(K <= 0 || N < 3){
                 *ct_out = NULL;
@@ -242,29 +327,25 @@ int anchor_consistency_build(struct msa* msa, struct aln_param* ap,
                 LOG_MSG("Anchor consistency: K=%d, weight=%.1f", K, weight);
         }
 
-        /* Build position maps: for each sequence i, for each anchor k */
-        for(i = 0; i < N; i++){
-                int len_i = msa->sequences[i]->len;
-                for(k = 0; k < K; k++){
-                        int ak = ct->anchor_ids[k];
-                        ct->map_lengths[i * K + k] = len_i;
-
-                        if(i == ak){
-                                /* Identity map for anchor itself */
-                                int p;
-                                MMALLOC(ct->pos_maps[i * K + k], sizeof(int) * len_i);
-                                for(p = 0; p < len_i; p++){
-                                        ct->pos_maps[i * K + k][p] = p;
-                                }
-                        }else{
-                                /* Pairwise alignment: seq_i vs anchor_k */
-                                RUN(pairwise_align_map(ap,
-                                                       msa->sequences[i]->s, len_i,
-                                                       msa->sequences[ak]->s, msa->sequences[ak]->len,
-                                                       &ct->pos_maps[i * K + k]));
-                        }
+        /* Build position maps: for each sequence i, for each anchor k.
+           This is the main bottleneck — O(N*K) pairwise DP alignments. */
+#ifdef USE_THREADPOOL
+        if(msa->pool != NULL){
+                struct anchor_par_ctx ctx;
+                ctx.msa = msa;
+                ctx.ap = ap;
+                ctx.ct = ct;
+                ctx.error = 0;
+                tp_parallel_for(msa->pool, 0, N, anchor_build_chunk, &ctx);
+                if(ctx.error){
+                        ERROR_MSG("Parallel anchor build failed");
                 }
+        }else{
+                RUN(anchor_build_serial(msa, ap, ct));
         }
+#else
+        RUN(anchor_build_serial(msa, ap, ct));
+#endif
 
         *ct_out = ct;
         return OK;

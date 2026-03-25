@@ -4,6 +4,10 @@
 #include <string.h>
 #include <stdio.h>
 
+#ifdef USE_THREADPOOL
+#include "threadpool/threadpool.h"
+#endif
+
 #define POAR_IMPORT
 #include "poar.h"
 
@@ -168,7 +172,46 @@ void pos_matrix_free(struct pos_matrix* pm)
         }
 }
 
-int extract_poars(struct poar_table* table, struct pos_matrix* pm, int aln_idx)
+#ifdef USE_THREADPOOL
+struct extract_poar_ctx {
+        struct poar_table* table;
+        struct pos_matrix* pm;
+        int numseq;
+        int alnlen;
+        int aln_idx;
+        int error;
+};
+
+static void extract_poar_chunk(int start, int end, void* arg)
+{
+        struct extract_poar_ctx* c = (struct extract_poar_ctx*)arg;
+        int j, col;
+        for(int i = start; i < end; i++){
+                for(j = i + 1; j < c->numseq; j++){
+                        int pidx = pair_index(i, j, c->numseq);
+                        struct poar_pair* pp = c->table->pairs[pidx];
+                        for(col = 0; col < c->alnlen; col++){
+                                int ri = c->pm->col_to_res[i][col];
+                                int rj = c->pm->col_to_res[j][col];
+                                if(ri >= 0 && rj >= 0){
+                                        uint32_t key = pack_key(ri, rj);
+                                        if(poar_pair_insert(pp, key, c->aln_idx) != OK){
+                                                c->error = 1;
+                                                return;
+                                        }
+                                }
+                        }
+                }
+        }
+}
+#endif
+
+int extract_poars(struct poar_table* table, struct pos_matrix* pm,
+                  int aln_idx
+#ifdef USE_THREADPOOL
+                  , threadpool_t* pool
+#endif
+                  )
 {
         int i, j, col;
         int numseq = pm->numseq;
@@ -176,17 +219,30 @@ int extract_poars(struct poar_table* table, struct pos_matrix* pm, int aln_idx)
 
         ASSERT(aln_idx < 32, "Maximum 32 alignments supported in ensemble");
 
-        for(i = 0; i < numseq - 1; i++){
-                for(j = i + 1; j < numseq; j++){
-                        int pidx = pair_index(i, j, numseq);
-                        struct poar_pair* pp = table->pairs[pidx];
-
-                        for(col = 0; col < alnlen; col++){
-                                int ri = pm->col_to_res[i][col];
-                                int rj = pm->col_to_res[j][col];
-                                if(ri >= 0 && rj >= 0){
-                                        uint32_t key = pack_key(ri, rj);
-                                        RUN(poar_pair_insert(pp, key, aln_idx));
+#ifdef USE_THREADPOOL
+        if(pool != NULL && numseq > 16){
+                struct extract_poar_ctx ctx = {
+                        table, pm, numseq, alnlen, aln_idx, 0
+                };
+                tp_parallel_for(pool, 0, numseq - 1,
+                                extract_poar_chunk, &ctx);
+                if(ctx.error){
+                        ERROR_MSG("Parallel POAR extraction failed");
+                }
+        }else
+#endif
+        {
+                for(i = 0; i < numseq - 1; i++){
+                        for(j = i + 1; j < numseq; j++){
+                                int pidx = pair_index(i, j, numseq);
+                                struct poar_pair* pp = table->pairs[pidx];
+                                for(col = 0; col < alnlen; col++){
+                                        int ri = pm->col_to_res[i][col];
+                                        int rj = pm->col_to_res[j][col];
+                                        if(ri >= 0 && rj >= 0){
+                                                uint32_t key = pack_key(ri, rj);
+                                                RUN(poar_pair_insert(pp, key, aln_idx));
+                                        }
                                 }
                         }
                 }

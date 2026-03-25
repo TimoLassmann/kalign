@@ -55,6 +55,19 @@ int main(int argc, char *argv[])
         return ret;
 }
 
+/* Helper: create a 3-run ensemble config with default params */
+static void make_ensemble_runs(struct kalign_run_config *runs, int n_runs,
+                                struct kalign_ensemble_config *ens, int min_support)
+{
+        for(int i = 0; i < n_runs; i++){
+                runs[i] = kalign_run_config_defaults();
+                runs[i].tree_seed = 42 + (uint64_t)i;
+                runs[i].tree_noise = (i > 0) ? 0.2f : 0.0f;
+        }
+        *ens = kalign_ensemble_config_defaults();
+        ens->min_support = min_support;
+}
+
 /* Test 1: Run ensemble alignment with n_runs=3 and verify that
  * col_confidence is populated with values in [0, 1]. */
 static int test_ensemble_confidence(const char *input_file)
@@ -68,29 +81,29 @@ static int test_ensemble_confidence(const char *input_file)
                 return -1;
         }
 
-        /* n_runs=3, default gap penalties, seed=42, min_support=0 (auto), no POAR save */
-        rv = kalign_ensemble(msa, 1, -1, 3, -1.0f, -1.0f, -1.0f, 42, 0, NULL, 0, 0.0f, -1.0f, 0, 0.0f, 0, 2.0f);
+        struct kalign_run_config runs[3];
+        struct kalign_ensemble_config ens;
+        make_ensemble_runs(runs, 3, &ens, 0);
+
+        rv = kalign_align_full(msa, runs, 3, &ens, 1);
         if(rv != 0){
-                fprintf(stderr, "  ERROR: kalign_ensemble returned %d\n", rv);
+                fprintf(stderr, "  ERROR: kalign_align_full (ensemble) returned %d\n", rv);
                 kalign_free_msa(msa);
                 return -1;
         }
 
-        /* Check that col_confidence was allocated */
         if(msa->col_confidence == NULL){
                 fprintf(stderr, "  ERROR: col_confidence is NULL after ensemble\n");
                 kalign_free_msa(msa);
                 return -1;
         }
 
-        /* Verify alignment length is positive */
         if(msa->alnlen <= 0){
                 fprintf(stderr, "  ERROR: alnlen is %d (expected > 0)\n", msa->alnlen);
                 kalign_free_msa(msa);
                 return -1;
         }
 
-        /* Check that all col_confidence values are in [0, 1] */
         for(int i = 0; i < msa->alnlen; i++){
                 float c = msa->col_confidence[i];
                 if(c < 0.0f || c > 1.0f){
@@ -102,7 +115,6 @@ static int test_ensemble_confidence(const char *input_file)
 
         fprintf(stdout, "  col_confidence: %d values, all in [0,1]\n", msa->alnlen);
 
-        /* Also verify that sequences are aligned (have equal length = alnlen) */
         for(int i = 0; i < msa->numseq; i++){
                 if(msa->sequences[i]->seq == NULL){
                         fprintf(stderr, "  ERROR: sequence %d has NULL seq\n", i);
@@ -124,75 +136,58 @@ static int test_ensemble_confidence(const char *input_file)
         return 0;
 }
 
-/* Test 2: Run ensemble with save_poar, then load POAR with
- * kalign_consensus_from_poar and verify both produce aligned output. */
+/* Test 2: Run ensemble with min_support=2, save POAR, then load POAR with
+ * kalign_consensus_from_poar and verify both produce matching aligned output.
+ *
+ * NOTE: POAR save is no longer in the ensemble config. This test now verifies
+ * that two ensemble runs with the same params produce identical alignments
+ * when using explicit min_support (deterministic consensus path). */
 static int test_poar_round_trip(const char *input_file)
 {
         struct msa *msa1 = NULL;
         struct msa *msa2 = NULL;
         int rv;
-        const char *poar_path = "test_ensemble_poar.bin";
 
-        /* First run: ensemble with POAR save */
         rv = kalign_read_input((char *)input_file, &msa1, 1);
         if(rv != 0 || msa1 == NULL){
                 fprintf(stderr, "  ERROR: failed to read input file: %s\n", input_file);
                 return -1;
         }
 
-        /* Use explicit min_support=2 so the ensemble always takes the consensus
-         * path.  kalign_consensus_from_poar() also requires min_support >= 1,
-         * and both must use the same threshold for the output to match. */
-        rv = kalign_ensemble(msa1, 1, -1, 3, -1.0f, -1.0f, -1.0f, 42, 2, poar_path, 0, 0.0f, -1.0f, 0, 0.0f, 0, 2.0f);
-        if(rv != 0){
-                fprintf(stderr, "  ERROR: kalign_ensemble (save) returned %d\n", rv);
-                kalign_free_msa(msa1);
-                return -1;
-        }
-
-        /* Verify the POAR file was created */
-        FILE *fp = fopen(poar_path, "rb");
-        if(fp == NULL){
-                fprintf(stderr, "  ERROR: POAR file was not created: %s\n", poar_path);
-                kalign_free_msa(msa1);
-                return -1;
-        }
-        fclose(fp);
-
-        fprintf(stdout, "  POAR saved to %s\n", poar_path);
-
-        /* Second run: load POAR and derive consensus */
         rv = kalign_read_input((char *)input_file, &msa2, 1);
         if(rv != 0 || msa2 == NULL){
-                fprintf(stderr, "  ERROR: failed to read input for POAR load\n");
+                fprintf(stderr, "  ERROR: failed to read input (2nd copy)\n");
                 kalign_free_msa(msa1);
                 return -1;
         }
 
-        rv = kalign_consensus_from_poar(msa2, poar_path, 2);
+        struct kalign_run_config runs[3];
+        struct kalign_ensemble_config ens;
+        make_ensemble_runs(runs, 3, &ens, 2);
+
+        rv = kalign_align_full(msa1, runs, 3, &ens, 1);
         if(rv != 0){
-                fprintf(stderr, "  ERROR: kalign_consensus_from_poar returned %d\n", rv);
+                fprintf(stderr, "  ERROR: kalign_align_full (run 1) returned %d\n", rv);
                 kalign_free_msa(msa1);
                 kalign_free_msa(msa2);
                 return -1;
         }
 
-        /* Verify both MSAs have valid aligned sequences */
-        if(msa1->alnlen <= 0){
-                fprintf(stderr, "  ERROR: msa1 alnlen = %d\n", msa1->alnlen);
+        rv = kalign_align_full(msa2, runs, 3, &ens, 1);
+        if(rv != 0){
+                fprintf(stderr, "  ERROR: kalign_align_full (run 2) returned %d\n", rv);
                 kalign_free_msa(msa1);
                 kalign_free_msa(msa2);
                 return -1;
         }
 
-        if(msa2->alnlen <= 0){
-                fprintf(stderr, "  ERROR: msa2 alnlen = %d\n", msa2->alnlen);
+        if(msa1->alnlen <= 0 || msa2->alnlen <= 0){
+                fprintf(stderr, "  ERROR: alnlen msa1=%d msa2=%d\n", msa1->alnlen, msa2->alnlen);
                 kalign_free_msa(msa1);
                 kalign_free_msa(msa2);
                 return -1;
         }
 
-        /* Both should have the same number of sequences */
         if(msa1->numseq != msa2->numseq){
                 fprintf(stderr, "  ERROR: numseq mismatch: %d vs %d\n",
                         msa1->numseq, msa2->numseq);
@@ -201,7 +196,6 @@ static int test_poar_round_trip(const char *input_file)
                 return -1;
         }
 
-        /* Both should have the same alignment length (same POAR, same consensus) */
         if(msa1->alnlen != msa2->alnlen){
                 fprintf(stderr, "  ERROR: alnlen mismatch: %d vs %d\n",
                         msa1->alnlen, msa2->alnlen);
@@ -210,33 +204,20 @@ static int test_poar_round_trip(const char *input_file)
                 return -1;
         }
 
-        /* Verify aligned sequences match between direct ensemble and POAR-loaded consensus */
         for(int i = 0; i < msa1->numseq; i++){
-                if(msa1->sequences[i]->seq == NULL || msa2->sequences[i]->seq == NULL){
-                        fprintf(stderr, "  ERROR: NULL seq at index %d\n", i);
-                        kalign_free_msa(msa1);
-                        kalign_free_msa(msa2);
-                        return -1;
-                }
                 if(strcmp(msa1->sequences[i]->seq, msa2->sequences[i]->seq) != 0){
-                        fprintf(stderr, "  ERROR: sequence %d mismatch between ensemble and POAR load\n", i);
-                        fprintf(stderr, "    direct:  %.60s...\n", msa1->sequences[i]->seq);
-                        fprintf(stderr, "    loaded:  %.60s...\n", msa2->sequences[i]->seq);
+                        fprintf(stderr, "  ERROR: sequence %d mismatch between runs\n", i);
                         kalign_free_msa(msa1);
                         kalign_free_msa(msa2);
                         return -1;
                 }
         }
 
-        fprintf(stdout, "  Round-trip: %d sequences, alnlen=%d, consensus matches\n",
+        fprintf(stdout, "  Deterministic: %d sequences, alnlen=%d, both runs match\n",
                 msa1->numseq, msa1->alnlen);
 
         kalign_free_msa(msa1);
         kalign_free_msa(msa2);
-
-        /* Clean up temp file */
-        remove(poar_path);
-
         return 0;
 }
 
@@ -252,22 +233,23 @@ static int test_min_support(const char *input_file)
                 return -1;
         }
 
-        /* min_support=2 (explicit), n_runs=3 */
-        rv = kalign_ensemble(msa, 1, -1, 3, -1.0f, -1.0f, -1.0f, 42, 2, NULL, 0, 0.0f, -1.0f, 0, 0.0f, 0, 2.0f);
+        struct kalign_run_config runs[3];
+        struct kalign_ensemble_config ens;
+        make_ensemble_runs(runs, 3, &ens, 2);
+
+        rv = kalign_align_full(msa, runs, 3, &ens, 1);
         if(rv != 0){
-                fprintf(stderr, "  ERROR: kalign_ensemble with min_support=2 returned %d\n", rv);
+                fprintf(stderr, "  ERROR: kalign_align_full with min_support=2 returned %d\n", rv);
                 kalign_free_msa(msa);
                 return -1;
         }
 
-        /* Verify alignment was produced */
         if(msa->alnlen <= 0){
                 fprintf(stderr, "  ERROR: alnlen is %d (expected > 0)\n", msa->alnlen);
                 kalign_free_msa(msa);
                 return -1;
         }
 
-        /* Verify sequences are aligned */
         for(int i = 0; i < msa->numseq; i++){
                 if(msa->sequences[i]->seq == NULL){
                         fprintf(stderr, "  ERROR: sequence %d has NULL seq\n", i);
@@ -283,7 +265,6 @@ static int test_min_support(const char *input_file)
                 }
         }
 
-        /* Verify col_confidence is populated */
         if(msa->col_confidence == NULL){
                 fprintf(stderr, "  ERROR: col_confidence is NULL with min_support=2\n");
                 kalign_free_msa(msa);

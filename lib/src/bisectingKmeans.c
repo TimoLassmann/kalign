@@ -54,7 +54,8 @@ static void create_tasks(struct node*n, struct aln_tasks* t);
 /* static int bisecting_kmeans_serial(struct msa *msa, struct node **ret_n, float **dm, int *samples, int num_samples); */
 static int bisecting_kmeans(struct msa* msa, struct node** ret_n,
                             const float * const * dm,
-                            int* samples, int num_samples);
+                            int* samples, int num_samples,
+                            pair_dist_fn leaf_dist);
 /* static int bisecting_kmeans_parallel(struct msa* msa, struct node** ret_n, float** dm,int* samples, int num_samples); */
 
 static int split(const float * const * dm, int *samples, int num_anchors, int num_samples,
@@ -84,12 +85,13 @@ struct bisect_task_arg {
         const float *const *dm;
         int *samples;
         int num_samples;
+        pair_dist_fn leaf_dist;
 };
 
 static void bisect_task_fn(void *arg)
 {
         struct bisect_task_arg *a = (struct bisect_task_arg *)arg;
-        bisecting_kmeans(a->msa, a->ret_n, a->dm, a->samples, a->num_samples);
+        bisecting_kmeans(a->msa, a->ret_n, a->dm, a->samples, a->num_samples, a->leaf_dist);
 }
 #endif
 
@@ -107,6 +109,11 @@ inline int cmp_floats(const float a, const float b)
         }
 }
 
+/* Default leaf-cluster distance: BPM on raw internal sequences */
+static float** bpm_pair_dist(struct msa* msa, int* samples, int n)
+{
+        return d_estimation(msa, samples, n, 1);
+}
 
 int build_tree_kmeans_noisy(struct msa* msa, struct aln_tasks** tasks,
                             uint64_t seed, float noise_sigma)
@@ -172,7 +179,7 @@ int build_tree_kmeans_noisy(struct msa* msa, struct aln_tasks** tasks,
 #pragma omp single nowait
 #endif
 #endif
-        bisecting_kmeans(msa, &root, (const float * const *)dm, samples, numseq);
+        bisecting_kmeans(msa, &root, (const float * const *)dm, samples, numseq, bpm_pair_dist);
 
         STOP_TIMER(timer);
         if(!msa->quiet){
@@ -267,7 +274,7 @@ int build_tree_kmeans(struct msa* msa, struct aln_tasks** tasks)
 #pragma omp single nowait
 #endif
 #endif
-        bisecting_kmeans(msa,&root, (const float * const *)dm, samples, numseq);
+        bisecting_kmeans(msa,&root, (const float * const *)dm, samples, numseq, bpm_pair_dist);
         /* } */
 
         STOP_TIMER(timer);
@@ -309,7 +316,8 @@ ERROR:
         return FAIL;
 }
 
-int bisecting_kmeans(struct msa* msa, struct node** ret_n, const float * const * dm,int* samples, int num_samples)
+int bisecting_kmeans(struct msa* msa, struct node** ret_n, const float * const * dm,
+                     int* samples, int num_samples, pair_dist_fn leaf_dist)
 {
         struct kmeans_result* res_tmp = NULL;
         struct kmeans_result* best = NULL;
@@ -348,7 +356,7 @@ int bisecting_kmeans(struct msa* msa, struct node** ret_n, const float * const *
                 if(threshold < 3) threshold = 3;
                 if(num_samples < threshold){
                         float** dm_local = NULL;
-                        RUNP(dm_local = d_estimation(msa, samples, num_samples,1));
+                        RUNP(dm_local = leaf_dist(msa, samples, num_samples));
                         n = upgma(dm_local, samples, num_samples);
                         *ret_n = n;
                         gfree(dm_local);
@@ -460,8 +468,8 @@ int bisecting_kmeans(struct msa* msa, struct node** ret_n, const float * const *
 
 #ifdef USE_THREADPOOL
         {
-                struct bisect_task_arg left_arg  = { msa, &n->left,  dm, sl, num_l };
-                struct bisect_task_arg right_arg = { msa, &n->right, dm, sr, num_r };
+                struct bisect_task_arg left_arg  = { msa, &n->left,  dm, sl, num_l, leaf_dist };
+                struct bisect_task_arg right_arg = { msa, &n->right, dm, sr, num_r, leaf_dist };
                 tp_group_t *g = tp_group_create(msa->pool);
                 tp_group_submit(g, bisect_task_fn, &left_arg);
                 tp_group_submit(g, bisect_task_fn, &right_arg);
@@ -472,12 +480,12 @@ int bisecting_kmeans(struct msa* msa, struct node** ret_n, const float * const *
 #ifdef HAVE_OPENMP
 #pragma omp task shared(msa,n,dm)
 #endif
-        bisecting_kmeans(msa,&n->left, dm, sl, num_l);
+        bisecting_kmeans(msa,&n->left, dm, sl, num_l, leaf_dist);
 
 #ifdef HAVE_OPENMP
 #pragma omp task shared(msa,n,dm,num_anchors)
 #endif
-        bisecting_kmeans(msa,&n->right, dm, sr, num_r);
+        bisecting_kmeans(msa,&n->right, dm, sr, num_r, leaf_dist);
 
 #ifdef HAVE_OPENMP
 #pragma omp taskwait
@@ -1230,6 +1238,75 @@ void free_kmeans_results(struct kmeans_result* k)
                 }
                 MFREE(k);
         }
+}
+
+/* Build guide tree from a pre-computed N×K distance matrix using bisecting
+   k-means.  Used by the realign loop where distances are computed from aligned
+   sequences (identity distances, already 0..1) rather than BPM on raw sequences.
+
+   The caller owns dm and is responsible for freeing it.  This function does NOT
+   free dm — unlike build_tree_kmeans which computes and frees its own dm. */
+int build_tree_kmeans_from_dm(struct msa* msa, struct aln_tasks** tasks,
+                               float** dm, int num_anchors,
+                               pair_dist_fn leaf_dist)
+{
+        struct aln_tasks* t = NULL;
+        struct node* root = NULL;
+        int* samples = NULL;
+        int numseq;
+        int i;
+
+        ASSERT(msa != NULL, "No alignment.");
+        ASSERT(dm != NULL, "No distance matrix.");
+        ASSERT(num_anchors > 0, "num_anchors must be > 0");
+
+        t = *tasks;
+        if(!t){
+                RUN(alloc_tasks(&t, msa->numseq));
+        }
+        numseq = msa->numseq;
+
+        MMALLOC(samples, sizeof(int) * numseq);
+        for(i = 0; i < numseq; i++){
+                samples[i] = i;
+        }
+
+        /* Bisecting k-means — same parallel algorithm as initial tree.
+           Note: bisecting_kmeans() takes ownership of samples and frees it. */
+#if !defined(USE_THREADPOOL)
+#ifdef HAVE_OPENMP
+#pragma omp parallel
+#pragma omp single nowait
+#endif
+#endif
+        bisecting_kmeans(msa, &root, (const float * const *)dm, samples, numseq, leaf_dist);
+        samples = NULL;  /* owned and freed by bisecting_kmeans */
+        ASSERT(root != NULL, "Bisecting k-means tree construction failed.");
+
+        label_internal(root, numseq);
+        create_tasks(root, t);
+
+        /* Compute per-sequence mean distance to anchors.
+           Identity distances are already 0..1, so NO length normalization
+           (unlike BPM distances in build_tree_kmeans which divides by seq_len). */
+        if(msa->seq_distances == NULL){
+                MMALLOC(msa->seq_distances, sizeof(float) * numseq);
+        }
+        for(i = 0; i < numseq; i++){
+                float sum = 0.0f;
+                int j;
+                for(j = 0; j < num_anchors; j++){
+                        sum += dm[i][j];
+                }
+                msa->seq_distances[i] = sum / (float)num_anchors;
+        }
+
+        MFREE(root);
+        *tasks = t;
+        return OK;
+ERROR:
+        if(samples) MFREE(samples);
+        return FAIL;
 }
 
 int build_tree_from_pairwise(struct msa* msa, struct aln_tasks** tasks, float** dm)
