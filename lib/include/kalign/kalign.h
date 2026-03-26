@@ -69,6 +69,13 @@ EXTERN int kalign_consensus_from_poar(struct msa* msa,
                                       const char* poar_path,
                                       int min_support);
 
+/* Confidence masking */
+#define KALIGN_MASK_LOWERCASE 0
+#define KALIGN_MASK_REMOVE    1
+
+EXTERN int kalign_mask_by_confidence(struct msa* msa, float threshold, int style);
+EXTERN int kalign_write_confidence(struct msa* msa, const char* path);
+
 /* Memory */
 EXTERN void kalign_free_msa(struct msa* msa);
 

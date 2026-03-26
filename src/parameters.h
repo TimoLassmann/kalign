@@ -29,6 +29,9 @@ struct parameters{
         int min_support;
         char* load_poar;
         char* mode;  /* "fast", "default", "recall", "accurate" (NULL = default) */
+        float confidence_threshold;  /* mask columns below this confidence (0=off) */
+        int confidence_style;       /* KALIGN_MASK_LOWERCASE or KALIGN_MASK_REMOVE */
+        char* confidence_output;    /* write per-column confidence to file (NULL=off) */
         int help_flag;
         int quiet;
         int dump_internal;

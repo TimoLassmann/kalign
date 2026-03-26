@@ -60,6 +60,9 @@ struct parameters*init_param(void)
         param->rename = 0;
         param->clean = 0;
         param->unalign = 0;
+        param->confidence_threshold = 0.0f;
+        param->confidence_style = 0;  /* KALIGN_MASK_LOWERCASE */
+        param->confidence_output = NULL;
         return param;
 ERROR:
         free_parameters(param);

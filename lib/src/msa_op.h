@@ -32,6 +32,18 @@ EXTERN int kalign_arr_to_msa(char **input_sequences, int *len, int numseq, struc
 EXTERN int finalise_alignment(struct msa* msa);
 EXTERN int make_linear_sequence(struct msa_seq *seq, char *linear_seq);
 
+/* Confidence masking styles */
+#define KALIGN_MASK_LOWERCASE 0
+#define KALIGN_MASK_REMOVE    1
+
+/* Mask low-confidence alignment columns.
+   style: KALIGN_MASK_LOWERCASE (residues → lowercase) or KALIGN_MASK_REMOVE (→ gaps).
+   No-op if threshold <= 0 or col_confidence is NULL (non-ensemble modes). */
+EXTERN int kalign_mask_by_confidence(struct msa* msa, float threshold, int style);
+
+/* Write per-column confidence scores to a text file (one value per line). */
+EXTERN int kalign_write_confidence(struct msa* msa, const char* path);
+
 #undef MSA_OP_IMPORT
 #undef EXTERN
 

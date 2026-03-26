@@ -680,6 +680,126 @@ def align_file_to_file(
 kalign = align
 
 
+# ---------------------------------------------------------------------------
+# Confidence masking utilities
+# ---------------------------------------------------------------------------
+
+
+def mask_alignment(
+    result: AlignedSequences,
+    threshold: float = 0.5,
+    style: str = "lowercase",
+) -> AlignedSequences:
+    """Mask low-confidence columns in an alignment result.
+
+    Parameters
+    ----------
+    result : AlignedSequences
+        Alignment result with confidence scores (from ensemble modes).
+    threshold : float
+        Columns with confidence below this value are masked.
+    style : str
+        "lowercase" — uncertain residues become lowercase (default).
+        "remove" — uncertain residues replaced with '-'.
+
+    Returns
+    -------
+    AlignedSequences
+        New result with masked sequences. Confidence arrays unchanged.
+    """
+    if result.column_confidence is None:
+        import warnings
+        warnings.warn(
+            "No confidence scores available (requires ensemble mode). "
+            "Returning unmasked alignment."
+        )
+        return result
+
+    conf = result.column_confidence
+    masked_seqs = []
+    for seq in result.sequences:
+        chars = list(seq)
+        for col in range(len(chars)):
+            if col < len(conf) and conf[col] < threshold and chars[col] != '-':
+                if style == "remove":
+                    chars[col] = '-'
+                else:
+                    chars[col] = chars[col].lower()
+        masked_seqs.append(''.join(chars))
+
+    return AlignedSequences(
+        names=result.names,
+        sequences=masked_seqs,
+        column_confidence=result.column_confidence,
+        residue_confidence=result.residue_confidence,
+    )
+
+
+def filter_alignment(
+    result: AlignedSequences,
+    threshold: float = 0.5,
+) -> AlignedSequences:
+    """Remove low-confidence columns from an alignment result.
+
+    Parameters
+    ----------
+    result : AlignedSequences
+        Alignment result with confidence scores (from ensemble modes).
+    threshold : float
+        Columns with confidence below this value are removed entirely.
+
+    Returns
+    -------
+    AlignedSequences
+        New result with only high-confidence columns. Shorter sequences.
+    """
+    if result.column_confidence is None:
+        import warnings
+        warnings.warn(
+            "No confidence scores available (requires ensemble mode). "
+            "Returning unfiltered alignment."
+        )
+        return result
+
+    conf = result.column_confidence
+    keep = [col for col in range(len(conf)) if conf[col] >= threshold]
+
+    filtered_seqs = []
+    for seq in result.sequences:
+        filtered_seqs.append(''.join(seq[col] for col in keep))
+
+    filtered_conf = [conf[col] for col in keep]
+    filtered_res_conf = None
+    if result.residue_confidence is not None:
+        filtered_res_conf = [
+            [row[col] for col in keep] for row in result.residue_confidence
+        ]
+
+    return AlignedSequences(
+        names=result.names,
+        sequences=filtered_seqs,
+        column_confidence=filtered_conf,
+        residue_confidence=filtered_res_conf,
+    )
+
+
+def write_confidence(path: str, result: AlignedSequences) -> None:
+    """Write per-column confidence scores to a text file.
+
+    Parameters
+    ----------
+    path : str
+        Output file path.
+    result : AlignedSequences
+        Alignment result with confidence scores.
+    """
+    if result.column_confidence is None:
+        raise ValueError("No confidence scores available (requires ensemble mode)")
+    with open(path, 'w') as f:
+        for val in result.column_confidence:
+            f.write(f"{val:.4f}\n")
+
+
 __all__ = [
     "align",
     "align_from_file",
@@ -692,6 +812,9 @@ __all__ = [
     "get_num_threads",
     "kalign",
     "AlignedSequences",
+    "mask_alignment",
+    "filter_alignment",
+    "write_confidence",
     "DNA",
     "DNA_INTERNAL",
     "RNA",

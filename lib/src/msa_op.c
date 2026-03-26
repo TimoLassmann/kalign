@@ -607,3 +607,80 @@ int kalign_msa_get_biotype(struct msa *msa)
         if(!msa) return ALN_BIOTYPE_UNDEF;
         return msa->biotype;
 }
+
+/* ======================================================================== */
+/* Confidence masking                                                        */
+/* ======================================================================== */
+
+#define KALIGN_MASK_LOWERCASE 0
+#define KALIGN_MASK_REMOVE    1
+
+int kalign_mask_by_confidence(struct msa* msa, float threshold, int style)
+{
+        int i, col;
+
+        ASSERT(msa != NULL, "No MSA");
+
+        if(threshold <= 0.0f){
+                return OK;  /* no masking requested */
+        }
+
+        if(msa->col_confidence == NULL){
+                WARNING_MSG("No confidence scores available (requires ensemble mode). "
+                            "Skipping masking.");
+                return OK;
+        }
+
+        ASSERT(msa->aligned == ALN_STATUS_FINAL, "MSA must be finalized");
+        ASSERT(msa->alnlen > 0, "Alignment length is 0");
+
+        for(col = 0; col < msa->alnlen; col++){
+                if(msa->col_confidence[col] >= threshold){
+                        continue;  /* column is confident */
+                }
+                /* Mask this column in all sequences */
+                for(i = 0; i < msa->numseq; i++){
+                        char c = msa->sequences[i]->seq[col];
+                        if(c == '-') continue;  /* gaps stay gaps */
+                        if(style == KALIGN_MASK_REMOVE){
+                                msa->sequences[i]->seq[col] = '-';
+                        }else{
+                                /* KALIGN_MASK_LOWERCASE */
+                                msa->sequences[i]->seq[col] = (char)tolower((unsigned char)c);
+                        }
+                }
+        }
+
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+int kalign_write_confidence(struct msa* msa, const char* path)
+{
+        FILE* fp = NULL;
+        int col;
+
+        ASSERT(msa != NULL, "No MSA");
+        ASSERT(path != NULL, "No output path");
+
+        if(msa->col_confidence == NULL){
+                WARNING_MSG("No confidence scores to write.");
+                return OK;
+        }
+
+        fp = fopen(path, "w");
+        if(!fp){
+                ERROR_MSG("Cannot open %s for writing", path);
+        }
+
+        for(col = 0; col < msa->alnlen; col++){
+                fprintf(fp, "%.4f\n", msa->col_confidence[col]);
+        }
+
+        fclose(fp);
+        return OK;
+ERROR:
+        if(fp) fclose(fp);
+        return FAIL;
+}

@@ -16,6 +16,9 @@
 #define OPT_MODE 22
 #define OPT_LOAD_POAR 20
 #define OPT_MIN_SUPPORT 18
+#define OPT_CONF_THRESHOLD 30
+#define OPT_CONF_STYLE 31
+#define OPT_CONF_OUTPUT 32
 
 static int set_aln_type(char* in, int* type);
 
@@ -50,6 +53,10 @@ int print_kalign_help(char * argv[])
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--tgpe","Terminal gap extension penalty (overrides preset)." ,"[]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"-n/--nthreads","Number of threads." ,"[auto]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--load-poar","Load POAR table for re-threshold." ,"[off]");
+
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--confidence-threshold","Mask columns below this confidence (0-1)." ,"[off]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--confidence-style","Masking style: lowercase or remove." ,"[lowercase]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--confidence-output","Write per-column confidence to file." ,"[off]");
 
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--version (-V/-v)","Prints version." ,"[NA]"  );
 
@@ -128,6 +135,9 @@ int main(int argc, char *argv[])
                         {"load-poar",  required_argument, 0, OPT_LOAD_POAR},
                         {"min-support",  required_argument, 0, OPT_MIN_SUPPORT},
                         {"nthreads",  required_argument, 0, 'n'},
+                        {"confidence-threshold", required_argument, 0, OPT_CONF_THRESHOLD},
+                        {"confidence-style", required_argument, 0, OPT_CONF_STYLE},
+                        {"confidence-output", required_argument, 0, OPT_CONF_OUTPUT},
                         {"input",  required_argument, 0, 'i'},
                         {"infile",  required_argument, 0, 'i'},
                         {"in",  required_argument, 0, 'i'},
@@ -180,6 +190,19 @@ int main(int argc, char *argv[])
                         break;
                 case OPT_MIN_SUPPORT:
                         param->min_support = atoi(optarg);
+                        break;
+                case OPT_CONF_THRESHOLD:
+                        param->confidence_threshold = (float)atof(optarg);
+                        break;
+                case OPT_CONF_STYLE:
+                        if(strcmp(optarg, "remove") == 0){
+                                param->confidence_style = KALIGN_MASK_REMOVE;
+                        }else{
+                                param->confidence_style = KALIGN_MASK_LOWERCASE;
+                        }
+                        break;
+                case OPT_CONF_OUTPUT:
+                        param->confidence_output = optarg;
                         break;
                 case 'h':
                         param->help_flag = 1;
@@ -322,6 +345,17 @@ int run_kalign(struct parameters* param)
                 }
 
                 RUN(kalign_align_full(msa, runs, n_runs, &ens, param->nthreads));
+        }
+
+        /* Apply confidence masking if requested */
+        if(param->confidence_threshold > 0.0f){
+                RUN(kalign_mask_by_confidence(msa, param->confidence_threshold,
+                                              param->confidence_style));
+        }
+
+        /* Write per-column confidence scores if requested */
+        if(param->confidence_output != NULL){
+                RUN(kalign_write_confidence(msa, param->confidence_output));
         }
 
         RUN(kalign_write_msa(msa, param->outfile, param->format));
