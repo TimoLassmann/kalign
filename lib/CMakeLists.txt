@@ -39,6 +39,7 @@ set(source_files
   
   src/aln_wrap.c
   src/aln_apair_dist.c
+  src/aln_add.c
 
   src/aln_param.c
   src/aln_run.c

@@ -29,6 +29,8 @@ struct parameters{
         int min_support;
         char* load_poar;
         char* mode;  /* "fast", "default", "recall", "accurate" (NULL = default) */
+        char* add_file;             /* new sequences to add to existing alignment */
+        char* existing_file;        /* existing alignment to add sequences to */
         float confidence_threshold;  /* mask columns below this confidence (0=off) */
         int confidence_style;       /* KALIGN_MASK_LOWERCASE or KALIGN_MASK_REMOVE */
         char* confidence_output;    /* write per-column confidence to file (NULL=off) */

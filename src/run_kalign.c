@@ -1,6 +1,8 @@
 #include "tldevel.h"
 #include "tlmisc.h"
 #include "kalign/kalign.h"
+#include "msa_struct.h"
+#include "aln_add.h"
 #include "parameters.h"
 
 #include <stdio.h>
@@ -19,6 +21,8 @@
 #define OPT_CONF_THRESHOLD 30
 #define OPT_CONF_STYLE 31
 #define OPT_CONF_OUTPUT 32
+#define OPT_ADD 33
+#define OPT_EXISTING 34
 
 static int set_aln_type(char* in, int* type);
 
@@ -54,6 +58,11 @@ int print_kalign_help(char * argv[])
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"-n/--nthreads","Number of threads." ,"[auto]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--load-poar","Load POAR table for re-threshold." ,"[off]");
 
+        fprintf(stdout,"\n");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--add FILE","New sequences to add to existing alignment." ,"[off]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--existing FILE","Existing alignment (new seqs added to this)." ,"[off]");
+
+        fprintf(stdout,"\n");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--confidence-threshold","Mask columns below this confidence (0-1)." ,"[off]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--confidence-style","Masking style: lowercase or remove." ,"[lowercase]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--confidence-output","Write per-column confidence to file." ,"[off]");
@@ -138,6 +147,8 @@ int main(int argc, char *argv[])
                         {"confidence-threshold", required_argument, 0, OPT_CONF_THRESHOLD},
                         {"confidence-style", required_argument, 0, OPT_CONF_STYLE},
                         {"confidence-output", required_argument, 0, OPT_CONF_OUTPUT},
+                        {"add",  required_argument, 0, OPT_ADD},
+                        {"existing",  required_argument, 0, OPT_EXISTING},
                         {"input",  required_argument, 0, 'i'},
                         {"infile",  required_argument, 0, 'i'},
                         {"in",  required_argument, 0, 'i'},
@@ -204,6 +215,12 @@ int main(int argc, char *argv[])
                 case OPT_CONF_OUTPUT:
                         param->confidence_output = optarg;
                         break;
+                case OPT_ADD:
+                        param->add_file = optarg;
+                        break;
+                case OPT_EXISTING:
+                        param->existing_file = optarg;
+                        break;
                 case 'h':
                         param->help_flag = 1;
                         break;
@@ -267,29 +284,39 @@ int main(int argc, char *argv[])
                 param->num_infiles += argc-optind;
         }
 
-        if(param->num_infiles == 0){
+        /* --add mode doesn't need -i input files */
+        if(param->add_file != NULL && param->existing_file != NULL){
+                /* Validate both files exist */
+                param->num_infiles = 0;  /* not using normal input */
+        }else if(param->add_file != NULL || param->existing_file != NULL){
+                LOG_MSG("Both --add and --existing must be specified together.");
+                free_parameters(param);
+                return EXIT_FAILURE;
+        }else if(param->num_infiles == 0){
                 RUN(print_kalign_help(argv));
                 LOG_MSG("No input files");
                 free_parameters(param);
                 return EXIT_SUCCESS;
         }
-        MMALLOC(param->infile, sizeof(char*) * param->num_infiles);
+        if(param->num_infiles > 0){
+                MMALLOC(param->infile, sizeof(char*) * param->num_infiles);
 
-        c = 0;
-        if(in){
-                param->infile[c] = (strcmp(in, "-") == 0) ? NULL : in;
-                c++;
-        }
-
-        if (optind < argc){
-                while (optind < argc){
-                        if(strcmp(argv[optind], "-") == 0){
-                                param->infile[c] = NULL; /* stdin */
-                        }else{
-                                param->infile[c] = argv[optind];
-                        }
+                c = 0;
+                if(in){
+                        param->infile[c] = (strcmp(in, "-") == 0) ? NULL : in;
                         c++;
-                        optind++;
+                }
+
+                if (optind < argc){
+                        while (optind < argc){
+                                if(strcmp(argv[optind], "-") == 0){
+                                        param->infile[c] = NULL; /* stdin */
+                                }else{
+                                        param->infile[c] = argv[optind];
+                                }
+                                c++;
+                                optind++;
+                        }
                 }
         }
 
@@ -311,6 +338,31 @@ int run_kalign(struct parameters* param)
         struct kalign_run_config runs[KALIGN_MAX_PRESET_RUNS];
         struct kalign_ensemble_config ens = kalign_ensemble_config_defaults();
         int n_runs = 0;
+
+        /* --add mode: add new sequences to existing alignment */
+        if(param->add_file != NULL && param->existing_file != NULL){
+                struct msa* new_seqs = NULL;
+
+                /* Read existing alignment */
+                RUN(kalign_read_input(param->existing_file, &msa, param->quiet));
+
+                /* Read new sequences (allows single sequence) */
+                RUN(kalign_read_sequences(param->add_file, &new_seqs, param->quiet));
+
+                if(!param->quiet){
+                        LOG_MSG("Adding %d sequences to existing alignment of %d sequences",
+                                new_seqs->numseq, msa->numseq);
+                }
+
+                /* Add new sequences to existing alignment */
+                RUN(kalign_add_sequences(msa, new_seqs, param->nthreads));
+                kalign_free_msa(new_seqs);
+
+                /* Write result */
+                RUN(kalign_write_msa(msa, param->outfile, param->format));
+                kalign_free_msa(msa);
+                return OK;
+        }
 
         if(param->num_infiles == 1){
                 RUN(kalign_read_input(param->infile[0], &msa, param->quiet));

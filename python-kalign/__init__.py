@@ -783,6 +783,43 @@ def filter_alignment(
     )
 
 
+def add_to_alignment(
+    existing: str,
+    new_sequences: str,
+    output: str,
+    format: str = "fasta",
+    n_threads: Optional[int] = None,
+) -> None:
+    """Add new sequences to an existing alignment.
+
+    Each new sequence is aligned against the consensus profile of the
+    existing alignment. The existing sequences are NOT re-aligned — their
+    gaps are preserved exactly.
+
+    Parameters
+    ----------
+    existing : str
+        Path to existing alignment file (FASTA/MSF/Clustal).
+    new_sequences : str
+        Path to file with new unaligned sequences.
+    output : str
+        Path to output file (existing + new sequences, all aligned).
+    format : str, optional
+        Output format: "fasta", "msf", "clu" (default: "fasta").
+    n_threads : int, optional
+        Number of threads.
+    """
+    if not os.path.exists(existing):
+        raise FileNotFoundError(f"Existing alignment not found: {existing}")
+    if not os.path.exists(new_sequences):
+        raise FileNotFoundError(f"New sequences file not found: {new_sequences}")
+
+    if n_threads is None:
+        n_threads = get_num_threads()
+
+    _core.add_to_alignment_file(existing, new_sequences, output, format, n_threads)
+
+
 def write_confidence(path: str, result: AlignedSequences) -> None:
     """Write per-column confidence scores to a text file.
 
@@ -815,6 +852,7 @@ __all__ = [
     "mask_alignment",
     "filter_alignment",
     "write_confidence",
+    "add_to_alignment",
     "DNA",
     "DNA_INTERNAL",
     "RNA",

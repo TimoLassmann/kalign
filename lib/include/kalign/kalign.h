@@ -52,6 +52,7 @@ struct msa;
 /* input output routines  */
 
 EXTERN int kalign_read_input(char* infile, struct msa** msa,int quiet);
+EXTERN int kalign_read_sequences(char* infile, struct msa** msa, int quiet);
 
 EXTERN int kalign_write_msa(struct msa *msa, char *outfile, char *format);
 
@@ -68,6 +69,11 @@ EXTERN int kalign(char **seq, int *len, int numseq, int n_threads, int type,
 EXTERN int kalign_consensus_from_poar(struct msa* msa,
                                       const char* poar_path,
                                       int min_support);
+
+/* Add sequences to existing alignment */
+EXTERN int kalign_add_sequences(struct msa* existing,
+                                 struct msa* new_seqs,
+                                 int n_threads);
 
 /* Confidence masking */
 #define KALIGN_MASK_LOWERCASE 0

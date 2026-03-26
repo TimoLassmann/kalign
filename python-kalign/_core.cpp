@@ -17,6 +17,7 @@ extern "C" {
     #include "msa_alloc.h"
     #include "msa_op.h"
     #include "msa_cmp.h"
+    #include "aln_add.h"
     #include "dssim.h"
 }
 
@@ -831,6 +832,53 @@ PYBIND11_MODULE(_core, m) {
           py::arg("gap_extend") = -1.0f,
           py::arg("terminal_gap_extend") = -1.0f,
           "Alias for align_file_to_file(). Align file to file using a named mode preset.");
+
+    m.def("add_to_alignment_file", [](
+            const std::string& existing_file,
+            const std::string& new_seqs_file,
+            const std::string& output_file,
+            const std::string& format,
+            int n_threads
+    ) {
+        struct msa* existing = nullptr;
+        struct msa* new_seqs = nullptr;
+
+        int result = kalign_read_input(
+            const_cast<char*>(existing_file.c_str()), &existing, 1);
+        if (result != 0 || !existing) {
+            throw std::runtime_error("Failed to read existing alignment: " + existing_file);
+        }
+
+        result = kalign_read_sequences(
+            const_cast<char*>(new_seqs_file.c_str()), &new_seqs, 1);
+        if (result != 0 || !new_seqs) {
+            kalign_free_msa(existing);
+            throw std::runtime_error("Failed to read new sequences: " + new_seqs_file);
+        }
+
+        result = kalign_add_sequences(existing, new_seqs, n_threads);
+        if (result != 0) {
+            kalign_free_msa(existing);
+            kalign_free_msa(new_seqs);
+            throw std::runtime_error("Failed to add sequences to alignment");
+        }
+
+        kalign_free_msa(new_seqs);
+
+        result = kalign_write_msa(existing,
+            const_cast<char*>(output_file.c_str()),
+            const_cast<char*>(format.c_str()));
+        kalign_free_msa(existing);
+        if (result != 0) {
+            throw std::runtime_error("Failed to write output alignment");
+        }
+    },
+    py::arg("existing_file"),
+    py::arg("new_seqs_file"),
+    py::arg("output_file"),
+    py::arg("format") = "fasta",
+    py::arg("n_threads") = 1,
+    "Add new sequences to an existing alignment without re-aligning existing sequences.");
 
     // Matrix constants (canonical names)
     m.attr("MATRIX_AUTO") = KALIGN_MATRIX_AUTO;

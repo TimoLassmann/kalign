@@ -173,6 +173,70 @@ ERROR:
         return FAIL;
 }
 
+/* Like kalign_read_input but allows 1 sequence (for --add mode). */
+int kalign_read_sequences(char* infile, struct msa** msa, int quiet)
+{
+        /* Read normally but without the >= 2 check */
+        struct msa* backup = *msa;
+        *msa = NULL;
+
+        /* Use the same read logic but skip check_for_sequences.
+           We replicate the core of kalign_read_input here. */
+        struct in_buffer* b = NULL;
+        struct msa* m = NULL;
+        int type;
+        int i, j;
+
+        if(infile && !my_file_exists(infile)){
+                ERROR_MSG("File: %s does not exist.", infile);
+        }
+
+        RUN(read_file_stdin(&b, infile));
+        j = 0;
+        for(i = 0; i < MACRO_MIN(1, b->n_lines); i++){
+                j += b->l[i]->len - 1;
+        }
+        if(j == 0){
+                free_in_buffer(b);
+                *msa = backup;
+                return OK;
+        }
+
+        RUN(detect_alignment_format(b, &type));
+        if(type == FORMAT_FA){
+                RUN(read_fasta(b, &m));
+        }else if(type == FORMAT_MSF){
+                RUN(read_msf(b, &m));
+        }else if(type == FORMAT_CLU){
+                RUN(read_clu(b, &m));
+        }else{
+                free_in_buffer(b);
+                ERROR_MSG("Could not detect input format in: %s", infile ? infile : "stdin");
+        }
+        m->quiet = quiet;
+        RUN(detect_alphabet(m));
+        RUN(detect_aligned(m));
+        RUN(set_sip_nsip(m));
+        free_in_buffer(b);
+
+        if(m->numseq < 1){
+                ERROR_MSG("No sequences found in %s", infile ? infile : "stdin");
+        }
+
+        if(backup != NULL){
+                RUN(merge_msa(&backup, m));
+                kalign_free_msa(m);
+                *msa = backup;
+        }else{
+                *msa = m;
+        }
+        return OK;
+ERROR:
+        if(m) kalign_free_msa(m);
+        *msa = backup;
+        return FAIL;
+}
+
 int check_for_sequences(struct msa* msa)
 {
         if(!msa){

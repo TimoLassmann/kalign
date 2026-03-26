@@ -60,6 +60,8 @@ struct parameters*init_param(void)
         param->rename = 0;
         param->clean = 0;
         param->unalign = 0;
+        param->add_file = NULL;
+        param->existing_file = NULL;
         param->confidence_threshold = 0.0f;
         param->confidence_style = 0;  /* KALIGN_MASK_LOWERCASE */
         param->confidence_output = NULL;
