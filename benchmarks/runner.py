@@ -14,40 +14,33 @@ from .scoring import AlignmentResult, EXTERNAL_TOOLS, run_case
 
 def _run_one(args):
     """Worker function for parallel execution."""
-    case, method, binary, n_threads, refine, adaptive_budget, ensemble = args
+    case, method, binary, n_threads, mode = args
     return run_case(case, method=method, binary=binary, n_threads=n_threads,
-                    refine=refine, adaptive_budget=adaptive_budget, ensemble=ensemble)
+                    mode=mode)
 
 
 def _result_label(r) -> str:
-    """Format a concise label showing method and config for verbose output."""
+    """Format a concise label for verbose output."""
     if r.method in EXTERNAL_TOOLS:
         return r.method
-    parts = ["kalign"]
-    if r.refine != "none":
-        parts.append(f"refine={r.refine}")
-    if r.ensemble:
-        parts.append(f"ens={r.ensemble}")
-    return " ".join(parts)
+    return f"kalign {r.refine}"
 
 
 def run_benchmark(
     dataset: str = "balibase",
     methods: Optional[List[str]] = None,
-    refine_modes: Optional[List[str]] = None,
+    modes: Optional[List[str]] = None,
     max_cases: int = 0,
     binary: str = "kalign",
     n_threads: int = 1,
     verbose: bool = False,
-    adaptive_budget: bool = False,
-    ensemble: int = 0,
     parallel: int = 1,
 ) -> List[AlignmentResult]:
     """Run benchmark suite and return results."""
     if methods is None:
-        methods = ["python_api"]
-    if refine_modes is None:
-        refine_modes = ["none"]
+        methods = ["cli"]
+    if modes is None:
+        modes = ["default"]
 
     cases = get_cases(dataset, max_cases=max_cases if max_cases > 0 else None)
 
@@ -56,9 +49,11 @@ def run_benchmark(
         print("Try running with --download-only first.")
         return []
 
-    print(f"Running {len(cases)} cases from '{dataset}' with methods: {methods}, refine: {refine_modes}")
+    print(f"Running {len(cases)} cases from '{dataset}'")
+    print(f"  Methods: {methods}")
+    print(f"  Modes:   {modes}")
     if parallel > 1:
-        print(f"Using {parallel} parallel workers")
+        print(f"  Workers: {parallel}")
     print()
 
     # Build work items
@@ -66,16 +61,14 @@ def run_benchmark(
     for case in cases:
         for method in methods:
             if method in EXTERNAL_TOOLS:
-                # External tools don't support refine/ensemble — run once
-                work.append((case, method, binary, n_threads, "none", False, 0))
+                work.append((case, method, binary, n_threads, "default"))
             else:
-                for refine in refine_modes:
-                    work.append((case, method, binary, n_threads, refine, adaptive_budget, ensemble))
+                for mode in modes:
+                    work.append((case, method, binary, n_threads, mode))
 
     total = len(work)
 
     if parallel <= 1:
-        # Sequential (original behavior)
         results = []
         for i, item in enumerate(work):
             result = _run_one(item)
@@ -87,15 +80,15 @@ def run_benchmark(
                 else:
                     print(f"[{i+1}/{total}] {result.family:<12} {label:<25} SP={result.recall:.3f}  TC={result.tc:.3f}  F1={result.f1:.3f}  {result.wall_time:.1f}s")
     else:
-        # Parallel execution
-        results = [None] * total
+        results = []
         done = 0
         with ProcessPoolExecutor(max_workers=parallel) as pool:
             futures = {pool.submit(_run_one, item): i for i, item in enumerate(work)}
+            indexed_results = [None] * total
             for future in as_completed(futures):
                 idx = futures[future]
                 result = future.result()
-                results[idx] = result
+                indexed_results[idx] = result
                 done += 1
                 if verbose:
                     label = _result_label(result)
@@ -103,6 +96,7 @@ def run_benchmark(
                         print(f"[{done}/{total}] {result.family:<12} {label:<25} ERROR: {result.error}")
                     else:
                         print(f"[{done}/{total}] {result.family:<12} {label:<25} SP={result.recall:.3f}  TC={result.tc:.3f}  F1={result.f1:.3f}  {result.wall_time:.1f}s")
+        results = [r for r in indexed_results if r is not None]
 
     return results
 
@@ -113,36 +107,54 @@ def print_summary(results: List[AlignmentResult]) -> None:
     for r in results:
         if r.error:
             continue
-        ens = f" ensemble={r.ensemble}" if r.ensemble else ""
-        key = f"{r.method} refine={r.refine}{ens}"
+        if r.method in EXTERNAL_TOOLS:
+            key = r.method
+        else:
+            key = f"kalign {r.refine}"
         by_group.setdefault(key, []).append(r)
+
+    print(f"\n{'Method':<24} {'SP':>8} {'Prec':>8} {'F1':>8} {'TC':>8} {'Time':>8} {'N':>5}")
+    print("-" * 75)
 
     for group, group_results in sorted(by_group.items()):
         recalls = [r.recall for r in group_results]
         precisions = [r.precision for r in group_results]
         f1s = [r.f1 for r in group_results]
         tcs = [r.tc for r in group_results]
-        times = [r.wall_time for r in group_results]
+        total_time = sum(r.wall_time for r in group_results)
 
-        print(f"\n--- {group} ({len(group_results)} cases) ---")
-        print(f"  SP:        mean={statistics.mean(recalls):.3f}  "
-              f"median={statistics.median(recalls):.3f}  "
-              f"min={min(recalls):.3f}  max={max(recalls):.3f}")
-        print(f"  TC:        mean={statistics.mean(tcs):.3f}  "
-              f"median={statistics.median(tcs):.3f}")
-        print(f"  Precision: mean={statistics.mean(precisions):.3f}  "
-              f"median={statistics.median(precisions):.3f}")
-        print(f"  F1:        mean={statistics.mean(f1s):.3f}  "
-              f"median={statistics.median(f1s):.3f}")
-        print(f"  Time (s):  total={sum(times):.1f}  "
-              f"mean={statistics.mean(times):.2f}  "
-              f"max={max(times):.2f}")
+        print(f"{group:<24} {statistics.mean(recalls):>8.3f} {statistics.mean(precisions):>8.3f} "
+              f"{statistics.mean(f1s):>8.3f} {statistics.mean(tcs):>8.3f} "
+              f"{total_time:>7.0f}s {len(group_results):>5}")
+
+    # Per-category breakdown
+    categories = sorted({r.dataset for r in results if not r.error})
+    if len(categories) > 1:
+        for cat in categories:
+            cat_results = [r for r in results if r.dataset == cat and not r.error]
+            if not cat_results:
+                continue
+            cat_groups = {}
+            for r in cat_results:
+                key = r.method if r.method in EXTERNAL_TOOLS else f"kalign {r.refine}"
+                cat_groups.setdefault(key, []).append(r)
+
+            cat_name = cat.replace("balibase_", "")
+            n = len(next(iter(cat_groups.values())))
+            print(f"\n--- {cat_name} ({n} cases) ---")
+            print(f"{'Method':<24} {'SP':>8} {'Prec':>8} {'F1':>8} {'TC':>8}")
+            print("-" * 60)
+            for group, gr in sorted(cat_groups.items()):
+                print(f"{group:<24} {statistics.mean(r.recall for r in gr):>8.3f} "
+                      f"{statistics.mean(r.precision for r in gr):>8.3f} "
+                      f"{statistics.mean(r.f1 for r in gr):>8.3f} "
+                      f"{statistics.mean(r.tc for r in gr):>8.3f}")
 
     errors = [r for r in results if r.error]
     if errors:
         print(f"\n{len(errors)} error(s):")
         for r in errors:
-            print(f"  {r.family} ({r.method} refine={r.refine}): {r.error}")
+            print(f"  {r.family} ({r.method}): {r.error}")
 
 
 def save_results(results: List[AlignmentResult], path: str) -> None:
@@ -157,22 +169,16 @@ def save_results(results: List[AlignmentResult], path: str) -> None:
     for r in results:
         if r.error:
             continue
-        ens = f"_ensemble={r.ensemble}" if r.ensemble else ""
-        key = f"{r.method}_refine={r.refine}{ens}"
+        key = r.method if r.method in EXTERNAL_TOOLS else f"kalign_{r.refine}"
         by_group.setdefault(key, []).append(r)
 
     for group, group_results in by_group.items():
-        scores = [r.sp_score for r in group_results]
         recalls = [r.recall for r in group_results]
         precisions = [r.precision for r in group_results]
         f1s = [r.f1 for r in group_results]
         tcs = [r.tc for r in group_results]
         data["summary"][group] = {
             "n_cases": len(group_results),
-            "sp_mean": statistics.mean(scores),
-            "sp_median": statistics.median(scores),
-            "sp_min": min(scores),
-            "sp_max": max(scores),
             "recall_mean": statistics.mean(recalls),
             "precision_mean": statistics.mean(precisions),
             "f1_mean": statistics.mean(f1s),
@@ -200,9 +206,16 @@ def main() -> None:
     parser.add_argument(
         "--method",
         nargs="+",
-        default=["python_api"],
+        default=["cli"],
         choices=["python_api", "cli", "clustalo", "mafft", "muscle"],
-        help="Alignment method(s) to test (default: python_api)",
+        help="Alignment method(s) to test (default: cli)",
+    )
+    parser.add_argument(
+        "--mode",
+        nargs="+",
+        default=["default"],
+        choices=["fast", "default", "recall", "accurate"],
+        help="Kalign mode preset(s) to test (default: default)",
     )
     parser.add_argument(
         "--max-cases",
@@ -212,15 +225,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--binary",
-        default="build/src/kalign",
-        help="Path to C-compiled kalign binary for CLI method (default: build/src/kalign)",
-    )
-    parser.add_argument(
-        "--refine",
-        nargs="+",
-        default=["none"],
-        choices=["none", "all", "confident"],
-        help="Refinement mode(s) to test (default: none)",
+        default="kalign",
+        help="Path to kalign binary for CLI method (default: kalign)",
     )
     parser.add_argument(
         "--threads",
@@ -234,21 +240,10 @@ def main() -> None:
         help="Output JSON file for results",
     )
     parser.add_argument(
-        "--adaptive-budget",
-        action="store_true",
-        help="Scale trial count by uncertainty",
-    )
-    parser.add_argument(
-        "--ensemble",
-        type=int,
-        default=0,
-        help="Number of ensemble runs (0 = off)",
-    )
-    parser.add_argument(
         "-j", "--parallel",
         type=int,
         default=1,
-        help="Number of parallel workers for benchmark cases (default: 1)",
+        help="Number of parallel workers (default: 1)",
     )
     parser.add_argument(
         "--download-only",
@@ -271,13 +266,11 @@ def main() -> None:
     results = run_benchmark(
         dataset=args.dataset,
         methods=args.method,
-        refine_modes=args.refine,
+        modes=args.mode,
         max_cases=args.max_cases,
         binary=args.binary,
         n_threads=args.threads,
         verbose=args.verbose,
-        adaptive_budget=args.adaptive_budget,
-        ensemble=args.ensemble,
         parallel=args.parallel,
     )
 

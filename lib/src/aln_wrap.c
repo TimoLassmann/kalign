@@ -4,6 +4,11 @@
 #include "esl_stopwatch.h"
 #include "task.h"
 #include "msa_struct.h"
+
+#ifdef HAVE_AVX2
+#include <xmmintrin.h>
+#include <mm_malloc.h>
+#endif
 #include "msa_op.h"
 #include "msa_alloc.h"
 #include "msa_check.h"

@@ -3,25 +3,23 @@
 # Includes kalign, Clustal Omega, MAFFT, and MUSCLE v5 for comparative
 # benchmarking on BAliBASE, BRAliBASE, and BaliFam100 datasets.
 #
-# Build:
+# Build (installs kalign from the 'extra' branch):
 #   podman build -t kalign-benchmark .
+#
+# Build from a specific commit for reproducibility:
+#   podman build --build-arg KALIGN_REF=abc1234 -t kalign-benchmark .
+#
+# Run benchmarks:
+#   podman run -it \
+#     -v ./benchmarks/data:/data \
+#     kalign-benchmark \
+#     python -m benchmarks \
+#       --dataset balibase --method cli clustalo mafft muscle \
+#       --mode fast default recall accurate -v
 #
 # Run the interactive dashboard:
 #   podman run -it -p 8050:8050 \
-#     -v ./benchmarks/data:/kalign/benchmarks/data \
-#     kalign-benchmark
-#
-# Run a CLI benchmark:
-#   podman run -it \
-#     -v ./benchmarks/data:/kalign/benchmarks/data \
-#     kalign-benchmark \
-#     python -m benchmarks \
-#       --dataset balibase --method python_api clustalo mafft muscle -v
-#
-# View results in the dashboard after a CLI run:
-#   podman run -it -p 8050:8050 \
-#     -v ./benchmarks/data:/kalign/benchmarks/data \
-#     -v ./benchmarks/results:/kalign/benchmarks/results \
+#     -v ./benchmarks/data:/data \
 #     kalign-benchmark
 
 FROM ubuntu:24.04
@@ -37,7 +35,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # ---------- Build MUSCLE v5 from source ----------
-# myutils.h checks __arm64__ (macOS) but not __aarch64__ (Linux); add it
 RUN cd /tmp && \
     git clone --depth 1 https://github.com/rcedgar/muscle.git && \
     cd muscle/src && \
@@ -46,40 +43,32 @@ RUN cd /tmp && \
     cp ../bin/muscle /usr/local/bin/ && \
     rm -rf /tmp/muscle
 
-# ---------- Copy kalign source and build ----------
-COPY . /kalign
-WORKDIR /kalign
-
-# Build kalign twice: threadpool and OpenMP
-RUN mkdir cbuild-tp && cd cbuild-tp && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DUSE_OPENMP=OFF -DUSE_THREADPOOL=ON .. && \
-    make -j"$(nproc)"
-
-RUN mkdir cbuild-omp && cd cbuild-omp && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DUSE_OPENMP=ON -DUSE_THREADPOOL=OFF .. && \
-    make -j"$(nproc)"
-
 # ---------- Python environment ----------
 RUN python3 -m venv /venv
-ENV PATH="/venv/bin:/kalign/cbuild-tp/src:$PATH"
+ENV PATH="/venv/bin:$PATH"
+RUN pip install --no-cache-dir uv
 
-RUN pip install --no-cache-dir uv && \
-    uv pip install --no-cache -e ".[benchmark]" \
-      --config-settings='cmake.args=-DUSE_OPENMP=OFF;-DUSE_THREADPOOL=ON'
+# ---------- Clone kalign and build ----------
+ARG KALIGN_REF=extra
+RUN git clone --branch ${KALIGN_REF} --depth 1 \
+    https://github.com/TimoLassmann/kalign.git /kalign
+WORKDIR /kalign
 
-# ---------- Verify tools ----------
-RUN which kalign && which clustalo && which mafft && which muscle
+# Build kalign C binary (threadpool, no OpenMP)
+RUN mkdir cbuild && cd cbuild && \
+    cmake -DCMAKE_BUILD_TYPE=Release -DUSE_OPENMP=OFF -DUSE_THREADPOOL=ON .. && \
+    make -j"$(nproc)" && \
+    cp src/kalign /usr/local/bin/kalign
 
-# ---------- Data & results directories ----------
-RUN mkdir -p /kalign/benchmarks/data/downloads /kalign/benchmarks/results
-
-# ---------- Hot-swap: cross-compiled kalign binary (last for fast rebuilds) ----------
-COPY zig-out/kalign-linux-aarch64 /usr/local/bin/kalign
-RUN chmod +x /usr/local/bin/kalign
-
-# Rebuild Python module with latest source (uses cached venv layer)
+# Install Python package with benchmark dependencies
 RUN uv pip install --no-cache -e ".[benchmark]" \
       --config-settings='cmake.args=-DUSE_OPENMP=OFF;-DUSE_THREADPOOL=ON'
+
+# ---------- Verify all tools ----------
+RUN kalign --version && clustalo --version && mafft --version && muscle -version
+
+# ---------- Data directory (mount point for BAliBASE etc.) ----------
+RUN mkdir -p /kalign/benchmarks/data/downloads /kalign/benchmarks/results
 
 EXPOSE 8050
 

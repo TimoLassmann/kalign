@@ -1,6 +1,11 @@
 #include "tldevel.h"
 #include "msa_struct.h"
 
+#ifdef HAVE_AVX2
+#include <xmmintrin.h>
+#include <mm_malloc.h>
+#endif
+
 #ifdef USE_THREADPOOL
 #include "threadpool.h"
 #endif

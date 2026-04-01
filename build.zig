@@ -1,6 +1,4 @@
 const std = @import("std");
-const builtin = @import("builtin");
-const ArrayList = std.ArrayList;
 
 const kalignPackageVersion = "3.5.1";
 
@@ -9,44 +7,54 @@ const targets: []const std.Target.Query = &.{
     .{ .cpu_arch = .aarch64, .os_tag = .linux },
     .{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .gnu },
     .{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .musl },
-    // .{ .cpu_arch = .x86_64, .os_tag = .windows },
 };
 
 const cflags = [_][]const u8{
-    "-DKALIGN_PACKAGE_VERSION=\"3.5.0\"",
+    "-DKALIGN_PACKAGE_VERSION=\"" ++ kalignPackageVersion ++ "\"",
     "-DKALIGN_PACKAGE_NAME=\"kalign\"",
     "-DKALIGN_ALN_SERIAL_THRESHOLD=250",
     "-DKALIGN_KMEANS_UPGMA_THRESHOLD=50",
 };
 
 pub fn build(b: *std.Build) !void {
-    // const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
     for (targets) |t| {
-        const lib = b.addStaticLibrary(.{
-            .name = "tldevel",
+        // --- Static library module ---
+        const lib_mod = b.createModule(.{
             .target = b.resolveTargetQuery(t),
             .optimize = optimize,
+            .link_libc = true,
         });
-        lib.linkLibC();
-        lib.addIncludePath(.{ .path = "./lib/src" });
-        lib.addCSourceFiles(.{ .files = &kalign_lib_sources, .flags = &cflags });
-        lib.addIncludePath(.{ .path = "./lib/include" });
+        lib_mod.addIncludePath(b.path("lib/src"));
+        lib_mod.addIncludePath(b.path("lib/include"));
+        lib_mod.addCSourceFiles(.{ .files = &kalign_lib_sources, .flags = &cflags });
+
+        const lib = b.addLibrary(.{
+            .name = "tldevel",
+            .linkage = .static,
+            .root_module = lib_mod,
+        });
         b.installArtifact(lib);
+
+        // --- Executable module ---
+        const bin_mod = b.createModule(.{
+            .target = b.resolveTargetQuery(t),
+            .optimize = optimize,
+            .link_libc = true,
+        });
+        bin_mod.addIncludePath(b.path("lib/src"));
+        bin_mod.addIncludePath(b.path("lib/include"));
+        bin_mod.addCSourceFiles(.{ .files = &kalign_sources, .flags = &cflags });
+        bin_mod.linkLibrary(lib);
 
         const kalign_bin = b.addExecutable(.{
             .name = "kalign",
-            .target = b.resolveTargetQuery(t),
-            .optimize = optimize,
+            .root_module = bin_mod,
         });
-
-        lib.addCSourceFiles(.{ .files = &kalign_sources, .flags = &cflags });
-        kalign_bin.addIncludePath(.{ .path = "./lib/src" });
-        kalign_bin.addIncludePath(.{ .path = "./lib/include" });
-        kalign_bin.linkLibrary(lib);
         b.installArtifact(kalign_bin);
 
+        // Install into a per-target subdirectory (e.g. zig-out/x86_64-linux-gnu/kalign)
         const target_output = b.addInstallArtifact(kalign_bin, .{
             .dest_dir = .{
                 .override = .{
@@ -57,25 +65,9 @@ pub fn build(b: *std.Build) !void {
 
         b.getInstallStep().dependOn(&target_output.step);
     }
-
-    // const exe = b.addExecutable(.{
-    //     .name = "zig_test",
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
-    // exe.addCSourceFile(.{ .file = .{ .path = "./tests/zig_test.c" }, .flags = &[_][]const u8{"-std=c99"} });
-
-    // // exe.addCSourceFiles(.{ .files = &kalign_lib_sources, .flags = &[_][]const u8{"-std=c99"} });
-    // // exe.addCSourceFile(&.{"./tests/zig_test.c"}, cflags.items);
-    // // exe.addCSourceFile("./lib/src/strnlen_compat.c", cflags.items);
-    // exe.addIncludePath(.{ .path = "./lib/src" });
-    // // exe.linkLibrary(lib);
-    // exe.linkLibC();
-    // b.installArtifact(exe);
 }
 
 const kalign_lib_sources = [_][]const u8{
-    // "lib/src/strnlen_compat.c",
     "lib/src/test.c",
     "lib/src/tldevel.c",
     "lib/src/tlmisc.c",
@@ -97,6 +89,7 @@ const kalign_lib_sources = [_][]const u8{
     "lib/src/pick_anchor.c",
     "lib/src/aln_wrap.c",
     "lib/src/aln_apair_dist.c",
+    "lib/src/aln_add.c",
     "lib/src/aln_param.c",
     "lib/src/aln_run.c",
     "lib/src/aln_mem.c",
@@ -116,6 +109,6 @@ const kalign_lib_sources = [_][]const u8{
 };
 
 const kalign_sources = [_][]const u8{
-    "./src/run_kalign.c",
-    "./src/parameters.c",
+    "src/run_kalign.c",
+    "src/parameters.c",
 };
