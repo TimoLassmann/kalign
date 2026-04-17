@@ -30,7 +30,7 @@ EXTERN int kalign_msa_to_arr(struct msa *msa, char ***aligned, int *out_aln_len)
 EXTERN int kalign_arr_to_msa(char **input_sequences, int *len, int numseq, struct msa **multiple_aln);
 
 EXTERN int finalise_alignment(struct msa* msa);
-EXTERN int make_linear_sequence(struct msa_seq *seq, char *linear_seq);
+EXTERN int make_linear_sequence(struct msa_seq *seq, char *linear_seq, int *out_len);
 
 /* Confidence masking styles */
 #define KALIGN_MASK_LOWERCASE 0

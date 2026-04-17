@@ -222,6 +222,8 @@ static int align_one_to_profile(struct aln_param* ap,
            path[c]: 0=match, &1=gap in profile (insertion in new seq — SKIP in strict mode),
                     &2=gap in new seq (insert '-'), 3=end */
         MMALLOC(gapped, sizeof(char) * (m->path[0] + 2));
+        memset(gapped, '-', m->path[0] + 1);
+        gapped[m->path[0] + 1] = '\0';
 
         pos_seq = 0;
         i = 0;

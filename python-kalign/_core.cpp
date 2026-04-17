@@ -7,8 +7,6 @@
 #include <string>
 #include <memory>
 #include <stdexcept>
-#include <fstream>
-#include <cstdio>
 #include <cstdlib>
 
 // Include DSSim for sequence simulation and MSA structures
@@ -486,45 +484,20 @@ py::object align_from_file_mode(
 
     py::object confidence = extract_confidence(msa_data, msa_data->numseq);
 
-    /* Write to temp file to get gap-inserted FASTA output */
-    const char* tmpdir = std::getenv("TMPDIR");
-    if (!tmpdir) tmpdir = std::getenv("TMP");
-    if (!tmpdir) tmpdir = std::getenv("TEMP");
-    if (!tmpdir) tmpdir = "/tmp";
-    std::string temp_file = std::string(tmpdir) + "/kalign_output.fa";
-    result = kalign_write_msa(msa_data, const_cast<char*>(temp_file.c_str()),
-                               const_cast<char*>("fasta"));
-    kalign_free_msa(msa_data);
+    int numseq = msa_data->numseq;
+    int alnlen = msa_data->alnlen;
 
-    if (result != 0) {
-        throw std::runtime_error("Failed to write alignment results");
-    }
-
-    std::ifstream file(temp_file);
     std::vector<std::string> names;
     std::vector<std::string> aligned_sequences;
-    std::string line, current_name, current_seq;
+    names.reserve(numseq);
+    aligned_sequences.reserve(numseq);
 
-    while (std::getline(file, line)) {
-        if (line.empty()) continue;
-        if (line[0] == '>') {
-            if (!current_seq.empty()) {
-                names.push_back(current_name);
-                aligned_sequences.push_back(current_seq);
-                current_seq.clear();
-            }
-            current_name = line.substr(1);
-            auto ws = current_name.find_first_of(" \t");
-            if (ws != std::string::npos) current_name = current_name.substr(0, ws);
-        } else {
-            current_seq += line;
-        }
+    for (int i = 0; i < numseq; i++) {
+        names.emplace_back(msa_data->sequences[i]->name);
+        aligned_sequences.emplace_back(msa_data->sequences[i]->seq, alnlen);
     }
-    if (!current_seq.empty()) {
-        names.push_back(current_name);
-        aligned_sequences.push_back(current_seq);
-    }
-    std::remove(temp_file.c_str());
+
+    kalign_free_msa(msa_data);
 
     if (!confidence.is_none()) {
         return py::make_tuple(names, aligned_sequences, confidence);

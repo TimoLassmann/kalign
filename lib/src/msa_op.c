@@ -3,6 +3,7 @@
 #include "alphabet.h"
 
 #include <ctype.h>
+#include <string.h>
 
 #include "msa_alloc.h"
 #define MSA_OP_IMPORT
@@ -67,7 +68,7 @@ int msa_seq_cpy(struct msa_seq *d, struct msa_seq *src)
                 d->s[j] = src->s[j];
                 d->gaps[j] = src->gaps[j];
         }
-        d->gaps[src->alloc_len] = src->gaps[src->alloc_len];
+        d->gaps[src->len] = src->gaps[src->len];
         d->seq[src->len] = 0;
         d->len = src->len;
         d->rank = src->rank;
@@ -386,6 +387,8 @@ int kalign_msa_to_arr(struct msa* msa, char ***aligned, int *out_aln_len)
         for(int i = 0 ; i < numseq;i++){
                 out[i] = NULL;
                 MMALLOC(out[i], sizeof(char) * (aln_len +1));
+                memset(out[i], '-', aln_len);
+                out[i][aln_len] = 0;
         }
 
         /* galloc(&out, numseq,aln_len+1); */
@@ -550,21 +553,28 @@ static int aln_unknown_warning_message_same_len_no_gaps(void)
 
 int finalise_alignment(struct msa* msa)
 {
-        ASSERT(msa->aligned == ALN_STATUS_ALIGNED, "Sequences are not aligned");
         struct msa_seq* seq = NULL;
         char* linear_seq = NULL;
         int aln_len = 0;
+        ASSERT(msa->aligned == ALN_STATUS_ALIGNED, "Sequences are not aligned");
 
-        
         for(int i = 0; i <= msa->sequences[0]->len;i++){
                 aln_len += msa->sequences[0]->gaps[i];
         }
         aln_len += msa->sequences[0]->len;
 
         for(int i = 0; i < msa->numseq;i++){
+                int seq_aln_len = 0;
                 MMALLOC(linear_seq, sizeof(char)* (aln_len+1));
+                memset(linear_seq, '-', aln_len);
+                linear_seq[aln_len] = 0;
                 seq = msa->sequences[i];
-                RUN(make_linear_sequence(seq,linear_seq));
+                RUN(make_linear_sequence(seq, linear_seq, &seq_aln_len));
+                if(seq_aln_len != aln_len){
+                        ERROR_MSG("Alignment length mismatch: seq %d (%s) "
+                                  "has length %d, expected %d",
+                                  i, seq->name, seq_aln_len, aln_len);
+                }
                 MFREE(seq->seq);
                 seq->seq = linear_seq;
                 /* seq->len = aln_len; */
@@ -574,31 +584,28 @@ int finalise_alignment(struct msa* msa)
         msa->aligned = ALN_STATUS_FINAL;
         return OK;
 ERROR:
+        if(linear_seq) MFREE(linear_seq);
         return FAIL;
 }
 
-int make_linear_sequence(struct msa_seq* seq, char* linear_seq)
+int make_linear_sequence(struct msa_seq* seq, char* linear_seq, int* out_len)
 {
         int c,j,f;
         f = 0;
         for(j = 0;j < seq->len;j++){
-                //LOG_MSG("%d %d",j,seq->gaps[j]);
                 for(c = 0;c < seq->gaps[j];c++){
                         linear_seq[f] = '-';
                         f++;
-
                 }
-                //LOG_MSG("%d %d %d",j,f,seq->gaps[j]);
                 linear_seq[f] = seq->seq[j];
                 f++;
         }
         for(c = 0;c < seq->gaps[ seq->len];c++){
-                //LOG_MSG("%d %d",j,seq->gaps[seq->len]);
                 linear_seq[f] = '-';
                 f++;
         }
         linear_seq[f] = 0;
-        ///fprintf(stdout,"LINEAR:%s\n",linear_seq);
+        if(out_len) *out_len = f;
         return OK;
 }
 
