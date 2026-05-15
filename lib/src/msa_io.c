@@ -319,7 +319,6 @@ int detect_alignment_format(struct in_buffer*b,int* type)
 
         //char line[BUFFER_LEN];
         int hints[3];
-        int line_len;
         int line_number;
         int set;
         int i;
@@ -335,18 +334,7 @@ int detect_alignment_format(struct in_buffer*b,int* type)
         }
         for(i = 0; i < MACRO_MIN(b->n_lines, 100);i++){
                 line = b->l[i]->line;
-                line_len = b->l[i]->len;
 
-                //}
-        //RUNP(f_ptr = fopen(infile, "r"));
-
-        /* scan through first line header  */
-        //while ((nread = getline(&line, &b_len, f_ptr)) != -1){
-                //while(fgets(line, BUFFER_LEN, f_ptr)){
-                //line_len =  nread;//strnlen(line, BUFFER_LEN);
-        //line[line_len-1] = 0;
-
-                line_len--;
                 if(line[0] == '>'){
                         hints[0]++; /* fasta */
                 }
@@ -416,7 +404,7 @@ int read_file_stdin(struct in_buffer** buffer,char* infile)
         char* line = NULL;
         char* tmp = NULL;
         size_t b_len = 0;
-        size_t nread;
+        ssize_t nread;
         int i;
         //char line[BUFFER_LEN];
         int line_len;

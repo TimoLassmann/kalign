@@ -33,7 +33,6 @@ int main(void)
         float** mat = NULL;
         double r;
         float d1;
-        float d2;
         int i,j,c;
         int max_iter = 10;
         int num_element = 128;

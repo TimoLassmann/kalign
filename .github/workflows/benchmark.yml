@@ -37,7 +37,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libomp-dev cmake
+          sudo apt-get install -y cmake
 
       - name: Build C binary
         run: |
