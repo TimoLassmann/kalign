@@ -73,7 +73,11 @@ run k, that's a vote. Bonus = weight × (votes / K).
 - `consistency_merge` (int, default 0)
 - `consistency_merge_weight` (float, default 2.0)
 
-### Optimizer: `optimize_unified.py`
+### Optimizer search space
+
+The NSGA-III optimizer that derived the preset values now lives in the
+manuscript repository (`scripts/optimizers/`); the search space for this
+feature was:
 - `consistency_merge`: Choice({0, 1}), only when n_runs > 1
 - `consistency_merge_weight`: Real([0.5, 10.0]), only when consistency_merge=1
 
@@ -95,4 +99,3 @@ benefit. The optimizer finds the sweet spot. Default 2.0.
 - `lib/src/ensemble.c` — consistency merge path
 - `lib/CMakeLists.txt` — new source file
 - `python-kalign/_core.cpp` — expose params
-- `benchmarks/optimize_unified.py` — optimizer variables

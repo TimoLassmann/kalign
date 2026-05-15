@@ -295,10 +295,10 @@ Verify that MDSA families that crashed with dense implementation now complete:
     -o /tmp/test.fa --consistency 8 --realign 2
 ```
 
-Run the full MDSA DNA benchmark:
-```bash
-uv run python -m benchmarks.optimize_unified --dataset mdsa --pop-size 20 --n-gen 2 --n-workers 4
-```
+Run the full MDSA DNA benchmark: the optimizer harness that produced the
+nucleotide preset numbers (`optimize_unified.py`) now lives in the
+manuscript repository at `scripts/optimizers/` and is no longer shipped
+with kalign.
 
 ### 5.3 Existing test suite
 
