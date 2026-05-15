@@ -5,7 +5,6 @@ This module provides convenient functions for reading sequences from files
 and writing alignments in various formats, with optional Biopython integration.
 """
 
-import os
 from pathlib import Path
 from typing import List, Optional, TextIO, Tuple, Union
 

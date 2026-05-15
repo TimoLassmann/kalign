@@ -57,9 +57,6 @@ set(source_files
   src/anchor_consistency.c
   src/msa_consistency.c
   src/ensemble.c
-
-  # src/coretralign.c
-  # src/test.h
   )
 
 # Add threadpool source when enabled

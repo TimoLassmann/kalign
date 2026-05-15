@@ -6,7 +6,7 @@ alignments produced by Kalign.
 """
 
 from collections import Counter
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import numpy as np
 

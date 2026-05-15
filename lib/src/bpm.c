@@ -18,7 +18,6 @@
 __m256i BROADCAST_MASK[16];
 
  void bitShiftLeft256ymm (__m256i *data, int count);
-__m256i bitShiftRight256ymm (__m256i *data, int count);
 
 /* taken from Alexander Yee: http://www.numberworld.org/y-cruncher/internals/addition.html#ks_add */
  __m256i add256(uint32_t carry, __m256i A, __m256i B);
@@ -335,20 +334,6 @@ void bitShiftLeft256ymm (__m256i *data, int count)
         //return carryOut;
 }
 
-__m256i bitShiftRight256ymm (__m256i *data, int count)
-{
-        __m256i innerCarry, carryOut, rotate;
-
-
-        innerCarry = _mm256_slli_epi64(*data, 64 - count);
-        rotate =  _mm256_permute4x64_epi64 (innerCarry, 0x39);
-        innerCarry = _mm256_blend_epi32 (_mm256_setzero_si256 (), rotate, 0x3F);
-        *data = _mm256_srli_epi64(*data, count);
-        *data = _mm256_or_si256(*data,  innerCarry);
-
-        carryOut   = _mm256_xor_si256 (innerCarry, rotate);                        //FIXME: not sure if this is correct!!!
-        return carryOut;
-}
 #endif
 
 
