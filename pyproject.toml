@@ -177,11 +177,6 @@ before-all = [
     "choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' || echo 'cmake already installed'",
 ]
 
-# Test settings for all platforms
-[tool.cibuildwheel.environment]
-# Set OpenMP variables for better performance
-OMP_NUM_THREADS = "1"
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]

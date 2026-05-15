@@ -84,8 +84,7 @@ jobs:
         # Environment variables for builds
         CIBW_ENVIRONMENT: >
           CMAKE_BUILD_PARALLEL_LEVEL=2
-          OMP_NUM_THREADS=1
-          
+
         # Skip testing during wheel build to avoid cross-compilation issues
         CIBW_TEST_SKIP: "*"
           
