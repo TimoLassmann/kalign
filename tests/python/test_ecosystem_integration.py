@@ -319,7 +319,6 @@ class TestBackwardCompatibility:
             "MODE_DEFAULT",
             "MODE_RECALL",
             "MODE_ACCURATE",
-            "MODE_PRECISE",
             "PROTEIN_CORBLOSUM66",
             "__version__",
             "__author__",

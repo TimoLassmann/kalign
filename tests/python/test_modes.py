@@ -1,4 +1,4 @@
-"""Tests for the unified mode interface (default/fast/precise)."""
+"""Tests for the unified mode interface (fast/default/recall/accurate)."""
 
 import os
 import tempfile
@@ -22,10 +22,10 @@ class TestModeConstants:
     """Test mode constant exports."""
 
     def test_mode_constants_exist(self):
-        assert kalign.MODE_DEFAULT == "default"
         assert kalign.MODE_FAST == "fast"
+        assert kalign.MODE_DEFAULT == "default"
+        assert kalign.MODE_RECALL == "recall"
         assert kalign.MODE_ACCURATE == "accurate"
-        assert kalign.MODE_PRECISE == "precise"  # deprecated alias
 
 
 class TestAlignModes:
@@ -51,10 +51,9 @@ class TestAlignModes:
         assert len(result) == len(TEST_SEQUENCES)
         assert all(len(s) == len(result[0]) for s in result)
 
-    def test_precise_mode(self):
-        """mode='precise' is deprecated alias for 'accurate'."""
-        with pytest.warns(DeprecationWarning, match="precise"):
-            result = kalign.align(TEST_SEQUENCES, mode="precise")
+    def test_recall_mode(self):
+        """mode='recall' produces alignment."""
+        result = kalign.align(TEST_SEQUENCES, mode="recall")
         if isinstance(result, tuple):
             seqs = result[0]
         else:
@@ -98,8 +97,8 @@ class TestAlignFromFileModes:
         names, sequences = result
         assert len(names) > 0
 
-    def test_precise_mode(self):
-        result = kalign.align_from_file(TEST_FILE, mode="precise")
+    def test_accurate_mode(self):
+        result = kalign.align_from_file(TEST_FILE, mode="accurate")
         names, sequences = result
         assert len(names) > 0
 
@@ -126,11 +125,11 @@ class TestAlignFileToFileModes:
         finally:
             os.unlink(out)
 
-    def test_precise_mode(self):
+    def test_accurate_mode(self):
         with tempfile.NamedTemporaryFile(suffix=".fa", delete=False) as f:
             out = f.name
         try:
-            kalign.align_file_to_file(TEST_FILE, out, mode="precise")
+            kalign.align_file_to_file(TEST_FILE, out, mode="accurate")
             assert os.path.getsize(out) > 0
         finally:
             os.unlink(out)

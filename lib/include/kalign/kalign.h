@@ -127,7 +127,7 @@ EXTERN int kalign_generate_ensemble_runs(const struct kalign_run_config* base,
  * (objectives: F1, TC, wall_time) with 5-fold cross-validation on
  * BAliBASE v4 (protein) and BRAliBASE (RNA).
  *
- * mode:    "fast", "default", or "accurate" (case-insensitive).
+ * mode:    "fast", "default", "recall", or "accurate" (case-insensitive).
  *          NULL is treated as "default".
  * biotype: ALN_BIOTYPE_PROTEIN, ALN_BIOTYPE_DNA, or ALN_BIOTYPE_RNA.
  *          Determines which preset grid slot to use.

@@ -29,25 +29,28 @@ sequences = [
     "ATCGATCATCG"
 ]
 
-# Default mode — consistency anchors + VSM (best general-purpose)
+# Default mode — single run with consistency anchors (best general-purpose)
 aligned = kalign.align(sequences)
 
-# Fast mode — no consistency, fastest
+# Fast mode — single run, fastest
 aligned = kalign.align(sequences, mode="fast")
 
-# Precise mode — ensemble + realign, highest precision
-aligned = kalign.align(sequences, mode="precise")
+# Accurate mode — ensemble, highest precision
+aligned = kalign.align(sequences, mode="accurate")
 ```
 
 ## Modes
 
-Kalign v3.5 provides three named modes that package the best configurations:
+Kalign v3.5 provides four named modes, exposed identically through the Python API
+and the `kalign` command-line tool. Presets were derived from NSGA-III
+multi-objective optimization on BAliBASE v4 (protein) and BRAliBASE (RNA).
 
 | Mode | Python | CLI | Description |
 |------|--------|-----|-------------|
-| **default** | `mode="default"` or omit | `kalign` | Consistency anchors + VSM. Best general-purpose. |
-| **fast** | `mode="fast"` | `kalign --fast` | VSM only. Fastest, similar to kalign v3.4. |
-| **precise** | `mode="precise"` | `kalign --precise` | Ensemble(3) + VSM + realign. Highest precision. |
+| **fast** | `mode="fast"` | `kalign --mode fast` | Single run, fastest. |
+| **default** | `mode="default"` or omit | `kalign` (or `--mode default`) | Single run with consistency anchors. Best general-purpose. |
+| **recall** | `mode="recall"` | `kalign --mode recall` | Ensemble, optimized for recall. |
+| **accurate** | `mode="accurate"` | `kalign --mode accurate` | Ensemble, highest precision. |
 
 Explicit parameters always override mode defaults:
 
@@ -55,11 +58,12 @@ Explicit parameters always override mode defaults:
 # Fast base + 5 ensemble runs
 aligned = kalign.align(sequences, mode="fast", ensemble=5)
 
-# Precise base + custom gap penalty
-aligned = kalign.align(sequences, mode="precise", gap_open=8.0)
+# Accurate base + custom gap penalty
+aligned = kalign.align(sequences, mode="accurate", gap_open=8.0)
 ```
 
-Mode constants are also available: `kalign.MODE_DEFAULT`, `kalign.MODE_FAST`, `kalign.MODE_PRECISE`.
+Mode constants are also available: `kalign.MODE_FAST`, `kalign.MODE_DEFAULT`,
+`kalign.MODE_RECALL`, `kalign.MODE_ACCURATE`.
 
 ## Core API
 
@@ -68,7 +72,7 @@ Mode constants are also available: `kalign.MODE_DEFAULT`, `kalign.MODE_FAST`, `k
 ```python
 aligned = kalign.align(
     sequences,              # list of str
-    mode=None,              # "default", "fast", "precise", or None (= default)
+    mode=None,              # "fast", "default", "recall", "accurate", or None (= default)
     seq_type="auto",        # "auto", "dna", "rna", "protein", "divergent", "internal"
     gap_open=None,          # positive float, or None for defaults
     gap_extend=None,        # positive float, or None for defaults
@@ -103,8 +107,8 @@ Additional parameters for advanced use:
 ```python
 result = kalign.align_from_file(
     "input.fasta",
-    mode="precise",              # or "default", "fast"
-    ensemble=5,                  # override: 5 runs instead of mode default (3)
+    mode="accurate",             # or "fast", "default", "recall"
+    ensemble=5,                  # override: 5 runs instead of mode default
     min_support=0,               # consensus threshold (0 = auto)
     save_poar="consensus.poar",  # save POAR table for re-thresholding
     # load_poar="consensus.poar",  # OR load pre-computed POAR
@@ -142,13 +146,13 @@ Supported formats: `fasta`, `clustal`, `stockholm`, `phylip` (non-FASTA formats 
 
 ## Ensemble Alignment & Confidence Scores
 
-Ensemble mode runs multiple alignments with varied parameters and combines results via POAR (Pairs of Aligned Residues) consensus. The simplest way to use it is `mode="precise"` (ensemble=3 + realign). For more control, set `ensemble` directly.
+Ensemble mode runs multiple alignments with varied parameters and combines results via POAR (Pairs of Aligned Residues) consensus. The simplest way to use it is `mode="accurate"` (5-run ensemble) or `mode="recall"` (recall-tuned ensemble). For more control, set `ensemble` directly.
 
 ```python
 import kalign
 
-# Precise mode: ensemble(3) + realign — highest precision
-result = kalign.align_from_file("proteins.fasta", mode="precise")
+# Accurate mode: 5-run ensemble — highest precision
+result = kalign.align_from_file("proteins.fasta", mode="accurate")
 
 # Or: explicit 5 ensemble runs
 result = kalign.align_from_file("proteins.fasta", ensemble=5)
@@ -298,8 +302,9 @@ print(type(aln))  # <class 'skbio.alignment._tabular_msa.TabularMSA'>
 ```bash
 # Modes
 kalign-py -i sequences.fasta -o aligned.fasta                    # default mode
-kalign-py --fast -i sequences.fasta -o aligned.fasta             # fast mode
-kalign-py --precise -i sequences.fasta -o aligned.fasta          # precise mode
+kalign-py --mode fast -i sequences.fasta -o aligned.fasta        # fast mode
+kalign-py --mode recall -i sequences.fasta -o aligned.fasta      # recall mode
+kalign-py --mode accurate -i sequences.fasta -o aligned.fasta    # accurate mode
 
 # I/O options
 kalign-py -i sequences.fasta -o - --format clustal               # stdout

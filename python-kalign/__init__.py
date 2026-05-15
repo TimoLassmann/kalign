@@ -82,7 +82,6 @@ MODE_FAST = "fast"
 MODE_DEFAULT = "default"
 MODE_RECALL = "recall"
 MODE_ACCURATE = "accurate"
-MODE_PRECISE = "precise"  # deprecated alias for "accurate"
 
 # Valid preset modes (resolved by C library)
 _PRESET_MODES = {"fast", "default", "recall", "accurate"}
@@ -118,20 +117,13 @@ def _resolve_seq_type(seq_type):
 
 
 def _resolve_mode_name(mode):
-    """Normalize mode name, handling 'precise' -> 'accurate' alias."""
+    """Normalize mode name to one of the C-library presets."""
     if mode is None:
         return "default"
     lower = mode.lower()
-    if lower == "precise":
-        warnings.warn(
-            'mode="precise" is deprecated, use mode="accurate" instead.',
-            DeprecationWarning,
-            stacklevel=3,
-        )
-        return "accurate"
     if lower not in _PRESET_MODES:
         raise ValueError(
-            f"Invalid mode: {mode!r}. Must be one of: 'default', 'fast', 'accurate'"
+            f"Invalid mode: {mode!r}. Must be one of: 'fast', 'default', 'recall', 'accurate'"
         )
     return lower
 
@@ -871,7 +863,6 @@ __all__ = [
     "MODE_DEFAULT",
     "MODE_RECALL",
     "MODE_ACCURATE",
-    "MODE_PRECISE",
     "__version__",
     "__author__",
     "__email__",
