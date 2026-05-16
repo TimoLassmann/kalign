@@ -1,4 +1,57 @@
-2026-02-27  Timo Lassmann  <timolassmann@icloud.com>
+2026-05-16  Timo Lassmann  <timolassmann@icloud.com>
+
+	* version 3.5.2 - Four-mode preset system, threadpool, hardening
+	Algorithm and presets
+	- Four mode presets stable for protein and nucleotide:
+	  fast, default, recall, accurate. Per-mode configurations
+	  derived by NSGA-III multi-objective optimisation on
+	  BAliBASE v4 (protein) and BRAliBASE (RNA).
+	- Unified nucleotide preset (DNA and RNA share one path).
+	- Ensemble alignment with POAR consensus and per-column /
+	  per-residue confidence scores.
+	- New --add mode: append sequences to an existing alignment.
+	- Sparse consistency-bonus matrix for large MSAs (avoids
+	  quadratic memory in column count).
+	- Removed deprecated 'precise' mode alias (Python only;
+	  never shipped as a wheel).
+
+	Parallelism
+	- Chase-Lev work-stealing thread pool is now the default
+	  parallelism backend; OpenMP is optional (USE_OPENMP=ON).
+	- macOS wheels no longer link libomp.dylib, resolving the
+	  conda-forge / numpy OpenMP runtime conflict.
+
+	Security / robustness
+	- POAR file parsing now rejects malformed inputs that would
+	  cause integer overflow in pair-count or per-pair entry
+	  count (lib/src/poar.c). Limited threat model (requires
+	  explicit --load-poar) but tightened anyway.
+	- finalise_alignment is now atomic w.r.t. msa->sequences:
+	  validates all per-sequence linear lengths before swapping
+	  any pointer, so a failure leaves the MSA unchanged.
+	- kalign_msa_compare wraps finalise_alignment in RUN(); a
+	  failure surfaces cleanly instead of producing a half-
+	  finalised MSA.
+	- DSSIM stress test now uses KALIGN_MATRIX_AUTO so it
+	  exercises both protein and DNA biotypes correctly.
+	- Bumped locked dependencies (cryptography, flask, werkzeug,
+	  pillow, pygments, pytest, urllib3, requests, mako, black)
+	  past their CVE fix versions.
+
+	Build / tooling
+	- build.zig updated for zig 0.16 (four cross-compile targets).
+	- tests/check-local.sh: one-command pre-push gate that runs
+	  zig build + native ctest + Linux ASAN container + pytest.
+	- Containerfile.memcheck (Ubuntu + ASAN + Valgrind) for local
+	  Linux memory-bug reproduction.
+	- Removed paper-side benchmark machinery, optimizer scripts,
+	  and design-rationale PRDs from the public tree (preserved
+	  in the manuscript repository for reproducibility).
+	- Cleaned up ~550 lines of dead code (coretralign,
+	  bitShiftRight256ymm, unused split() in bisectingKmeans).
+	- Build is now warning-free on clang and GCC.
+	- Dropped the broken benchmark CI workflow (BAliBASE download
+	  endpoint has been gone for months).
 
 	* version 3.5.1 - Bugfix release
 	- Fix memory leak in build_tree_from_pairwise (realign/ensemble)
