@@ -313,7 +313,8 @@ def align(
 
     # Gap penalty override rule: if any gap penalty is set, use "fast" preset
     has_gap_override = (
-        gap_open is not None or gap_extend is not None
+        gap_open is not None
+        or gap_extend is not None
         or terminal_gap_extend is not None
     )
     if has_gap_override:
@@ -323,7 +324,9 @@ def align(
 
     confidence_data = None
     result = _core.align_mode(
-        sequences, effective_mode, seq_type_int,
+        sequences,
+        effective_mode,
+        seq_type_int,
         gap_open if gap_open is not None else -1.0,
         gap_extend if gap_extend is not None else -1.0,
         terminal_gap_extend if terminal_gap_extend is not None else -1.0,
@@ -457,7 +460,8 @@ def align_from_file(
         raise ValueError("n_threads must be at least 1")
 
     has_gap_override = (
-        gap_open is not None or gap_extend is not None
+        gap_open is not None
+        or gap_extend is not None
         or terminal_gap_extend is not None
     )
     if has_gap_override:
@@ -466,7 +470,9 @@ def align_from_file(
         effective_mode = _resolve_mode_name(mode)
 
     result = _core.align_from_file_mode(
-        input_file, effective_mode, seq_type_int,
+        input_file,
+        effective_mode,
+        seq_type_int,
         gap_open if gap_open is not None else -1.0,
         gap_extend if gap_extend is not None else -1.0,
         terminal_gap_extend if terminal_gap_extend is not None else -1.0,
@@ -477,8 +483,10 @@ def align_from_file(
         col_conf = list(conf["column_confidence"])
         res_conf = [list(row) for row in conf["residue_confidence"]]
         return AlignedSequences(
-            names=names, sequences=sequences,
-            column_confidence=col_conf, residue_confidence=res_conf,
+            names=names,
+            sequences=sequences,
+            column_confidence=col_conf,
+            residue_confidence=res_conf,
         )
     else:
         names, sequences = result
@@ -512,10 +520,14 @@ def write_alignment(
 
     format_lower = format.lower()
     format_map = {
-        "fasta": "fasta", "fa": "fasta",
-        "clustal": "clustal", "aln": "clustal",
-        "stockholm": "stockholm", "sto": "stockholm",
-        "phylip": "phylip", "phy": "phylip",
+        "fasta": "fasta",
+        "fa": "fasta",
+        "clustal": "clustal",
+        "aln": "clustal",
+        "stockholm": "stockholm",
+        "sto": "stockholm",
+        "phylip": "phylip",
+        "phy": "phylip",
     }
     if format_lower not in format_map:
         raise ValueError(
@@ -524,13 +536,16 @@ def write_alignment(
     mapped_format = format_map[format_lower]
 
     from . import io as _io
+
     if mapped_format == "fasta":
         _io.write_fasta(sequences, output_file, ids=ids)
     elif mapped_format == "clustal":
         _io.write_clustal(sequences, output_file, ids=ids)
     elif mapped_format == "stockholm":
         _io.write_stockholm(
-            sequences, output_file, ids=ids,
+            sequences,
+            output_file,
+            ids=ids,
             column_confidence=column_confidence,
             residue_confidence=residue_confidence,
         )
@@ -651,7 +666,8 @@ def align_file_to_file(
         n_threads = get_num_threads()
 
     has_gap_override = (
-        gap_open is not None or gap_extend is not None
+        gap_open is not None
+        or gap_extend is not None
         or terminal_gap_extend is not None
     )
     if has_gap_override:
@@ -660,7 +676,11 @@ def align_file_to_file(
         effective_mode = _resolve_mode_name(mode)
 
     _core.align_file_to_file_mode(
-        input_file, output_file, effective_mode, format, n_threads,
+        input_file,
+        output_file,
+        effective_mode,
+        format,
+        n_threads,
         seq_type_int,
         gap_open if gap_open is not None else -1.0,
         gap_extend if gap_extend is not None else -1.0,
@@ -701,6 +721,7 @@ def mask_alignment(
     """
     if result.column_confidence is None:
         import warnings
+
         warnings.warn(
             "No confidence scores available (requires ensemble mode). "
             "Returning unmasked alignment."
@@ -712,12 +733,12 @@ def mask_alignment(
     for seq in result.sequences:
         chars = list(seq)
         for col in range(len(chars)):
-            if col < len(conf) and conf[col] < threshold and chars[col] != '-':
+            if col < len(conf) and conf[col] < threshold and chars[col] != "-":
                 if style == "remove":
-                    chars[col] = '-'
+                    chars[col] = "-"
                 else:
                     chars[col] = chars[col].lower()
-        masked_seqs.append(''.join(chars))
+        masked_seqs.append("".join(chars))
 
     return AlignedSequences(
         names=result.names,
@@ -747,6 +768,7 @@ def filter_alignment(
     """
     if result.column_confidence is None:
         import warnings
+
         warnings.warn(
             "No confidence scores available (requires ensemble mode). "
             "Returning unfiltered alignment."
@@ -758,7 +780,7 @@ def filter_alignment(
 
     filtered_seqs = []
     for seq in result.sequences:
-        filtered_seqs.append(''.join(seq[col] for col in keep))
+        filtered_seqs.append("".join(seq[col] for col in keep))
 
     filtered_conf = [conf[col] for col in keep]
     filtered_res_conf = None
@@ -824,7 +846,7 @@ def write_confidence(path: str, result: AlignedSequences) -> None:
     """
     if result.column_confidence is None:
         raise ValueError("No confidence scores available (requires ensemble mode)")
-    with open(path, 'w') as f:
+    with open(path, "w") as f:
         for val in result.column_confidence:
             f.write(f"{val:.4f}\n")
 
