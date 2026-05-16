@@ -1,6 +1,7 @@
 #include "tldevel.h"
 
 #include <ctype.h>
+#include <limits.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -338,7 +339,15 @@ int poar_table_read(struct poar_table** out_table, const char* path)
         t->pairs = NULL;
         t->numseq = (int)numseq;
         t->n_alignments = (int)n_alignments;
-        t->n_pairs = (int)(numseq * (numseq - 1) / 2);
+
+        /* Compute pair count in 64-bit; numseq*(numseq-1) overflows uint32 at
+           numseq >= 65537, and the cast to int wraps negative at numseq >= 65536. */
+        uint64_t n_pairs64 = (uint64_t)numseq * ((uint64_t)numseq - 1) / 2;
+        if(n_pairs64 > (uint64_t)INT_MAX){
+                ERROR_MSG("POAR file %s: numseq=%u implies %llu pairs, exceeds INT_MAX",
+                          path, numseq, (unsigned long long)n_pairs64);
+        }
+        t->n_pairs = (int)n_pairs64;
 
         MMALLOC(t->pairs, sizeof(struct poar_pair*) * t->n_pairs);
         for(i = 0; i < t->n_pairs; i++){
@@ -351,6 +360,13 @@ int poar_table_read(struct poar_table** out_table, const char* path)
 
                 if(fread(&n_entries, 4, 1, fp) != 1){
                         ERROR_MSG("Failed to read pair %d entries count", i);
+                }
+
+                /* Cap so the cast to int doesn't wrap negative and the per-entry
+                   allocation size doesn't overflow size_t. */
+                if(n_entries > (uint32_t)(INT_MAX / sizeof(struct poar_entry))){
+                        ERROR_MSG("POAR file: pair %d has n_entries=%u, exceeds bounds",
+                                  i, n_entries);
                 }
 
                 MMALLOC(pp, sizeof(struct poar_pair));
