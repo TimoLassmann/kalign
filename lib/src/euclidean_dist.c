@@ -33,6 +33,9 @@ int main(void)
         float** mat = NULL;
         double r;
         float d1;
+#ifdef HAVE_AVX2
+        float d2;
+#endif
         int i,j,c;
         int max_iter = 10;
         int num_element = 128;
