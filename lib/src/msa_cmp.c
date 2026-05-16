@@ -133,11 +133,11 @@ int kalign_msa_compare(struct msa *r, struct msa *t,  float *score)
 
 
         if(r->aligned == ALN_STATUS_ALIGNED){
-                finalise_alignment(r);
+                RUN(finalise_alignment(r));
         }
 
         if(t->aligned == ALN_STATUS_ALIGNED){
-                finalise_alignment(t);
+                RUN(finalise_alignment(t));
         }
 
         if(r->alnlen == 0 && r->numseq > 0){
@@ -508,10 +508,10 @@ int kalign_msa_compare_detailed(struct msa *r, struct msa *t,
         ASSERT(out != NULL, "No output struct");
 
         if(r->aligned == ALN_STATUS_ALIGNED){
-                finalise_alignment(r);
+                RUN(finalise_alignment(r));
         }
         if(t->aligned == ALN_STATUS_ALIGNED){
-                finalise_alignment(t);
+                RUN(finalise_alignment(t));
         }
 
         /* Handle references read from file that had no gaps:
@@ -567,10 +567,10 @@ int kalign_msa_compare_with_mask(struct msa *r, struct msa *t,
         ASSERT(out != NULL, "No output struct");
 
         if(r->aligned == ALN_STATUS_ALIGNED){
-                finalise_alignment(r);
+                RUN(finalise_alignment(r));
         }
         if(t->aligned == ALN_STATUS_ALIGNED){
-                finalise_alignment(t);
+                RUN(finalise_alignment(t));
         }
 
         if(r->alnlen == 0 && r->numseq > 0){

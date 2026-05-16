@@ -65,11 +65,15 @@ int test_consistency(int num_tests, int numseq,int dna,int seed)
                 msa_shuffle_seq(m2, rng);
                 {
                         struct kalign_run_config cfg = kalign_run_config_defaults();
-                        kalign_align_full(m, &cfg, 1, NULL, t1);
-                        kalign_align_full(m2, &cfg, 1, NULL, t2);
+                        /* Defaults select a protein matrix; use AUTO so the
+                           library picks the appropriate matrix per biotype
+                           (so this test exercises both protein and DNA). */
+                        cfg.matrix = KALIGN_MATRIX_AUTO;
+                        RUN(kalign_align_full(m, &cfg, 1, NULL, t1));
+                        RUN(kalign_align_full(m2, &cfg, 1, NULL, t2));
                 }
 
-                kalign_msa_compare(m, m2, &score);
+                RUN(kalign_msa_compare(m, m2, &score));
                 if(score != 100.0f){
                         LOG_MSG("Testing %d : %d %d %f", i , t1 ,t2,score);
                         kalign_write_msa(m, NULL, "msf");

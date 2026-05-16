@@ -105,6 +105,7 @@ int dssim_get_fasta(struct msa **msa, int n_seq, int n_obs, int dna,int len, int
         m->run_parallel = 0;
         m->consistency_table = NULL;
         m->quiet = 1;
+        m->poar_consistency = NULL;
         MMALLOC(m->sequences, sizeof(struct msa_seq*) * m->alloc_numseq);
 
         for(int i = 0; i < 128; i++){

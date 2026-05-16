@@ -104,7 +104,14 @@ EXTERN int kalign_msa_compare_with_mask(struct msa *r, struct msa *t,
                                         int *scored_cols, int n_cols,
                                         struct poar_score *out);
 
-/* Unified alignment entry point — all callers should use this. */
+/* Unified alignment entry point — all callers should use this.
+ *
+ * NOTE: kalign_run_config_defaults() returns a *protein-oriented* config
+ * (matrix = KALIGN_MATRIX_PFASUM43, protein gap penalties).  Callers that
+ * may operate on DNA or RNA input should set cfg.matrix = KALIGN_MATRIX_AUTO
+ * before passing the config to kalign_align_full; the library will then
+ * resolve to a biotype-appropriate matrix at alignment time.  The mode-preset
+ * path (kalign_get_mode_preset) populates the matrix per biotype automatically. */
 EXTERN struct kalign_run_config kalign_run_config_defaults(void);
 EXTERN struct kalign_ensemble_config kalign_ensemble_config_defaults(void);
 

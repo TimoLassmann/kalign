@@ -553,8 +553,7 @@ static int aln_unknown_warning_message_same_len_no_gaps(void)
 
 int finalise_alignment(struct msa* msa)
 {
-        struct msa_seq* seq = NULL;
-        char* linear_seq = NULL;
+        char** linear_seqs = NULL;
         int aln_len = 0;
         ASSERT(msa->aligned == ALN_STATUS_ALIGNED, "Sequences are not aligned");
 
@@ -563,28 +562,46 @@ int finalise_alignment(struct msa* msa)
         }
         aln_len += msa->sequences[0]->len;
 
+        /* Two-pass to keep finalisation atomic w.r.t. msa->sequences:
+           build and validate every linear_seq first; only swap pointers
+           into msa->sequences[i]->seq once we know every sequence is
+           consistent.  On error the MSA's per-sequence buffers are
+           untouched and callers can safely retry or fall back. */
+        MMALLOC(linear_seqs, sizeof(char*) * msa->numseq);
+        for(int i = 0; i < msa->numseq; i++) linear_seqs[i] = NULL;
+
         for(int i = 0; i < msa->numseq;i++){
                 int seq_aln_len = 0;
-                MMALLOC(linear_seq, sizeof(char)* (aln_len+1));
-                memset(linear_seq, '-', aln_len);
-                linear_seq[aln_len] = 0;
-                seq = msa->sequences[i];
-                RUN(make_linear_sequence(seq, linear_seq, &seq_aln_len));
+                struct msa_seq* seq = msa->sequences[i];
+
+                MMALLOC(linear_seqs[i], sizeof(char) * (aln_len + 1));
+                memset(linear_seqs[i], '-', aln_len);
+                linear_seqs[i][aln_len] = 0;
+
+                RUN(make_linear_sequence(seq, linear_seqs[i], &seq_aln_len));
                 if(seq_aln_len != aln_len){
                         ERROR_MSG("Alignment length mismatch: seq %d (%s) "
                                   "has length %d, expected %d",
                                   i, seq->name, seq_aln_len, aln_len);
                 }
-                MFREE(seq->seq);
-                seq->seq = linear_seq;
-                /* seq->len = aln_len; */
-                linear_seq = NULL;
         }
+
+        /* All sequences validated — commit the swap. */
+        for(int i = 0; i < msa->numseq; i++){
+                MFREE(msa->sequences[i]->seq);
+                msa->sequences[i]->seq = linear_seqs[i];
+        }
+        MFREE(linear_seqs);
         msa->alnlen = aln_len;
         msa->aligned = ALN_STATUS_FINAL;
         return OK;
 ERROR:
-        if(linear_seq) MFREE(linear_seq);
+        if(linear_seqs){
+                for(int i = 0; i < msa->numseq; i++){
+                        if(linear_seqs[i]) MFREE(linear_seqs[i]);
+                }
+                MFREE(linear_seqs);
+        }
         return FAIL;
 }
 
