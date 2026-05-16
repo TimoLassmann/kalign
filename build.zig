@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const kalignPackageVersion = "3.5.2";
+const kalignPackageVersion = "3.6.0";
 
 const targets: []const std.Target.Query = &.{
     .{ .cpu_arch = .aarch64, .os_tag = .macos },

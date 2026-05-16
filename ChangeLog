@@ -1,5 +1,17 @@
 2026-05-16  Timo Lassmann  <timolassmann@icloud.com>
 
+	* version 3.6.0 - Drop Python 3.9/3.10 support; CI Node 24 upgrade
+	- Minimum Python version raised to 3.11. Python 3.9 reached EOL in
+	  October 2025 and 3.10 reaches EOL in October 2026; both are now
+	  beyond their supported lifecycle for upstream wheels (pillow,
+	  matplotlib). Wheels and CI matrices now target 3.11 / 3.12 / 3.13
+	  / 3.14.
+	- GitHub Actions updated to Node.js 24 successor versions
+	  (checkout v5, setup-python v6, upload/download-artifact v5,
+	  codecov v5) ahead of the 2026-06-02 forced Node 24 switch.
+	- Drive-by: dropped redundant `brew install cmake` on macOS-latest
+	  runners (cmake is preinstalled).
+
 	* version 3.5.2 - Four-mode preset system, threadpool, hardening
 	Algorithm and presets
 	- Four mode presets stable for protein and nucleotide:
