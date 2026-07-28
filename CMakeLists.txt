@@ -79,15 +79,15 @@ set(KALIGN_PFOR_MIN_CHUNK "10" CACHE STRING "Minimum iterations per chunk in tp_
 
 
 if(USE_OPENMP)
-  # Configure OpenMP for macOS with Homebrew (only for arm64 native builds)
-  if(APPLE AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "arm64" AND NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
-    list(APPEND CMAKE_PREFIX_PATH /opt/homebrew)
-    # Set OpenMP flags for Apple Clang + Homebrew libomp
-    set(OpenMP_C_FLAGS "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
+  # Configure OpenMP for macOS with external libomp (only for Apple Clang on arm64 native builds)
+  if(APPLE AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "arm64" AND NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64" AND CMAKE_C_COMPILER_ID STREQUAL "AppleClang")
+    # Defaults to Homebrew
+    set(LIBOMP_ROOT "/opt/homebrew/opt/libomp" CACHE PATH "libomp install prefix")
+    set(OpenMP_C_FLAGS "-Xpreprocessor -fopenmp -I${LIBOMP_ROOT}/include")
     set(OpenMP_C_LIB_NAMES "omp")
-    set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
+    set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp -I${LIBOMP_ROOT}/include")
     set(OpenMP_CXX_LIB_NAMES "omp")
-    set(OpenMP_omp_LIBRARY /opt/homebrew/opt/libomp/lib/libomp.dylib)
+    set(OpenMP_omp_LIBRARY "${LIBOMP_ROOT}/lib/libomp.dylib")
   endif()
 
   find_package(OpenMP)
