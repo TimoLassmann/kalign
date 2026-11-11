@@ -23,6 +23,7 @@ EXTERN int set_sip_nsip(struct msa *msa);
 EXTERN int reformat_settings_msa(struct msa *msa, int rename, int unalign);
 
 EXTERN int convert_msa_to_internal(struct msa* msa, int type);
+EXTERN int msa_report_foreign_chars(struct msa* msa, int biotype);
 
 /* convert alinged msa sequences to character array */
 EXTERN int kalign_msa_to_arr(struct msa *msa, char ***aligned, int *out_aln_len);

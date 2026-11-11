@@ -1,0 +1,21 @@
+fold	mode	source	flag	core SP	core TC	core precision	core CPU s	3.7.0 core CPU s (budget basis)	preset
+0	fast	new		0.839	0.689	0.837	14.01	16.55	single K200 gpo=19.46 vsm=0.09 sw=0.13 c=1 re=0 ref=N
+0	default	new		0.792	0.642	0.921	88.75	75.53	ens3 K200/K200/K200 gpo=16.01/19.97/17.54 vsm=0.20/2.48/0.25 sw=0.64 c=1 re=1 ref=C/N/N ms=3 cm=0
+0	recall	new		0.848	0.702	0.843	35.78	34.25	single K200 gpo=16.01 vsm=0.20 sw=0.64 c=1 re=1 ref=C
+0	accurate	new		0.804	0.657	0.914	171.43	183.08	ens3 K200/K200/K200 gpo=19.43/16.58/14.76 vsm=2.27/0.71/0.03 sw=0.48 c=8 re=2 ref=N/N/C ms=3 cm=0
+1	fast	new		0.842	0.707	0.839	11.71	14.01	single K200 gpo=16.75 vsm=1.25 sw=1.37 c=1 re=0 ref=N
+1	default	new		0.791	0.654	0.915	75.85	63.23	ens3 K200/K200/K200 gpo=15.99/18.92/18.67 vsm=0.20/1.83/1.65 sw=0.59 c=1 re=1 ref=C/N/N ms=3 cm=0
+1	recall	new		0.847	0.715	0.843	30.40	29.23	single K200 gpo=15.99 vsm=0.20 sw=0.59 c=1 re=1 ref=C
+1	accurate	new		0.800	0.664	0.913	126.33	153.45	ens5 K200/K20/K200/K200/K200 gpo=15.99/19.53/13.99/18.87/18.85 vsm=0.20/1.79/1.71/1.52/1.41 sw=0.59 c=1 re=1 ref=C/N/N/N/C ms=4 cm=0
+2	fast	new		0.853	0.725	0.851	11.58	14.02	single K20 gpo=18.78 vsm=0.30 sw=0.60 c=1 re=0 ref=N
+2	default	new		0.805	0.671	0.929	60.17	63.71	ens3 K200/K200/K20 gpo=19.95/16.03/20.00 vsm=1.45/2.82/0.85 sw=1.11 c=3 re=0 ref=N/N/N ms=3 cm=0
+2	recall	new		0.858	0.732	0.855	32.12	29.12	single K20 gpo=20.00 vsm=0.85 sw=0.13 c=10 re=0 ref=N
+2	accurate	new		0.833	0.704	0.913	129.88	154.34	ens3 K20/K200/K20 gpo=19.99/19.95/19.95 vsm=0.30/1.45/2.93 sw=0.15 c=8 re=1 ref=C/N/N ms=2 cm=0
+3	fast	new		0.830	0.684	0.828	14.39	14.10	single K200 gpo=17.18 vsm=0.99 sw=0.28 c=2 re=0 ref=N
+3	default	3.7.0		0.813	0.670	0.866	64.79	64.79	ens3 K20/K200/K200 gpo=19.27/16.58/16.50 vsm=0.45/0.71/0.49 sw=0.45 c=0 re=1 ref=N/N/C ms=2 cm=0
+3	recall	new		0.835	0.690	0.831	28.53	29.25	single K200 gpo=17.69 vsm=0.49 sw=0.20 c=5 re=1 ref=N
+3	accurate	3.7.0		0.806	0.664	0.888	155.73	155.73	ens5 K200/K1/K200/K200/K1 gpo=19.48/19.38/15.87/15.99/5.35 vsm=0.49/1.21/0.72/0.19/1.41 sw=0.59 c=2 re=1 ref=C/C/N/C/N ms=3 cm=0
+4	fast	new		0.843	0.698	0.840	11.69	13.74	single K200 gpo=17.60 vsm=0.03 sw=0.22 c=1 re=0 ref=N
+4	default	new		0.784	0.641	0.922	62.47	61.86	ens3 K200/K200/K200 gpo=19.99/19.58/13.02 vsm=2.89/2.06/0.93 sw=0.20 c=1 re=1 ref=N/N/N ms=3 cm=0
+4	recall	new		0.843	0.700	0.843	30.19	28.32	single K200 gpo=19.50 vsm=0.49 sw=0.48 c=1 re=1 ref=C
+4	accurate	3.7.0		0.818	0.678	0.897	150.22	150.22	ens5 K200/K1/K200/K200/K1 gpo=19.48/19.38/15.87/15.99/5.35 vsm=0.49/1.21/0.72/0.19/1.41 sw=0.59 c=2 re=1 ref=C/C/N/C/N ms=3 cm=0

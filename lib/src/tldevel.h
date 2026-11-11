@@ -54,15 +54,15 @@
         }while (0)
 
 #define ASSERT(TEST,...)  if(!(TEST)) {         \
-                error(AT,#TEST );               \
                 error(AT, __VA_ARGS__);         \
+                error(AT,#TEST );               \
                 goto ERROR;                     \
         }
 
 #if (DEBUGLEVEL >= 1)
 #define DASSERT(TEST,...) if(!(TEST)) {         \
-                error(AT,#TEST );               \
                 error(AT, __VA_ARGS__);         \
+                error(AT,#TEST );               \
                 goto ERROR;                     \
         }
 #else
@@ -277,6 +277,9 @@ EXTERN int galloc_too_few_arg_error (void* p);
 /* functions  */
 
 EXTERN void error(const char *location, const char *format, ...);
+/* first error message reported on this thread since tl_clear_error() ("" if none) */
+EXTERN const char* tl_first_error(void);
+EXTERN void tl_clear_error(void);
 EXTERN void warning(const char *location, const char *format, ...);
 EXTERN void log_message( const char *format, ...);
 
@@ -287,5 +290,16 @@ EXTERN const char* tldevel_version(void);
 #undef TLDEVEL_IMPORT
 #undef EXTERN
 
+/* Performance instrumentation (perf/dp/instr/kperf.h). Off by default: every
+   KPERF_* hook expands to nothing unless KALIGN_PERF_TIMERS is defined, which
+   only the perf harness library variant does (-DKALIGN_PERF=ON). */
+#ifdef KALIGN_PERF_TIMERS
+#include "kperf.h"
+#else
+#define KPERF_REGION(id)
+#define KPERF_PHASE_REGION(id, ph)
+#define KPERF_DP(kind, op, m, cells)
+#define KPERF_RUNNER(m)
+#endif
 
 #endif

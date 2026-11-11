@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "tldevel.h"
 #define BPM_IMPORT
@@ -338,6 +339,184 @@ void bitShiftLeft256ymm (__m256i *data, int count)
 
 
 
+
+#if defined(__GNUC__) || defined(__clang__)
+#define U4_INLINE static inline __attribute__((always_inline))
+#else
+#define U4_INLINE static inline
+#endif
+/* ---- SIMD block wavefront for bpm_block -------------------------------
+   4 x 64-bit lanes (NEON: 2 x uint64x2_t, AVX2: __m256i).  Lane b holds block
+   b and processes character s - b at step s, so the carry from block b-1 is a
+   one-lane shift of the previous step's output.  Per block, the arithmetic is
+   exactly bpm_block's (branch-free form).  Blocks that have not started are
+   masked during the first steps; finished blocks only feed higher blocks that
+   have finished too, and the result is read from the last block while it is
+   active.  Used from BPM_SIMD_MIN_BLOCKS blocks on (NEON pays off only for
+   long patterns: the scalar integer path is already fast on Apple cores). */
+#if defined(_MSC_VER) && !defined(__clang__)
+#define BPM_SIMD 0
+#elif defined(__ARM_NEON)
+#include <arm_neon.h>
+#define BPM_SIMD 1
+#define BPM_SIMD_MIN_BLOCKS 6
+typedef struct { uint64x2_t lo, hi; } u64x4;
+U4_INLINE u64x4 u4_set(uint64_t a, uint64_t b, uint64_t c, uint64_t d)
+{
+        u64x4 r;
+        r.lo = vcombine_u64(vcreate_u64(a), vcreate_u64(b));
+        r.hi = vcombine_u64(vcreate_u64(c), vcreate_u64(d));
+        return r;
+}
+U4_INLINE u64x4 u4_dup(uint64_t a) { u64x4 r = { vdupq_n_u64(a), vdupq_n_u64(a) }; return r; }
+#define U4_BIN(name, op) U4_INLINE u64x4 name(u64x4 a, u64x4 b) { u64x4 r = { op(a.lo, b.lo), op(a.hi, b.hi) }; return r; }
+U4_BIN(u4_and, vandq_u64)
+U4_BIN(u4_or, vorrq_u64)
+U4_BIN(u4_xor, veorq_u64)
+U4_BIN(u4_add, vaddq_u64)
+U4_BIN(u4_sub, vsubq_u64)
+U4_INLINE u64x4 u4_not(u64x4 a) { return u4_xor(a, u4_dup(~(uint64_t)0)); }
+U4_INLINE u64x4 u4_shl1(u64x4 a) { u64x4 r = { vshlq_n_u64(a.lo, 1), vshlq_n_u64(a.hi, 1) }; return r; }
+U4_INLINE u64x4 u4_shr63(u64x4 a) { u64x4 r = { vshrq_n_u64(a.lo, 63), vshrq_n_u64(a.hi, 63) }; return r; }
+/* [prev3, cur0, cur1, cur2] */
+U4_INLINE u64x4 u4_shift_in(u64x4 prev, u64x4 cur)
+{
+        u64x4 r = { vextq_u64(prev.hi, cur.lo, 1), vextq_u64(cur.lo, cur.hi, 1) };
+        return r;
+}
+/* lanes with mask all-ones take a, others b */
+U4_INLINE u64x4 u4_sel(u64x4 mask, u64x4 a, u64x4 b)
+{
+        u64x4 r = { vbslq_u64(mask.lo, a.lo, b.lo), vbslq_u64(mask.hi, a.hi, b.hi) };
+        return r;
+}
+U4_INLINE uint64_t u4_lane(u64x4 a, int l)
+{
+        switch(l){
+        case 0: return vgetq_lane_u64(a.lo, 0);
+        case 1: return vgetq_lane_u64(a.lo, 1);
+        case 2: return vgetq_lane_u64(a.hi, 0);
+        default: return vgetq_lane_u64(a.hi, 1);
+        }
+}
+#elif defined(__AVX2__)
+#include <immintrin.h>
+#define BPM_SIMD 1
+#define BPM_SIMD_MIN_BLOCKS 2
+typedef __m256i u64x4;
+U4_INLINE u64x4 u4_set(uint64_t a, uint64_t b, uint64_t c, uint64_t d)
+{
+        return _mm256_set_epi64x((long long)d, (long long)c, (long long)b, (long long)a);
+}
+U4_INLINE u64x4 u4_dup(uint64_t a) { return _mm256_set1_epi64x((long long)a); }
+U4_INLINE u64x4 u4_and(u64x4 a, u64x4 b) { return _mm256_and_si256(a, b); }
+U4_INLINE u64x4 u4_or(u64x4 a, u64x4 b) { return _mm256_or_si256(a, b); }
+U4_INLINE u64x4 u4_xor(u64x4 a, u64x4 b) { return _mm256_xor_si256(a, b); }
+U4_INLINE u64x4 u4_add(u64x4 a, u64x4 b) { return _mm256_add_epi64(a, b); }
+U4_INLINE u64x4 u4_sub(u64x4 a, u64x4 b) { return _mm256_sub_epi64(a, b); }
+U4_INLINE u64x4 u4_not(u64x4 a) { return _mm256_xor_si256(a, _mm256_set1_epi64x(-1)); }
+U4_INLINE u64x4 u4_shl1(u64x4 a) { return _mm256_slli_epi64(a, 1); }
+U4_INLINE u64x4 u4_shr63(u64x4 a) { return _mm256_srli_epi64(a, 63); }
+U4_INLINE u64x4 u4_shift_in(u64x4 prev, u64x4 cur)
+{
+        const u64x4 c = _mm256_permute4x64_epi64(cur, _MM_SHUFFLE(2, 1, 0, 3));
+        const u64x4 p = _mm256_permute4x64_epi64(prev, _MM_SHUFFLE(2, 1, 0, 3));
+        return _mm256_blend_epi32(c, p, 0x03);
+}
+U4_INLINE u64x4 u4_sel(u64x4 mask, u64x4 a, u64x4 b) { return _mm256_blendv_epi8(b, a, mask); }
+U4_INLINE uint64_t u4_lane(u64x4 a, int l)
+{
+        uint64_t t[4];
+        _mm256_storeu_si256((__m256i*)t, a);
+        return t[l];
+}
+#else
+#define BPM_SIMD 0
+#endif
+
+
+#if BPM_SIMD
+/* peq: SIGMA x 16 table as built by bpm_block; B blocks; L = n + padding */
+static int bpm_block_simd(const uint8_t* t, int n, const uint64_t peq[SIGMA][16], int B, int L, int m)
+{
+        const int V = (B + 3) / 4;
+        int k = m;
+        /* text with 16 zero characters before and after: char(i) = tp[i] */
+        uint8_t tbuf[4096 + 64];
+        uint8_t* heap = NULL;
+        uint8_t* tp;
+        if(L + 32 <= (int)sizeof(tbuf)){
+                tp = tbuf + 16;
+        }else{
+                heap = malloc((size_t)L + 32);
+                if(!heap) return -1;
+                tp = heap + 16;
+        }
+        memset(tp - 16, 0, 16);
+        if(n > 0) memcpy(tp, t, (size_t)n);
+        memset(tp + n, 0, (size_t)(L - n) + 16);
+
+        u64x4 P[4], M[4], SC[4], HP[4], HN[4];
+        for(int v = 0; v < V; v++){
+                P[v] = u4_dup(~(uint64_t)0);
+                M[v] = u4_dup(0);
+                SC[v] = u4_set(64 * (4 * v + 1), 64 * (4 * v + 2), 64 * (4 * v + 3), 64 * (4 * v + 4));
+                HP[v] = u4_dup(0);
+                HN[v] = u4_dup(0);
+        }
+        const int lv = (B - 1) / 4;
+        const int ll = (B - 1) % 4;
+        const u64x4 zero = u4_dup(0);
+        for(int s = 0; s < L + B - 1; s++){
+                u64x4 prevp = zero;
+                u64x4 prevn = zero;
+                for(int v = 0; v < V; v++){
+                        const int b0 = 4 * v;
+                        const u64x4 hp = u4_shift_in(prevp, HP[v]);
+                        const u64x4 hn = u4_shift_in(prevn, HN[v]);
+                        prevp = HP[v];
+                        prevn = HN[v];
+                        u64x4 Eq = u4_set(peq[tp[s - b0]][b0], peq[tp[s - b0 - 1]][b0 + 1],
+                                          peq[tp[s - b0 - 2]][b0 + 2], peq[tp[s - b0 - 3]][b0 + 3]);
+                        const u64x4 Pv = P[v];
+                        const u64x4 Mv = M[v];
+                        const u64x4 Xv = u4_or(Eq, Mv);
+                        Eq = u4_or(Eq, hn);
+                        const u64x4 Xh = u4_or(u4_xor(u4_add(u4_and(Eq, Pv), Pv), Pv), Eq);
+                        u64x4 Ph = u4_or(Mv, u4_not(u4_or(Xh, Pv)));
+                        u64x4 Mh = u4_and(Pv, Xh);
+                        const u64x4 op = u4_shr63(Ph);
+                        const u64x4 on = u4_shr63(Mh);
+                        Ph = u4_or(u4_shl1(Ph), hp);
+                        Mh = u4_or(u4_shl1(Mh), hn);
+                        u64x4 nP = u4_or(Mh, u4_not(u4_or(Xv, Ph)));
+                        u64x4 nM = u4_and(Ph, Xv);
+                        u64x4 nS = u4_sub(u4_add(SC[v], op), on);
+                        if(s < b0 + 3){
+                                const u64x4 act = u4_set(s >= b0 ? ~(uint64_t)0 : 0, s >= b0 + 1 ? ~(uint64_t)0 : 0,
+                                                         s >= b0 + 2 ? ~(uint64_t)0 : 0, s >= b0 + 3 ? ~(uint64_t)0 : 0);
+                                nP = u4_sel(act, nP, Pv);
+                                nM = u4_sel(act, nM, Mv);
+                                nS = u4_sel(act, nS, SC[v]);
+                        }
+                        P[v] = nP;
+                        M[v] = nM;
+                        SC[v] = nS;
+                        HP[v] = op;
+                        HN[v] = on;
+                }
+                if(s >= B - 1){
+                        const int sc = (int)(int64_t)u4_lane(SC[lv], ll);
+                        if(sc < k){
+                                k = sc;
+                        }
+                }
+        }
+        free(heap);
+        return k;
+}
+#endif
+
 int bpm_block(const uint8_t *t, const uint8_t *p, int n, int m)
 {
         int32_t w;
@@ -346,7 +525,6 @@ int bpm_block(const uint8_t *t, const uint8_t *p, int n, int m)
         int32_t maxd;
         int32_t k;
         int32_t W;
-        uint64_t HIGH_BIT;
         uint64_t ONE = 1;
 
         if(m > 1024){
@@ -356,7 +534,6 @@ int bpm_block(const uint8_t *t, const uint8_t *p, int n, int m)
         w_bytes = sizeof(uint64_t);
         w =  w_bytes * 8;
         b_max = DIV_CEIL(m,w);
-        HIGH_BIT = ONE << (w - 1);
 
         W = w * b_max - m;
         
@@ -397,34 +574,35 @@ int bpm_block(const uint8_t *t, const uint8_t *p, int n, int m)
         /* b_max = DIV_CEIL(m,w); */
         /* LOG_MSG("%d -> %d",m,b_max); */
         /* W = w * b_max - m; */
-        HIGH_BIT = ONE << (w - 1);
         /* MMALLOC(score,b_max * sizeof(int32_t)); */
         /* MMALLOC(P ,b_max * w_bytes); */
         /* MMALLOC(M ,b_max * w_bytes); */
 
         /* MMALLOC(Peq,SIGMA * sizeof(uint64_t *)); */
 
-        for (int c = 0; c < SIGMA; c++) {
-                /* Peq[c] = NULL; */
-                /* MMALLOC(Peq[c], b_max*w_bytes); */
-                /* Peq[c] = (uint64_t *) malloc(b_max*w_bytes); */
-
-                /* memset(Peq[c], 0, b_max*w_bytes); */
-                for (int32_t block = 0; block < b_max; block++) {
-                        uint64_t bitPos = (uint64_t) 1;
-                        for (int32_t i = block * w; i < (block + 1) * w; ++i) {
-                                // fill the remainder after the last block with 1 (>m matches anything)
-                                if (i >= m || p[i] == c) {
-                                        Peq[c][block] |= bitPos;
-                                }
-                                /* if (i >= m ){ */
-                                /*         LOG_MSG("Am filling %d",i); */
-                                /* } */
-                                bitPos <<= 1;
-                        }
+        /* Peq[c][block] bit j: pattern position block*w + j holds c, or lies
+           past the end of the pattern (> m matches anything).  One pass over
+           the pattern; this builds exactly the table of the former
+           SIGMA x (b_max * w) comparison loop. */
+        for (int32_t i = 0; i < m; i++) {
+                if (p[i] < SIGMA) {
+                        Peq[p[i]][i / w] |= ONE << (i % w);
+                }
+        }
+        for (int32_t i = m; i < b_max * w; i++) {
+                for (int c = 0; c < SIGMA; c++) {
+                        Peq[c][i / w] |= ONE << (i % w);
                 }
         }
 
+#if BPM_SIMD
+        if(b_max >= BPM_SIMD_MIN_BLOCKS){
+                int ks = bpm_block_simd(t, n, (const uint64_t (*)[16])Peq, b_max, n + W, m);
+                if(ks >= 0){
+                        return ks;
+                }
+        }
+#endif
         int y = DIV_CEIL(maxd, w) - 1; /* 256 is max edit distance  */
         /* init blocks  */
         for (int b = 0; b <= y; b++) {
@@ -434,132 +612,39 @@ int bpm_block(const uint8_t *t, const uint8_t *p, int n, int m)
                 score[b] = (uint32_t)(b + 1) * w;
         }
 
+        /* Main loop.  With maxd = m the last block y = b_max - 1 is always
+           active: its score is a semi-global edit distance of the (padded)
+           pattern, at most m + W < maxd + w, so the block count never shrinks,
+           and it starts at b_max - 1, so it never grows.  The block step is
+           branch-free: the horizontal delta handed to the next block is two
+           bits, hp (+1) and hn (-1); Ph and Mh are disjoint, so at most one is
+           set.  The arithmetic per block is unchanged. */
         for (int i = 0; i < n+W; i++) {
-                /* LOG_MSG(" (%d)",i); */
-                uint8_t c = 0;
-                if(i >= n){
-                        /* seq padding  */
-                        c = 0;
-                }else{
-                        c = (uint8_t)t[i];
-                }
-                /* LOG_MSG(" c: %d  (%d)", c,i); */
-                int carry = 0;
-
+                const uint8_t c = (i >= n) ? 0 : (uint8_t)t[i];
+                uint64_t hp = 0;
+                uint64_t hn = 0;
                 for (int b = 0; b <= y; b++) {
-                        /* LOG_MSG("y: %d c: %d b: %d n: %d m:%d",y, c,b,n,m); */
-                        uint64_t Pv = P[b];
-                        uint64_t Mv = M[b];
+                        const uint64_t Pv = P[b];
+                        const uint64_t Mv = M[b];
                         uint64_t Eq = Peq[c][b];
-
-                        uint64_t Xv, Xh;
-                        uint64_t Ph, Mh;
-                        int hIn = carry;
-                        int h_out = 0;
-
-                        Xv = Eq | Mv;
-                        if (hIn < 0) {
-                                Eq |= ONE;
-                        }
-                        Xh = (((Eq & Pv) + Pv) ^ Pv) | Eq;
-
-                        Ph = Mv | (~(Xh | Pv));
-                        Mh = Pv & Xh;
-
-                        if (Ph & HIGH_BIT) {
-                                h_out += 1;
-                        }
-                        if (Mh & HIGH_BIT) {
-                                h_out -= 1;
-                        }
-
-                        Ph <<= 1;
-                        Mh <<= 1;
-
-                        if (hIn < 0) {
-                                Mh |= ONE;
-                        } else if (hIn > 0) {
-                                Ph |= ONE;
-                        }
-
-                        Pv = Mh | (~(Xv | Ph));
-                        Mv = Ph & Xv;
-
-                        P[b] = Pv;
-                        M[b] = Mv;
-
-                        carry = h_out;
-                        score[b] += carry;
-                }
-
-                if ((score[y] - carry <= maxd) && (y < (b_max - 1)) && ((Peq[c][y + 1] & ONE) || (carry < 0))) {
-                        y += 1;
-                        /* bpm_init_block(s,y); */
-                        P[y] = (uint64_t) -1;//Ones
-                        M[y] = 0;
-
-                        int b = y;
-
-                        uint64_t Pv = P[b];
-                        uint64_t Mv = M[b];
-                        uint64_t Eq = Peq[c][b];
-
-                        uint64_t Xv, Xh;
-                        uint64_t Ph, Mh;
-                        int hIn = carry;
-                        int h_out = 0;
-
-                        Xv = Eq | Mv;
-                        if (hIn < 0) {
-                                Eq |= ONE;
-                        }
-                        Xh = (((Eq & Pv) + Pv) ^ Pv) | Eq;
-
-                        Ph = Mv | (~(Xh | Pv));
-                        Mh = Pv & Xh;
-
-                        if (Ph & HIGH_BIT) {
-                                h_out += 1;
-                        }
-                        if (Mh & HIGH_BIT) {
-                                h_out -= 1;
-                        }
-
-                        Ph <<= 1;
-                        Mh <<= 1;
-
-                        if (hIn < 0) {
-                                Mh |= ONE;
-                        } else if (hIn > 0) {
-                                Ph |= ONE;
-                        }
-
-                        Pv = Mh | (~(Xv | Ph));
-                        Mv = Ph & Xv;
-
-                        P[b] = Pv;
-                        M[b] = Mv;
-
-                        /* carry = h_out; */
-
-                        score[y] = score[y - 1] + w - carry + h_out;//advanceBlock(s,y, c, carry);
-                } else {
-                        while (score[y] >= (maxd + w)) {
-                                if (y == 0) break;
-                                y -= 1;
-                                /* LOG_MSG("y in loop: %d", y); */
-                        }
+                        const uint64_t Xv = Eq | Mv;
+                        Eq |= hn;
+                        const uint64_t Xh = (((Eq & Pv) + Pv) ^ Pv) | Eq;
+                        uint64_t Ph = Mv | (~(Xh | Pv));
+                        uint64_t Mh = Pv & Xh;
+                        const uint64_t op = Ph >> (w - 1);
+                        const uint64_t on = Mh >> (w - 1);
+                        Ph = (Ph << 1) | hp;
+                        Mh = (Mh << 1) | hn;
+                        P[b] = Mh | (~(Xv | Ph));
+                        M[b] = Ph & Xv;
+                        hp = op;
+                        hn = on;
+                        score[b] += (int32_t)op - (int32_t)on;
                 }
                 if(score[y] < k){
-                        /* LOG_MSG("%d", s->score[y]); */
                         k = score[y];
                 }
-
-
-                /* if (y == (b_max - 1) && s->score[y] <= maxd) { */
-                /*         assert(i - s->W >= 0); */
-                /*         /\* result->push_front(SearchResult(score[y], (uint32_t)(i - W))); *\/ */
-                /* } */
         }
         return k;
 }

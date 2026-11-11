@@ -137,6 +137,18 @@ jobs:
     - name: Check package
       run: |
         twine check dist/*
+
+    - name: Check source package contents
+      run: |
+        # Only what building and testing the package needs (pyproject.toml, sdist.exclude);
+        # research material must never reach PyPI.
+        allowed=".gitignore AUTHORS CITATION.cff CMakeLists.txt COPYING ChangeLog PKG-INFO README-python.md README.md lib pyproject.toml python-kalign src tests"
+        found=$(tar tzf dist/*.tar.gz | cut -d/ -f2 | grep -v '^$' | sort -u)
+        extra=$(comm -13 <(tr ' ' '\n' <<< "$allowed" | sort) <(echo "$found"))
+        if [ -n "$extra" ]; then
+          echo "Unexpected top-level paths in the source package:"; echo "$extra"; exit 1
+        fi
+        echo "source package holds: $(echo $found)"
         
     - name: Test installation from wheel
       run: |

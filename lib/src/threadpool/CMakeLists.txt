@@ -6,9 +6,6 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(CMAKE_C_STANDARD 11)
     set(CMAKE_C_STANDARD_REQUIRED ON)
     enable_testing()
-
-    # Optional: find OpenMP for benchmark comparison
-    find_package(OpenMP)
 endif()
 
 find_package(Threads REQUIRED)
@@ -34,8 +31,3 @@ add_test(NAME threadpool_stress COMMAND stress_threadpool)
 add_executable(bench_threadpool bench_threadpool.c)
 target_link_libraries(bench_threadpool PRIVATE threadpool)
 set_target_properties(bench_threadpool PROPERTIES C_STANDARD 11)
-
-if(OpenMP_C_FOUND)
-    target_link_libraries(bench_threadpool PRIVATE OpenMP::OpenMP_C)
-    target_compile_definitions(bench_threadpool PRIVATE HAVE_OPENMP)
-endif()

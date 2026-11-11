@@ -23,15 +23,11 @@ make test
 make install
 ```
 
-Kalign uses a built-in thread pool for parallelization (requires pthreads, available on all POSIX systems). If pthreads is not available, it falls back to serial execution. To use OpenMP instead:
-
-```bash
-cmake -DUSE_OPENMP=ON -DUSE_THREADPOOL=OFF ..
-```
+Kalign runs on Linux and macOS. It parallelises with a built-in thread pool (pthreads); with `-n 1` it runs serially.
 
 ### Zig build (alternative)
 
-Requires zig version 0.12.
+Tested with zig 0.16.
 
 ```bash
 zig build
@@ -51,14 +47,21 @@ See [README-python.md](README-python.md) for the full Python documentation.
 kalign -i <input> -o <output>
 ```
 
-Kalign has four mode presets, optimized for protein and nucleotide sequences:
+Kalign 4 has two modes, each with a protein and a DNA/RNA setting; the
+sequence type is detected from the input, or set with `--type protein`,
+`--type dna` or `--type rna` (DNA and RNA use the same setting):
 
 | Mode | Flag | Description |
 |------|------|-------------|
-| fast | `--mode fast` | Single run, fastest. |
-| default | `--mode default` | Single run with consistency anchors (default). |
-| recall | `--mode recall` | Ensemble, optimized for recall. |
-| accurate | `--mode accurate` | Ensemble, highest precision. |
+| fast | `--mode fast` | Single run, fastest. This is the default (`--mode default` is an alias). |
+| accurate | `--mode accurate` | 5-member ensemble with per-column confidence, slower. At most 5,000 sequences (`--mode recall` is an alias). |
+
+The four settings were fitted on reference alignments inside grouped nested
+cross-validation: fast by multi-objective search (NSGA-III); accurate by an
+NSGA-III ensemble search followed by a small grid over guide-tree noise and
+consensus support. Each shipped setting is the final fit on all training data,
+then scored on held-out data that the fit did not use. The fit code, the
+records and the settings are in [presets/](presets/).
 
 ### Examples
 
@@ -82,9 +85,9 @@ kalign seqsA.fa seqsB.fa -o combined.fa
 ### Options
 
 ```
---mode         Mode preset: fast, default, recall, accurate. [default]
+--mode         Mode preset: fast (default), accurate; "default" = fast, "recall" = accurate. [fast]
 --format       Output format: fasta, msf, clu. [fasta]
---type         Sequence type: protein, dna, rna, divergent. [auto]
+--type         Sequence type: protein, dna, rna (overrides detection). [auto]
 --gpo          Gap open penalty (overrides preset). [auto]
 --gpe          Gap extension penalty (overrides preset). [auto]
 --tgpe         Terminal gap extension penalty (overrides preset). [auto]
@@ -116,11 +119,11 @@ target_link_libraries(<target> kalign::kalign)
 
 ## Benchmarks
 
-### Balibase
-![Balibase_scores](https://user-images.githubusercontent.com/8110320/198513840-0e08a634-bb41-4826-bd58-7fc66eae1054.jpeg)
-
-### Bralibase
-![Bralibase_scores](https://user-images.githubusercontent.com/8110320/198513850-00e5037f-355f-45ec-828f-ed8d47497272.jpeg)
+The Kalign 4 settings and their benchmark against FAMSA 2, MAFFT, MUSCLE 5 and
+Clustal Omega (protein and DNA/RNA reference alignments, simulations, alignment
+size up to 50,000 sequences, and trees, positive selection and homology search
+built on the alignments) are described in a preprint in preparation. The
+benchmarks of earlier versions are in the ChangeLog.
 
 ## Citation
 

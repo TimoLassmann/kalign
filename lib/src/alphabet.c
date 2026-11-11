@@ -142,7 +142,7 @@ ERROR:
 
 int create_default_protein(struct alphabet* a)
 {
-        char aacode[20] = "ACDEFGHIKLMNPQRSTVWY";
+        char aacode[] = "ACDEFGHIKLMNPQRSTVWY";
         /* char aacode[20] = "ARNDCQEGHILKMFPSTWYV";//BZX"; */
         int code;
         int i;
@@ -178,7 +178,7 @@ int create_default_protein(struct alphabet* a)
 
 int create_protein_BZX(struct alphabet* a)
 {
-        char aacode[23] = "ARNDCQEGHILKMFPSTWYVBZX";
+        char aacode[] = "ARNDCQEGHILKMFPSTWYVBZX";
 
         int code;
         int i;
@@ -206,7 +206,7 @@ int create_protein_BZX(struct alphabet* a)
 int create_default_DNA(struct alphabet* a)
 {
 
-        char dnacode[16] = "ACGTUNRYSWKMBDHV";
+        char dnacode[] = "ACGTUNRYSWKMBDHV";
 
         int code;
         int i;
@@ -247,7 +247,7 @@ int create_default_DNA(struct alphabet* a)
 
 int create_reduced_protein(struct alphabet* a)
 {
-        char aacode[20] = "ACDEFGHIKLMNPQRSTVWY";
+        char aacode[] = "ACDEFGHIKLMNPQRSTVWY";
 
         int code;
         int i;
@@ -304,7 +304,7 @@ Martin Steinegger 1, 2, 3 and Johannes Söding 1 */
 
 int create_reduced_protein2(struct alphabet* a)
 {
-        char aacode[20] = "ACDEFGHIKLMNPQRSTVWY";
+        char aacode[] = "ACDEFGHIKLMNPQRSTVWY";
 
         int code;
         int i;

@@ -1,0 +1,10 @@
+# local data, caches and big outputs live on the workstation (WS=~/tmp/kalign-refit); never in git
+data/
+cache/
+runs/
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.coverage
+htmlcov/

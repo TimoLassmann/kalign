@@ -321,13 +321,13 @@ int sample_pick(double *p, int len, struct rng_state* rng, int *pick)
 
 char emit_letter(int c)
 {
-        char alphabet[20] = "ACDEFGHIKLMNPQRSTVWY";
+        char alphabet[] = "ACDEFGHIKLMNPQRSTVWY";
         return alphabet[c];
 }
 
 char emit_letter_dna(int c)
 {
-        char alphabet[4] = "ACGT";
+        char alphabet[] = "ACGT";
         return alphabet[c];
 }
 

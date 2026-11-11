@@ -1,0 +1,155 @@
+# Data registry for the pooled re-fit (presets/). One entry per downloaded file.
+# Written by presets/recipe/download.py; do not edit sha256 values by hand.
+- name: drive5_bench_tar
+  benchmark: drive5_bench
+  url: https://www.drive5.com/bench/bench.tar.gz
+  version: 'drive5 bench.tar.gz (Last-Modified 2025-09-07): BAliBASE 3, PREFAB 4, OXBench, SABRE in FASTA'
+  license: none found (no licence file in the archive or on https://www.drive5.com/bench/); freely distributed
+    for benchmarking
+  retrieved: '2026-10-05T01:34:50Z'
+  sha256: 0728653fd132b96a019c189f92a3fb8829fbb5971d43884199af0fe1b1afa436
+  size_bytes: 21414017
+  local_path: raw/drive5_bench/bench.tar.gz
+  note: Edgar, R.C.
+  sha256_pinned_before_download: false
+- name: rfam_seed
+  benchmark: rfam
+  url: https://ftp.ebi.ac.uk/pub/databases/Rfam/15.1/Rfam.seed.gz
+  version: Rfam 15.1
+  license: 'Rfam README: ''Rfam is freely available and in the public domain under the Creative Commons
+    Zero licence.'' (see COPYING)'
+  retrieved: '2026-10-05T01:35:01Z'
+  sha256: 41f014f4ab5628620935f089b1bb77987ebc162fda7c72bff368a32c9cccabac
+  size_bytes: 5928432
+  local_path: raw/rfam/Rfam.seed.gz
+  note: pinned release directory, not CURRENT
+  sha256_pinned_before_download: false
+- name: rfam_readme
+  benchmark: rfam
+  url: https://ftp.ebi.ac.uk/pub/databases/Rfam/15.1/README
+  version: Rfam 15.1
+  license: see rfam_seed
+  retrieved: '2026-10-05T01:35:02Z'
+  sha256: 3644c076ee3420a6b37bd8f7b8759dff408eea64067e4973ac5e0d54ec72a807
+  size_bytes: 17470
+  local_path: raw/rfam/README
+  note: licence statement source
+  sha256_pinned_before_download: false
+- name: rfam_copying
+  benchmark: rfam
+  url: https://ftp.ebi.ac.uk/pub/databases/Rfam/15.1/COPYING
+  version: Rfam 15.1
+  license: see rfam_seed
+  retrieved: '2026-10-05T01:35:03Z'
+  sha256: 4366e90e0da3df45363e4c1d1bba140b3036ff3f78967f1b5f9ba23685b889d5
+  size_bytes: 601
+  local_path: raw/rfam/COPYING
+  note: licence text
+  sha256_pinned_before_download: false
+- name: bralibase_data_set1
+  benchmark: bralibase
+  url: https://web.archive.org/web/20160408045442id_/http://projects.binf.ku.dk/pgardner/bralibase/data-set1.tar.gz
+  version: BRAliBASE II data-set1 (Wayback 2016-04-08)
+  license: none found in archive; article (Gardner et al. 2005, NAR) CC BY; derived from Rfam
+  retrieved: '2026-10-05T01:35:05Z'
+  sha256: e93f12064b54458ea6c8ba177b6789df929a4d5729175f79f86892149140d85f
+  size_bytes: 131201
+  local_path: raw/bralibase/data-set1.tar.gz
+  note: Wayback Machine copy of projects.binf.ku.dk
+  sha256_pinned_before_download: false
+- name: bralibase_data_set2
+  benchmark: bralibase
+  url: https://web.archive.org/web/20160408045453id_/http://projects.binf.ku.dk/pgardner/bralibase/data-set2.tar.gz
+  version: BRAliBASE II data-set2 (Wayback 2016-04-08)
+  license: none found in archive; article (Gardner et al. 2005, NAR) CC BY; derived from Rfam
+  retrieved: '2026-10-05T01:35:06Z'
+  sha256: f1bdede47200b1b7a6477a9daf99126f2cd1a7e2c8d12c47b3fb96aceea1e6a0
+  size_bytes: 11509
+  local_path: raw/bralibase/data-set2.tar.gz
+  note: Wayback Machine copy of projects.binf.ku.dk
+  sha256_pinned_before_download: false
+- name: mdsa_balibase
+  benchmark: mdsa
+  url: https://dna.cs.byu.edu/mdsas/tarred/balibase_mdsa_all.tar.gz
+  version: MDSA 'all' (Carroll et al. 2007)
+  license: none found (index page gone, files live)
+  retrieved: '2026-10-05T01:35:09Z'
+  sha256: 499cee4a2a4942b9c17db3ba2b61a549b2abf5e9539963f71223ec30b6089c29
+  size_bytes: 5457257
+  local_path: raw/mdsa/balibase_mdsa_all.tar.gz
+  note: expected sha256 from experiments/redesign/resources/REGISTRY.yaml
+  sha256_pinned_before_download: true
+- name: mdsa_oxbench
+  benchmark: mdsa
+  url: https://dna.cs.byu.edu/mdsas/tarred/oxbench_mdsa_all.tar.gz
+  version: MDSA 'all' (Carroll et al. 2007)
+  license: none found (index page gone, files live)
+  retrieved: '2026-10-05T01:35:10Z'
+  sha256: be8b064ba800827a17de1fdbabf242556bb61a8895d04bd02a54b5236dcbb0aa
+  size_bytes: 303672
+  local_path: raw/mdsa/oxbench_mdsa_all.tar.gz
+  note: expected sha256 from experiments/redesign/resources/REGISTRY.yaml
+  sha256_pinned_before_download: true
+- name: mdsa_smart
+  benchmark: mdsa
+  url: https://dna.cs.byu.edu/mdsas/tarred/smart_mdsa_all.tar.gz
+  version: MDSA 'all' (Carroll et al. 2007)
+  license: none found (index page gone, files live)
+  retrieved: '2026-10-05T01:35:13Z'
+  sha256: e4e1fc4adbeaea69be101fa64886d5ae54d25fad0be459456b1c2f93145301b4
+  size_bytes: 5904017
+  local_path: raw/mdsa/smart_mdsa_all.tar.gz
+  note: expected sha256 from experiments/redesign/resources/REGISTRY.yaml
+  sha256_pinned_before_download: true
+- name: balifam_repo
+  benchmark: balifam
+  url: https://github.com/rcedgar/balifam
+  version: git f2a46ac425834b4acecce7e0d7cd1439090ffca2
+  commit: f2a46ac425834b4acecce7e0d7cd1439090ffca2
+  commit_date: '2021-06-29T06:45:17-07:00'
+  license: "Creative Commons Legal Code\n\nCC0 1.0 Universal\n\n    CREATIVE COMMONS CORPORATION IS NOT\
+    \ A LAW FIRM AND DOES NOT PROVIDE\n    LEGAL SERVICES. DISTRIBUTION OF THIS DOCUMENT DOES NOT CREATE\
+    \ AN\n    ATTORNEY-CLIENT RELATIONSHIP. CREATIVE COMMONS PROVIDES THIS\n    INFORMATION ON AN \"AS-IS\"\
+    \ BASIS. CREATIVE"
+  retrieved: '2026-10-05T01:37:25Z'
+  sha256: a09128c16395ec0297dbd9aa0da32711c1bf5ed802388a1f2928a52f6a5895af
+  balifam100_tree_sha256: a09128c16395ec0297dbd9aa0da32711c1bf5ed802388a1f2928a52f6a5895af
+  size_bytes: 1843127
+  local_path: raw/balifam/repo
+  note: git clone; only balifam100/ is used; sha256 = tree hash over (file sha256, relative path) of balifam100/
+- name: tool_mafft_linsi
+  kind: tool
+  exe: ~/tmp/kalign-refit/tools/mafft/bin/mafft
+  version: 'v7.526 (2024/Apr/26); L-INS-i: --localpair --maxiterate 1000 --thread 1'
+  exe_sha256: a740a3de423ebfc8c5ae825d25b4a20bf0aa0ce0c0260b16c597a312c87edb63
+  build_id: be984989a68a136630b22c6a1a981db03096097689bc7e6a8bdc7c5a276798b8
+  n_hashed_files: 35
+  source: https://gitlab.com/sysimm/mafft/-/archive/v7.526/mafft-v7.526.tar.gz
+  source_sha256: 2d81ba74ad6181df3c662b882f529734f3eb78af9b205d6840ca345612bf6410
+  install: built from source (make, PREFIX=WS/tools/mafft, core/ only, no extensions)
+  license: BSD-style (MAFFT licence)
+  retrieved: '2026-10-05'
+- name: tool_muscle5
+  kind: tool
+  exe: ~/tmp/kalign-refit/tools/bin/muscle
+  version: muscle 5.3.linux64 [d9725ac]; -align if n_seq<=200 else -super5; -threads 1
+  exe_sha256: 318abeb951d786a3e2532714cc81ad3b3d8f79a2b517dc31316eeb5b694db2bc
+  build_id: 125616adef2913b949ab3372d714e4c72f35604402f22f3a29ee9fc4bcdb5d88
+  n_hashed_files: 1
+  source: https://github.com/rcedgar/muscle/releases/download/v5.3/muscle-linux-x86.v5.3
+  source_sha256: 318abeb951d786a3e2532714cc81ad3b3d8f79a2b517dc31316eeb5b694db2bc
+  install: official static binary release, copied to WS/tools/bin/muscle
+  license: GPL-3.0
+  retrieved: '2026-10-05'
+- name: tool_clustalo
+  kind: tool
+  exe: ~/tmp/kalign-refit/tools/bin/clustalo
+  version: 1.2.4; defaults; --threads=1
+  exe_sha256: 2556472af94d54b3dbe3cdb6d342d9aaede7fae2ef7cf3647c07c22022c6bf56
+  build_id: 941b03634dc5a41169879f34329a26bf1ea4d57aa2fdf524eb610ea468e078f7
+  n_hashed_files: 1
+  source: Debian 11 package clustalo 1.2.4-7 (/usr/bin/clustalo copied to WS/tools/bin/clustalo)
+  install: apt binary copied; www.clustal.org returns HTTP 403/HTML to scripted downloads from the workstation;
+    1.2.4 is the latest upstream release
+  license: LGPL-2.1+
+  retrieved: '2026-10-05'

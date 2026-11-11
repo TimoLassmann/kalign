@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const kalignPackageVersion = "3.6.0";
+const kalignPackageVersion = "4.0.0";
 
 const targets: []const std.Target.Query = &.{
     .{ .cpu_arch = .aarch64, .os_tag = .macos },
@@ -12,9 +12,15 @@ const targets: []const std.Target.Query = &.{
 const cflags = [_][]const u8{
     "-DKALIGN_PACKAGE_VERSION=\"" ++ kalignPackageVersion ++ "\"",
     "-DKALIGN_PACKAGE_NAME=\"kalign\"",
-    "-DKALIGN_ALN_SERIAL_THRESHOLD=250",
+    "-DKALIGN_ALN_SERIAL_THRESHOLD=500",
     "-DKALIGN_KMEANS_UPGMA_THRESHOLD=50",
+    "-DKALIGN_DIST_MIN_SEQS=50",
+    "-DKALIGN_PFOR_MIN_CHUNK=10",
+    "-DKALIGN_WAVE",
 };
+
+// the member gap model's scalar and wavefront kernels must round identically on every platform
+const cflags_gapmodel = cflags ++ [_][]const u8{"-ffp-contract=off"};
 
 pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
@@ -28,7 +34,9 @@ pub fn build(b: *std.Build) !void {
         });
         lib_mod.addIncludePath(b.path("lib/src"));
         lib_mod.addIncludePath(b.path("lib/include"));
+        lib_mod.addIncludePath(b.path("lib/src/threadpool"));
         lib_mod.addCSourceFiles(.{ .files = &kalign_lib_sources, .flags = &cflags });
+        lib_mod.addCSourceFiles(.{ .files = &.{"lib/src/aln_gapmodel.c"}, .flags = &cflags_gapmodel });
 
         const lib = b.addLibrary(.{
             .name = "tldevel",
@@ -83,15 +91,19 @@ const kalign_lib_sources = [_][]const u8{
     "lib/src/alphabet.c",
     "lib/src/task.c",
     "lib/src/bisectingKmeans.c",
+    "lib/src/sl_tree.c",
     "lib/src/sequence_distance.c",
     "lib/src/bpm.c",
+    "lib/src/aln_wave.c",
     "lib/src/euclidean_dist.c",
     "lib/src/pick_anchor.c",
     "lib/src/aln_wrap.c",
     "lib/src/aln_apair_dist.c",
+    "lib/src/guide_dist.c",
     "lib/src/aln_add.c",
     "lib/src/aln_param.c",
     "lib/src/aln_run.c",
+    "lib/src/aln_vsm.c",
     "lib/src/aln_mem.c",
     "lib/src/aln_setup.c",
     "lib/src/aln_controller.c",
@@ -103,9 +115,11 @@ const kalign_lib_sources = [_][]const u8{
     "lib/src/weave_alignment.c",
     "lib/src/poar.c",
     "lib/src/consensus_msa.c",
+    "lib/src/consensus_fill.c",
     "lib/src/anchor_consistency.c",
     "lib/src/msa_consistency.c",
     "lib/src/ensemble.c",
+    "lib/src/threadpool/threadpool.c",
 };
 
 const kalign_sources = [_][]const u8{

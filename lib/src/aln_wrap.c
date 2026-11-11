@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include "tldevel.h"
 #include "tlmisc.h"
 #include <strings.h>
@@ -17,6 +18,8 @@
 
 #include "alphabet.h"
 #include "bisectingKmeans.h"
+#include "sl_tree.h"
+#include "guide_dist.h"
 
 #include "aln_param.h"
 #include "aln_run.h"
@@ -26,14 +29,7 @@
 #include "kalign/kalign.h"
 #include "kalign/kalign_config.h"
 #include "ensemble.h"
-
-#ifdef HAVE_OPENMP
-#include <omp.h>
-#endif
-
-#ifdef USE_THREADPOOL
 #include "threadpool.h"
-#endif
 
 #define ALN_WRAP_IMPORT
 #include "aln_wrap.h"
@@ -129,18 +125,27 @@ ERROR:
 /* Handles the full pipeline: input check, sort, alphabet conversion, tree   */
 /* building, alignment, refinement, and optional realign iterations.          */
 /*                                                                           */
-/* The caller owns msa->pool (if USE_THREADPOOL).  This function does NOT    */
+/* The caller owns msa->pool (NULL for one thread).  This function does NOT */
 /* create or destroy the threadpool — it reads msa->pool for parallel work.  */
 /* ======================================================================== */
 
 int kalign_single_run(struct msa *msa,
                       const struct kalign_run_config *cfg,
                       int n_threads)
-{
+{ KPERF_REGION(KP_RUN);
         struct aln_tasks* tasks = NULL;
         struct aln_param* ap = NULL;
+        struct guide_dist_ctx* gctx = NULL;
         int type;
         int iter;
+
+        ASSERT(cfg->guide_dist == KALIGN_GUIDE_DIST_BPM ||
+               cfg->guide_dist == KALIGN_GUIDE_DIST_PAIRALN,
+               "Unknown guide_dist %d", cfg->guide_dist);
+        ASSERT(cfg->gap_model == 0 || cfg->gap_model == 1, "Unknown gap_model %d", cfg->gap_model);
+
+        /* Guide-tree options of this run */
+        RUN(sl_opts_resolve(&msa->tree, cfg));
 
         /* Input check (also sets ranks) */
         RUN(kalign_essential_input_check(msa, 0));
@@ -163,38 +168,43 @@ int kalign_single_run(struct msa *msa,
 
         RUN(alloc_tasks(&tasks, msa->numseq));
 
-#if !defined(USE_THREADPOOL) && defined(HAVE_OPENMP)
-        omp_set_num_threads(n_threads);
-#endif
+        /* Resolve auto matrix selection (sequence-length heuristic) and
+           init alignment parameters.  Done before the guide tree because
+           guide_dist = PAIRALN aligns sequence pairs with these parameters. */
+        type = cfg->matrix;
+        RUN(resolve_matrix_auto(msa, &type));
+
+        RUN(aln_param_init(&ap, msa->biotype, n_threads, type,
+                           cfg->gpo, cfg->gpe, cfg->tgpe));
+        ap->gap_model = cfg->gap_model;
+        ap->pool = msa->pool;
+
+        if(cfg->guide_dist == KALIGN_GUIDE_DIST_PAIRALN){
+                RUN(guide_dist_ctx_create(msa, ap, &gctx));
+        }
 
         /* Build guide tree — noisy variant for ensemble diversity */
         if(cfg->tree_seed != 0 && cfg->tree_noise > 0.0f){
-                RUN(build_tree_kmeans_noisy(msa, &tasks, cfg->tree_seed, cfg->tree_noise));
+                RUN(build_tree_kmeans_noisy(msa, &tasks, cfg->tree_seed, cfg->tree_noise, gctx));
         }else{
-                RUN(build_tree_kmeans(msa, &tasks));
+                RUN(build_tree_kmeans(msa, &tasks, gctx));
         }
+        guide_dist_ctx_free(gctx);
+        gctx = NULL;
 
         /* Convert to full alphabet for alignment */
         if(msa->biotype == ALN_BIOTYPE_PROTEIN){
                 RUN(convert_msa_to_internal(msa, ALPHA_ambigiousPROTEIN));
         }
 
-        /* Resolve auto matrix selection using BPM distances */
-        type = cfg->matrix;
-        RUN(resolve_matrix_auto(msa, &type));
-
-        /* Init alignment parameters from config */
-        RUN(aln_param_init(&ap, msa->biotype, n_threads, type,
-                           cfg->gpo, cfg->gpe, cfg->tgpe));
-#ifdef USE_THREADPOOL
-        ap->pool = msa->pool;
-#endif
-
         /* Apply config overrides (config values are concrete, not sentinels) */
         ap->adaptive_budget = cfg->adaptive_budget;
         ap->use_seq_weights = cfg->seq_weights;
         ap->dist_scale = cfg->dist_scale;
         ap->vsm_amax = cfg->vsm_amax;
+        ap->vsm_mode = cfg->vsm_mode;
+        ap->vsm_kappa = cfg->vsm_kappa;
+        ap->vsm_dzero = cfg->vsm_dzero;
 
         if(ap->use_seq_weights > 0.0f){
                 RUN(compute_tree_weights(msa, tasks));
@@ -227,6 +237,7 @@ int kalign_single_run(struct msa *msa,
            k-means tree → dealign → re-encode → re-align.
            Sequences stay aligned until after tree build so the identity
            distance callback can read gap characters from seq->seq. */
+        msa->tree.in_realign = 1;
         for(iter = 0; iter < cfg->realign; iter++){
                 float** dm = NULL;
                 int* realign_anchors = NULL;
@@ -304,6 +315,7 @@ int kalign_single_run(struct msa *msa,
                 }
                 msa->aligned = ALN_STATUS_ALIGNED;
         }
+        msa->tree.in_realign = 0;
 
         /* Two-pass refinement after the final alignment pass */
         if(cfg->refine != KALIGN_REFINE_NONE && cfg->refine != KALIGN_REFINE_INLINE){
@@ -316,7 +328,9 @@ int kalign_single_run(struct msa *msa,
                 msa->consistency_table = NULL;
         }
 
-        RUN(finalise_alignment(msa));
+        if(!msa->defer_finalise){
+                RUN(finalise_alignment(msa));
+        }
         RUN(msa_sort_rank(msa));
 
         STOP_TIMER(t1);
@@ -333,6 +347,7 @@ ERROR:
                 anchor_consistency_free((struct consistency_table*)msa->consistency_table);
                 msa->consistency_table = NULL;
         }
+        guide_dist_ctx_free(gctx);
         aln_param_free(ap);
         if(tasks) free_tasks(tasks);
         return FAIL;
@@ -388,6 +403,19 @@ struct kalign_run_config kalign_run_config_defaults(void)
         cfg.tree_noise = 0.0f;
         cfg.consistency_anchors = 0;
         cfg.consistency_weight = 2.0f;
+        cfg.vsm_mode = 0;        /* legacy VSM (shipped presets) */
+        cfg.vsm_kappa = 1.0f;
+        cfg.vsm_dzero = 1.0f;
+        cfg.guide_dist = KALIGN_GUIDE_DIST_BPM;  /* shipped guide tree */
+        cfg.gap_model = 0;       /* Kalign gap rule */
+        cfg.tree_method = -1;    /* -1: shipped tree (sl_opts_resolve) */
+        cfg.tree_dist = -1;
+        cfg.tree_alpha = -1;
+        cfg.tree_maxlen = -1;
+        cfg.tree_leaf = -1;
+        cfg.tree_kmeans_dist = -1;
+        cfg.realign_tree = -1;
+        cfg.tree_sl_noise = 0.0f;
         return cfg;
 }
 
@@ -397,6 +425,9 @@ struct kalign_ensemble_config kalign_ensemble_config_defaults(void)
         ens.min_support = 0;
         ens.consistency_merge = 0;
         ens.consistency_merge_weight = 2.0f;
+        ens.fill_in = 0;
+        ens.fill_anchor_frac = 0.0f;
+        ens.fill_support = 1;
         return ens;
 }
 
@@ -406,258 +437,116 @@ int kalign_align_full(struct msa* msa,
                       const struct kalign_ensemble_config* ens,
                       int n_threads)
 {
-#ifdef USE_THREADPOOL
         threadpool_t *pool = NULL;
-#endif
 
         ASSERT(msa != NULL, "No MSA");
         ASSERT(runs != NULL, "No run configs");
         ASSERT(n_runs >= 1, "n_runs must be >= 1");
 
         if(n_threads < 1) n_threads = 1;
+        {
+                /* More threads than cores only slows the run down: idle workers spin before
+                   they park and then compete with the busy ones for the cores. The output
+                   does not depend on the number of threads. */
+                const long cores = sysconf(_SC_NPROCESSORS_ONLN);
+                if(cores >= 1 && n_threads > cores){
+                        if(!msa->quiet){
+                                WARNING_MSG("%d threads requested; using %ld, the number of cores.", n_threads, cores);
+                        }
+                        n_threads = (int)cores;
+                }
+        }
 
-#ifdef USE_THREADPOOL
-        pool = tp_create(n_threads);
+        RUN(msa_report_foreign_chars(msa, msa->biotype));
+
+        /* n_threads is the total number of threads that run tasks.
+           tp_create(n) starts n workers besides the calling thread, which
+           also executes tasks, so the pool gets n_threads - 1 workers; with
+           n_threads = 1 no pool is created and all pool calls run serially
+           on this thread (threadpool.h, NULL pool). */
+        if(n_threads > 1){
+                pool = tp_create(n_threads - 1);
+                ASSERT(pool != NULL, "Could not create thread pool");
+        }
         msa->pool = pool;
-#elif defined(HAVE_OPENMP)
-        omp_set_num_threads(n_threads);
-#endif
 
         if(n_runs > 1){
+                /* The ensemble works on finalised member alignments */
+                msa->defer_finalise = 0;
                 RUN(kalign_ensemble_from_configs(msa, runs, n_runs, ens, n_threads));
         }else{
                 RUN(kalign_single_run(msa, &runs[0], n_threads));
         }
 
-#ifdef USE_THREADPOOL
         msa->pool = NULL;
         tp_destroy(pool);
-#endif
         return OK;
 ERROR:
-#ifdef USE_THREADPOOL
         msa->pool = NULL;
         tp_destroy(pool);
-#endif
         return FAIL;
 }
 
 /* ======================================================================== */
-/* NSGA-III optimized protein mode presets                                   */
+/* Mode presets (Kalign 4)                                                   */
 /* ======================================================================== */
 
-/* Helper: fill one run config with preset values */
-static void preset_run(struct kalign_run_config *r,
-                        int matrix, float gpo, float gpe, float tgpe,
-                        float vsm_amax, float seq_weights,
-                        int realign, int refine,
-                        uint64_t seed, float noise)
+/* The table is generated from presets/results/v2/presets_v2.json by
+   presets/release/emit_c_presets.py: two modes per sequence type, chosen at
+   the knees of the pooled nested cross-validation Pareto front
+   (presets/results/v2/RESULTS_v2.md); protein fast is the fast-fit knee
+   setting (presets/results/fastfit/final_pick.json: member gap model and
+   hybrid single-linkage guide tree); protein accurate is the confidence re-fit's
+   pick (presets/results/ensconf/final_pick.json: the ensemble fit's 5
+   members, member 1 = protein fast, all on member 1's guide tree with
+   per-member single-linkage tree noise, consensus min_support 2). Each run is built exactly as
+   python-kalign/_core.cpp ensemble_custom_file_to_file builds it from the
+   same parameters (seed 42 -> tree_seed 42 + k; per-member tree_noise), so
+   the preset path reproduces the evaluated alignments byte for byte. */
+#include "mode_presets.h"
+
+static void preset_apply(const struct kalign_mode_preset *p,
+                         struct kalign_run_config *runs,
+                         int *n_runs,
+                         struct kalign_ensemble_config *ens)
 {
-        *r = kalign_run_config_defaults();
-        r->matrix = matrix;
-        r->gpo = gpo;
-        r->gpe = gpe;
-        r->tgpe = tgpe;
-        r->vsm_amax = vsm_amax;
-        r->seq_weights = seq_weights;
-        r->realign = realign;
-        r->refine = refine;
-        r->tree_seed = seed;
-        r->tree_noise = noise;
-}
-
-/* Helper: set shared consistency params on all runs */
-static void preset_consistency(struct kalign_run_config *runs, int n_runs,
-                                int anchors, float weight)
-{
-        for(int i = 0; i < n_runs; i++){
-                runs[i].consistency_anchors = anchors;
-                runs[i].consistency_weight = weight;
+        *n_runs = p->n_runs;
+        for(int k = 0; k < p->n_runs; k++){
+                struct kalign_run_config *r = &runs[k];
+                *r = kalign_run_config_defaults();
+                r->matrix = p->matrix[k];
+                r->gpo = p->gpo[k];
+                r->gpe = p->gpe[k];
+                r->tgpe = p->tgpe[k];
+                r->tree_seed = 42 + (uint64_t)k;
+                r->tree_noise = p->tree_noise[k];
+                r->vsm_amax = p->vsm_amax[k];
+                r->dist_scale = 0.0f;
+                r->seq_weights = p->seq_weights[k];
+                r->refine = p->refine[k];
+                r->realign = p->realign[k];
+                r->consistency_anchors = p->consistency_anchors[k];
+                r->consistency_weight = p->consistency_weight[k];
+                r->vsm_mode = p->vsm_mode[k];
+                r->vsm_kappa = p->vsm_kappa[k];
+                r->vsm_dzero = p->vsm_dzero[k];
+                r->guide_dist = p->guide_dist[k];
+                r->gap_model = p->gap_model;
+                r->tree_method = p->tree_method[k];
+                r->tree_dist = p->tree_dist[k];
+                r->tree_alpha = p->tree_alpha[k];
+                r->tree_maxlen = p->tree_maxlen[k];
+                r->tree_leaf = p->tree_leaf[k];
+                r->tree_kmeans_dist = p->tree_kmeans_dist[k];
+                r->realign_tree = p->realign_tree[k];
+                r->tree_sl_noise = p->tree_sl_noise[k];
         }
-}
-
-/* ---- Protein presets (NSGA-III optimized on BAliBASE v4, gen 41) ---- */
-
-static int preset_protein(const char *m,
-                           struct kalign_run_config *runs,
-                           int *n_runs,
-                           struct kalign_ensemble_config *ens)
-{
-        /* fast: single run, ~34s on BAliBASE. F1=0.737 R=0.818 P=0.670 */
-        if(strcasecmp(m, "fast") == 0){
-                *n_runs = 1;
-                preset_run(&runs[0],
-                           KALIGN_MATRIX_PFASUM60,
-                           8.626f, 0.843f, 0.433f,
-                           0.592f, 1.534f,
-                           0, KALIGN_REFINE_NONE,
-                           0, 0.0f);
-                return 0;
-        }
-
-        /* default: single run with inline refinement, ~130s.
-           F1=0.750 R=0.779 P=0.724 */
-        if(strcasecmp(m, "default") == 0){
-                *n_runs = 1;
-                preset_run(&runs[0],
-                           KALIGN_MATRIX_PFASUM60,
-                           8.121f, 0.684f, 0.560f,
-                           1.661f, 2.356f,
-                           0, KALIGN_REFINE_INLINE,
-                           0, 0.0f);
-                preset_consistency(runs, 1, 1, 1.640f);
-                return 0;
-        }
-
-        /* recall: 5-run ensemble optimized for recall, ~1175s.
-           F1=0.777 R=0.837 P=0.726 */
-        if(strcasecmp(m, "recall") == 0){
-                *n_runs = 5;
-                preset_run(&runs[0], KALIGN_MATRIX_CORBLOSUM66,
-                           5.416f, 1.071f, 1.620f,
-                           2.536f, 0.282f,
-                           1, KALIGN_REFINE_ALL, 42, 0.0f);
-                preset_run(&runs[1], KALIGN_MATRIX_CORBLOSUM66,
-                           12.091f, 1.024f, 1.284f,
-                           2.078f, 0.282f,
-                           1, KALIGN_REFINE_INLINE, 43, 0.0f);
-                preset_run(&runs[2], KALIGN_MATRIX_PFASUM60,
-                           6.970f, 2.919f, 0.632f,
-                           0.877f, 0.282f,
-                           1, KALIGN_REFINE_NONE, 44, 0.0f);
-                preset_run(&runs[3], KALIGN_MATRIX_PFASUM43,
-                           6.173f, 1.102f, 0.510f,
-                           1.276f, 0.282f,
-                           1, KALIGN_REFINE_ALL, 45, 0.0f);
-                preset_run(&runs[4], KALIGN_MATRIX_PFASUM43,
-                           5.278f, 1.764f, 1.088f,
-                           2.315f, 0.282f,
-                           1, KALIGN_REFINE_CONFIDENT, 46, 0.0f);
-                preset_consistency(runs, 5, 3, 2.120f);
-                ens->min_support = 0;
-                return 0;
-        }
-
-        /* accurate: 5-run ensemble optimized for F1, ~2005s.
-           F1=0.814 R=0.782 P=0.848 */
-        if(strcasecmp(m, "accurate") == 0){
-                *n_runs = 5;
-                preset_run(&runs[0], KALIGN_MATRIX_PFASUM43,
-                           8.682f, 0.650f, 1.465f,
-                           2.532f, 1.468f,
-                           1, KALIGN_REFINE_INLINE, 42, 0.0f);
-                preset_run(&runs[1], KALIGN_MATRIX_PFASUM43,
-                           6.148f, 1.174f, 1.297f,
-                           2.011f, 1.468f,
-                           1, KALIGN_REFINE_ALL, 43, 0.0f);
-                preset_run(&runs[2], KALIGN_MATRIX_CORBLOSUM66,
-                           3.622f, 1.004f, 0.631f,
-                           0.872f, 1.468f,
-                           1, KALIGN_REFINE_CONFIDENT, 44, 0.0f);
-                preset_run(&runs[3], KALIGN_MATRIX_CORBLOSUM66,
-                           5.988f, 0.552f, 0.495f,
-                           1.914f, 1.468f,
-                           1, KALIGN_REFINE_CONFIDENT, 45, 0.0f);
-                preset_run(&runs[4], KALIGN_MATRIX_PFASUM43,
-                           13.939f, 2.629f, 1.406f,
-                           1.830f, 1.468f,
-                           1, KALIGN_REFINE_NONE, 46, 0.0f);
-                preset_consistency(runs, 5, 8, 2.457f);
-                ens->min_support = 3;
-                return 0;
-        }
-
-        return -1;
-}
-
-/* ---- Nucleotide presets (NSGA-III optimized on BRAliBASE + MDSA, gen 100) ----
- *
- * Unified presets for both DNA and RNA. Optimized on combined
- * BRAliBASE (599 RNA cases) + MDSA (325 DNA cases).
- * All presets use Kimura two-parameter matrices.
- */
-
-static int preset_nucleotide(const char *m,
-                              struct kalign_run_config *runs,
-                              int *n_runs,
-                              struct kalign_ensemble_config *ens)
-{
-        /* fast: single run with realign, ~5s. F1=0.790 R=0.792 P=0.788 */
-        if(strcasecmp(m, "fast") == 0){
-                *n_runs = 1;
-                preset_run(&runs[0],
-                           KALIGN_MATRIX_NUC_200PAM,
-                           19.873f, 0.642f, 2.582f,
-                           0.874f, 0.199f,
-                           1, KALIGN_REFINE_NONE,
-                           0, 0.0f);
-                return 0;
-        }
-
-        /* default: 3-run ensemble with realign, ~26s.
-           F1=0.806 R=0.773 P=0.842 */
-        if(strcasecmp(m, "default") == 0){
-                *n_runs = 3;
-                preset_run(&runs[0], KALIGN_MATRIX_NUC_20PAM,
-                           19.275f, 0.628f, 2.854f,
-                           0.445f, 0.448f,
-                           1, KALIGN_REFINE_NONE, 42, 0.0f);
-                preset_run(&runs[1], KALIGN_MATRIX_NUC_200PAM,
-                           16.581f, 0.274f, 2.491f,
-                           0.706f, 0.448f,
-                           1, KALIGN_REFINE_NONE, 43, 0.0f);
-                preset_run(&runs[2], KALIGN_MATRIX_NUC_200PAM,
-                           16.499f, 3.754f, 2.896f,
-                           0.491f, 0.448f,
-                           1, KALIGN_REFINE_CONFIDENT, 44, 0.0f);
-                ens->min_support = 2;
-                return 0;
-        }
-
-        /* recall: single run with realign, ~17s.
-           F1=0.798 R=0.800 P=0.796 */
-        if(strcasecmp(m, "recall") == 0){
-                *n_runs = 1;
-                preset_run(&runs[0],
-                           KALIGN_MATRIX_NUC_200PAM,
-                           19.882f, 0.646f, 2.854f,
-                           0.874f, 0.449f,
-                           1, KALIGN_REFINE_CONFIDENT,
-                           0, 0.0f);
-                preset_consistency(runs, 1, 1, 1.616f);
-                return 0;
-        }
-
-        /* accurate: 5-run ensemble with realign, ~100s.
-           F1=0.810 R=0.760 P=0.867 */
-        if(strcasecmp(m, "accurate") == 0){
-                *n_runs = 5;
-                preset_run(&runs[0], KALIGN_MATRIX_NUC_200PAM,
-                           19.475f, 0.728f, 2.856f,
-                           0.492f, 0.590f,
-                           1, KALIGN_REFINE_CONFIDENT, 42, 0.0f);
-                preset_run(&runs[1], KALIGN_MATRIX_NUC_1PAM,
-                           19.377f, 1.379f, 2.486f,
-                           1.211f, 0.590f,
-                           1, KALIGN_REFINE_CONFIDENT, 43, 0.0f);
-                preset_run(&runs[2], KALIGN_MATRIX_NUC_200PAM,
-                           15.869f, 0.353f, 2.430f,
-                           0.721f, 0.590f,
-                           1, KALIGN_REFINE_NONE, 44, 0.0f);
-                preset_run(&runs[3], KALIGN_MATRIX_NUC_200PAM,
-                           15.989f, 2.331f, 2.764f,
-                           0.188f, 0.590f,
-                           1, KALIGN_REFINE_CONFIDENT, 45, 0.0f);
-                preset_run(&runs[4], KALIGN_MATRIX_NUC_1PAM,
-                           5.346f, 3.483f, 0.610f,
-                           1.406f, 0.590f,
-                           1, KALIGN_REFINE_NONE, 46, 0.0f);
-                preset_consistency(runs, 5, 2, 0.800f);
-                ens->min_support = 3;
-                return 0;
-        }
-
-        return -1;
+        ens->min_support = p->min_support;
+        ens->consistency_merge = p->consistency_merge;
+        ens->consistency_merge_weight = p->consistency_merge_weight;
+        ens->fill_in = p->fill_in;
+        ens->fill_anchor_frac = p->fill_anchor_frac;
+        ens->fill_support = p->fill_support;
 }
 
 int kalign_get_mode_preset(const char *mode,
@@ -666,14 +555,85 @@ int kalign_get_mode_preset(const char *mode,
                             int *n_runs,
                             struct kalign_ensemble_config *ens)
 {
-        const char *m = mode ? mode : "default";
+        const char *m = mode ? mode : "fast";
+        int nuc = (biotype == ALN_BIOTYPE_DNA);
+        int idx;
 
         *ens = kalign_ensemble_config_defaults();
 
-        if(biotype == ALN_BIOTYPE_DNA){
-                return preset_nucleotide(m, runs, n_runs, ens);
+        if(strcasecmp(m, "fast") == 0 ||
+           strcasecmp(m, "default") == 0){
+                /* "default" is an alias of "fast" (the default mode) */
+                idx = nuc ? KALIGN_PRESET_NUCLEOTIDE_FAST : KALIGN_PRESET_PROTEIN_FAST;
+        }else if(strcasecmp(m, "accurate") == 0 ||
+                 strcasecmp(m, "recall") == 0){
+                /* "recall" is an alias of "accurate" */
+                idx = nuc ? KALIGN_PRESET_NUCLEOTIDE_ACCURATE : KALIGN_PRESET_PROTEIN_ACCURATE;
+        }else{
+                return -1;
         }
+        preset_apply(&kalign_mode_presets[idx], runs, n_runs, ens);
+        return 0;
+}
 
-        /* Default: protein presets */
-        return preset_protein(m, runs, n_runs, ens);
+int kalign_mode_size_ok(const char *mode, int biotype, int numseq)
+{
+        const char *m = mode ? mode : "fast";
+
+        (void) biotype;  /* same limit for protein and nucleotide */
+        if(strcasecmp(m, "accurate") == 0 || strcasecmp(m, "recall") == 0){
+                return numseq <= KALIGN_ACCURATE_MAX_SEQ;
+        }
+        return 1;
+}
+
+int kalign_parse_seq_type(const char *name, int *seq_type)
+{
+        if(name == NULL || strcasecmp(name, "auto") == 0){
+                *seq_type = KALIGN_SEQ_AUTO;
+        }else if(strcasecmp(name, "protein") == 0){
+                *seq_type = KALIGN_SEQ_PROTEIN;
+        }else if(strcasecmp(name, "dna") == 0){
+                *seq_type = KALIGN_SEQ_DNA;
+        }else if(strcasecmp(name, "rna") == 0){
+                *seq_type = KALIGN_SEQ_RNA;
+        }else{
+                return -1;
+        }
+        return 0;
+}
+
+int kalign_set_seq_type(struct msa *msa, int seq_type, int *overridden)
+{
+        int want;
+
+        if(overridden) *overridden = 0;
+        if(msa == NULL) return -1;
+
+        switch(seq_type){
+        case KALIGN_SEQ_AUTO:
+                return 0;
+        case KALIGN_SEQ_PROTEIN:
+                want = ALN_BIOTYPE_PROTEIN;
+                break;
+        case KALIGN_SEQ_DNA:
+        case KALIGN_SEQ_RNA:
+                want = ALN_BIOTYPE_DNA;  /* DNA and RNA share one biotype */
+                break;
+        default:
+                return -1;
+        }
+        if(overridden && msa->biotype != ALN_BIOTYPE_UNDEF && msa->biotype != want){
+                *overridden = 1;
+        }
+        msa->biotype = want;
+        return 0;
+}
+
+const char *kalign_seq_type_name(struct msa *msa)
+{
+        if(msa == NULL) return "unknown";
+        if(msa->biotype == ALN_BIOTYPE_PROTEIN) return "protein";
+        if(msa->biotype == ALN_BIOTYPE_DNA) return "DNA/RNA";
+        return "unknown";
 }

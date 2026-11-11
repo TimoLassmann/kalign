@@ -117,6 +117,101 @@ ERROR:
 }
 
 
+/* Residues (letters) of two gapped rows are the same, ignoring case and gaps. */
+static int same_residues(const char* a, int len_a, const char* b, int len_b)
+{
+        int i = 0;
+        int j = 0;
+        while(1){
+                while(i < len_a && !isalpha((int)a[i])){
+                        i++;
+                }
+                while(j < len_b && !isalpha((int)b[j])){
+                        j++;
+                }
+                if(i == len_a || j == len_b){
+                        return (i == len_a && j == len_b);
+                }
+                if(toupper((int)a[i]) != toupper((int)b[j])){
+                        return 0;
+                }
+                i++;
+                j++;
+        }
+}
+
+/* Match every reference sequence to one test sequence, after both MSAs went through
+   sort_msa_for_comparison.  A match has the same name and the same residues (case and gaps
+   ignored); among test sequences with the same name, the first unused one in sorted order is
+   taken, so identical inputs pair exactly as before (position i with position i).
+   On success the test MSA is reordered so that t->sequences[i] is the match of
+   r->sequences[i] for i < r->numseq; test sequences not in the reference are moved behind
+   them and take no part in the comparison (the test may hold more sequences than the
+   reference).  A reference sequence without a match is an error. */
+static int match_test_to_reference(struct msa* r, struct msa* t)
+{
+        struct msa_seq** order = NULL;
+        int* used = NULL;
+        int n = 0;
+
+        ASSERT(r->numseq > 0, "Reference alignment has no sequences");
+        if(t->numseq < r->numseq){
+                ERROR_MSG("Test alignment has %d sequences, fewer than the %d of the reference: every reference sequence must be in the test alignment", t->numseq, r->numseq);
+        }
+        MMALLOC(order, sizeof(struct msa_seq*) * t->numseq);
+        MMALLOC(used, sizeof(int) * t->numseq);
+        for(int j = 0; j < t->numseq; j++){
+                used[j] = 0;
+        }
+        for(int i = 0; i < r->numseq; i++){
+                struct msa_seq* rs = r->sequences[i];
+                int lo = 0;
+                int hi = t->numseq;
+                int found = -1;
+                int same_name = 0;
+                /* first test sequence whose name is >= the reference name (test is sorted by name first) */
+                while(lo < hi){
+                        int mid = lo + (hi - lo) / 2;
+                        if(strncmp(t->sequences[mid]->name, rs->name, MSA_NAME_LEN) < 0){
+                                lo = mid + 1;
+                        }else{
+                                hi = mid;
+                        }
+                }
+                for(int j = lo; j < t->numseq && strncmp(t->sequences[j]->name, rs->name, MSA_NAME_LEN) == 0; j++){
+                        same_name = 1;
+                        if(!used[j] && same_residues(rs->seq, r->alnlen, t->sequences[j]->seq, t->alnlen)){
+                                found = j;
+                                break;
+                        }
+                }
+                if(found < 0){
+                        if(same_name){
+                                ERROR_MSG("Reference sequence %s: the test sequence(s) with this name have different residues", rs->name);
+                        }
+                        ERROR_MSG("Reference sequence %s is not in the test alignment", rs->name);
+                }
+                used[found] = 1;
+                order[n++] = t->sequences[found];
+        }
+        for(int j = 0; j < t->numseq; j++){
+                if(!used[j]){
+                        order[n++] = t->sequences[j];
+                }
+        }
+        for(int j = 0; j < t->numseq; j++){
+                t->sequences[j] = order[j];
+        }
+        MFREE(order);
+        MFREE(used);
+        return OK;
+ERROR:
+        MFREE(order);
+        MFREE(used);
+        return FAIL;
+}
+
+
 static int compare_pair(char *seq1A, char *seq2A, char *seq1B, char *seq2B,
                         int len_a, int len_b, struct cmp_stats *stat);
 
@@ -149,6 +244,7 @@ int kalign_msa_compare(struct msa *r, struct msa *t,  float *score)
 
         RUN(sort_msa_for_comparison(r));
         RUN(sort_msa_for_comparison(t));
+        RUN(match_test_to_reference(r, t));
 
         MMALLOC(stat, sizeof(struct cmp_stats));
         stat->identical_gaps = 0;
@@ -394,14 +490,14 @@ static int compare_with_mask_helper(struct msa *r, struct msa *t,
            Build residue-to-test-column map for each sequence. */
         {
                 int** res_to_tcol = NULL;
-                MMALLOC(res_to_tcol, sizeof(int*) * t->numseq);
-                for(int s = 0; s < t->numseq; s++){
+                MMALLOC(res_to_tcol, sizeof(int*) * r->numseq);
+                for(int s = 0; s < r->numseq; s++){
                         res_to_tcol[s] = NULL;
                         MMALLOC(res_to_tcol[s], sizeof(int) * (t->sequences[s]->len + 1));
                 }
 
                 /* Fill residue→test_column map */
-                for(int s = 0; s < t->numseq; s++){
+                for(int s = 0; s < r->numseq; s++){
                         int p = 0;
                         for(int c = 0; c < t->alnlen; c++){
                                 if(isalpha((int)t->sequences[s]->seq[c])){
@@ -411,57 +507,55 @@ static int compare_with_mask_helper(struct msa *r, struct msa *t,
                         }
                 }
 
-                /* Check each scored reference column */
+                /* Check each scored reference column.
+                   pos[s] = number of residues of reference sequence s in columns < c, kept as a running count
+                   (updated after every column, scored or not) instead of being recounted from column 0 for
+                   each column; the values read are the same, so the result is unchanged. */
+                int* pos = NULL;
+                MMALLOC(pos, sizeof(int) * r->numseq);
+                for(int s = 0; s < r->numseq; s++){
+                        pos[s] = 0;
+                }
                 for(int c = 0; c < r->alnlen; c++){
-                        if(!scored_cols[c]){
-                                continue;
-                        }
-                        int first_tcol = -1;
-                        int all_same = 1;
-                        int nres = 0;
-                        /* Count non-gap residues at this column */
-                        for(int s = 0; s < r->numseq; s++){
-                                if(isalpha((int)r->sequences[s]->seq[c])){
-                                        nres++;
-                                }
-                        }
-                        if(nres < 2){
-                                /* Need at least 2 residues for a "pair" column */
-                                continue;
-                        }
-
-                        tc_total++;
-                        /* Check if all residues map to same test column */
-                        {
-                                int pos[r->numseq];
-                                for(int s = 0; s < r->numseq; s++){
-                                        pos[s] = 0;
-                                }
-                                for(int cc = 0; cc < c; cc++){
-                                        for(int s = 0; s < r->numseq; s++){
-                                                if(isalpha((int)r->sequences[s]->seq[cc])){
-                                                        pos[s]++;
-                                                }
-                                        }
-                                }
+                        if(scored_cols[c]){
+                                int first_tcol = -1;
+                                int all_same = 1;
+                                int nres = 0;
+                                /* Count non-gap residues at this column */
                                 for(int s = 0; s < r->numseq; s++){
                                         if(isalpha((int)r->sequences[s]->seq[c])){
-                                                int tcol = res_to_tcol[s][pos[s]];
-                                                if(first_tcol < 0){
-                                                        first_tcol = tcol;
-                                                }else if(tcol != first_tcol){
-                                                        all_same = 0;
-                                                        break;
+                                                nres++;
+                                        }
+                                }
+                                /* Need at least 2 residues for a "pair" column */
+                                if(nres >= 2){
+                                        tc_total++;
+                                        /* Check if all residues map to same test column */
+                                        for(int s = 0; s < r->numseq; s++){
+                                                if(isalpha((int)r->sequences[s]->seq[c])){
+                                                        int tcol = res_to_tcol[s][pos[s]];
+                                                        if(first_tcol < 0){
+                                                                first_tcol = tcol;
+                                                        }else if(tcol != first_tcol){
+                                                                all_same = 0;
+                                                                break;
+                                                        }
                                                 }
+                                        }
+                                        if(all_same){
+                                                tc_correct++;
                                         }
                                 }
                         }
-                        if(all_same){
-                                tc_correct++;
+                        for(int s = 0; s < r->numseq; s++){
+                                if(isalpha((int)r->sequences[s]->seq[c])){
+                                        pos[s]++;
+                                }
                         }
                 }
+                MFREE(pos);
 
-                for(int s = 0; s < t->numseq; s++){
+                for(int s = 0; s < r->numseq; s++){
                         MFREE(res_to_tcol[s]);
                 }
                 MFREE(res_to_tcol);
@@ -528,6 +622,7 @@ int kalign_msa_compare_detailed(struct msa *r, struct msa *t,
 
         RUN(sort_msa_for_comparison(r));
         RUN(sort_msa_for_comparison(t));
+        RUN(match_test_to_reference(r, t));
 
         ASSERT(r->alnlen > 0, "Reference alignment has length 0");
 
@@ -582,6 +677,7 @@ int kalign_msa_compare_with_mask(struct msa *r, struct msa *t,
 
         RUN(sort_msa_for_comparison(r));
         RUN(sort_msa_for_comparison(t));
+        RUN(match_test_to_reference(r, t));
 
         ASSERT(n_cols == r->alnlen,
                "Mask length (%d) != reference alignment length (%d)",

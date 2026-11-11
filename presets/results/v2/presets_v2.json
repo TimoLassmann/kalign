@@ -1,0 +1,250 @@
+{
+ "amendment": "v2",
+ "source": "final fit (fold all), selection rule recipe.select_v2",
+ "presets": {
+  "protein": {
+   "fast": {
+    "key": "89c3aa1e9e078e6ae378fd54e09dc0641e5b7757b7b306c56ca3b4894ebd2948",
+    "params": {
+     "n_runs": 1,
+     "run_gpo": [
+      6.190432441439749
+     ],
+     "run_gpe": [
+      0.8092411597874494
+     ],
+     "run_tgpe": [
+      0.5996379665635143
+     ],
+     "run_noise": [
+      0.0
+     ],
+     "run_types": [
+      1
+     ],
+     "run_vsm_amax": [
+      0.0
+     ],
+     "run_refine": [
+      0
+     ],
+     "run_vsm_kappa": [
+      1.0
+     ],
+     "run_vsm_dzero": [
+      1.0
+     ],
+     "run_guide_dist": [
+      0
+     ],
+     "seq_weights": 2.8012471630813027,
+     "consistency": 3,
+     "consistency_weight": 2.891914131308884,
+     "realign": 1,
+     "min_support": 0,
+     "consistency_merge": 0,
+     "consistency_merge_weight": 2.0,
+     "vsm_mode": 0,
+     "fill_in": 0,
+     "fill_anchor_frac": 0.0,
+     "fill_support": 1
+    }
+   },
+   "accurate": {
+    "key": "2852d1c29232d035cf5f065e560b338321afd3d9de459ab9fa4e62c0d8e9ae32",
+    "params": {
+     "run_gpo": [
+      7.245679886316388,
+      8.682924575562579,
+      8.666908387528048,
+      10.046296295093997,
+      9.938151953797526
+     ],
+     "run_gpe": [
+      1.2711861059584495,
+      1.4817795930813284,
+      0.6232696905387289,
+      1.2169417549985757,
+      0.6450596906117213
+     ],
+     "run_tgpe": [
+      1.101919805597086,
+      1.133354233486977,
+      0.5984120114435603,
+      1.72862984766209,
+      0.6962292720497582
+     ],
+     "run_types": [
+      3,
+      2,
+      2,
+      2,
+      2
+     ],
+     "run_vsm_amax": [
+      0.47079259795999695,
+      0.7597475766003089,
+      1.4883565565775152,
+      2.520297180905028,
+      2.510024652497063
+     ],
+     "run_refine": [
+      2,
+      0,
+      0,
+      2,
+      0
+     ],
+     "run_vsm_kappa": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "run_vsm_dzero": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+     ],
+     "run_guide_dist": [
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "n_runs": 5,
+     "run_noise": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "seq_weights": 3.272525919253566,
+     "consistency": 8,
+     "consistency_weight": 3.5579641521153507,
+     "realign": 2,
+     "vsm_mode": 0,
+     "consistency_merge": 0,
+     "consistency_merge_weight": 2.0,
+     "min_support": 2,
+     "fill_in": 1,
+     "fill_anchor_frac": 0.07963204130763865,
+     "fill_support": 1
+    }
+   },
+   "default": {
+    "alias": "accurate"
+   },
+   "recall": {
+    "alias": "accurate"
+   }
+  },
+  "nucleotide": {
+   "fast": {
+    "key": "4ff7e4d1ccaafdc4fe9b6602af04f23f91479e43d8c718a5ce3f328cb20aadd2",
+    "params": {
+     "n_runs": 1,
+     "run_gpo": [
+      15.584104422293285
+     ],
+     "run_gpe": [
+      0.6147504027876776
+     ],
+     "run_tgpe": [
+      2.9040783529268577
+     ],
+     "run_noise": [
+      0.0
+     ],
+     "run_types": [
+      12
+     ],
+     "run_vsm_amax": [
+      0.2943446472264315
+     ],
+     "run_refine": [
+      0
+     ],
+     "seq_weights": 0.427509434153184,
+     "consistency": 1,
+     "consistency_weight": 1.1977573259542555,
+     "realign": 0,
+     "min_support": 0,
+     "consistency_merge": 0,
+     "consistency_merge_weight": 2.0,
+     "vsm_mode": 0,
+     "run_vsm_kappa": [
+      1.0
+     ],
+     "run_vsm_dzero": [
+      1.0
+     ],
+     "run_guide_dist": [
+      0
+     ],
+     "fill_in": 0,
+     "fill_anchor_frac": 0.0,
+     "fill_support": 1
+    }
+   },
+   "accurate": {
+    "key": "bd03cdb7dcff5dde16e9be6462d0ccddb7143959523e997039704c8eb05dd9d7",
+    "params": {
+     "n_runs": 1,
+     "run_gpo": [
+      15.884130828945816
+     ],
+     "run_gpe": [
+      1.3620482777149288
+     ],
+     "run_tgpe": [
+      2.600845910205299
+     ],
+     "run_noise": [
+      0.0
+     ],
+     "run_types": [
+      12
+     ],
+     "run_vsm_amax": [
+      0.5186282925633531
+     ],
+     "run_refine": [
+      2
+     ],
+     "seq_weights": 0.5596083794009516,
+     "consistency": 5,
+     "consistency_weight": 3.568145719718166,
+     "realign": 1,
+     "min_support": 0,
+     "consistency_merge": 0,
+     "consistency_merge_weight": 2.0,
+     "vsm_mode": 0,
+     "run_vsm_kappa": [
+      1.0
+     ],
+     "run_vsm_dzero": [
+      1.0
+     ],
+     "run_guide_dist": [
+      0
+     ],
+     "fill_in": 0,
+     "fill_anchor_frac": 0.0,
+     "fill_support": 1
+    }
+   },
+   "default": {
+    "alias": "accurate"
+   },
+   "recall": {
+    "alias": "accurate"
+   }
+  }
+ }
+}

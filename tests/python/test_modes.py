@@ -133,3 +133,22 @@ class TestAlignFileToFileModes:
             assert os.path.getsize(out) > 0
         finally:
             os.unlink(out)
+
+
+class TestAccurateSizeLimit:
+    """Protein accurate refuses inputs above kalign's 5,000-sequence limit."""
+
+    SEQS = ["MKFLILLFNILCLFPVLAADNHGVSLHCTTATAIP"[: 20 + i % 15] for i in range(5001)]
+
+    def test_align_refuses(self):
+        with pytest.raises(ValueError, match="not feasible above 5000"):
+            kalign.align(self.SEQS, mode="accurate")
+
+    def test_file_to_file_refuses(self):
+        with tempfile.TemporaryDirectory() as d:
+            inp, out = os.path.join(d, "in.fa"), os.path.join(d, "out.fa")
+            with open(inp, "w") as fh:
+                fh.writelines(f">s{i}\n{s}\n" for i, s in enumerate(self.SEQS))
+            with pytest.raises(ValueError, match="not feasible above 5000"):
+                kalign.align_file_to_file(inp, out, mode="accurate")
+            assert not os.path.exists(out)

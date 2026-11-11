@@ -3,9 +3,7 @@
 
 #include <stdint.h>
 
-#ifdef USE_THREADPOOL
 typedef struct threadpool threadpool_t;
-#endif
 
 #ifdef MSA_STRUCT_IMPORT
 #define EXTERN
@@ -35,6 +33,20 @@ struct msa_seq{
         int alloc_len;
 };
 
+/* Guide-tree options of one run; set by sl_opts_resolve() from the run config (defaults: the shipped tree). */
+struct tree_opts{
+        int mode;          /* SL_MODE_*: 0 k-means (shipped), 1 single linkage (Prim), 2 SLINK, 3 hybrid */
+        int dist;          /* 0 raw Myers (shipped), 1 normalised Myers, 2 LCS indel ratio, 3 1 - LCS/shorter */
+        int full;          /* 0 reduced tree alphabet (shipped), 1 full alphabet */
+        int maxlen;        /* residues per sequence for the tree distance (0 = whole sequences, LCS only) */
+        int leaf;          /* groups below this size get an exact subtree (shipped: 50) */
+        int kmeans_dist;   /* 0 shipped anchor distances, 1 k-means on the tree distance above */
+        int realign_tree;  /* 0 realign pass keeps the shipped leaf rule, 1 it follows leaf / hybrid */
+        int in_realign;    /* set by kalign_single_run around the realign iterations */
+        float sl_noise;    /* hybrid: perturbation sigma of the single-linkage subtrees (0 = none) */
+        uint64_t sl_seed;  /* seed of that perturbation (the run's tree_seed) */
+};
+
 struct msa{
         struct msa_seq** sequences;
         float* seq_distances;   /* per-sequence mean distance (normalized), set during tree building */
@@ -44,20 +56,20 @@ struct msa{
         int* nsip;
         int* plen;
         uint8_t run_parallel;
-#ifdef USE_THREADPOOL
         threadpool_t *pool;
-#endif
         int numseq;
         int num_profiles;
         int alloc_numseq;
         int aligned;
         int alnlen;
+        int defer_finalise; /* 1: a single run leaves the alignment as gap counts; kalign_write_msa writes FASTA rows from them */
         int letter_freq[128];
         uint8_t L;
         uint8_t biotype;
         int quiet;
         void* consistency_table;    /* struct consistency_table*, NULL when disabled */
         void* poar_consistency;     /* struct poar_consistency_ctx*, NULL when disabled */
+        struct tree_opts tree;
 };
 
 #undef MSA_STRUCT_IMPORT

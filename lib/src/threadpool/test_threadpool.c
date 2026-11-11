@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdatomic.h>
+#include <stdint.h>
 
 /* ── Test harness ─────────────────────────────────────────────── */
 
@@ -546,7 +547,109 @@ static int test_sequential_groups(void)
     return 0;
 }
 
+/* NULL pool: every call runs serially on the calling thread, in order. */
+struct order_arg { int *log; int *n; int id; };
+
+static void log_order(void *arg)
+{
+    struct order_arg *o = (struct order_arg *)arg;
+    o->log[(*o->n)++] = o->id;
+}
+
+static int test_null_pool_serial(void)
+{
+    int N = 1000;
+    int *arr = (int *)calloc((size_t)N, sizeof(int));
+    CHECK(arr != NULL);
+    tp_parallel_for(NULL, 0, N, fill_squares, arr);
+    for (int i = 0; i < N; i++)
+        CHECK(arr[i] == i * i);
+    free(arr);
+
+    int log[4] = { -1, -1, -1, -1 };
+    int n = 0;
+    struct order_arg o[4];
+    tp_group_t *g = tp_group_create(NULL);
+    CHECK(g != NULL);
+    for (int i = 0; i < 4; i++) {
+        o[i].log = log; o[i].n = &n; o[i].id = i;
+        CHECK(tp_group_submit(g, log_order, &o[i]) == 0);
+        CHECK(n == i + 1);          /* ran immediately */
+    }
+    tp_group_wait(g);
+    tp_group_destroy(g);
+    for (int i = 0; i < 4; i++)
+        CHECK(log[i] == i);
+    return 0;
+}
+
 /* ── main ─────────────────────────────────────────────────────── */
+
+
+/* ── 13. stack depth of waits that help with other tasks ─────────
+ * A waiting thread runs other tasks inline.  Kalign's 200,000-sequence
+ * runs overflowed an 8 MB stack because those helps nested without
+ * bound: depth followed the number of tasks, not the tree.  Nesting
+ * of the recursive task must stay within the pool's bound. */
+
+static _Thread_local int tl_nest = 0;
+static atomic_int g_max_nest;
+
+static void nest_tree_task(void *arg)
+{
+    struct tree_task_arg *ta = (struct tree_task_arg *)arg;
+    struct tree_node *n = ta->node;
+
+    tl_nest++;
+    int cur = atomic_load(&g_max_nest);
+    while (tl_nest > cur && !atomic_compare_exchange_weak(&g_max_nest, &cur, tl_nest))
+        ;
+
+    if (n->leaf_id >= 0) {
+        n->result = leaf_work(n->leaf_id);
+    } else {
+        struct tree_task_arg left_arg  = { ta->pool, n->left };
+        struct tree_task_arg right_arg = { ta->pool, n->right };
+        tp_group_t *g = tp_group_create(ta->pool);
+        tp_group_submit(g, nest_tree_task, &left_arg);
+        tp_group_submit(g, nest_tree_task, &right_arg);
+        tp_group_wait(g);
+        tp_group_destroy(g);
+        n->result = n->left->result + n->right->result;
+    }
+    tl_nest--;
+}
+
+static int test_bounded_help_depth(void)
+{
+    const int depth = 16;                          /* 65536 leaves */
+    int id = 0;
+    struct tree_node *root = build_tree(depth, &id);
+    float serial_result = serial_tree(root);
+    int worst = 0;
+
+    for (int rep = 0; rep < 5; rep++) {
+        free_tree(root);
+        id = 0;
+        root = build_tree(depth, &id);
+        atomic_store(&g_max_nest, 0);
+
+        threadpool_t *pool = tp_create(8);
+        struct tree_task_arg targ = { pool, root };
+        nest_tree_task(&targ);                    /* from a non-worker, like Kalign */
+        tp_destroy(pool);
+
+        float diff = root->result - serial_result;
+        if (diff < 0) diff = -diff;
+        CHECK(diff < 0.01f);
+        if (atomic_load(&g_max_nest) > worst) worst = atomic_load(&g_max_nest);
+    }
+    free_tree(root);
+    if (worst > (TP_MAX_FOREIGN_DEPTH + 1) * (depth + 1))
+        fprintf(stderr, "    nesting %d > bound %d\n", worst, (TP_MAX_FOREIGN_DEPTH + 1) * (depth + 1));
+    CHECK(worst <= (TP_MAX_FOREIGN_DEPTH + 1) * (depth + 1));
+    return 0;
+}
 
 int main(void)
 {
@@ -570,6 +673,8 @@ int main(void)
     RUN(deep_recursive_tree);
     RUN(deep_recursive_fib);
     RUN(sequential_groups);
+    RUN(null_pool_serial);
+    RUN(bounded_help_depth);
 
     printf("\n%d/%d passed", g_pass, g_total);
     if (g_fail > 0) printf(", %d FAILED", g_fail);

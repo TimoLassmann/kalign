@@ -5,9 +5,10 @@ authors:
   - given-names: "Timo"
     family-names: "Lassmann"
     orcid: "https://orcid.org/0000-0002-0138-2691"
-title: "Kalign 3: multiple sequence alignment of large datasets"
-version: 3.5.1
-date-released: 2026-02-27
+title: "Kalign"
+version: 4.0.0
+# set to the day the v4.0.0 tag is pushed; add the Kalign 4 preprint as preferred-citation once it has a DOI
+date-released: 2026-11-10
 url: "https://github.com/TimoLassmann/kalign"
 repository-code: "https://github.com/TimoLassmann/kalign"
 license: Apache-2.0

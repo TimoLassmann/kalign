@@ -6,7 +6,11 @@
 #include "aln_param.h"
 
 #include "aln_struct.h"
+#ifdef KALIGN_WAVE
+#include "aln_wave.h"
+#endif
 #include "anchor_consistency.h"
+#include "aln_gapmodel.h"
 
 #define ALN_PROFILEPROFILE_IMPORT
 #include "aln_profileprofile.h"
@@ -16,7 +20,11 @@
 
 
 int aln_profileprofile_foward(struct aln_mem* m)
-{
+{ KPERF_DP(KPERF_DP_PP, KPERF_DP_FWD, m, (int64_t)(m->enda - m->starta) * (m->endb - m->startb));
+        if(m->gm) return gm_pp_forward(m);   /* member gap model */
+#ifdef KALIGN_WAVE
+        if(m->wave && !aln_wave_pp(m, 1)) return OK;
+#endif
         unsigned int freq[24];
         const float* restrict prof1 = m->prof1;
         const float* restrict prof2 = m->prof2;
@@ -107,7 +115,7 @@ int aln_profileprofile_foward(struct aln_mem* m)
                         }
                         prof2 -= 32;
                         if(m->consistency){
-                                pa += sparse_bonus_lookup(m->consistency, i, j);
+                                pa += sparse_bonus_lookup(m->consistency, i, j - 1);
                         }
 
                         s[j].a = pa;
@@ -137,7 +145,7 @@ int aln_profileprofile_foward(struct aln_mem* m)
                 }
                 prof2 -= 32;
                 if(m->consistency){
-                        pa += sparse_bonus_lookup(m->consistency, i, j);
+                        pa += sparse_bonus_lookup(m->consistency, i, j - 1);
                 }
 
                 s[j].a = pa;
@@ -147,7 +155,7 @@ int aln_profileprofile_foward(struct aln_mem* m)
                 if (m->endb != m->len_b){
                         s[j].gb = MAX(s[j].gb+prof1[28] ,ca+prof1[27]);
                 }else{
-                        s[j].gb = MAX(s[j].gb,ca)+ prof1[29];
+                        s[j].gb = MAX(s[j].gb, ca + prof1[27]) + prof1[29];
                 }
                 prof2 -= (m->endb-m->startb) << 6;
 
@@ -157,7 +165,11 @@ int aln_profileprofile_foward(struct aln_mem* m)
 }
 
 int aln_profileprofile_backward(struct aln_mem* m)
-{
+{ KPERF_DP(KPERF_DP_PP, KPERF_DP_BWD, m, (int64_t)(m->enda_2 - m->starta_2) * (m->endb - m->startb));
+        if(m->gm) return gm_pp_backward(m);   /* member gap model */
+#ifdef KALIGN_WAVE
+        if(m->wave && !aln_wave_pp(m, -1)) return OK;
+#endif
         unsigned int freq[24];
         struct states* restrict s = m->b;
         const float* restrict prof1 = m->prof1;
@@ -186,7 +198,7 @@ int aln_profileprofile_backward(struct aln_mem* m)
                 for(j = m->endb-1;j > m->startb;j--){
                         prof2 -= 64;
                         s[j].a = -FLT_MAX;
-                        s[j].ga = MAX(s[j+1].ga+prof2[28],s[j+1].a+prof2[27]);
+                        s[j].ga = MAX(s[j+1].ga+prof2[92],s[j+1].a+prof2[27]);
                         s[j].gb = -FLT_MAX;
                 }
                 prof2 -= 64;
@@ -228,7 +240,7 @@ int aln_profileprofile_backward(struct aln_mem* m)
                 xga = s[m->endb].ga;
 
                 if(m->endb != m->len_b){
-                        s[m->endb].gb = MAX(pgb+prof1[28] ,pa+prof1[27]);
+                        s[m->endb].gb = MAX(pgb+prof1[92] ,pa+prof1[27]);
                 }else{
                         s[m->endb].gb = MAX(pgb,pa)+prof1[29];
                 }
@@ -258,11 +270,11 @@ int aln_profileprofile_backward(struct aln_mem* m)
                         pga = s[j].ga;
 
                         //s[j].ga = MAX(s[j+1].ga+prof2[28], s[j+1].a+prof2[27]);
-                        s[j].ga = MAX(xga+prof2[28], xa+prof2[27]);
+                        s[j].ga = MAX(xga+prof2[92], xa+prof2[27]);
 
                         pgb = s[j].gb;
 
-                        s[j].gb = MAX(pgb+prof1[28], ca+prof1[27]);
+                        s[j].gb = MAX(pgb+prof1[92], ca+prof1[27]);
 
                         pa = ca;
                         xa = s[j].a;
@@ -288,9 +300,9 @@ int aln_profileprofile_backward(struct aln_mem* m)
 
                 //pgb = s[j].gb;
                 if(m->startb){
-                        s[j].gb = MAX(s[j].gb+prof1[28], ca+prof1[27]);
+                        s[j].gb = MAX(s[j].gb+prof1[92], ca+prof1[27]);
                 }else{
-                        s[j].gb = MAX(s[j].gb,ca)+prof1[29];
+                        s[j].gb = MAX(s[j].gb, ca + prof1[27]) + prof1[29];
                 }
 
                 //pa = ca;
@@ -300,7 +312,8 @@ int aln_profileprofile_backward(struct aln_mem* m)
 
 
 int aln_profileprofile_meetup(struct aln_mem* m,int old_cor[], int* meet,int* t,float* score)
-{
+{ KPERF_DP(KPERF_DP_PP, KPERF_DP_MEET, m, (int64_t)(old_cor[3] - old_cor[2] + 1));
+        if(m->gm) return gm_pp_meetup(m, old_cor, meet, t, score);   /* member gap model */
         struct states* f = m->f;
         struct states* b = m->b;
         int i;
@@ -382,8 +395,10 @@ int aln_profileprofile_meetup(struct aln_mem* m,int old_cor[], int* meet,int* t,
                 }
 
 
-                if(m->startb == 0){
-                        s_tmp = f[i].gb+b[i].gb+prof1[29]-sub;
+                /* gb -> gb join: in column 0 (startb == 0) both halves
+                   already carry their rows' terminal cost; elsewhere extend */
+                if(i == 0){
+                        s_tmp = f[i].gb+b[i].gb-sub;
                 }else{
                         s_tmp = f[i].gb+b[i].gb+prof1[28]-sub;
                 }
@@ -421,8 +436,9 @@ int aln_profileprofile_meetup(struct aln_mem* m,int old_cor[], int* meet,int* t,
                 max2 = s_tmp; c2 = i; transition2 = 3;
         }
 
+        /* last column: trailing row gap, already priced by both halves */
         if(m->endb == m->len_b){
-                s_tmp = f[i].gb+b[i].gb+prof1[29]-sub;
+                s_tmp = f[i].gb+b[i].gb-sub;
         }else{
                 s_tmp = f[i].gb+b[i].gb+prof1[28]-sub;
         }

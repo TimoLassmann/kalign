@@ -3,12 +3,7 @@
 
 #include "msa_struct.h"
 
-#ifdef HAVE_OPENMP
-#include <omp.h>
-#endif
-#ifdef USE_THREADPOOL
 #include "threadpool.h"
-#endif
 
 #include "task.h"
 
@@ -24,59 +19,183 @@
 #include "sp_score.h"
 #include "anchor_consistency.h"
 #include "msa_consistency.h"
+#include "aln_vsm.h"
 
 #include <string.h>
+#include <stdatomic.h>
 #include <float.h>
 
 #define ALN_RUN_IMPORT
 #include "aln_run.h"
 
-static void recursive_aln(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, uint8_t* active, int c);
-/* static void recursive_aln_openMP(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, uint8_t* active, int c); */
-/* static void recursive_aln_serial(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, uint8_t* active, int c); */
-
 static int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id);
 static int do_align_inline_refine(struct msa* msa, struct aln_tasks* t, struct aln_mem* m, int task_id, int n_trials);
-static void recursive_aln_inline(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, uint8_t* active, int c, int n_trials);
-/* static int do_align_serial(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id); */
-/* static int do_score(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id); */
 
-/* static int SampleWithoutReplacement(struct rng_state* rng, int N, int n,int* samples); */
-/* static int int_cmp(const void *a, const void *b); */
+/* ---------------------------------------------------------------------------
+ * Non-recursive guide-tree walk.
+ *
+ * Every internal node (task) keeps a count of unfinished internal children.
+ * Nodes whose children are all leaves are ready at the start.  A thread that
+ * finishes a node decrements its parent's count and, if it reaches zero,
+ * continues with the parent in the same loop.  No task ever waits for another
+ * tree task, so the C stack use of a thread does not depend on tree depth.
+ * Each node's alignment depends only on its two children, so results do not
+ * depend on the execution order.
+ * ------------------------------------------------------------------------- */
 
-#ifdef USE_THREADPOOL
-struct recursive_aln_arg {
+typedef atomic_int walk_cnt_t;
+
+struct walk_ctx {
         struct msa *msa;
         struct aln_tasks *t;
         struct aln_param *ap;
         uint8_t *active;
-        int c;
+        int n_trials;           /* < 0: plain alignment, >= 0: inline refinement */
+        int *parent;            /* parent task index, -1 for the root */
+        walk_cnt_t *pending;    /* unfinished internal children */
 };
 
-static void recursive_aln_task(void *arg)
-{
-        struct recursive_aln_arg *a = (struct recursive_aln_arg *)arg;
-        recursive_aln(a->msa, a->t, a->ap, a->active, a->c);
-}
-
-struct recursive_aln_inline_arg {
-        struct msa *msa;
-        struct aln_tasks *t;
-        struct aln_param *ap;
-        uint8_t *active;
-        int c;
-        int n_trials;
+struct walk_arg {
+        struct walk_ctx *ctx;
+        int node;
 };
 
-static void recursive_aln_inline_task(void *arg)
+/* Returns the new count. */
+static int walk_dec_pending(struct walk_ctx *w, int p)
 {
-        struct recursive_aln_inline_arg *a = (struct recursive_aln_inline_arg *)arg;
-        recursive_aln_inline(a->msa, a->t, a->ap, a->active, a->c, a->n_trials);
+        int old;
+        old = atomic_fetch_sub_explicit(&w->pending[p], 1, memory_order_acq_rel);
+        return old - 1;
 }
-#endif
+
+/* Align node c, then keep going up the tree while the parent becomes ready. */
+static void walk_run_chain(struct walk_ctx *w, int c)
+{
+        struct msa *msa = w->msa;
+        struct aln_tasks *t = w->t;
+        struct aln_param *ap = w->ap;
+
+        while(c >= 0){
+                struct task *local_t = t->list[c];
+                struct aln_mem *ml = NULL;
+
+                alloc_aln_mem(&ml, 256);
+                ml->ap = ap;
+                ml->mode = ALN_MODE_FULL;
+                ml->run_parallel = msa->run_parallel;
+                ml->pool = ap->pool;
+                if(w->n_trials < 0){
+                        do_align(msa, t, ml, c);
+                }else{
+                        do_align_inline_refine(msa, t, ml, c, w->n_trials);
+                }
+
+                w->active[local_t->a] = 0;
+                w->active[local_t->b] = 0;
+                w->active[local_t->c] = 1;
+                free_aln_mem(ml);
+
+                int p = w->parent[c];
+                if(p >= 0 && walk_dec_pending(w, p) == 0){
+                        c = p;
+                }else{
+                        c = -1;
+                }
+        }
+}
+
+static void walk_task(void *arg)
+{
+        struct walk_arg *a = (struct walk_arg *)arg;
+        walk_run_chain(a->ctx, a->node);
+}
+
+static int walk_tree(struct msa* msa, struct aln_tasks* t, struct aln_param* ap,
+                     uint8_t* active, int n_trials)
+{
+        struct walk_ctx w;
+        int n = t->n_tasks;
+        int i;
+        int *ready = NULL;
+        int n_ready = 0;
+        struct walk_arg *args = NULL;
+
+        w.msa = msa;
+        w.t = t;
+        w.ap = ap;
+        w.active = active;
+        w.n_trials = n_trials;
+        w.parent = NULL;
+        w.pending = NULL;
+
+        MMALLOC(w.parent, sizeof(int) * n);
+        MMALLOC(w.pending, sizeof(walk_cnt_t) * n);
+        MMALLOC(ready, sizeof(int) * n);
+        for(i = 0; i < n; i++){
+                w.parent[i] = -1;
+                w.pending[i] = 0;
+        }
+        for(i = 0; i < n; i++){
+                int ch[2];
+                int j;
+                ch[0] = t->list[i]->a - msa->numseq;
+                ch[1] = t->list[i]->b - msa->numseq;
+                for(j = 0; j < 2; j++){
+                        if(ch[j] >= 0){
+                                w.parent[ch[j]] = i;
+                                w.pending[i]++;
+                        }
+                }
+        }
+        for(i = 0; i < n; i++){
+                if(w.pending[i] == 0){
+                        ready[n_ready++] = i;
+                }
+        }
+
+        if(ap->pool){
+                tp_group_t *g = tp_group_create(ap->pool);
+                MMALLOC(args, sizeof(struct walk_arg) * n_ready);
+                for(i = 0; i < n_ready; i++){
+                        args[i].ctx = &w;
+                        args[i].node = ready[i];
+                        if(!g || tp_group_submit(g, walk_task, &args[i]) != 0){
+                                walk_run_chain(&w, ready[i]);
+                        }
+                }
+                if(g){
+                        tp_group_wait(g);
+                        tp_group_destroy(g);
+                }
+                MFREE(args);
+        }else{
+                for(i = 0; i < n_ready; i++){
+                        walk_run_chain(&w, ready[i]);
+                }
+        }
+
+        MFREE(ready);
+        MFREE(w.pending);
+        MFREE(w.parent);
+        return OK;
+ERROR:
+        if(args){
+                MFREE(args);
+        }
+        if(ready){
+                MFREE(ready);
+        }
+        if(w.pending){
+                MFREE(w.pending);
+        }
+        if(w.parent){
+                MFREE(w.parent);
+        }
+        return FAIL;
+}
 
 int create_msa_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
-{
+{ KPERF_PHASE_REGION(KP_PROGRESSIVE, KPH_PROGRESSIVE);
         int i;
         uint8_t* active = NULL;
 
@@ -97,13 +216,7 @@ int create_msa_tree(struct msa* msa, struct aln_param* ap,struct aln_tasks* t)
                 msa->run_parallel = 0;
         }
 
-#if !defined(USE_THREADPOOL)
-#ifdef HAVE_OPENMP
-#pragma omp parallel
-#pragma omp single nowait
-#endif
-#endif
-        recursive_aln(msa, t, ap, active, t->n_tasks-1);
+        RUN(walk_tree(msa, t, ap, active, -1));
 
         MFREE(active);
         return OK;
@@ -114,69 +227,6 @@ ERROR:
         return FAIL;
 }
 
-
-void recursive_aln(struct msa* msa, struct aln_tasks*t, struct aln_param* ap, uint8_t* active, int c)
-{
-        struct task* local_t = NULL;
-
-        /* Follow left and right branch until I arrive at sequences / profiles
-           ready to align.
-        */
-        int a;
-        int b;
-        local_t = t->list[c];
-
-        a = local_t->a - msa->numseq;
-        b = local_t->b - msa->numseq;
-
-#ifdef USE_THREADPOOL
-        {
-                struct recursive_aln_arg arg_a = { msa, t, ap, active, a };
-                struct recursive_aln_arg arg_b = { msa, t, ap, active, b };
-                tp_group_t *g = tp_group_create(ap->pool);
-                if(!active[local_t->a] && local_t->a >= msa->numseq)
-                        tp_group_submit(g, recursive_aln_task, &arg_a);
-                if(!active[local_t->b] && local_t->b >= msa->numseq)
-                        tp_group_submit(g, recursive_aln_task, &arg_b);
-                tp_group_wait(g);
-                tp_group_destroy(g);
-        }
-#else
-        if(!active[local_t->a] && local_t->a >= msa->numseq){
-#ifdef HAVE_OPENMP
-#pragma omp task shared(msa,t,ap,active) firstprivate(a)
-#endif
-                recursive_aln(msa, t, ap, active, a);
-        }
-        if(!active[local_t->b] && local_t->b >= msa->numseq){
-#ifdef HAVE_OPENMP
-#pragma omp task shared(msa,t,ap,active) firstprivate(b)
-#endif
-                recursive_aln(msa, t, ap, active, b);
-        }
-#ifdef HAVE_OPENMP
-#pragma omp taskwait
-#endif
-#endif
-
-        struct aln_mem* ml = NULL;
-
-        alloc_aln_mem(&ml, 256);
-
-        ml->ap = ap;
-        ml->mode = ALN_MODE_FULL;
-        ml->run_parallel = msa->run_parallel;
-#ifdef USE_THREADPOOL
-        ml->pool = ap->pool;
-#endif
-        do_align(msa,t,ml,c);
-
-        active[local_t->a] = 0;
-        active[local_t->b] = 0;
-        active[local_t->c] = 1;
-        /* LOG_MSG("Local: %d %d %d p:%d", local_t->a, local_t->b, local_t->c, local_t->p); */
-        free_aln_mem(ml);
-}
 
 float compute_gap_scale(struct msa* msa, struct aln_param* ap, int a, int b)
 {
@@ -221,7 +271,8 @@ float compute_gap_scale(struct msa* msa, struct aln_param* ap, int a, int b)
 float compute_subm_offset(struct msa* msa, struct aln_param* ap, int a, int b)
 {
         float amax = ap->vsm_amax;
-        if(amax <= 0.0f || msa->seq_distances == NULL){
+        /* Legacy VSM only; KALIGN_VSM_MERGE is handled by vsm_merge_offset() */
+        if(ap->vsm_mode != KALIGN_VSM_LEGACY || amax <= 0.0f || msa->seq_distances == NULL){
                 return 0.0f;
         }
 
@@ -280,6 +331,8 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
         /* Distance-dependent parameter scaling */
         struct aln_param* orig_ap = m->ap;
         struct aln_param scaled_ap;
+        float* vsm_save_a = NULL;
+        float* vsm_save_b = NULL;
         float gap_scale = compute_gap_scale(msa, m->ap, a, b);
         float subm_off = compute_subm_offset(msa, m->ap, a, b);
         if(gap_scale < 1.0f || subm_off > 0.0f){
@@ -307,6 +360,18 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                 RUN(set_gap_penalties_n(t->profile[b],m->len_b,msa->nsip[a]));
         }
 
+        {
+                float vsm_off = 0.0f;
+                RUN(vsm_merge_offset(msa, t, m->ap, a, b, m->len_a, m->len_b, &vsm_off));
+                if(vsm_off > 0.0f){
+                        if(m->ap != &scaled_ap){
+                                scaled_ap = *m->ap;
+                                m->ap = &scaled_ap;
+                        }
+                        scaled_ap.subm_offset = vsm_off;
+                        RUN(vsm_shift_profiles(t, a, b, m->len_a, m->len_b, vsm_off, &vsm_save_a, &vsm_save_b));
+                }
+        }
         RUN(init_alnmem(m));
 
         m->margin_sum = 0.0F;
@@ -467,6 +532,8 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
                 m->consistency = NULL;
         }
 
+        vsm_unshift_profiles(t, a, b, &vsm_save_a, &vsm_save_b);
+
         /* Restore original aln_param for profile update (unscaled base penalties) */
         m->ap = orig_ap;
 
@@ -500,6 +567,13 @@ int do_align(struct msa* msa,struct aln_tasks* t,struct aln_mem* m, int task_id)
 
         return OK;
 ERROR:
+        /* Leave the profiles and parameters as they were before the merge. */
+        if(m->consistency){
+                sparse_bonus_free(m->consistency);
+                m->consistency = NULL;
+        }
+        vsm_unshift_profiles(t, a, b, &vsm_save_a, &vsm_save_b);
+        m->ap = orig_ap;
         return FAIL;
 }
 
@@ -510,7 +584,7 @@ ERROR:
 
 int create_msa_tree_inline_refine(struct msa* msa, struct aln_param* ap,
                                   struct aln_tasks* t, int n_trials)
-{
+{ KPERF_PHASE_REGION(KP_PROGRESSIVE, KPH_PROGRESSIVE);
         int i;
         uint8_t* active = NULL;
 
@@ -533,13 +607,7 @@ int create_msa_tree_inline_refine(struct msa* msa, struct aln_param* ap,
                 msa->run_parallel = 0;
         }
 
-#if !defined(USE_THREADPOOL)
-#ifdef HAVE_OPENMP
-#pragma omp parallel
-#pragma omp single nowait
-#endif
-#endif
-        recursive_aln_inline(msa, t, ap, active, t->n_tasks - 1, n_trials);
+        RUN(walk_tree(msa, t, ap, active, n_trials));
 
         MFREE(active);
         return OK;
@@ -548,67 +616,6 @@ ERROR:
                 MFREE(active);
         }
         return FAIL;
-}
-
-void recursive_aln_inline(struct msa* msa, struct aln_tasks* t,
-                           struct aln_param* ap, uint8_t* active, int c,
-                           int n_trials)
-{
-        struct task* local_t = NULL;
-        int a, b;
-
-        local_t = t->list[c];
-        a = local_t->a - msa->numseq;
-        b = local_t->b - msa->numseq;
-
-        /* Fork-join: sibling subtrees are independent — same pattern as recursive_aln */
-#ifdef USE_THREADPOOL
-        {
-                struct recursive_aln_inline_arg arg_a = { msa, t, ap, active, a, n_trials };
-                struct recursive_aln_inline_arg arg_b = { msa, t, ap, active, b, n_trials };
-                tp_group_t *g = tp_group_create(ap->pool);
-                if(!active[local_t->a] && local_t->a >= msa->numseq)
-                        tp_group_submit(g, recursive_aln_inline_task, &arg_a);
-                if(!active[local_t->b] && local_t->b >= msa->numseq)
-                        tp_group_submit(g, recursive_aln_inline_task, &arg_b);
-                tp_group_wait(g);
-                tp_group_destroy(g);
-        }
-#else
-        if(!active[local_t->a] && local_t->a >= msa->numseq){
-#ifdef HAVE_OPENMP
-#pragma omp task shared(msa,t,ap,active) firstprivate(a,n_trials)
-#endif
-                recursive_aln_inline(msa, t, ap, active, a, n_trials);
-        }
-        if(!active[local_t->b] && local_t->b >= msa->numseq){
-#ifdef HAVE_OPENMP
-#pragma omp task shared(msa,t,ap,active) firstprivate(b,n_trials)
-#endif
-                recursive_aln_inline(msa, t, ap, active, b, n_trials);
-        }
-#ifdef HAVE_OPENMP
-#pragma omp taskwait
-#endif
-#endif
-
-        /* After children complete: align this edge (multi-trial stays serial) */
-        struct aln_mem* ml = NULL;
-        alloc_aln_mem(&ml, 256);
-        ml->ap = ap;
-        ml->mode = ALN_MODE_FULL;
-        ml->run_parallel = msa->run_parallel;
-#ifdef USE_THREADPOOL
-        ml->pool = ap->pool;
-#endif
-
-        do_align_inline_refine(msa, t, ml, c, n_trials);
-
-        active[local_t->a] = 0;
-        active[local_t->b] = 0;
-        active[local_t->c] = 1;
-
-        free_aln_mem(ml);
 }
 
 /* Run n_trials alignments for one edge, keep the best by SP score.
@@ -632,6 +639,8 @@ int do_align_inline_refine(struct msa* msa, struct aln_tasks* t,
         /* Distance-dependent parameter scaling */
         struct aln_param* orig_ap = m->ap;
         struct aln_param scaled_ap;
+        float* vsm_save_a = NULL;
+        float* vsm_save_b = NULL;
         float gap_scale = compute_gap_scale(msa, m->ap, a, b);
         float subm_off = compute_subm_offset(msa, m->ap, a, b);
         if(gap_scale < 1.0f || subm_off > 0.0f){
@@ -662,6 +671,19 @@ int do_align_inline_refine(struct msa* msa, struct aln_tasks* t,
 
         len_a = m->len_a;
         len_b = m->len_b;
+
+        {
+                float vsm_off = 0.0f;
+                RUN(vsm_merge_offset(msa, t, m->ap, a, b, len_a, len_b, &vsm_off));
+                if(vsm_off > 0.0f){
+                        if(m->ap != &scaled_ap){
+                                scaled_ap = *m->ap;
+                                m->ap = &scaled_ap;
+                        }
+                        scaled_ap.subm_offset = vsm_off;
+                        RUN(vsm_shift_profiles(t, a, b, len_a, len_b, vsm_off, &vsm_save_a, &vsm_save_b));
+                }
+        }
 
         RUN(init_alnmem(m));
 
@@ -853,6 +875,8 @@ int do_align_inline_refine(struct msa* msa, struct aln_tasks* t,
         /* Store confidence */
         t->list[task_id]->confidence = best_sp;
 
+        vsm_unshift_profiles(t, a, b, &vsm_save_a, &vsm_save_b);
+
         /* Restore original aln_param for profile update */
         m->ap = orig_ap;
 
@@ -891,5 +915,12 @@ ERROR:
         if(best_path){
                 MFREE(best_path);
         }
+        /* Leave the profiles and parameters as they were before the merge. */
+        if(m->consistency){
+                sparse_bonus_free(m->consistency);
+                m->consistency = NULL;
+        }
+        vsm_unshift_profiles(t, a, b, &vsm_save_a, &vsm_save_b);
+        m->ap = orig_ap;
         return FAIL;
 }

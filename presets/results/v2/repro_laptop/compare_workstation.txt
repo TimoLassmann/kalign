@@ -1,0 +1,15 @@
+arm                 n SP laptop   SP ws TC laptop   TC ws mean|dSP| max|dSP| SP within .001
+new fast          385    0.8328  0.8328    0.5251  0.5295    0.0005   0.0521          99.0%
+new accurate      385    0.8522  0.8523    0.5685  0.5728    0.0005   0.0210          97.7%
+3.7.0 fast        385    0.8294  0.8293    0.5164  0.5207    0.0004   0.0315          99.2%
+3.7.0 default     385    0.8242  0.8242    0.4965  0.5004    0.0005   0.0340          98.4%
+3.7.0 accurate    385    0.8482  0.8479    0.5385  0.5426    0.0006   0.0719          98.2%
+largest SP differences (laptop vs workstation):
+  3.7.0 accurate   BB20002    laptop 0.871  workstation 0.799
+  new fast         BB40002    laptop 0.434  workstation 0.486
+  3.7.0 accurate   BB40002    laptop 0.913  workstation 0.868
+  new fast         BB20002    laptop 0.396  workstation 0.353
+  3.7.0 default    BBS30015   laptop 0.897  workstation 0.863
+  3.7.0 fast       BB40002    laptop 0.723  workstation 0.691
+  3.7.0 default    BB40002    laptop 0.690  workstation 0.667
+  new accurate     BBS20031   laptop 0.895  workstation 0.874

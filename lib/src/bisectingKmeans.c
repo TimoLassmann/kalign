@@ -1,10 +1,5 @@
 #include "tldevel.h"
-#ifdef HAVE_OPENMP
-#include <omp.h>
-#endif
-#ifdef USE_THREADPOOL
 #include "threadpool.h"
-#endif
 
 #ifdef HAVE_AVX2
 #include <xmmintrin.h>
@@ -20,17 +15,17 @@
 /* #include "global.h" */
 #include "task.h"
 #include "sequence_distance.h"
+#include "guide_dist.h"
 #include "euclidean_dist.h"
 
 /* #include "alignment.h" */
 #include "pick_anchor.h"
 #include "esl_stopwatch.h"
 
-struct node{
-        struct node* left;
-        struct node* right;
-        int id;
-};
+#include "sl_tree.h"   /* struct node; single-linkage and hybrid guide trees */
+
+/* thread pool for the single-linkage trees (NULL: serial) */
+#define SL_POOL(msa) ((void*)(msa)->pool)
 
 struct kmeans_result{
         int* sl;
@@ -55,12 +50,21 @@ static void create_tasks(struct node*n, struct aln_tasks* t);
 static int bisecting_kmeans(struct msa* msa, struct node** ret_n,
                             const float * const * dm,
                             int* samples, int num_samples,
-                            pair_dist_fn leaf_dist);
+                            pair_dist_fn leaf_dist, void* leaf_ctx);
 /* static int bisecting_kmeans_parallel(struct msa* msa, struct node** ret_n, float** dm,int* samples, int num_samples); */
+
+/* One pending bisection: the samples to split and where to hang the result. */
+struct bjob {
+        struct node** ret_n;
+        int* samples;
+        int num_samples;
+};
+static int bisect_step(struct msa* msa, struct node** ret_n, const float * const * dm,
+                       int* samples, int num_samples, pair_dist_fn leaf_dist, void* leaf_ctx,
+                       struct bjob* out, int* nout);
 
 static int split2(const float * const * dm,const int* samples, const int num_anchors,const int num_samples,const int seed_pick,struct kmeans_result** ret);
 
-#ifdef USE_THREADPOOL
 /* Wrapper args for threadpool task submission */
 struct split2_task_arg {
         const float *const *dm;
@@ -77,22 +81,6 @@ static void split2_task_fn(void *arg)
         split2(a->dm, a->samples, a->num_anchors, a->num_samples, a->seed_idx, a->res);
 }
 
-struct bisect_task_arg {
-        struct msa *msa;
-        struct node **ret_n;
-        const float *const *dm;
-        int *samples;
-        int num_samples;
-        pair_dist_fn leaf_dist;
-};
-
-static void bisect_task_fn(void *arg)
-{
-        struct bisect_task_arg *a = (struct bisect_task_arg *)arg;
-        bisecting_kmeans(a->msa, a->ret_n, a->dm, a->samples, a->num_samples, a->leaf_dist);
-}
-#endif
-
 static inline int cmp_floats(const float a, const float b);
 
 inline int cmp_floats(const float a, const float b)
@@ -108,17 +96,57 @@ inline int cmp_floats(const float a, const float b)
 }
 
 /* Default leaf-cluster distance: BPM on raw internal sequences */
-static float** bpm_pair_dist(struct msa* msa, int* samples, int n)
+static float** bpm_pair_dist(struct msa* msa, int* samples, int n, void* ctx)
 {
+        (void)ctx;
         return d_estimation(msa, samples, n, 1);
 }
 
-int build_tree_kmeans_noisy(struct msa* msa, struct aln_tasks** tasks,
-                            uint64_t seed, float noise_sigma)
+/* UPGMA leaf distances on the run's tree distance (tree_kmeans_dist = 1) */
+static float** sl_pair_dist(struct msa* msa, int* samples, int n, void* ctx)
 {
+        (void)ctx;
+        return sl_pair_matrix(msa, samples, n);
+}
+
+/* Anchor distances used by bisecting k-means when a pairwise-alignment guide
+   distance is requested.  The top-level k-means is only reached when the
+   input has at least KALIGN_KMEANS_UPGMA_THRESHOLD (floored at 3) sequences;
+   below that the whole tree comes from the leaf distance, so the N x K
+   alignments are skipped. */
+static int guide_needs_anchor_dm(int numseq)
+{
+        int threshold = KALIGN_KMEANS_UPGMA_THRESHOLD;
+        if(threshold < 3) threshold = 3;
+        return numseq >= threshold;
+}
+
+static void free_anchor_dm(float** dm, int numseq)
+{
+        int i;
+        if(!dm){
+                return;
+        }
+        for(i = 0; i < numseq; i++){
+                if(dm[i]){
+#ifdef HAVE_AVX2
+                        _mm_free(dm[i]);
+#else
+                        MFREE(dm[i]);
+#endif
+                }
+        }
+        MFREE(dm);
+}
+
+int build_tree_kmeans_noisy(struct msa* msa, struct aln_tasks** tasks,
+                            uint64_t seed, float noise_sigma,
+                            struct guide_dist_ctx* gctx)
+{ KPERF_PHASE_REGION(KP_TREE, KPH_TREE);
         struct aln_tasks* t = NULL;
         struct node* root = NULL;
         float** dm = NULL;
+        float** dm_tree = NULL;
         int* samples = NULL;
         int* anchors = NULL;
         int num_anchors;
@@ -138,10 +166,24 @@ int build_tree_kmeans_noisy(struct msa* msa, struct aln_tasks** tasks,
                 LOG_MSG("Calculating pairwise distances (noisy, seed=%lu)", (unsigned long)seed);
         }
         START_TIMER(timer);
-        RUNP(anchors = pick_anchor(msa, &num_anchors));
-        RUNP(dm = d_estimation(msa, anchors, num_anchors, 0));
+        {
+                float** anchor_bpm = NULL;
+                RUNP(anchors = pick_anchor_dist(msa, &num_anchors, &anchor_bpm));
+                dm = d_estimation_cached(msa, anchors, num_anchors, 0, anchor_bpm);
+                pick_anchor_dist_free(anchor_bpm, numseq);
+                if(!dm) ERROR_MSG("d_estimation failed");
+        }
+        if(gctx && guide_needs_anchor_dm(numseq)){
+                RUNP(dm_tree = guide_dist_anchor_matrix(msa, gctx, anchors, num_anchors));
+        }
+        if(sl_kmeans_dist_override(msa)){
+                free_anchor_dm(dm_tree, numseq);
+                RUNP(dm_tree = sl_anchor_matrix(msa, anchors, num_anchors));
+        }
 
-        /* Add multiplicative Gaussian noise to distance matrix */
+        /* Add multiplicative Gaussian noise to distance matrix.
+           The same factor perturbs the pairwise-alignment anchor distances
+           (if used), so seq_distances stay identical to guide_dist = 0. */
         if(seed != 0 && noise_sigma > 0.0f){
                 struct rng_state* rng = NULL;
                 rng = init_rng(seed);
@@ -150,6 +192,9 @@ int build_tree_kmeans_noisy(struct msa* msa, struct aln_tasks** tasks,
                                 double noise = tl_random_gaussian(rng, 1.0, (double)noise_sigma);
                                 if(noise < 0.1) noise = 0.1;
                                 dm[i][j] *= (float)noise;
+                                if(dm_tree){
+                                        dm_tree[i][j] *= (float)noise;
+                                }
                         }
                 }
                 free_rng(rng);
@@ -171,13 +216,17 @@ int build_tree_kmeans_noisy(struct msa* msa, struct aln_tasks** tasks,
                 LOG_MSG("Building guide tree.");
         }
 
-#if !defined(USE_THREADPOOL)
-#ifdef HAVE_OPENMP
-#pragma omp parallel
-#pragma omp single nowait
-#endif
-#endif
-        bisecting_kmeans(msa, &root, (const float * const *)dm, samples, numseq, bpm_pair_dist);
+        if(sl_tree_mode(msa) == SL_MODE_PRIM || sl_tree_mode(msa) == SL_MODE_SLINK){
+                RUN(sl_build(msa, sl_tree_mode(msa), noise_sigma, seed, SL_POOL(msa), &root));
+        }else if(gctx){
+                bisecting_kmeans(msa, &root,
+                                 (const float * const *)(dm_tree ? dm_tree : dm),
+                                 samples, numseq, sl_kmeans_dist_override(msa) ? sl_pair_dist : guide_dist_pair_matrix, gctx);
+        }else{
+                bisecting_kmeans(msa, &root, (const float * const *)(dm_tree ? dm_tree : dm), samples, numseq,
+                                 sl_kmeans_dist_override(msa) ? sl_pair_dist : bpm_pair_dist, NULL);
+        }
+        ASSERT(root != NULL, "Guide tree construction failed.");
 
         STOP_TIMER(timer);
         if(!msa->quiet){
@@ -185,6 +234,8 @@ int build_tree_kmeans_noisy(struct msa* msa, struct aln_tasks** tasks,
         }
         label_internal(root, numseq);
         create_tasks(root, t);
+        free_anchor_dm(dm_tree, numseq);
+        dm_tree = NULL;
 
         /* Compute per-sequence normalized mean distance (noisy variant). */
         if(msa->seq_distances == NULL){
@@ -216,11 +267,13 @@ ERROR:
         return FAIL;
 }
 
-int build_tree_kmeans(struct msa* msa, struct aln_tasks** tasks)
-{
+int build_tree_kmeans(struct msa* msa, struct aln_tasks** tasks,
+                      struct guide_dist_ctx* gctx)
+{ KPERF_PHASE_REGION(KP_TREE, KPH_TREE);
         struct aln_tasks* t = NULL;
         struct node* root = NULL;
         float** dm = NULL;
+        float** dm_tree = NULL;
         int* samples = NULL;
         int* anchors = NULL;
         int num_anchors;
@@ -242,9 +295,23 @@ int build_tree_kmeans(struct msa* msa, struct aln_tasks** tasks)
                 LOG_MSG("Calculating pairwise distances");
         }
         START_TIMER(timer);
-        RUNP(anchors = pick_anchor(msa, &num_anchors));
-
-        RUNP(dm = d_estimation(msa, anchors, num_anchors,0));//les,int pair)
+        {
+                float** anchor_bpm = NULL;
+                RUNP(anchors = pick_anchor_dist(msa, &num_anchors, &anchor_bpm));
+                dm = d_estimation_cached(msa, anchors, num_anchors, 0, anchor_bpm);
+                pick_anchor_dist_free(anchor_bpm, numseq);
+                if(!dm) ERROR_MSG("d_estimation failed");
+        }
+        /* guide_dist = 1: tree from pairwise-alignment distances; the BPM
+           matrix above is still used for seq_distances (VSM, gap scaling,
+           consistency anchors), so only the guide tree changes. */
+        if(gctx && guide_needs_anchor_dm(numseq)){
+                RUNP(dm_tree = guide_dist_anchor_matrix(msa, gctx, anchors, num_anchors));
+        }
+        if(sl_kmeans_dist_override(msa)){
+                free_anchor_dm(dm_tree, numseq);
+                RUNP(dm_tree = sl_anchor_matrix(msa, anchors, num_anchors));
+        }
 
 
         STOP_TIMER(timer);
@@ -266,14 +333,18 @@ int build_tree_kmeans(struct msa* msa, struct aln_tasks** tasks)
         /* if(n_threads == 1){ */
         /*         RUN(bisecting_kmeans_serial(msa,&root, dm, samples, numseq)); */
         /* }else{ */
-#if !defined(USE_THREADPOOL)
-#ifdef HAVE_OPENMP
-#pragma omp parallel
-#pragma omp single nowait
-#endif
-#endif
-        bisecting_kmeans(msa,&root, (const float * const *)dm, samples, numseq, bpm_pair_dist);
+        if(sl_tree_mode(msa) == SL_MODE_PRIM || sl_tree_mode(msa) == SL_MODE_SLINK){
+                RUN(sl_build(msa, sl_tree_mode(msa), 0.0f, 0, SL_POOL(msa), &root));
+        }else if(gctx){
+                bisecting_kmeans(msa, &root,
+                                 (const float * const *)(dm_tree ? dm_tree : dm),
+                                 samples, numseq, sl_kmeans_dist_override(msa) ? sl_pair_dist : guide_dist_pair_matrix, gctx);
+        }else{
+                bisecting_kmeans(msa,&root, (const float * const *)(dm_tree ? dm_tree : dm), samples, numseq,
+                                 sl_kmeans_dist_override(msa) ? sl_pair_dist : bpm_pair_dist, NULL);
+        }
         /* } */
+        ASSERT(root != NULL, "Guide tree construction failed.");
 
         STOP_TIMER(timer);
         if(!msa->quiet){
@@ -282,6 +353,8 @@ int build_tree_kmeans(struct msa* msa, struct aln_tasks** tasks)
         label_internal(root, numseq);
 
         create_tasks(root, t);
+        free_anchor_dm(dm_tree, numseq);
+        dm_tree = NULL;
 
         /* Compute per-sequence normalized mean distance to anchors.
            Used for distance-dependent gap penalty scaling. */
@@ -314,9 +387,132 @@ ERROR:
         return FAIL;
 }
 
-int bisecting_kmeans(struct msa* msa, struct node** ret_n, const float * const * dm,
-                     int* samples, int num_samples, pair_dist_fn leaf_dist)
+/* Non-recursive driver for bisect_step.  Pending jobs live on a heap stack,
+   so C stack use does not depend on the depth of the tree.  With a thread
+   pool the left half of each split is handed to the pool (all tasks join one
+   group owned by the caller; no task waits on another) and the right half is
+   continued on the same thread.  The tree built does not depend on the
+   order in which jobs run. */
+struct bis_ctx {
+        struct msa* msa;
+        const float * const * dm;
+        pair_dist_fn leaf_dist;
+        void* leaf_ctx;
+        tp_group_t* g;
+};
+
+struct bis_task {
+        struct bis_ctx* ctx;
+        struct bjob job;
+};
+
+static int bis_run(struct bis_ctx* c, struct bjob first, int* first_status);
+
+static void bis_task_fn(void* arg)
 {
+        struct bis_task* bt = (struct bis_task*)arg;
+        struct bis_ctx* c = bt->ctx;
+        struct bjob j = bt->job;
+        free(bt);
+        bis_run(c, j, NULL);
+}
+
+static int bis_run(struct bis_ctx* c, struct bjob first, int* first_status)
+{
+        struct bjob* stack = NULL;
+        int cap = 64;
+        int top = 0;
+        int ret = OK;
+
+        stack = malloc(sizeof(struct bjob) * (size_t)cap);
+        if(!stack){
+                ERROR_MSG("out of memory");
+        }
+        stack[top++] = first;
+        while(top > 0){
+                struct bjob j = stack[--top];
+                struct bjob out[2];
+                int nout = 0;
+                int r = bisect_step(c->msa, j.ret_n, c->dm, j.samples, j.num_samples,
+                                    c->leaf_dist, c->leaf_ctx, out, &nout);
+                if(first_status){
+                        *first_status = r;
+                        first_status = NULL;
+                }
+                if(r != OK){
+                        ret = FAIL;
+                }
+                if(nout == 2){
+                        int k = 1;
+                        if(c->g){
+                                struct bis_task* bt = malloc(sizeof(struct bis_task));
+                                if(bt){
+                                        bt->ctx = c;
+                                        bt->job = out[0];
+                                        if(tp_group_submit(c->g, bis_task_fn, bt) == 0){
+                                                k = 1;
+                                                /* left submitted: continue with the right half only */
+                                                out[0] = out[1];
+                                                nout = 1;
+                                        }else{
+                                                free(bt);
+                                        }
+                                }
+                        }
+                        if(top + nout > cap){
+                                struct bjob* ns;
+                                cap *= 2;
+                                ns = realloc(stack, sizeof(struct bjob) * (size_t)cap);
+                                if(!ns){
+                                        ERROR_MSG("out of memory");
+                                }
+                                stack = ns;
+                        }
+                        /* push right first so that the left half is processed first */
+                        for(k = nout - 1; k >= 0; k--){
+                                stack[top++] = out[k];
+                        }
+                }
+        }
+        free(stack);
+        return ret;
+ERROR:
+        if(stack){
+                free(stack);
+        }
+        return FAIL;
+}
+
+int bisecting_kmeans(struct msa* msa, struct node** ret_n, const float * const * dm,
+                     int* samples, int num_samples, pair_dist_fn leaf_dist, void* leaf_ctx)
+{
+        struct bis_ctx c;
+        struct bjob root;
+        int status = OK;
+
+        c.msa = msa;
+        c.dm = dm;
+        c.leaf_dist = leaf_dist;
+        c.leaf_ctx = leaf_ctx;
+        root.ret_n = ret_n;
+        root.samples = samples;
+        root.num_samples = num_samples;
+        c.g = NULL;
+        if(msa->pool){
+                c.g = tp_group_create(msa->pool);
+        }
+        bis_run(&c, root, &status);
+        if(c.g){
+                tp_group_wait(c.g);
+                tp_group_destroy(c.g);
+        }
+        return status;
+}
+
+int bisect_step(struct msa* msa, struct node** ret_n, const float * const * dm,
+                int* samples, int num_samples, pair_dist_fn leaf_dist, void* leaf_ctx,
+                struct bjob* out, int* nout)
+{ KPERF_REGION(KP_TREE_KMEANS);
         struct kmeans_result* res_tmp = NULL;
         struct kmeans_result* best = NULL;
         /* struct kmeans_result** res = NULL; */
@@ -332,6 +528,8 @@ int bisecting_kmeans(struct msa* msa, struct node** ret_n, const float * const *
         int num_l,num_r;
 
         /* LOG_MSG("num_samples: %d", num_samples); */
+
+        *nout = 0;
 
         /* Base cases: 0 or 1 samples cannot be split further */
         if(num_samples <= 0){
@@ -350,11 +548,20 @@ int bisecting_kmeans(struct msa* msa, struct node** ret_n, const float * const *
         /* K-means needs at least 3 samples for a non-degenerate bisection.
            Floor the threshold to 3 so UPGMA handles tiny inputs safely. */
         {
-                int threshold = KALIGN_KMEANS_UPGMA_THRESHOLD;
+                int threshold = sl_kmeans_leaf(msa);
                 if(threshold < 3) threshold = 3;
+                if(num_samples < threshold && sl_kmeans_leaf_is_sl(msa)){
+                        /* hybrid tree: the group's subtree by single linkage */
+                        float nz = msa->tree.in_realign ? 0.0f : msa->tree.sl_noise;
+                        RUN(sl_build_subset(msa, samples, num_samples, SL_MODE_PRIM, nz,
+                                            nz > 0.0f ? msa->tree.sl_seed : 0, SL_POOL(msa), &n));
+                        *ret_n = n;
+                        MFREE(samples);
+                        return OK;
+                }
                 if(num_samples < threshold){
                         float** dm_local = NULL;
-                        RUNP(dm_local = leaf_dist(msa, samples, num_samples));
+                        RUNP(dm_local = leaf_dist(msa, samples, num_samples, leaf_ctx));
                         n = upgma(dm_local, samples, num_samples);
                         *ret_n = n;
                         gfree(dm_local);
@@ -384,7 +591,6 @@ int bisecting_kmeans(struct msa* msa, struct node** ret_n, const float * const *
         for(i = 0;i < tries;i += 4){
                 change = 0;
 
-#ifdef USE_THREADPOOL
                 {
                         struct split2_task_arg args[4];
                         for (int t = 0; t < 4; t++) {
@@ -401,27 +607,6 @@ int bisecting_kmeans(struct msa* msa, struct node** ret_n, const float * const *
                         tp_group_wait(g);
                         tp_group_destroy(g);
                 }
-#else
-#ifdef HAVE_OPENMP
-#pragma omp task shared(dm,samples,num_anchors, num_samples,i,step,res)
-#endif
-                split2(dm,samples,num_anchors, num_samples, ((i)*step) % num_samples, &res[0]);
-#ifdef HAVE_OPENMP
-#pragma omp task shared(dm,samples,num_anchors, num_samples,i,step,res)
-#endif
-                split2(dm,samples,num_anchors, num_samples, ((i+ 1)*step) % num_samples, &res[1]);
-#ifdef HAVE_OPENMP
-#pragma omp task shared(dm,samples,num_anchors, num_samples,i,step,res)
-#endif
-                split2(dm,samples,num_anchors, num_samples, ((i+ 2)*step) % num_samples, &res[2]);
-#ifdef HAVE_OPENMP
-#pragma omp task shared(dm,samples,num_anchors, num_samples,i,step,res)
-#endif
-                split2(dm,samples,num_anchors, num_samples, ((i+ 3)*step) % num_samples, &res[3]);
-#ifdef HAVE_OPENMP
-#pragma omp taskwait
-#endif
-#endif
 
                 for(j = 0; j < 4;j++){
                         if(!best){
@@ -464,33 +649,16 @@ int bisecting_kmeans(struct msa* msa, struct node** ret_n, const float * const *
         MFREE(samples);
         n = alloc_node();
 
-#ifdef USE_THREADPOOL
-        {
-                struct bisect_task_arg left_arg  = { msa, &n->left,  dm, sl, num_l, leaf_dist };
-                struct bisect_task_arg right_arg = { msa, &n->right, dm, sr, num_r, leaf_dist };
-                tp_group_t *g = tp_group_create(msa->pool);
-                tp_group_submit(g, bisect_task_fn, &left_arg);
-                tp_group_submit(g, bisect_task_fn, &right_arg);
-                tp_group_wait(g);
-                tp_group_destroy(g);
-        }
-#else
-#ifdef HAVE_OPENMP
-#pragma omp task shared(msa,n,dm)
-#endif
-        bisecting_kmeans(msa,&n->left, dm, sl, num_l, leaf_dist);
-
-#ifdef HAVE_OPENMP
-#pragma omp task shared(msa,n,dm,num_anchors)
-#endif
-        bisecting_kmeans(msa,&n->right, dm, sr, num_r, leaf_dist);
-
-#ifdef HAVE_OPENMP
-#pragma omp taskwait
-#endif
-#endif
-
-        *ret_n =n;
+        /* The two halves are bisected by the caller (bisecting_kmeans),
+           so this function does not recurse. */
+        out[0].ret_n = &n->left;
+        out[0].samples = sl;
+        out[0].num_samples = num_l;
+        out[1].ret_n = &n->right;
+        out[1].samples = sr;
+        out[1].num_samples = num_r;
+        *nout = 2;
+        *ret_n = n;
         return OK;
 ERROR:
         return FAIL;
@@ -884,53 +1052,116 @@ ERROR:
         return NULL;
 }
 
-int label_internal(struct node*n, int label)
-{
-        //n->d = d;
-        if(n->left){
-                label = label_internal(n->left, label);
-        }
-        if(n->right){
-                label = label_internal(n->right, label);
-        }
-        if(n->id == -1){
-                n->id = label;
-                label++;
-        }
-        return label;
+struct tree_frame {
+        struct node* n;
+        int st;
+};
 
+static void tree_stack_grow(void** stack, int* cap, size_t elem)
+{
+        void* ns;
+        *cap *= 2;
+        ns = realloc(*stack, elem * (size_t)*cap);
+        if(!ns){
+                fprintf(stderr, "out of memory in tree walk\n");
+                abort();
+        }
+        *stack = ns;
 }
 
-void create_tasks(struct node*n, struct aln_tasks* t)
+/* Post-order labelling (left, right, self), with an explicit stack. */
+int label_internal(struct node*n, int label)
 {
+        struct tree_frame* stack = NULL;
+        int cap = 64;
+        int top = 0;
 
-
-        if(n->left && n->right){
-                struct task* task;
-
-                task = t->list[t->n_tasks];
-                task->a = n->left->id;
-                task->b = n->right->id;
-                task->c = n->id;
-                /* task->p = depth; */
-                /* task->p = n->d; */
-                /* task->n = n->n; */
-                /* fprintf(stdout,"Node %d   depends on %d %d\n", n->id , n->left->id, n->right->id); */
-
-                t->n_tasks++;
+        stack = malloc(sizeof(struct tree_frame) * (size_t)cap);
+        if(!stack){
+                fprintf(stderr, "out of memory in tree walk\n");
+                abort();
         }
-        if(n->left){
-                create_tasks(n->left,t);
-        }
-        if(n->right){
-                create_tasks(n->right,t);
-        }
-        if(n->left){
-                if(n->right){
-                        MFREE(n->left);
-                        MFREE(n->right);
+        stack[top].n = n;
+        stack[top].st = 0;
+        top++;
+        while(top > 0){
+                struct tree_frame* f = &stack[top - 1];
+                struct node* child = NULL;
+                if(f->st == 0){
+                        f->st = 1;
+                        child = f->n->left;
+                }else if(f->st == 1){
+                        f->st = 2;
+                        child = f->n->right;
+                }else{
+                        if(f->n->id == -1){
+                                f->n->id = label;
+                                label++;
+                        }
+                        top--;
+                        continue;
+                }
+                if(child){
+                        if(top == cap){
+                                tree_stack_grow((void**)&stack, &cap, sizeof(struct tree_frame));
+                        }
+                        stack[top].n = child;
+                        stack[top].st = 0;
+                        top++;
                 }
         }
+        free(stack);
+        return label;
+}
+
+/* Pre-order task emission, with an explicit stack.  As before, the two
+   children of a node that has both are freed once visited. */
+void create_tasks(struct node*n, struct aln_tasks* t)
+{
+        struct tree_frame* stack = NULL;   /* st: 1 = free node after visiting */
+        int cap = 64;
+        int top = 0;
+
+        stack = malloc(sizeof(struct tree_frame) * (size_t)cap);
+        if(!stack){
+                fprintf(stderr, "out of memory in tree walk\n");
+                abort();
+        }
+        stack[top].n = n;
+        stack[top].st = 0;
+        top++;
+        while(top > 0){
+                struct node* x = stack[--top].n;
+                int free_it = stack[top].st;
+                struct node* l = x->left;
+                struct node* r = x->right;
+                if(l && r){
+                        struct task* task;
+                        task = t->list[t->n_tasks];
+                        task->a = l->id;
+                        task->b = r->id;
+                        task->c = x->id;
+                        t->n_tasks++;
+                }
+                if(top + 2 > cap){
+                        tree_stack_grow((void**)&stack, &cap, sizeof(struct tree_frame));
+                }
+                /* push right first so that the left subtree is emitted first */
+                if(r){
+                        stack[top].n = r;
+                        stack[top].st = (l != NULL);
+                        top++;
+                }
+                if(l){
+                        stack[top].n = l;
+                        stack[top].st = (r != NULL);
+                        top++;
+                }
+                if(free_it){
+                        MFREE(x);
+                }
+        }
+        free(stack);
 }
 
 
@@ -976,7 +1207,7 @@ void free_kmeans_results(struct kmeans_result* k)
 int build_tree_kmeans_from_dm(struct msa* msa, struct aln_tasks** tasks,
                                float** dm, int num_anchors,
                                pair_dist_fn leaf_dist)
-{
+{ KPERF_PHASE_REGION(KP_TREE, KPH_TREE);
         struct aln_tasks* t = NULL;
         struct node* root = NULL;
         int* samples = NULL;
@@ -1000,13 +1231,7 @@ int build_tree_kmeans_from_dm(struct msa* msa, struct aln_tasks** tasks,
 
         /* Bisecting k-means — same parallel algorithm as initial tree.
            Note: bisecting_kmeans() takes ownership of samples and frees it. */
-#if !defined(USE_THREADPOOL)
-#ifdef HAVE_OPENMP
-#pragma omp parallel
-#pragma omp single nowait
-#endif
-#endif
-        bisecting_kmeans(msa, &root, (const float * const *)dm, samples, numseq, leaf_dist);
+        bisecting_kmeans(msa, &root, (const float * const *)dm, samples, numseq, leaf_dist, NULL);
         samples = NULL;  /* owned and freed by bisecting_kmeans */
         ASSERT(root != NULL, "Bisecting k-means tree construction failed.");
 
@@ -1037,7 +1262,7 @@ ERROR:
 }
 
 int build_tree_from_pairwise(struct msa* msa, struct aln_tasks** tasks, float** dm)
-{
+{ KPERF_PHASE_REGION(KP_TREE, KPH_TREE);
         struct aln_tasks* t = NULL;
         struct node* root = NULL;
         int* samples = NULL;

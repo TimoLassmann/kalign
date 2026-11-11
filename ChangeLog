@@ -1,3 +1,296 @@
+2026-11-10  Timo Lassmann  <timolassmann@icloud.com>
+
+	* version 4.0.0 - Two modes, fast (the default) and accurate, each with
+	  a protein and a DNA/RNA setting fitted by grouped nested
+	  cross-validation and scored on held-out data. First release since
+	  3.6.0: it includes the unreleased 3.6.1 and 3.7.0 and the 4.0.0
+	  pre-release entries below, whose mode settings are all replaced.
+	- Modes: "fast" (single run; "default" is an alias) and "accurate"
+	  (5-member ensemble with per-column confidence; "recall" is an
+	  alias). The sequence type is detected from the input.
+	- Settings (parameter key, pick file under presets/results):
+	  protein fast 0976900c (fastfit/final_pick.json); protein accurate
+	  be5c0b5a (ensconf/final_pick.json); DNA/RNA fast 64d6da0a
+	  (nucfit/fast_final_pick.json); DNA/RNA accurate 7263e4b4
+	  (nucfit/accurate_final_pick.json). Each is the final fit on all
+	  training data. Fast: NSGA-III search, knee of the front. Accurate:
+	  NSGA-III ensemble search, then a grid over guide-tree noise and
+	  consensus support; the 5 members share member 1's (the fast
+	  setting's) guide tree with seeded single-linkage tree noise (protein
+	  0.05, DNA/RNA 0.2); consensus min_support 2 (a residue pair joins
+	  two columns only when at least 2 members align it). Plans, amendments and records: presets/docs; the
+	  fit code: presets/recipe.
+	- lib/src/mode_presets.h is generated from the four pick files by
+	  presets/release/emit_c_presets.py; tests/preset_golden.cmake checks
+	  that the CLI reproduces the evaluated parameter path byte for byte
+	  (protein and nucleotide, fast and accurate).
+	- accurate refuses inputs above 5,000 sequences, protein and DNA/RNA
+	  alike (KALIGN_ACCURATE_MAX_SEQ).
+	- --type (CLI) / seq_type (Python): auto, protein, dna or rna. A
+	  given type overrides detection and selects that type's settings;
+	  a mismatch with detection gives a warning, not an error. Also
+	  applies with --add. The values internal, divergent and pfasum*
+	  are removed. Letters outside the chosen alphabet (e.g. protein
+	  letters under --type dna) are scored as 'A' and reported in one
+	  warning per input ("N characters not in the DNA/RNA alphabet (...)
+	  were scored as 'A'"), not one warning per character.
+	- New run option tree_sl_noise: seeded noise on the single-linkage
+	  subtrees of the hybrid guide tree (default 0, no change).
+	- Fix: kalign_msa_compare, _detailed and _with_mask paired the i-th
+	  reference sequence with the i-th test sequence after sorting and
+	  never checked that they were the same sequence; with extra, missing
+	  or changed sequences they compared the wrong rows or read past the
+	  end. Sequences are now matched by name and residues; extra test
+	  sequences are ignored; a missing or changed reference sequence is an
+	  error. Scores of matching inputs are unchanged. TC scoring keeps a
+	  running residue count (same result, faster).
+	- Fix: accurate mode with several threads crashed (SIGBUS) on macOS
+	  for inputs with deep guide trees (e.g. 2,000 near-identical
+	  sequences): the tree walks recursed once per tree level on 512 KB
+	  worker stacks. The walks no longer recurse; worker stacks are 64 MB
+	  (KALIGN_TP_STACK_SIZE). Output is unchanged.
+	- OpenMP removed: the built-in thread pool (pthreads) is the only
+	  parallel backend; the USE_OPENMP and USE_THREADPOOL CMake options
+	  are gone. With -n 1 no worker thread is started. Supported
+	  platforms: Linux and macOS. Output is unchanged.
+	- Faster, output unchanged (byte-identical to the evaluated 4.0.0
+	  code on all 14,475 paper alignments and 30,406 thread-identity
+	  comparisons, x86-64 with and without AVX2; macOS/ARM test set
+	  1,764/1,764). Consensus building in accurate mode: merge loop,
+	  parallel no-op prefilter and radix sort, pair enumeration limited
+	  to the support levels a pass needs, all ensemble members scored in
+	  one pass that also counts the consensus candidates. Guide trees:
+	  the LCS (protein) and Myers (DNA/RNA) distances run with a fixed
+	  block count per sequence length, several pairs per vector (AVX2
+	  on x86-64, NEON on ARM, scalar otherwise). Anchor positions
+	  without a column map. Idle worker threads search 1000 times before
+	  they park. Speed-up over the evaluated code on x86-64: accurate
+	  protein 1.8-2.0x on 1 thread, 3.0-4.8x on 16; accurate DNA/RNA
+	  1.6-1.9x; fast protein 1.1-2.5x; fast DNA/RNA 1.6x on 1 thread,
+	  3.2x on 16.
+	- Threads: at most the number of cores (sysconf); a larger -n or
+	  n_threads is reduced with a warning (more threads than cores only
+	  slowed the run down).
+	- Fix: malformed input ended in a crash. One sequence, or a header
+	  without sequence, freed the alignment twice; an empty sequence among
+	  others crashed refinement (it is dropped again, as in 3.6.0); a
+	  byte above 127 in sequences passed through the C API or Python
+	  wrote outside the letter table (now an error). Empty input, an
+	  unknown format and an unwritable output file give a clear error.
+	  Python exceptions carry the reason from the library
+	  (kalign_last_error, kalign_clear_error in the C API).
+	- Fix: data race on the VSM debug flag in accurate mode (harmless,
+	  reported by ThreadSanitizer).
+	- Python source package: only what building and testing needs (12 MB
+	  -> 0.36 MB); experiments, preset fitting, benchmarks and development
+	  notes are left out.
+	- Library ABI: SOVERSION 4 (as 3.7.0).
+
+2026-10-15  Timo Lassmann  <timolassmann@icloud.com>
+
+	* Protein fast preset replaced by the fast-fit setting 0976900c (one
+	  run, member gap model, k-means + Prim guide tree), chosen by nested
+	  cross-validation and confirmed on a lockbox; record and results in
+	  presets/docs/fastfit/RECORD_protein_fast.md.
+	- fast is now the default mode; "default" is an alias of "fast",
+	  "recall" stays an alias of "accurate".
+	- Run configs and presets take the member gap model, the guide-tree
+	  options and, per ensemble member, sequence weights, realign,
+	  consistency and VSM mode. Other presets' output is unchanged.
+
+2026-10-08  Timo Lassmann  <timolassmann@icloud.com>
+
+	* 4.0.0 pre-release (not released; its modes were replaced, see
+	  2026-11-10) - Two modes per sequence type, fast and accurate,
+	  chosen by pooled nested cross-validation (presets/results/v2)
+	- Modes: "fast" and "accurate"; "default" and "recall" are aliases of
+	  "accurate", which is now the default. Protein accurate is a 5-run
+	  ensemble; nucleotide accurate is a single run with consistency
+	  anchors and realignment.
+	- The parameters are generated into lib/src/mode_presets.h from
+	  presets/results/v2/presets_v2.json by
+	  presets/release/emit_c_presets.py; the CLI and the Python mode API
+	  reproduce the evaluated parameter path byte for byte
+	  (tests/preset_golden.cmake, presets/release/equiv_check.py).
+	- Library ABI unchanged (SOVERSION 4).
+	- Accurate (ensemble) mode memory: the per-sequence-pair POAR table is
+	  replaced by per-run residue-to-column maps; pairs are derived on
+	  demand. Peak memory 2-9% of before at 1,000 sequences, 17-26% faster,
+	  output byte-identical; no 32-bit overflow above 46,340 sequences.
+	- Fix: stack overflow with many sequences and threads (e.g. fast mode at
+	  200,000 sequences): waiting threads nested unrelated tasks without
+	  bound; foreign-task nesting is now capped (threadpool). Output unchanged.
+	- Fix: in accurate mode, residues x and x + 4096 of a sequence longer
+	  than 4096 residues shared a POAR key, so their pair support was
+	  merged. Keys are now 64-bit; output changes only for inputs with such
+	  a sequence. POAR files are written as version 2 (version 1 still read).
+	- Fix: memory leak on consensus-building error paths.
+	- Removed the --load-poar command-line option (no Kalign command writes POAR
+	  files any more) and --min-support, which only that path used;
+	  kalign_consensus_from_poar stays in the C API.
+
+2026-10-03  Timo Lassmann  <timolassmann@icloud.com>
+
+	* version 3.7.0 - New protein default/accurate presets; new alignment
+	  mechanisms; DP correctness fixes; 2-3x faster; library SOVERSION 4
+	- Includes 3.6.1 (never released separately; see below).
+	- Speed-ups (they leave the output byte-identical on the same
+	  platform: BAliBASE 3 (218 cases x 3 modes), BRAliBASE (481 x 4
+	  modes), simulated sets and tests/data in all modes, 1 to 16
+	  threads, on Apple M3 (NEON) and AMD Threadripper 3970X (AVX2)):
+	  - Guide tree: the sequence-to-anchor BPM distances computed while
+	    picking anchors are reused instead of recomputed, and each pair of
+	    a leaf cluster is computed once instead of twice.
+	  - BPM: the match table is built in one pass over the pattern; the
+	    block step is branch-free; a SIMD block wavefront (NEON from 6
+	    blocks, AVX2 from 2 blocks) processes several 64-bit blocks at once.
+	  - Ensembles: POAR extraction merges each sequence pair's residue
+	    pairs in one pass, and scoring scans instead of binary-searching.
+	  - DP: wavefront SIMD forward/backward passes for seq-seq,
+	    seq-profile and profile-profile alignment (lib/src/aln_wave.c,
+	    generated from perf/dp/kernels; NEON and AVX2 through
+	    lib/src/wave_simd.h), on by default (CMake option KALIGN_WAVE);
+	    builds without NEON/AVX2 and MSVC use the scalar kernels.
+	  - Threads: refinement (default mode) runs the two subtrees of every
+	    guide-tree node concurrently, its DP passes run forward/backward in
+	    parallel, and its trials run concurrently; parallel loops use 4
+	    chunks per thread so the pairwise (j > i) loops balance.  Default
+	    mode at 8-32 threads goes from 1.3-1.7x to 2.4-7.4x over one thread
+	    (x86, simulated N50-N2000); accurate 15-35% faster at 4+ threads.
+	  - perf/dp: profiling and DP benchmark harness (KALIGN_PERF, off by
+	    default) used to develop and verify the kernels.
+	  - Single thread, vs the same code without them: x86 fast 2.89x,
+	    default 2.45x, accurate 2.70x (BAliBASE accurate 1003 s ->
+	    318 s); M3 fast 2.39x, default 1.91x, accurate 2.03x.
+	  - Note: ARM and x86 builds can differ in near-tie cases because the
+	    profile-profile score is a fused multiply-add on AArch64 and a
+	    separate multiply and add on x86 without FMA (BAliBASE: 9/218
+	    fast, 8/218 default, 51/218 accurate outputs differ; F1/TC
+	    differences under 0.001).
+	- New mechanisms (all opt-in through kalign_run_config /
+	  kalign_ensemble_config, CLI flags and the Python bindings):
+	  - Per-merge variable scoring matrix (vsm_mode = 1, --vsm-mode,
+	    --vsm-kappa, --vsm-dzero): the substitution offset is computed
+	    for each profile merge from the distance between the two groups
+	    and bounded by the gap penalties. vsm_mode = 0 keeps the legacy
+	    VSM.
+	  - Guide-tree distances from pairwise global alignments
+	    (guide_dist = 1, --guide-dist 1): Kimura (protein) or
+	    Jukes-Cantor (DNA/RNA) corrected distances with the run's matrix
+	    and gap penalties. guide_dist = 0 keeps the BPM edit distance.
+	  - Consensus fill-in for ensembles (fill_in, --fill-in,
+	    --fill-anchor-frac, --fill-support): residues the POAR consensus
+	    leaves in columns of their own can be realigned between anchor
+	    columns, projected from the best run, or attached to an existing
+	    column.
+	  - Input validation for the new CLI and Python parameters; state is
+	    restored on VSM error paths.
+	- Correctness fixes in the DP kernels (seq-seq, seq-profile and
+	  profile-profile; these change the output of every mode):
+	  - A match entering or leaving a terminal row gap at the far end of
+	    the forward (last column) or backward (first column) pass was not
+	    charged the gap-open penalty that every other terminal-gap
+	    transition pays, so a gap's price depended on which Hirschberg
+	    half it fell in and on argument order.
+	  - The Hirschberg meetup priced a row gap continuing across the
+	    split row with the terminal extension at every column whenever
+	    the sub-problem started in column 0; interior columns now pay the
+	    gap extension and terminal columns nothing (both halves already
+	    carry those rows' cost).
+	  - The backward profile kernels charged gap extension with the
+	    profile slot of the previous gap residue instead of the residue
+	    being added, as the forward kernels, the profile setup and the
+	    path scoring do.
+	  - The forward kernels looked up the consistency bonus one column
+	    off (the bonus for pair a_i, b_k was credited to a_i, b_(k-1));
+	    this affects modes with consistency anchors (3.7.0 default).
+	  With the fixes the forward total equals the backward total and an
+	  independent full-matrix DP, the returned path is optimal, and
+	  aligning (A,B) and (B,A) gives the same score, on 60,000 random
+	  problems and on 216 problems captured from real runs, with the
+	  consistency bonus on and off; before the fixes about 10-15% of
+	  random paths were suboptimal and 14-23% depended on argument order.
+	  Measured effect on alignment quality (60 BAliBASE cases, 192 WAG
+	  simulations; development data) is within +/-0.006 on SP,
+	  precision, F1 and TC in every mode (e.g. default F1 +0.004
+	  BAliBASE, +0.002 WAG).
+	- Changed protein presets (confirmed on held-out data before
+	  adoption; 3.6.1 = shipped):
+	  - default: new single-run preset (consistency anchors, realign,
+	    refinement, lower VSM amplitude).
+	  - accurate: new 5-run ensemble (per-merge VSM, pairwise-alignment
+	    guide trees in 3 of 5 runs, min_support 2).
+	  - recall: now the SAME preset as accurate; for protein input
+	    recall is an alias of accurate.
+	  - fast: unchanged (the candidate missed the tree-accuracy
+	    non-inferiority margin by 0.0009, so the shipped preset is kept).
+	  - Nucleotide (DNA/RNA) presets: unchanged.
+	- Held-out confirmation, 192 simulated LG alignments (co-primary
+	  outcomes; difference new - 3.6.1, nRF lower is better; measured on
+	  the code before the DP correctness fixes above):
+	  - default:  TC +0.047, F1 +0.030, nRF -0.009 (not significant).
+	  - recall:   nRF -0.047, TC +0.027, F1 +0.014.
+	  - accurate: nRF -0.083, TC +0.046, F1 -0.0045 (a real loss, within
+	    the pre-registered -0.010 margin).
+	  PREFAB 4 (1390 cases), Q: default +0.079, accurate +0.064,
+	  recall +0.0005.
+	  Re-measured with the released code (fixes and speed-ups, same
+	  presets): LG sims default nRF 0.183, TC 0.699, F1 0.762;
+	  accurate/recall nRF 0.164, TC 0.712, F1 0.784; fast nRF 0.196,
+	  TC 0.642, F1 0.704. PREFAB 4 Q: default 0.639, accurate 0.655,
+	  fast 0.636. Single-thread CPU (M3 Max): LG 2 / 12 / 54 s and
+	  PREFAB 23 / 117 / 769 s for fast / default / accurate (MAFFT
+	  L-INS-i 132 s and 1,121 s).
+	- Trade-off: the new default and accurate/recall presets favour
+	  recall, column accuracy (TC) and the accuracy of trees inferred
+	  from the alignment. The high precision of the old accurate preset
+	  is not retained (LG simulations: precision 0.883 -> 0.777, recall
+	  0.743 -> 0.793; PREFAB 4 precision 0.781 -> 0.668). With the
+	  speed-ups the new default takes about 1.2x the CPU time of the old
+	  one (LG 12 vs 10 s, PREFAB 117 vs 101 s); accurate takes about half
+	  (54 vs 141 s, 769 vs 1,431 s).
+	- Fill-in: the confirmed ensemble was selected with fill_in = attach
+	  and fill_support 5; with min_support 2 attach never applies, so the
+	  outputs are byte-identical to fill-in off. The preset uses
+	  fill_in = off.
+	- The C presets reproduce the confirmed parameter sets byte for byte
+	  through the Python ensemble path (new ctest kalign_preset_golden;
+	  golden hashes regenerated with tests/preset_golden_regen.py after
+	  the DP correctness fixes, so they differ from the alignments of
+	  the confirmation run).
+	- ABI: kalign_run_config and kalign_ensemble_config gained fields
+	  and kalign_run_config_defaults() / kalign_ensemble_config_defaults()
+	  return them by value, so the C ABI changed. The shared library
+	  SOVERSION is now set independently of the project version and is 4
+	  (libkalign.so.4); code linked against earlier 3.x libraries must be
+	  recompiled.
+
+2026-09-30  Timo Lassmann  <timolassmann@icloud.com>
+
+	* version 3.6.1 - Bug fix: ensemble consensus could scramble residues
+	- Fixed a bug in ensemble consensus building (recall and accurate
+	  modes) that could reorder residues within output sequences. The
+	  column-ordering cycle check used a fixed 4096-entry queue and
+	  silently stopped searching when it filled; the missed cycle was then
+	  broken by the final column sort, placing residues out of order.
+	  Affected inputs are those with wide consensus alignments (> ~4096
+	  columns): on BAliBASE 3, 2/218 cases in accurate mode and 3/218 in
+	  recall mode returned scrambled sequences. Output sequences are now
+	  checked to occupy strictly increasing columns.
+	- Consensus columns are now ordered with an online topological order
+	  (Pearce-Kelly), which also makes consensus building much faster on
+	  large inputs (e.g. 493 sequences: accurate mode 47.8 s -> 8.9 s).
+	- Output changes: fast and default modes are byte-identical to 3.6.0.
+	  In recall and accurate modes the aligned residue pairs are identical
+	  except where 3.6.0 produced corrupted output; columns that are not
+	  ordered by any sequence may appear in a different order. In recall
+	  mode a correct consensus can now outscore the single best run where
+	  the corrupted one did not (5/218 BAliBASE cases).
+	- n_threads = 1 now runs on one thread (previously the thread pool
+	  added a worker thread next to the calling thread). Output unchanged.
+	- New regression test: consensus preserves residue order
+	  (kalign_ensemble_test_long on BB40023).
+
 2026-05-16  Timo Lassmann  <timolassmann@icloud.com>
 
 	* version 3.6.0 - Drop Python 3.9/3.10 support; CI Node 24 upgrade

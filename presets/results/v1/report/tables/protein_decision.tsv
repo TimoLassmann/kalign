@@ -1,0 +1,5 @@
+mode	dSP (bench-weighted)	dTC (bench-weighted)	dPrecision (bench-weighted)	dSP (case)	dTC (case)	CPU ratio new/3.7.0 (4 workers, final core)	ships	reason
+fast	+0.0010 [-0.0014, +0.0033]	+0.0006 [-0.0042, +0.0058]	-0.0021 [-0.0042, -0.0002]	+0.0014 [-0.0010, +0.0038]	+0.0012 [-0.0014, +0.0038]	1.00	no	3.7.0 stays: OOF rule not met
+default	+0.0030 [-0.0018, +0.0087]	+0.0149 [+0.0048, +0.0264]	+0.0447 [+0.0396, +0.0511]	-0.0040 [-0.0082, -0.0001]	+0.0009 [-0.0040, +0.0057]	1.02	yes	ships: OOF rule met, within budget
+recall	-0.0047 [-0.0084, -0.0012]	+0.0069 [-0.0017, +0.0150]	+0.0426 [+0.0384, +0.0477]	-0.0098 [-0.0132, -0.0062]	-0.0056 [-0.0097, -0.0014]	1.05	yes	ships: OOF rule met, within budget
+accurate	-0.0047 [-0.0084, -0.0012]	+0.0069 [-0.0017, +0.0150]	+0.0426 [+0.0384, +0.0477]	-0.0098 [-0.0132, -0.0062]	-0.0056 [-0.0097, -0.0014]	1.05	yes	ships: OOF rule met, within budget

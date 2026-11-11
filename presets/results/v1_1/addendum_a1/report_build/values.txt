@@ -1,0 +1,2 @@
+SPEED_OBS = 3.7.0 is faster in all eight pool and mode combinations, by 1.6 to 2.5 times except protein default (1.1 times), whose 3.7.0 preset refines every alignment fully where the 3.6.1 preset refined inline; that preset change also raised protein default SP from 0.694 to 0.738.
+TRADEOFF_NUC_OBS = Kalign 3.6.1 and 3.7.0 differ in CPU, not in accuracy (SP within 0.004 in every mode); the re-fitted default and accurate presets lose SP and TC against 3.7.0, and MUSCLE 5 is the most accurate program at about 26 times the CPU of Kalign accurate.

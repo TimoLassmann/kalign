@@ -1,0 +1,689 @@
+{
+ "fit": "final",
+ "rule": "DECISION_fastfit_selection.md",
+ "n_eligible": 31,
+ "registered_fast": {
+  "key": "0ac3c505ce70f4e4ac0e8a65b440a572a485ec395c5a481525a661720cf7ed72",
+  "source": "search gen 69",
+  "params": {
+   "n_runs": 1,
+   "run_gpo": [
+    7.925380917127636
+   ],
+   "run_gpe": [
+    1.8189591382917123
+   ],
+   "run_tgpe": [
+    0.5810005238161691
+   ],
+   "run_noise": [
+    0.0
+   ],
+   "run_types": [
+    1
+   ],
+   "run_vsm_amax": [
+    0.07379241723300056
+   ],
+   "run_refine": [
+    0
+   ],
+   "run_vsm_kappa": [
+    1.0
+   ],
+   "run_vsm_dzero": [
+    1.0
+   ],
+   "run_guide_dist": [
+    0
+   ],
+   "seq_weights": 2.8012471630813027,
+   "consistency": 0,
+   "consistency_weight": 1.0,
+   "realign": 0,
+   "min_support": 0,
+   "consistency_merge": 0,
+   "consistency_merge_weight": 2.0,
+   "vsm_mode": 0,
+   "fill_in": 0,
+   "fill_anchor_frac": 0.0,
+   "fill_support": 1,
+   "run_tree_method": [
+    3
+   ],
+   "run_tree_dist": [
+    2
+   ],
+   "run_tree_alpha": [
+    0
+   ],
+   "run_tree_maxlen": [
+    1024
+   ],
+   "run_tree_leaf": [
+    1952
+   ],
+   "run_tree_kmeans_dist": [
+    0
+   ],
+   "run_realign_tree": [
+    1
+   ]
+  },
+  "short": "n=1 P43 gpo=7.93 vsm0 amax=0.07 gd=0 c=0 re=0 sw=2.80 | tree=kmeans+Prim leaf=1952 dist=lcs alpha=red kmdist=bpm rt=1",
+  "core": {
+   "q_small": 0.7141411519716082,
+   "sp_small": 0.7876595171029853,
+   "tc_small": 0.6406227868402314,
+   "q_large": 0.6988255938483661,
+   "per_k": {
+    "1000": {
+     "q": 0.7400047268305691,
+     "sp": 0.8059326216070476,
+     "tc": 0.6740768320540903,
+     "n": 308
+    },
+    "10000": {
+     "q": 0.657646460866163,
+     "sp": 0.73428669965962,
+     "tc": 0.581006222072706,
+     "n": 257
+    }
+   },
+   "cpu_small": 17.953907999999913,
+   "cpu_large": 3103.033241999999,
+   "cpu_ratio_small": 0.36121858965045867,
+   "cpu_ratio_large": 0.6835172110622701,
+   "R": 0.49688944744452773,
+   "feasible": true
+  }
+ },
+ "registered_fast_is_fallback": false,
+ "registered_ultra": {
+  "key": "6f4f7b159ca876b2c0e5dbc1ae242db4e7dcdc9ed6600d7980d7f4f69535ff53",
+  "source": "search gen 86",
+  "params": {
+   "n_runs": 1,
+   "run_gpo": [
+    7.725072654973048
+   ],
+   "run_gpe": [
+    1.9052884705144753
+   ],
+   "run_tgpe": [
+    0.761984771570014
+   ],
+   "run_noise": [
+    0.0
+   ],
+   "run_types": [
+    1
+   ],
+   "run_vsm_amax": [
+    0.06683104985227413
+   ],
+   "run_refine": [
+    0
+   ],
+   "run_vsm_kappa": [
+    1.0
+   ],
+   "run_vsm_dzero": [
+    1.0
+   ],
+   "run_guide_dist": [
+    0
+   ],
+   "seq_weights": 3.896444637177141,
+   "consistency": 0,
+   "consistency_weight": 1.0,
+   "realign": 0,
+   "min_support": 0,
+   "consistency_merge": 0,
+   "consistency_merge_weight": 2.0,
+   "vsm_mode": 0,
+   "fill_in": 0,
+   "fill_anchor_frac": 0.0,
+   "fill_support": 1,
+   "run_tree_method": [
+    3
+   ],
+   "run_tree_dist": [
+    2
+   ],
+   "run_tree_alpha": [
+    1
+   ],
+   "run_tree_maxlen": [
+    1024
+   ],
+   "run_tree_leaf": [
+    54
+   ],
+   "run_tree_kmeans_dist": [
+    0
+   ],
+   "run_realign_tree": [
+    1
+   ]
+  },
+  "short": "n=1 P43 gpo=7.73 vsm0 amax=0.07 gd=0 c=0 re=0 sw=3.90 | tree=kmeans+Prim leaf=54 dist=lcs alpha=full kmdist=bpm rt=1",
+  "core": {
+   "q_small": 0.7124850900962437,
+   "sp_small": 0.7876611507632509,
+   "tc_small": 0.6373090294292366,
+   "q_large": 0.6279636878253994,
+   "per_k": {
+    "1000": {
+     "q": 0.6733973237636269,
+     "sp": 0.7496575710101904,
+     "tc": 0.5971370765170633,
+     "n": 308
+    },
+    "10000": {
+     "q": 0.5825300518871717,
+     "sp": 0.6633802032391584,
+     "tc": 0.5016799005351851,
+     "n": 257
+    }
+   },
+   "cpu_small": 15.842392000000018,
+   "cpu_large": 1189.0608390000011,
+   "cpu_ratio_small": 0.3187365388599375,
+   "cpu_ratio_large": 0.2619190595369858,
+   "R": 0.2889345505443556,
+   "feasible": true
+  }
+ },
+ "gm1": {
+  "key": "a57f36fe170ec32dc76d2e30edeee7448a7a92132eb3321f2e1ec55f4eb5e4dc",
+  "source": "gm1 fast preset",
+  "params": {
+   "n_runs": 1,
+   "run_gpo": [
+    7.833692432618236
+   ],
+   "run_gpe": [
+    0.9463291267641571
+   ],
+   "run_tgpe": [
+    2.697449842806514
+   ],
+   "run_noise": [
+    0.0
+   ],
+   "run_types": [
+    1
+   ],
+   "run_vsm_amax": [
+    0.7154252391041576
+   ],
+   "run_refine": [
+    0
+   ],
+   "run_vsm_kappa": [
+    1.0
+   ],
+   "run_vsm_dzero": [
+    1.0
+   ],
+   "run_guide_dist": [
+    0
+   ],
+   "seq_weights": 3.6221996245704107,
+   "consistency": 2,
+   "consistency_weight": 0.6357651696858546,
+   "realign": 1,
+   "min_support": 0,
+   "consistency_merge": 0,
+   "consistency_merge_weight": 2.0,
+   "vsm_mode": 0,
+   "fill_in": 0,
+   "fill_anchor_frac": 0.0,
+   "fill_support": 1,
+   "run_tree_method": [
+    0
+   ],
+   "run_tree_dist": [
+    0
+   ],
+   "run_tree_alpha": [
+    0
+   ],
+   "run_tree_maxlen": [
+    1024
+   ],
+   "run_tree_leaf": [
+    50
+   ],
+   "run_tree_kmeans_dist": [
+    0
+   ],
+   "run_realign_tree": [
+    1
+   ]
+  },
+  "short": "n=1 P43 gpo=7.83 vsm0 amax=0.72 gd=0 c=2 re=1 sw=3.62 | tree=kmeans+WPGMA leaf=50 dist=myers alpha=red kmdist=bpm rt=1",
+  "core": {
+   "q_small": 0.720444755585573,
+   "sp_small": 0.7937137871335512,
+   "tc_small": 0.6471757240375948,
+   "q_large": 0.5019254689176366,
+   "per_k": {
+    "1000": {
+     "q": 0.5696511250570068,
+     "sp": 0.6487211084513038,
+     "tc": 0.49058114166270966,
+     "n": 308
+    },
+    "10000": {
+     "q": 0.4341998127782663,
+     "sp": 0.5137931492020876,
+     "tc": 0.3546064763544448,
+     "n": 257
+    }
+   },
+   "cpu_small": 42.446702000000016,
+   "cpu_large": 4504.187552999996,
+   "cpu_ratio_small": 0.853994452447533,
+   "cpu_ratio_large": 0.9921549252703589,
+   "R": 0.9204861770550296,
+   "feasible": true
+  }
+ },
+ "n_within": 11,
+ "knee": {
+  "key": "0976900cd9cc212935e8c848cbb3a377e77ec8ee1578efb35b64f49193e5dae0",
+  "why": "cheapest of 11 within 1.96 SE of the best",
+  "params": {
+   "n_runs": 1,
+   "run_gpo": [
+    7.920942106089958
+   ],
+   "run_gpe": [
+    1.18381621775931
+   ],
+   "run_tgpe": [
+    0.5772021020620974
+   ],
+   "run_noise": [
+    0.0
+   ],
+   "run_types": [
+    1
+   ],
+   "run_vsm_amax": [
+    0.4450905212526136
+   ],
+   "run_refine": [
+    0
+   ],
+   "run_vsm_kappa": [
+    1.0
+   ],
+   "run_vsm_dzero": [
+    1.0
+   ],
+   "run_guide_dist": [
+    0
+   ],
+   "seq_weights": 2.8628485836806923,
+   "consistency": 0,
+   "consistency_weight": 1.0,
+   "realign": 0,
+   "min_support": 0,
+   "consistency_merge": 0,
+   "consistency_merge_weight": 2.0,
+   "vsm_mode": 0,
+   "fill_in": 0,
+   "fill_anchor_frac": 0.0,
+   "fill_support": 1,
+   "run_tree_method": [
+    3
+   ],
+   "run_tree_dist": [
+    2
+   ],
+   "run_tree_alpha": [
+    0
+   ],
+   "run_tree_maxlen": [
+    1024
+   ],
+   "run_tree_leaf": [
+    1163
+   ],
+   "run_tree_kmeans_dist": [
+    1
+   ],
+   "run_realign_tree": [
+    1
+   ]
+  },
+  "source": "search gen 49",
+  "core": {
+   "q_small": 0.7240558564064326,
+   "sp_small": 0.7953485557598216,
+   "tc_small": 0.6527631570530431,
+   "q_large": 0.6869027475581182,
+   "cpu_small": 19.813944999999816,
+   "cpu_large": 2546.592198000003,
+   "n": 1405,
+   "n_err": 0,
+   "valid": true,
+   "per_benchmark": {
+    "bali3": {
+     "q": 0.7270020251092651,
+     "sp": 0.8457459975232665,
+     "tc": 0.6082580526952639,
+     "n": 175
+    },
+    "balifam": {
+     "q": 0.7482599494025088,
+     "sp": 0.867753282939861,
+     "tc": 0.6287666158651566,
+     "n": 51
+    },
+    "ox": {
+     "q": 0.8781325739542493,
+     "sp": 0.9107811998499222,
+     "tc": 0.845483948058576,
+     "n": 141
+    },
+    "prefab4": {
+     "q": 0.7750047472455242,
+     "sp": 0.7750047472455242,
+     "tc": 0.7750047472455242,
+     "n": 242
+    },
+    "sabre": {
+     "q": 0.49187998632061475,
+     "sp": 0.5774575512405342,
+     "tc": 0.40630242140069517,
+     "n": 231
+    }
+   },
+   "per_k": {
+    "1000": {
+     "q": 0.7354217444927151,
+     "sp": 0.8025946578218668,
+     "tc": 0.6682488311635635,
+     "n": 308
+    },
+    "10000": {
+     "q": 0.6383837506235214,
+     "sp": 0.720556645601405,
+     "tc": 0.5562108556456377,
+     "n": 257
+    }
+   },
+   "cpu_ratio_small": 0.3986410796085022,
+   "cpu_ratio_large": 0.5609477763016175,
+   "R": 0.4728814091808488,
+   "feasible": true
+  }
+ },
+ "knee_d0.005": {
+  "key": "e40b4bc5e306d68e3809531424863529b8be6be72474cee4bb13eb4174988041",
+  "why": "sensitivity: cheapest of 9 within 0.005 of the best",
+  "params": {
+   "n_runs": 1,
+   "run_gpo": [
+    7.925380917127636
+   ],
+   "run_gpe": [
+    1.7130658324820314
+   ],
+   "run_tgpe": [
+    0.7722694683532232
+   ],
+   "run_noise": [
+    0.0
+   ],
+   "run_types": [
+    2
+   ],
+   "run_vsm_amax": [
+    0.4092897241718095
+   ],
+   "run_refine": [
+    0
+   ],
+   "run_vsm_kappa": [
+    1.0
+   ],
+   "run_vsm_dzero": [
+    1.0
+   ],
+   "run_guide_dist": [
+    0
+   ],
+   "seq_weights": 2.7111190509356553,
+   "consistency": 0,
+   "consistency_weight": 1.0,
+   "realign": 0,
+   "min_support": 0,
+   "consistency_merge": 0,
+   "consistency_merge_weight": 2.0,
+   "vsm_mode": 0,
+   "fill_in": 0,
+   "fill_anchor_frac": 0.0,
+   "fill_support": 1,
+   "run_tree_method": [
+    3
+   ],
+   "run_tree_dist": [
+    2
+   ],
+   "run_tree_alpha": [
+    0
+   ],
+   "run_tree_maxlen": [
+    1024
+   ],
+   "run_tree_leaf": [
+    1983
+   ],
+   "run_tree_kmeans_dist": [
+    0
+   ],
+   "run_realign_tree": [
+    1
+   ]
+  },
+  "source": "search gen 99",
+  "core": {
+   "q_small": 0.7256783696973512,
+   "sp_small": 0.7971922501884434,
+   "tc_small": 0.6541644892062592,
+   "q_large": 0.6906135311797793,
+   "cpu_small": 16.58440199999987,
+   "cpu_large": 3083.2538849999983,
+   "n": 1405,
+   "n_err": 0,
+   "valid": true,
+   "per_benchmark": {
+    "bali3": {
+     "q": 0.7193894491701456,
+     "sp": 0.8419758945087846,
+     "tc": 0.5968030038315064,
+     "n": 175
+    },
+    "balifam": {
+     "q": 0.7588287533189504,
+     "sp": 0.8729554071965965,
+     "tc": 0.6447020994413041,
+     "n": 51
+    },
+    "ox": {
+     "q": 0.880063398592528,
+     "sp": 0.9113489942852778,
+     "tc": 0.8487778028997784,
+     "n": 141
+    },
+    "prefab4": {
+     "q": 0.7755093366283636,
+     "sp": 0.7755093366283636,
+     "tc": 0.7755093366283636,
+     "n": 242
+    },
+    "sabre": {
+     "q": 0.4946009107767687,
+     "sp": 0.584171618323194,
+     "tc": 0.40503020323034344,
+     "n": 231
+    }
+   },
+   "per_k": {
+    "1000": {
+     "q": 0.7377996072461276,
+     "sp": 0.8045415204301074,
+     "tc": 0.6710576940621479,
+     "n": 308
+    },
+    "10000": {
+     "q": 0.643427455113431,
+     "sp": 0.7226492609951621,
+     "tc": 0.5642056492317001,
+     "n": 257
+    }
+   },
+   "cpu_ratio_small": 0.33366519983483417,
+   "cpu_ratio_large": 0.6791603351028841,
+   "R": 0.47603799105953376,
+   "feasible": true
+  }
+ },
+ "knee_d0.01": {
+  "key": "339cde749fc42d8008f3a00021beef905482c838b15155bab0c3a7d4056c6354",
+  "why": "sensitivity: cheapest of 14 within 0.01 of the best",
+  "params": {
+   "n_runs": 1,
+   "run_gpo": [
+    8.159105455385433
+   ],
+   "run_gpe": [
+    1.3643914548823153
+   ],
+   "run_tgpe": [
+    0.5964687636172831
+   ],
+   "run_noise": [
+    0.0
+   ],
+   "run_types": [
+    1
+   ],
+   "run_vsm_amax": [
+    0.6185380354944269
+   ],
+   "run_refine": [
+    0
+   ],
+   "run_vsm_kappa": [
+    1.0
+   ],
+   "run_vsm_dzero": [
+    1.0
+   ],
+   "run_guide_dist": [
+    0
+   ],
+   "seq_weights": 4.171679974212933,
+   "consistency": 0,
+   "consistency_weight": 1.0,
+   "realign": 0,
+   "min_support": 0,
+   "consistency_merge": 0,
+   "consistency_merge_weight": 2.0,
+   "vsm_mode": 0,
+   "fill_in": 0,
+   "fill_anchor_frac": 0.0,
+   "fill_support": 1,
+   "run_tree_method": [
+    3
+   ],
+   "run_tree_dist": [
+    2
+   ],
+   "run_tree_alpha": [
+    0
+   ],
+   "run_tree_maxlen": [
+    1024
+   ],
+   "run_tree_leaf": [
+    886
+   ],
+   "run_tree_kmeans_dist": [
+    0
+   ],
+   "run_realign_tree": [
+    1
+   ]
+  },
+  "source": "search gen 80",
+  "core": {
+   "q_small": 0.7211298866800716,
+   "sp_small": 0.7932689763725864,
+   "tc_small": 0.648990796987557,
+   "q_large": 0.6862814039838284,
+   "cpu_small": 17.906757000000155,
+   "cpu_large": 2102.9044900000013,
+   "n": 1405,
+   "n_err": 0,
+   "valid": true,
+   "per_benchmark": {
+    "bali3": {
+     "q": 0.7214919109669833,
+     "sp": 0.8429878778646406,
+     "tc": 0.5999959440693262,
+     "n": 175
+    },
+    "balifam": {
+     "q": 0.750403105804488,
+     "sp": 0.8703277567355365,
+     "tc": 0.6304784548734391,
+     "n": 51
+    },
+    "ox": {
+     "q": 0.8769399040601523,
+     "sp": 0.9102801493077592,
+     "tc": 0.8435996588125456,
+     "n": 141
+    },
+    "prefab4": {
+     "q": 0.7722129186808859,
+     "sp": 0.7722129186808859,
+     "tc": 0.7722129186808859,
+     "n": 242
+    },
+    "sabre": {
+     "q": 0.48460159388784896,
+     "sp": 0.5705361792741095,
+     "tc": 0.3986670085015884,
+     "n": 231
+    }
+   },
+   "per_k": {
+    "1000": {
+     "q": 0.7316325955386239,
+     "sp": 0.7989118200447269,
+     "tc": 0.6643533710325209,
+     "n": 308
+    },
+    "10000": {
+     "q": 0.6409302124290329,
+     "sp": 0.7181586694390255,
+     "tc": 0.5637017554190403,
+     "n": 257
+    }
+   },
+   "cpu_ratio_small": 0.36026994840084764,
+   "cpu_ratio_large": 0.46321495776458294,
+   "R": 0.40851245872353403,
+   "feasible": true
+  }
+ },
+ "written": "2026-10-14T20:20:44"
+}

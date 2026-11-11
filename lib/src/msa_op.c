@@ -8,6 +8,7 @@
 #include "msa_alloc.h"
 #define MSA_OP_IMPORT
 #include "msa_op.h"
+#include "sl_tree.h"
 
 static int aln_unknown_warning_message_gaps_but_len_diff(struct msa *msa);
 static int aln_unknown_warning_message_same_len_no_gaps(void);
@@ -44,7 +45,13 @@ int msa_cpy(struct msa** dest, struct msa* src)
         }
         d->numseq = src->numseq;
         d->quiet = src->quiet;
-        RUN(detect_alphabet(d));
+        /* A copy keeps the source's sequence type (it may have been set by
+           the user, --type / seq_type); detect only if the source has none. */
+        if(src->biotype != ALN_BIOTYPE_UNDEF){
+                d->biotype = src->biotype;
+        }else{
+                RUN(detect_alphabet(d));
+        }
         RUN(detect_aligned(d));
         RUN(set_sip_nsip(d));
 
@@ -146,8 +153,8 @@ int detect_alphabet(struct msa* msa)
 
         double DNA[128];
         double protein[128];
-        char DNA_letters[12]= "acgtunACGTUN";
-        char protein_letters[40] = "acdefghiklmnpqrstvwyACDEFGHIKLMNPQRSTVWY";
+        char DNA_letters[]= "acgtunACGTUN";
+        char protein_letters[] = "acdefghiklmnpqrstvwyACDEFGHIKLMNPQRSTVWY";
 
         double dna_prob;
         double prot_prob;
@@ -356,9 +363,11 @@ int convert_msa_to_internal(struct msa* msa, int type)
         for(i = 0; i <  msa->numseq;i++){
                 seq = msa->sequences[i];
                 for(j =0 ; j < seq->len;j++){
+                        /* Characters outside the alphabet (e.g. protein letters
+                           under --type dna) are scored as internal code 0 ('A'
+                           in every alphabet); msa_report_foreign_chars() reports
+                           them once per input. */
                         if(t[(int) seq->seq[j]] == -1){
-                                WARNING_MSG("there should be no character not matching the alphabet");
-                                WARNING_MSG("offending character: >>>%c<<<", seq->seq[j]);
                                 seq->s[j] = 0;
                         }else{
                                 seq->s[j] = t[(int) seq->seq[j]];
@@ -372,6 +381,57 @@ ERROR:
         if(a){
                 MFREE(a);
         }
+        return FAIL;
+}
+
+/* Warn once about characters that convert_msa_to_internal() will score as 'A'
+   because they are not in the alphabet of biotype (DNA/RNA or protein).
+   Called once per input at the library entry points (kalign_align_full,
+   kalign_add_sequences), not per conversion: the ensemble converts copies of
+   the input several times.  Printed regardless of quiet: input letters are
+   being replaced. */
+int msa_report_foreign_chars(struct msa* msa, int biotype)
+{
+        struct alphabet* a = NULL;
+        int8_t* t = NULL;
+        long n_bad = 0;
+        uint8_t seen[256] = {0};
+        char list[2 * 256 + 1];
+        int p = 0;
+        int i,j;
+
+        if(biotype != ALN_BIOTYPE_DNA && biotype != ALN_BIOTYPE_PROTEIN){
+                return OK;
+        }
+        /* The protein alphabets used for the guide tree (redPROTEIN) and for
+           alignment (ambigiousPROTEIN) accept the same letters. */
+        RUNP(a = create_alphabet(biotype == ALN_BIOTYPE_DNA ? ALPHA_defDNA : ALPHA_ambigiousPROTEIN));
+        t = a->to_internal;
+        for(i = 0; i < msa->numseq; i++){
+                struct msa_seq* seq = msa->sequences[i];
+                for(j = 0; j < seq->len; j++){
+                        if(t[(int) seq->seq[j]] == -1){
+                                n_bad++;
+                                seen[(uint8_t) seq->seq[j]] = 1;
+                        }
+                }
+        }
+        MFREE(a);
+        if(n_bad){
+                for(i = 0; i < 256; i++){
+                        if(seen[i]){
+                                if(p) list[p++] = ' ';
+                                list[p++] = isprint(i) ? (char) i : '?';
+                        }
+                }
+                list[p] = 0;
+                WARNING_MSG("%ld character%s not in the %s alphabet (%s) %s scored as 'A'.",
+                            n_bad, n_bad == 1 ? "" : "s",
+                            biotype == ALN_BIOTYPE_DNA ? "DNA/RNA" : "protein",
+                            list, n_bad == 1 ? "was" : "were");
+        }
+        return OK;
+ERROR:
         return FAIL;
 }
 
@@ -453,6 +513,7 @@ int kalign_arr_to_msa(char** input_sequences, int* len, int numseq,struct msa** 
         msa->biotype = ALN_BIOTYPE_UNDEF;
         msa->aligned = 0;
         msa->alnlen = 0;
+        msa->defer_finalise = 0;
         msa->plen = NULL;
         msa->sip = NULL;
         msa->nsip = NULL;
@@ -460,20 +521,21 @@ int kalign_arr_to_msa(char** input_sequences, int* len, int numseq,struct msa** 
         msa->col_confidence = NULL;
         msa->seq_weights = NULL;
         msa->run_parallel = 0;
-#ifdef USE_THREADPOOL
         msa->pool = NULL;
-#endif
         msa->consistency_table = NULL;
         msa->poar_consistency = NULL;
         msa->quiet = 1;
+        RUN(sl_opts_resolve(&msa->tree, NULL));
         MMALLOC(msa->sequences, sizeof(struct msa_seq*) * msa->alloc_numseq);
 
         for(int i = 0; i < 128; i++){
                 msa->letter_freq[i] = 0;
         }
+        for(int i = 0; i < msa->alloc_numseq;i++){
+                msa->sequences[i] = NULL;       /* all set before any can fail: the error path frees them */
+        }
 
         for(int i = 0; i < msa->alloc_numseq;i++){
-                msa->sequences[i] = NULL;
                 struct msa_seq* seq = NULL;
 
                 MMALLOC(seq, sizeof(struct msa_seq));
@@ -497,8 +559,15 @@ int kalign_arr_to_msa(char** input_sequences, int* len, int numseq,struct msa** 
                         seq->gaps[j] = 0;
 
                 }
+                msa->sequences[i] = seq;        /* fully allocated: freed with msa on error */
                 for(int j = 0; j < len[i];j++){
-                        msa->letter_freq[(int)input_sequences[i][j]]++;
+                        const unsigned char c = (unsigned char)input_sequences[i][j];
+                        if(c >= 128){
+                                /* letter_freq has 128 entries; FASTA input keeps letters only */
+                                ERROR_MSG("Sequence %d contains a non-ASCII character (byte 0x%02x at position %d).",
+                                          i + 1, c, j + 1);
+                        }
+                        msa->letter_freq[c]++;
                         seq->seq[j] = input_sequences[i][j];
                 }
                 seq->seq[len[i]] = 0;
@@ -552,7 +621,7 @@ static int aln_unknown_warning_message_same_len_no_gaps(void)
 }
 
 int finalise_alignment(struct msa* msa)
-{
+{ KPERF_REGION(KP_FINALISE);
         char** linear_seqs = NULL;
         int aln_len = 0;
         ASSERT(msa->aligned == ALN_STATUS_ALIGNED, "Sequences are not aligned");

@@ -1,0 +1,729 @@
+{
+ "generated": "2026-10-07T12:25:35",
+ "procedure": "experiments/redesign/docs/PLAN_pooled_refit_v1.md (pooled nested CV, v1)",
+ "recipe_sha256": {
+  "__init__.py": "92bd374a35698bacb6dcaa38bf823930e28484e9faabf4bbb0a03a9465297fa8",
+  "_align_worker.py": "0f6e971d0ac577d188e7524b14f19fc7ed5e13ee31cc4f98a5ab74b05e2b192b",
+  "_layout_stats.py": "b4b0f5bad01dcbc8385ec0edf13b63a47d93615807f1e5d14e904fda53195bf6",
+  "_validate_bali3.py": "653dc58340fac5bfcb079655bf4d6e8cd7c94a3994827e100068cda73398b2c9",
+  "cache.py": "5f028f8d60974e287115733795af7fd6a517295e8be004ace63cb441e8363f68",
+  "cases_nucleotide.py": "9738d1f5caff3735109f7aace7aad691b38c9a43eb6aec25f412666b8550517a",
+  "cases_protein.py": "82350e07d5822d55d3614e8c90b5f0915dcfe679c75418d3167843d9857b51e8",
+  "core.py": "c0ac61e109220463c57be8ff2c5b462ba20503a3a3109cc304e2738d2e283dd8",
+  "decide.py": "b9a68d1674839f5f6ffe1673efef173d1631a873a5f82c96b7dc228674e0e75a",
+  "download.py": "43d272abbd7371d4c5b68688e15a534aadc4dee3c28665ff18a3c13a00ab76af",
+  "evaluate.py": "93b6ee7a8d6fc915704eb62653a503def86c79305554028dac8afe5742743640",
+  "externals.py": "89f2d7658651cf473a9cf94c14d28508f3af7dcdb4be45697dba77c809e8246b",
+  "features.py": "58e27b46c8d02b22d364d46606a864c358f6b86151a4d529cd50fb4c2a2269bd",
+  "fit.py": "3b480c3cd2d2a53dad71c9e365af1f502e791951107c2d1000882d5e9f79454f",
+  "folds.py": "a78332c68b3167de657a97ecf608be0d0a0443c6a79b52df8d0f04158abc20e0",
+  "freeze.py": "6792a4cae9c6d28ff39d6154437c9c30d63a3f46a67ece79763ac3e4042f2b42",
+  "grouping.py": "0f24a0e0726482490eee5fa190fdebb3bb9665d32ca3abb1a1d8e76f20e186cf",
+  "nested.py": "2e61446d4601f6d0ae7e6fbdf220af56f6740e5f4d0de50c4fce49d1b213841f",
+  "pool_results.py": "93993d92ed1bce9d9c66e9c35b057fe49c5d0dec24b5810e56d5263bbb262ac0",
+  "presets_370.py": "a36d271b5342040c0282be5948f699f057cf2b746739178010a449fa2b83d32a",
+  "report.py": "0f7b2142cd86b68f0a7f4efd5d3ae3ae0034424589f8ce2c7b18ed2587353121",
+  "scoring.py": "0b064b02d135b4445875894ae4a29d5365589016e152d89ac5bbc3175f91bfa9",
+  "scoring_nucleotide.py": "c9fe299ff4be41a8ea487b0fdee37e19fdd85305c0751981237091f917acf2f1",
+  "scoring_protein.py": "5c9f315be4e1e6eb75f3b59746caefadd617aab8320a48f7842396dc2b29f0a3",
+  "step0.py": "091bebc6a9b355d944d4d5a1a7b2285aeb9d3c3b3969a5f65c79e4016137bb9d",
+  "verify_batch_worker.py": "0c6509bd7dcf2f92dab65cf66ed26ef3134f5e468dce4caf2e2ff309ce947f79",
+  "verify_presets_370.py": "0697038037c23fcc84aa580e56a570ce78261dae7d876381bc60391c88102752"
+ },
+ "pools": {
+  "protein": {
+   "build_id": "d0a20557a822e88949de0e8bc7c0cf678f24247b3b4d724289af3c063ac34b4b",
+   "smoke": false,
+   "decided": "2026-10-07T12:25:35",
+   "modes": {
+    "fast": {
+     "source": "3.7.0",
+     "param_key": "c4cd6fec9b614be49d678c378e998106ae873792553e765655fcc63a7d68a47d",
+     "params": {
+      "n_runs": 1,
+      "run_gpo": [
+       8.626
+      ],
+      "run_gpe": [
+       0.843
+      ],
+      "run_tgpe": [
+       0.433
+      ],
+      "run_noise": [
+       0.0
+      ],
+      "run_types": [
+       2
+      ],
+      "run_vsm_amax": [
+       0.592
+      ],
+      "run_refine": [
+       0
+      ],
+      "run_vsm_kappa": [
+       1.0
+      ],
+      "run_vsm_dzero": [
+       1.0
+      ],
+      "run_guide_dist": [
+       0
+      ],
+      "seq_weights": 1.534,
+      "consistency": 0,
+      "consistency_weight": 1.0,
+      "realign": 0,
+      "min_support": 0,
+      "consistency_merge": 0,
+      "consistency_merge_weight": 2.0,
+      "vsm_mode": 0,
+      "fill_in": 0,
+      "fill_anchor_frac": 0.0,
+      "fill_support": 1
+     },
+     "reason": "3.7.0 stays: OOF rule not met",
+     "rule": {
+      "d_sp": 0.0010278973515091675,
+      "d_tc": 0.0006266733293616301,
+      "loss_margin": -0.005,
+      "gain_margin": 0.005,
+      "met": false
+     },
+     "budget": {
+      "cpu_new_4w": 10.356778999999998,
+      "cpu_ref_4w": 10.355813,
+      "ref_mode": "fast",
+      "ratio": 1.00009328094279,
+      "within": true,
+      "errors_new": 0,
+      "budget_factor": 1.2
+     }
+    },
+    "default": {
+     "source": "refit-v1",
+     "param_key": "04330d11c56d1b46c7da30614da0660fb9ec2c1fd8743a562ab547b372f2fd72",
+     "params": {
+      "run_gpo": [
+       8.04152373213338,
+       6.983960065854721,
+       10.758482996784027
+      ],
+      "run_gpe": [
+       0.8089307318497335,
+       1.8850196376961605,
+       0.6266372064097293
+      ],
+      "run_tgpe": [
+       2.414372999100357,
+       1.2422442410933932,
+       1.702758492371476
+      ],
+      "run_types": [
+       1,
+       3,
+       2
+      ],
+      "run_vsm_amax": [
+       0.37450822797872907,
+       1.311377369483814,
+       1.5661959367236102
+      ],
+      "run_refine": [
+       0,
+       0,
+       0
+      ],
+      "run_vsm_kappa": [
+       1.0,
+       1.0,
+       1.0
+      ],
+      "run_vsm_dzero": [
+       1.0,
+       1.0,
+       1.0
+      ],
+      "run_guide_dist": [
+       0,
+       0,
+       0
+      ],
+      "n_runs": 3,
+      "run_noise": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "seq_weights": 3.036869891747765,
+      "consistency": 0,
+      "consistency_weight": 1.0,
+      "realign": 1,
+      "vsm_mode": 0,
+      "consistency_merge": 0,
+      "consistency_merge_weight": 2.0,
+      "min_support": 2,
+      "fill_in": 0,
+      "fill_anchor_frac": 0.0,
+      "fill_support": 1
+     },
+     "reason": "ships: OOF rule met, within budget",
+     "rule": {
+      "d_sp": 0.001759768221187194,
+      "d_tc": 0.014901431905291043,
+      "loss_margin": -0.005,
+      "gain_margin": 0.005,
+      "met": true
+     },
+     "budget": {
+      "cpu_new_4w": 72.70175300000005,
+      "cpu_ref_4w": 70.95315199999997,
+      "ref_mode": "default",
+      "ratio": 1.0246444442665503,
+      "within": true,
+      "errors_new": 0,
+      "budget_factor": 1.2
+     }
+    },
+    "recall": {
+     "source": "refit-v1",
+     "param_key": "1becf7f2843e26b3a33cbaaca7c24dd8934cb291d27078b5b11cb53f825e5860",
+     "params": {
+      "run_gpo": [
+       7.245679886316388,
+       8.666707729662464,
+       7.621968760278588,
+       9.383545743870245,
+       5.621009959254649
+      ],
+      "run_gpe": [
+       1.2711861059584495,
+       0.613858302579037,
+       1.254900344617499,
+       1.264228073219121,
+       0.8981372818573407
+      ],
+      "run_tgpe": [
+       1.101919805597086,
+       0.601218903136713,
+       0.6252439536730929,
+       1.1212368107552377,
+       0.4737930605697324
+      ],
+      "run_types": [
+       3,
+       2,
+       1,
+       1,
+       2
+      ],
+      "run_vsm_amax": [
+       0.47079259795999695,
+       1.413823447882451,
+       0.450791822640952,
+       2.642119443318504,
+       0.4863285321570886
+      ],
+      "run_refine": [
+       2,
+       0,
+       2,
+       2,
+       1
+      ],
+      "run_vsm_kappa": [
+       1.0,
+       1.0,
+       1.0,
+       1.0,
+       1.0
+      ],
+      "run_vsm_dzero": [
+       1.0,
+       1.0,
+       1.0,
+       1.0,
+       1.0
+      ],
+      "run_guide_dist": [
+       0,
+       0,
+       0,
+       1,
+       0
+      ],
+      "n_runs": 5,
+      "run_noise": [
+       0.0,
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "seq_weights": 3.272525919253566,
+      "consistency": 8,
+      "consistency_weight": 3.5579641521153507,
+      "realign": 2,
+      "vsm_mode": 0,
+      "consistency_merge": 0,
+      "consistency_merge_weight": 2.0,
+      "min_support": 3,
+      "fill_in": 2,
+      "fill_anchor_frac": 0.0001252891557038116,
+      "fill_support": 1
+     },
+     "reason": "ships: OOF rule met, within budget",
+     "rule": {
+      "d_sp": -0.002040584520364726,
+      "d_tc": 0.010513672321924869,
+      "loss_margin": -0.005,
+      "gain_margin": 0.005,
+      "met": true
+     },
+     "budget": {
+      "cpu_new_4w": 980.0125119999997,
+      "cpu_ref_4w": 844.5956800000001,
+      "ref_mode": "accurate",
+      "ratio": 1.1603333230404393,
+      "within": true,
+      "errors_new": 0,
+      "budget_factor": 1.2
+     }
+    },
+    "accurate": {
+     "source": "refit-v1",
+     "param_key": "1becf7f2843e26b3a33cbaaca7c24dd8934cb291d27078b5b11cb53f825e5860",
+     "params": {
+      "run_gpo": [
+       7.245679886316388,
+       8.666707729662464,
+       7.621968760278588,
+       9.383545743870245,
+       5.621009959254649
+      ],
+      "run_gpe": [
+       1.2711861059584495,
+       0.613858302579037,
+       1.254900344617499,
+       1.264228073219121,
+       0.8981372818573407
+      ],
+      "run_tgpe": [
+       1.101919805597086,
+       0.601218903136713,
+       0.6252439536730929,
+       1.1212368107552377,
+       0.4737930605697324
+      ],
+      "run_types": [
+       3,
+       2,
+       1,
+       1,
+       2
+      ],
+      "run_vsm_amax": [
+       0.47079259795999695,
+       1.413823447882451,
+       0.450791822640952,
+       2.642119443318504,
+       0.4863285321570886
+      ],
+      "run_refine": [
+       2,
+       0,
+       2,
+       2,
+       1
+      ],
+      "run_vsm_kappa": [
+       1.0,
+       1.0,
+       1.0,
+       1.0,
+       1.0
+      ],
+      "run_vsm_dzero": [
+       1.0,
+       1.0,
+       1.0,
+       1.0,
+       1.0
+      ],
+      "run_guide_dist": [
+       0,
+       0,
+       0,
+       1,
+       0
+      ],
+      "n_runs": 5,
+      "run_noise": [
+       0.0,
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "seq_weights": 3.272525919253566,
+      "consistency": 8,
+      "consistency_weight": 3.5579641521153507,
+      "realign": 2,
+      "vsm_mode": 0,
+      "consistency_merge": 0,
+      "consistency_merge_weight": 2.0,
+      "min_support": 3,
+      "fill_in": 2,
+      "fill_anchor_frac": 0.0001252891557038116,
+      "fill_support": 1
+     },
+     "reason": "ships: OOF rule met, within budget",
+     "rule": {
+      "d_sp": -0.002040584520364726,
+      "d_tc": 0.010513672321924869,
+      "loss_margin": -0.005,
+      "gain_margin": 0.005,
+      "met": true
+     },
+     "budget": {
+      "cpu_new_4w": 980.0125119999997,
+      "cpu_ref_4w": 844.5956800000001,
+      "ref_mode": "accurate",
+      "ratio": 1.1603333230404393,
+      "within": true,
+      "errors_new": 0,
+      "budget_factor": 1.2
+     }
+    }
+   }
+  },
+  "nucleotide": {
+   "build_id": "d0a20557a822e88949de0e8bc7c0cf678f24247b3b4d724289af3c063ac34b4b",
+   "smoke": false,
+   "decided": "2026-10-07T12:25:35",
+   "modes": {
+    "fast": {
+     "source": "3.7.0",
+     "param_key": "7c4eef5e33ceae52415a88fbcc1451695ced1bbc8ecb81c1334145e17fb635d0",
+     "params": {
+      "n_runs": 1,
+      "run_gpo": [
+       19.873
+      ],
+      "run_gpe": [
+       0.642
+      ],
+      "run_tgpe": [
+       2.582
+      ],
+      "run_noise": [
+       0.0
+      ],
+      "run_types": [
+       12
+      ],
+      "run_vsm_amax": [
+       0.874
+      ],
+      "run_refine": [
+       0
+      ],
+      "run_vsm_kappa": [
+       1.0
+      ],
+      "run_vsm_dzero": [
+       1.0
+      ],
+      "run_guide_dist": [
+       0
+      ],
+      "seq_weights": 0.199,
+      "consistency": 0,
+      "consistency_weight": 1.0,
+      "realign": 1,
+      "min_support": 0,
+      "consistency_merge": 0,
+      "consistency_merge_weight": 2.0,
+      "vsm_mode": 0,
+      "fill_in": 0,
+      "fill_anchor_frac": 0.0,
+      "fill_support": 1
+     },
+     "reason": "3.7.0 stays: OOF rule not met",
+     "rule": {
+      "d_sp": 0.0012351424592710117,
+      "d_tc": 0.004751214963619237,
+      "loss_margin": -0.005,
+      "gain_margin": 0.005,
+      "met": false
+     },
+     "budget": {
+      "cpu_new_4w": 11.546406000000042,
+      "cpu_ref_4w": 14.12051300000002,
+      "ref_mode": "fast",
+      "ratio": 0.8177044275940984,
+      "within": true,
+      "errors_new": 0,
+      "budget_factor": 1.2
+     }
+    },
+    "default": {
+     "source": "3.7.0",
+     "param_key": "6bd9f3d3af0c69776e598567e09cf71acef3422b128d9c5fcc62d26bfbaa8214",
+     "params": {
+      "n_runs": 3,
+      "run_gpo": [
+       19.275,
+       16.581,
+       16.499
+      ],
+      "run_gpe": [
+       0.628,
+       0.274,
+       3.754
+      ],
+      "run_tgpe": [
+       2.854,
+       2.491,
+       2.896
+      ],
+      "run_noise": [
+       0.0,
+       0.0,
+       0.0
+      ],
+      "run_types": [
+       11,
+       12,
+       12
+      ],
+      "run_vsm_amax": [
+       0.445,
+       0.706,
+       0.491
+      ],
+      "run_refine": [
+       0,
+       0,
+       2
+      ],
+      "run_vsm_kappa": [
+       1.0,
+       1.0,
+       1.0
+      ],
+      "run_vsm_dzero": [
+       1.0,
+       1.0,
+       1.0
+      ],
+      "run_guide_dist": [
+       0,
+       0,
+       0
+      ],
+      "seq_weights": 0.448,
+      "consistency": 0,
+      "consistency_weight": 1.0,
+      "realign": 1,
+      "min_support": 2,
+      "consistency_merge": 0,
+      "consistency_merge_weight": 2.0,
+      "vsm_mode": 0,
+      "fill_in": 0,
+      "fill_anchor_frac": 0.0,
+      "fill_support": 1
+     },
+     "reason": "3.7.0 stays: OOF rule not met",
+     "rule": {
+      "d_sp": -0.03911185530340753,
+      "d_tc": -0.04235546081314289,
+      "loss_margin": -0.005,
+      "gain_margin": 0.005,
+      "met": false
+     },
+     "budget": {
+      "cpu_new_4w": 76.82578799999987,
+      "cpu_ref_4w": 68.82085199999986,
+      "ref_mode": "default",
+      "ratio": 1.1163155608709994,
+      "within": true,
+      "errors_new": 0,
+      "budget_factor": 1.2
+     }
+    },
+    "recall": {
+     "source": "refit-v1",
+     "param_key": "ac04f705bcf50969866435171086d4f83c4b394021c373bda212305627bf560d",
+     "params": {
+      "n_runs": 1,
+      "run_gpo": [
+       18.057496723871463
+      ],
+      "run_gpe": [
+       1.0259188823836523
+      ],
+      "run_tgpe": [
+       2.6569531115301057
+      ],
+      "run_noise": [
+       0.0
+      ],
+      "run_types": [
+       12
+      ],
+      "run_vsm_amax": [
+       0.5171473272722975
+      ],
+      "run_refine": [
+       0
+      ],
+      "seq_weights": 0.42992784134202633,
+      "consistency": 5,
+      "consistency_weight": 4.456307849640236,
+      "realign": 0,
+      "min_support": 0,
+      "consistency_merge": 0,
+      "consistency_merge_weight": 2.0,
+      "vsm_mode": 0,
+      "run_vsm_kappa": [
+       1.0
+      ],
+      "run_vsm_dzero": [
+       1.0
+      ],
+      "run_guide_dist": [
+       0
+      ],
+      "fill_in": 0,
+      "fill_anchor_frac": 0.0,
+      "fill_support": 1
+     },
+     "reason": "ships: OOF rule met, within budget",
+     "rule": {
+      "d_sp": 0.0023744253768986172,
+      "d_tc": 0.010527708318487138,
+      "loss_margin": -0.005,
+      "gain_margin": 0.005,
+      "met": true
+     },
+     "budget": {
+      "cpu_new_4w": 22.033808999999984,
+      "cpu_ref_4w": 31.229455000000033,
+      "ref_mode": "recall",
+      "ratio": 0.7055457419926143,
+      "within": true,
+      "errors_new": 0,
+      "budget_factor": 1.2
+     }
+    },
+    "accurate": {
+     "source": "3.7.0",
+     "param_key": "0076da0e3145bd66a594b90428aa3e055b59a5373056da8a7b5155041bbb0cbe",
+     "params": {
+      "n_runs": 5,
+      "run_gpo": [
+       19.475,
+       19.377,
+       15.869,
+       15.989,
+       5.346
+      ],
+      "run_gpe": [
+       0.728,
+       1.379,
+       0.353,
+       2.331,
+       3.483
+      ],
+      "run_tgpe": [
+       2.856,
+       2.486,
+       2.43,
+       2.764,
+       0.61
+      ],
+      "run_noise": [
+       0.0,
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "run_types": [
+       12,
+       10,
+       12,
+       12,
+       10
+      ],
+      "run_vsm_amax": [
+       0.492,
+       1.211,
+       0.721,
+       0.188,
+       1.406
+      ],
+      "run_refine": [
+       2,
+       2,
+       0,
+       2,
+       0
+      ],
+      "run_vsm_kappa": [
+       1.0,
+       1.0,
+       1.0,
+       1.0,
+       1.0
+      ],
+      "run_vsm_dzero": [
+       1.0,
+       1.0,
+       1.0,
+       1.0,
+       1.0
+      ],
+      "run_guide_dist": [
+       0,
+       0,
+       0,
+       0,
+       0
+      ],
+      "seq_weights": 0.59,
+      "consistency": 2,
+      "consistency_weight": 0.8,
+      "realign": 1,
+      "min_support": 3,
+      "consistency_merge": 0,
+      "consistency_merge_weight": 2.0,
+      "vsm_mode": 0,
+      "fill_in": 0,
+      "fill_anchor_frac": 0.0,
+      "fill_support": 1
+     },
+     "reason": "3.7.0 stays: OOF rule not met",
+     "rule": {
+      "d_sp": -0.010472290582418066,
+      "d_tc": -0.01194850168248768,
+      "loss_margin": -0.005,
+      "gain_margin": 0.005,
+      "met": false
+     },
+     "budget": {
+      "cpu_new_4w": 160.54948899999985,
+      "cpu_ref_4w": 174.1225340000001,
+      "ref_mode": "accurate",
+      "ratio": 0.9220488888589214,
+      "within": true,
+      "errors_new": 0,
+      "budget_factor": 1.2
+     }
+    }
+   }
+  }
+ }
+}

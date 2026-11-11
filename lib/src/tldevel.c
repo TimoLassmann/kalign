@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 
 
@@ -255,12 +256,30 @@ FREE_2D_ARRAY(double)
 
 #undef FREE_2D_ARRAY
 
+static _Thread_local char tl_first_err[512];
+
 void error(const char *location, const char *format, ...)
 {
         va_list argp;
         va_start(argp, format);
         verror(stderr,location,format,argp);
         va_end(argp);
+        /* keep the first message: the root cause, not the "Function ... failed." chain */
+        if(tl_first_err[0] == 0 && strncmp(format, "Function \"", 10) != 0){
+                va_start(argp, format);
+                vsnprintf(tl_first_err, sizeof(tl_first_err), format, argp);
+                va_end(argp);
+        }
+}
+
+const char* tl_first_error(void)
+{
+        return tl_first_err;
+}
+
+void tl_clear_error(void)
+{
+        tl_first_err[0] = 0;
 }
 
 void warning(const char *location, const char *format, ...)

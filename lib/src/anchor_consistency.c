@@ -10,9 +10,7 @@
 #include "aln_setup.h"
 #include "aln_controller.h"
 
-#ifdef USE_THREADPOOL
 #include "threadpool/threadpool.h"
-#endif
 
 #define ANCHOR_CONSISTENCY_IMPORT
 #include "anchor_consistency.h"
@@ -234,7 +232,6 @@ ERROR:
         return FAIL;
 }
 
-#ifdef USE_THREADPOOL
 /* Context for parallel anchor build */
 struct anchor_par_ctx {
         struct msa* msa;
@@ -280,12 +277,11 @@ static void anchor_build_chunk(int start, int end, void* arg)
                 }
         }
 }
-#endif /* USE_THREADPOOL */
 
 int anchor_consistency_build(struct msa* msa, struct aln_param* ap,
                              int n_anchors, float weight,
                              struct consistency_table** ct_out)
-{
+{ KPERF_PHASE_REGION(KP_CONS_BUILD, KPH_CONSBUILD);
         struct consistency_table* ct = NULL;
         int N = msa->numseq;
         int K = n_anchors;
@@ -329,7 +325,6 @@ int anchor_consistency_build(struct msa* msa, struct aln_param* ap,
 
         /* Build position maps: for each sequence i, for each anchor k.
            This is the main bottleneck — O(N*K) pairwise DP alignments. */
-#ifdef USE_THREADPOOL
         if(msa->pool != NULL){
                 struct anchor_par_ctx ctx;
                 ctx.msa = msa;
@@ -343,9 +338,6 @@ int anchor_consistency_build(struct msa* msa, struct aln_param* ap,
         }else{
                 RUN(anchor_build_serial(msa, ap, ct));
         }
-#else
-        RUN(anchor_build_serial(msa, ap, ct));
-#endif
 
         *ct_out = ct;
         return OK;
@@ -487,13 +479,11 @@ static int get_node_anchor_positions(struct consistency_table* ct,
                 /* Profile: consensus from member sequences */
                 int n_members = msa->nsip[node];
                 int* members = msa->sip[node];
-                int* col_to_ungapped = NULL;
                 int* best_pos = NULL;
                 int* agree_count = NULL;
                 int* total_count = NULL;
                 int mi, col;
 
-                MMALLOC(col_to_ungapped, sizeof(int) * (dp_len + 1));
                 MMALLOC(best_pos, sizeof(int) * dp_len);
                 MMALLOC(agree_count, sizeof(int) * dp_len);
                 MMALLOC(total_count, sizeof(int) * dp_len);
@@ -518,29 +508,18 @@ static int get_node_anchor_positions(struct consistency_table* ct,
                         seq_len = msa->sequences[si]->len;
                         gaps = msa->sequences[si]->gaps;
 
-                        /* Build col_to_ungapped from gaps[] */
+                        /* Residue p sits in profile column (gaps before it) + p; a residue
+                           that falls beyond dp_len ends the walk.  Columns without a residue
+                           of this member have no vote. */
                         col = 0;
-                        for(p = 0; p <= seq_len && col < dp_len; p++){
-                                int g;
-                                for(g = 0; g < gaps[p] && col < dp_len; g++){
-                                        col_to_ungapped[col] = -1;
-                                        col++;
+                        for(p = 0; p < seq_len; p++){
+                                col += gaps[p];
+                                if(col >= dp_len){
+                                        break;
                                 }
-                                if(p < seq_len && col < dp_len){
-                                        col_to_ungapped[col] = p;
-                                        col++;
-                                }
-                        }
-                        while(col < dp_len){
-                                col_to_ungapped[col] = -1;
+                                c = col;
                                 col++;
-                        }
-
-                        /* Accumulate votes for each profile column */
-                        for(c = 0; c < dp_len; c++){
-                                int ugp = col_to_ungapped[c];
-                                if(ugp < 0 || ugp >= seq_len) continue;
-                                apos = map[ugp];
+                                apos = map[p];
                                 if(apos < 0) continue;
 
                                 total_count[c]++;
@@ -563,7 +542,6 @@ static int get_node_anchor_positions(struct consistency_table* ct,
                         }
                 }
 
-                MFREE(col_to_ungapped);
                 MFREE(best_pos);
                 MFREE(agree_count);
                 MFREE(total_count);
@@ -578,7 +556,7 @@ int anchor_consistency_get_bonus_profile(struct consistency_table* ct,
                                           int node_a, int len_a,
                                           int node_b, int len_b,
                                           struct sparse_bonus** bonus_out)
-{
+{ KPERF_REGION(KP_CONS_BONUS);
         struct sparse_bonus* sb = NULL;
         int* apos_a = NULL;
         float* conf_a = NULL;

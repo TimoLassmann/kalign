@@ -60,7 +60,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "--type",
         default="auto",
         dest="seq_type",
-        help="Sequence type: auto, dna, rna, internal, protein, divergent (default: auto).",
+        choices=["auto", "protein", "dna", "rna"],
+        help="Sequence type: protein, dna or rna overrides detection (default: auto).",
     )
     parser.add_argument(
         "--mode",

@@ -1,0 +1,12 @@
+mode	arm	mean, fitting concurrency	mean, re-timed at 4 workers	total (s)
+fast	new (refit)	0.024	0.018	70.0
+default	new (refit)	0.148	0.131	432.1
+recall	new (refit)	0.799	0.726	2329.6
+accurate	new (refit)	0.799	0.726	2329.6
+fast	3.7.0	0.024	0.018	69.6
+default	3.7.0	0.143	0.125	417.6
+recall	3.7.0	0.820	0.746	2390.9
+accurate	3.7.0	0.820	0.746	2390.9
+-	Clustal Omega	0.324	n/a	943.9
+-	MAFFT L-INS-i	1.903	n/a	5548.8
+-	MUSCLE 5	14.625	n/a	42646.7

@@ -1,0 +1,74 @@
+{
+ "fit": "nucfast final (presets/docs/nucfit/PLAN_nucfit.md section 4, folds v2)",
+ "rule": "knee (PLAN_nucfit.md section 4)",
+ "key": "64d6da0a54519687cdf08862a921b3358dd559a5d9c3324490b3cf671cc60467",
+ "params": {
+  "n_runs": 1,
+  "run_gpo": [
+   13.470637829138196
+  ],
+  "run_gpe": [
+   1.8469448481385724
+  ],
+  "run_tgpe": [
+   2.6212834451518012
+  ],
+  "run_noise": [
+   0.0
+  ],
+  "run_types": [
+   12
+  ],
+  "run_vsm_amax": [
+   0.23365418153557552
+  ],
+  "run_refine": [
+   2
+  ],
+  "seq_weights": 1.3000420237032857,
+  "consistency": 3,
+  "consistency_weight": 3.4928292066575937,
+  "realign": 0,
+  "min_support": 0,
+  "consistency_merge": 0,
+  "consistency_merge_weight": 2.0,
+  "vsm_mode": 0,
+  "run_vsm_kappa": [
+   1.0
+  ],
+  "run_vsm_dzero": [
+   1.0
+  ],
+  "run_guide_dist": [
+   0
+  ],
+  "fill_in": 0,
+  "fill_anchor_frac": 0.0,
+  "fill_support": 1,
+  "run_tree_method": [
+   3
+  ],
+  "run_tree_dist": [
+   1
+  ],
+  "run_tree_alpha": [
+   1
+  ],
+  "run_tree_maxlen": [
+   1024
+  ],
+  "run_tree_leaf": [
+   1886
+  ],
+  "run_tree_kmeans_dist": [
+   0
+  ],
+  "run_realign_tree": [
+   1
+  ],
+  "run_gap_model": [
+   0
+  ]
+ },
+ "params_sha256": "c08ce7d4266f4a661ccda5037d8ff93cacb331b385fde0cc0b877ddd0f67a46f"
+}

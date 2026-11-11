@@ -75,7 +75,7 @@ ERROR:
 int compute_sp_score(struct msa* msa, struct aln_param* ap,
                      int* path, int* sip_a, int nsip_a,
                      int* sip_b, int nsip_b, float* score)
-{
+{ KPERF_REGION(KP_SP_SCORE);
         int* freq_a = NULL;
         int* freq_b = NULL;
         int* gap_a = NULL;

@@ -10,7 +10,6 @@
 #include "aln_seqprofile.h"
 #include "aln_profileprofile.h"
 
-#ifdef USE_THREADPOOL
 #include "threadpool.h"
 
 static void wrap_seqseq_fwd(void *arg)      { aln_seqseq_foward((struct aln_mem *)arg); }
@@ -19,7 +18,12 @@ static void wrap_profprof_fwd(void *arg)    { aln_profileprofile_foward((struct 
 static void wrap_profprof_bwd(void *arg)    { aln_profileprofile_backward((struct aln_mem *)arg); }
 static void wrap_seqprof_fwd(void *arg)     { aln_seqprofile_foward((struct aln_mem *)arg); }
 static void wrap_seqprof_bwd(void *arg)     { aln_seqprofile_backward((struct aln_mem *)arg); }
+
+#ifdef KALIGN_WAVE
+#include "aln_wave.h"
 #endif
+
+#include "aln_gapmodel.h"
 
 #define ALN_CONTROLLER_IMPORT
 #include "aln_controller.h"
@@ -27,7 +31,21 @@ static void wrap_seqprof_bwd(void *arg)     { aln_seqprofile_backward((struct al
 static int aln_continue(struct aln_mem* m,float input_states[],int old_cor[],int meet,int transition, uint8_t serial);
 
 int aln_runner(struct aln_mem* m)
-{
+{ KPERF_RUNNER(m);
+        /* top-level call with the member gap model: attach its weights (and its own wavefront tables) */
+        if(!m->gm && m->ap && m->ap->gap_model && gm_prepare(m)){
+                int ret = aln_runner(m);
+                gm_free(m);
+                return ret;
+        }
+#ifdef KALIGN_WAVE
+        /* top-level call: attach the per-alignment wavefront tables */
+        if(!m->wave && !m->gm && aln_wave_prepare(m)){
+                int ret = aln_runner(m);
+                aln_wave_free(m);
+                return ret;
+        }
+#endif
         float input_states[6];
         int old_cor[5];
         float score;
@@ -69,7 +87,6 @@ int aln_runner(struct aln_mem* m)
         m->enda_2 = old_cor[1];
 
         /* fprintf(stderr,"Forward:%d-%d	%d-%d\n",m->starta,m->enda,m->startb,m->endb); */
-#ifdef USE_THREADPOOL
         if(m->run_parallel && m->pool){
                 tp_group_t *g = tp_group_create(m->pool);
                 if(m->seq1){
@@ -104,56 +121,6 @@ int aln_runner(struct aln_mem* m)
                         aln_seqprofile_meetup(m,old_cor,&meet,&transition,&score);
                 }
         }
-#else
-#ifdef HAVE_OPENMP
-#pragma omp parallel
-#pragma omp single nowait
-        {
-#endif
-                if(m->seq1){
-#ifdef HAVE_OPENMP
-#pragma omp task shared(m) if(m->run_parallel)
-#endif
-                        aln_seqseq_foward(m);
-#ifdef HAVE_OPENMP
-#pragma omp task shared(m) if(m->run_parallel)
-#endif
-                        aln_seqseq_backward(m);
-#ifdef HAVE_OPENMP
-#pragma omp taskwait
-#endif
-                        aln_seqseq_meetup(m,old_cor,&meet,&transition,&score);
-                }else if(m->prof2){
-#ifdef HAVE_OPENMP
-#pragma omp task shared(m) if(m->run_parallel)
-#endif
-                        aln_profileprofile_foward(m);
-#ifdef HAVE_OPENMP
-#pragma omp task shared(m) if(m->run_parallel)
-#endif
-                        aln_profileprofile_backward(m);
-#ifdef HAVE_OPENMP
-#pragma omp taskwait
-#endif
-                        aln_profileprofile_meetup(m,old_cor,&meet,&transition,&score);
-                }else{
-#ifdef HAVE_OPENMP
-#pragma omp task shared(m) if(m->run_parallel)
-#endif
-                        aln_seqprofile_foward(m);
-#ifdef HAVE_OPENMP
-#pragma omp task shared(m) if(m->run_parallel)
-#endif
-                        aln_seqprofile_backward(m);
-#ifdef HAVE_OPENMP
-#pragma omp taskwait
-#endif
-                        aln_seqprofile_meetup(m,old_cor,&meet,&transition,&score);
-                }
-#ifdef HAVE_OPENMP
-        }
-#endif
-#endif
 
         if(m->mode == ALN_MODE_SCORE_ONLY){
                 m->score = score;
@@ -164,7 +131,7 @@ int aln_runner(struct aln_mem* m)
 }
 
 int aln_runner_serial(struct aln_mem* m)
-{
+{ KPERF_RUNNER(m);
         float input_states[6];
         int old_cor[5];
         float score;

@@ -23,11 +23,16 @@ struct parameters{
         float gpo;
         float gpe;
         float tgpe;
+        int vsm_mode;      /* -1 = preset; 0 = legacy VSM; 1 = per-merge VSM */
+        float vsm_kappa;   /* -1 = preset */
+        float vsm_dzero;   /* -1 = preset */
+        int guide_dist;    /* -1 = preset; 0 = BPM (shipped); 1 = pairwise-alignment distance */
         int num_infiles;
         int out_format;
         int nthreads;
-        int min_support;
-        char* load_poar;
+        int fill_in;                /* -1 = preset, 0 = off, 1 = on */
+        float fill_anchor_frac;     /* < 0 = preset */
+        int fill_support;           /* < 1 = preset */
         char* mode;  /* "fast", "default", "recall", "accurate" (NULL = default) */
         char* add_file;             /* new sequences to add to existing alignment */
         char* existing_file;        /* existing alignment to add sequences to */

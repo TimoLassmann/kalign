@@ -3,9 +3,7 @@
 
 #include <stdint.h>
 
-#ifdef USE_THREADPOOL
 typedef struct threadpool threadpool_t;
-#endif
 
 #define ALN_MODE_SCORE_ONLY 2
 #define ALN_MODE_FULL 1
@@ -30,9 +28,7 @@ struct aln_mem{
         int* path;
         int* tmp_path;
         uint8_t run_parallel;
-#ifdef USE_THREADPOOL
         threadpool_t *pool;
-#endif
         int alloc_path_len;
         float score;
         float margin_sum;       /* accumulated meetup margins */
@@ -64,6 +60,10 @@ struct aln_mem{
         int mode;
 
         struct sparse_bonus* consistency;   /* sparse bonus matrix, NULL if disabled */
+        void* gm;                           /* member gap model weights of the current alignment (aln_gapmodel.c) */
+#ifdef KALIGN_WAVE
+        void* wave;                         /* wavefront tables of the current alignment (aln_wave.c) */
+#endif
 };
 
 #endif

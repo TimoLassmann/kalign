@@ -20,6 +20,8 @@ struct msa;
 struct aln_param;
 struct aln_tasks;
 
+struct aln_mem;
+EXTERN int dispatch_alignment(struct msa* msa, struct aln_mem* ml, float* prof_a, float* prof_b, int a, int b, int len_a, int len_b);
 EXTERN int refine_alignment(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int refine_mode);
 
 #undef ALN_REFINE_IMPORT

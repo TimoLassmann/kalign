@@ -8,7 +8,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "kalign-python"
-version = "3.6.0"
+version = "4.0.0"
 description = "Python wrapper for the Kalign multiple sequence alignment engine"
 readme = "README-python.md"
 license = "Apache-2.0"
@@ -120,15 +120,37 @@ build.targets = ["_core"]
 # Install settings
 install.components = ["python"]
 
-# Source distribution settings
-# Now that all files are in the same directory tree, sdist should work correctly
+# Source distribution: only what building and testing the package needs. The
+# repository's research material (experiments, preset fitting, benchmarks,
+# profiling, development notes, container and CI files) is left out; files
+# ignored by git are left out as well. .github/workflows/python.yml fails if the
+# package holds any other top-level path.
 sdist.exclude = [
     "build*/",
     ".venv/",
     "__pycache__/",
     "**/*.pyc",
     "wheelhouse/",
-    "dist/"
+    "dist/",
+    "/experiments/",
+    "/presets/",
+    "/perf/",
+    "/benchmarks/",
+    "/scripts/",
+    "/doc/",
+    "/.claude/",
+    "/.github/",
+    "/CLAUDE.md",
+    "/WORK.md",
+    "/PARKED.md",
+    "/setup_server.sh",
+    "/Containerfile",
+    "/Containerfile.memcheck",
+    "/.containerignore",
+    "/.gitmodules",
+    "/uv.lock",
+    "/build.zig",
+    "/CONTRIBUTING.md",
 ]
 
 # Explicitly include critical directories that might be excluded by default
@@ -159,21 +181,12 @@ before-all = [
 ]
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"
 
-# macOS settings — OpenMP disabled to avoid libomp.dylib conflicts with conda/numpy
+# macOS settings
 [tool.cibuildwheel.macos]
 before-all = [
     "brew install cmake || echo 'cmake already installed'",
 ]
 repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
-
-[tool.cibuildwheel.macos.config-settings]
-"cmake.args" = "-DUSE_OPENMP=OFF;-DUSE_THREADPOOL=ON"
-
-# Windows settings
-[tool.cibuildwheel.windows]
-before-all = [
-    "choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' || echo 'cmake already installed'",
-]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -34,14 +34,6 @@ cmake -DCMAKE_BUILD_TYPE=ASAN ..
 make
 ```
 
-### Build Without OpenMP
-```bash
-mkdir build
-cd build
-cmake -DUSE_OPENMP=OFF ..
-make
-```
-
 ### Zig Build (Alternative)
 ```bash
 zig build
@@ -103,7 +95,7 @@ ctest -R <test_name>
 - `task.c` - Task scheduling and threading support
 
 ### Performance Features
-- **Multi-threading**: OpenMP parallelization
+- **Multi-threading**: built-in work-stealing thread pool (pthreads); `-n 1` runs serially
 - **SIMD**: SSE4.1, AVX, AVX2 optimizations (enabled by default)
 - **Bit-parallel algorithms**: Myers' algorithm for efficient alignment
 - **Memory optimization**: Custom allocation strategies
@@ -117,7 +109,6 @@ The library provides a C API (`kalign.h`) with C++ compatibility. Key functions:
 
 ### Build Configuration
 - C11 standard required
-- OpenMP support (can be disabled with `-DUSE_OPENMP=OFF`)
 - SIMD instruction support with runtime detection
 - Multiple build types: Release, Debug, ASAN (Address Sanitizer)
 - Cross-compilation support via Zig build system

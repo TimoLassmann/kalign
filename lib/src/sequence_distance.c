@@ -7,9 +7,7 @@
 
 #include "msa_struct.h"
 
-#ifdef USE_THREADPOOL
 #include "threadpool.h"
-#endif
 
 #define SEQUENCE_DISTANCE_IMPORT
 #include "sequence_distance.h"
@@ -21,12 +19,12 @@
 /* #include "misc.h" */
 #include "bpm.h"
 
-#ifdef USE_THREADPOOL
 struct dist_row_ctx {
         struct msa_seq** seqs;
         float** dm;
         int* samples;
         int num_samples;
+        float** cache;
 };
 
 static void dist_row_fn(int row_start, int row_end, void *arg)
@@ -38,14 +36,17 @@ static void dist_row_fn(int row_start, int row_end, void *arg)
                 for (int k = 0; k < c->num_samples; k++) {
                         uint8_t *s2 = c->seqs[c->samples[k]]->s;
                         int l2 = c->seqs[c->samples[k]]->len;
-                        c->dm[r][k] = calc_distance(s1, s2, l1, l2);
+                        if(c->cache && c->cache[r][k] >= 0.0F){
+                                c->dm[r][k] = c->cache[r][k];
+                        }else{
+                                c->dm[r][k] = calc_distance(s1, s2, l1, l2);
+                        }
                         int avg = (l1 + l2) / 2;
                         float add = MACRO_MIN(10000.0, avg) / 10000.0;
                         c->dm[r][k] += add;
                 }
         }
 }
-#endif
 
 #define NODESIZE 16
 
@@ -66,6 +67,13 @@ float protein_wu_distance_calculation(struct bignode* hash[],const uint8_t* seq,
 
 float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
 {
+        return d_estimation_cached(msa, samples, num_samples, pair, NULL);
+}
+
+/* cache (pair == 0 only, may be NULL): numseq x num_samples BPM distances
+   already computed by pick_anchor_dist (-1 = not computed). */
+float** d_estimation_cached(struct msa* msa, int* samples, int num_samples,int pair, float** cache)
+{ KPERF_REGION(KP_TREE_DIST_SEQ);
         float** dm = NULL;
         uint8_t* seq_a;
         uint8_t* seq_b;
@@ -83,11 +91,16 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
         if(pair){
 
                 RUN(galloc(&dm,num_samples,num_samples));
+                /* Each unordered pair once.  The full i x j loop that this
+                   replaces wrote every pair twice and kept the value of the
+                   later iteration, (i, j) with j < i, so that is the call
+                   made here (BPM truncates the pattern at 1024, so the
+                   argument order can matter). */
                 for(i = 0; i < num_samples;i++){
 
                         seq_a = msa->sequences[samples[i]]->s;
                         len_a = msa->sequences[samples[i]]->len;
-                        for(j = 0;j < num_samples;j++){
+                        for(j = 0;j <= i;j++){
                                 seq_b = msa->sequences[samples[j]]->s;
                                 len_b = msa->sequences[samples[j]]->len;
                                 dist = calc_distance(seq_a, seq_b, len_a, len_b);
@@ -129,17 +142,10 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
 
                 struct msa_seq** s = msa->sequences;
 
-#ifdef USE_THREADPOOL
                 if(msa->pool && numseq >= KALIGN_DIST_MIN_SEQS){
-                        struct dist_row_ctx ctx = { s, dm, samples, num_samples };
+                        struct dist_row_ctx ctx = { s, dm, samples, num_samples, cache };
                         tp_parallel_for_chunked(msa->pool, 0, numseq, KALIGN_PFOR_MIN_CHUNK, dist_row_fn, &ctx);
                 }else{
-#endif
-#if !defined(USE_THREADPOOL)
-#ifdef HAVE_OPENMP
-#pragma omp parallel for shared(dm, s) private(i, j) collapse(2) schedule(static)
-#endif
-#endif
                 for(i = 0; i < numseq;i++){
                         for(j = 0;j < num_samples;j++){
                                 uint8_t* s1;
@@ -150,15 +156,17 @@ float** d_estimation(struct msa* msa, int* samples, int num_samples,int pair)
                                 l1 = s[i]->len;
                                 s2 = s[samples[j]]->s;
                                 l2 = s[samples[j]]->len;
-                                dm[i][j] = calc_distance(s1,s2,l1,l2);
+                                if(cache && cache[i][j] >= 0.0F){
+                                        dm[i][j] = cache[i][j];
+                                }else{
+                                        dm[i][j] = calc_distance(s1,s2,l1,l2);
+                                }
                                 int sv = (l1 + l2) / 2;
                                 float add = MACRO_MIN(10000.0, sv) / 10000.0;
                                 dm[i][j] += add;
                         }
                 }
-#ifdef USE_THREADPOOL
                 }
-#endif
                 /* fprintf(stdout,"\n"); */
 
 

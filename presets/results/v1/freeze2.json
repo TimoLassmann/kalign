@@ -1,0 +1,15 @@
+{
+ "recorded": "2026-10-06T12:12:18",
+ "oof_rows_sha256": {
+  "refit/nucleotide/fold0/oof_rows.tsv": "6f0bbe430d21e8a9c1094724e9d1bad4f622217a42cb4e9aeaab220d4ec6120a",
+  "refit/nucleotide/fold1/oof_rows.tsv": "035541270ad367c1d0d306a2c8254724e3d0c707271be0aae7fc29f32c39a776",
+  "refit/nucleotide/fold2/oof_rows.tsv": "a5e631ec874eb01379e112d30c9b94495a63099f4892f4b9e7897a6e0e75234f",
+  "refit/nucleotide/fold3/oof_rows.tsv": "41543f45193c382ef082f60e198e35005a6aa1b25115f26541b94e00316e8845",
+  "refit/nucleotide/fold4/oof_rows.tsv": "eb2b3beba3c4d2aa43588eeb6b5cec0c0a9fe5e852d66643f6c94afd4aa5b496",
+  "refit/protein/fold0/oof_rows.tsv": "601d3878b2ff4cb2f76a4a6b004da69dd50f03b22aaddca403b9e7c205601e98",
+  "refit/protein/fold1/oof_rows.tsv": "4967119debb2049d559271aa070be7565488bfcb85688ee43c313962c900745a",
+  "refit/protein/fold2/oof_rows.tsv": "e1cef4b5badd1647fb62d001e651ffa0aabd05eb549a1df7128a86872449f691",
+  "refit/protein/fold3/oof_rows.tsv": "3dddd096a0a8d3c95d644ae9383038ee96eb5e8665d82a48777313794f960f38",
+  "refit/protein/fold4/oof_rows.tsv": "2794792e41d5895d388fa489fd02c0470c649db48d12d45173ff97bc7ae1d373"
+ }
+}

@@ -1,0 +1,181 @@
+<header class="head">
+  <p class="eyebrow">Kalign · presets and speed</p>
+  <h1>Kalign Preset Re-fit</h1>
+  <p class="subtitle">Kalign 3.7.0 aligns {SPEEDUP_RANGE} faster than Kalign 3.6.1 on one thread across {N_ALL} reference alignments, and the re-fitted protein accurate preset raises out-of-fold TC from 0.579 to 0.590 and precision from 0.717 to 0.760 at unchanged SP (0.755 against 0.757, 2,916 cases).</p>
+  <p class="meta">Report on run v1.1 of the pooled nested cross-validation re-fit, with Addendum A1 (Kalign 3.6.1). Companion to <code>presets/docs/PLAN.md</code> and <code>presets/results/v1_1/report/report.md</code>. Checked 2026-10-07.</p>
+</header>
+
+<div class="note info">
+  <span class="lbl">REPORT · authoritative for the v1.1 re-fit and the 3.6.1 comparison · checked 2026-10-07</span>
+  <p>The numbers come from the run's tables (<code>presets/results/v1_1/report/tables/</code>) and the Addendum A1 rows on the workstation. The new presets are not yet compiled into Kalign; the command-line program still ships the 3.7.0 presets. Where this page and the tables disagree, the tables are right.</p>
+</div>
+
+<section>
+  <p class="callout">Across 6,141 reference alignments, Kalign 3.7.0 needed {SPEEDUP_RANGE} less single-thread CPU than Kalign 3.6.1 in every mode. Its protein default and accurate presets were also more accurate (SP +0.044 and +0.040), its protein recall preset was 0.005 lower in SP than the separate 3.6.1 recall ensemble at half the CPU, and nucleotide SP stayed within 0.004 of 3.6.1. A pre-registered re-fit by grouped five-fold nested cross-validation then replaced three of seven presets (protein default, protein accurate, nucleotide recall): each raises out-of-fold TC by 0.011 to 0.015 within 1.2 times the 3.7.0 CPU, and protein precision by 0.04 to 0.06. The protein presets lose SP on alignments below 20% identity (−0.025) and on PREFAB (−0.013). Final-fit scores exceed the out-of-fold estimates by at most 0.006 in SP and TC for protein, so the fitting procedure shows no meaningful overfitting. MUSCLE 5 and MAFFT L-INS-i remain more accurate on protein (SP 0.796 and 0.784) at about 18 and 2.4 times the CPU of Kalign accurate.</p>
+
+  <div class="figure">
+{SVG:fig_tradeoff_protein}
+    <p class="figcap">Out-of-fold SP (left) and TC (right) against mean single-thread CPU per case for 2,916 protein reference alignments, each benchmark weighted equally; bars are 95% BCa bootstrap intervals and the CPU axis is logarithmic. Marker shape is the mode, colour the program; filled rust markers are re-fitted presets that passed the decision rule and open rust markers re-fitted presets it rejected. Protein recall is drawn for Kalign 3.6.1 only, because in 3.7.0 and in the re-fit it equals accurate. Kalign 3.7.0 sits to the left of Kalign 3.6.1 in every mode and above it in default and accurate (SP 0.738 against 0.694, 0.757 against 0.717); the 3.6.1 recall ensemble reaches the highest Kalign SP (0.762, TC 0.589) at 1.6 s per case, against 0.755 and 0.590 for the re-fitted accurate preset at 0.9 s; the re-fitted default and accurate presets sit above 3.7.0 in TC at about the same CPU; MUSCLE 5 and MAFFT L-INS-i are more accurate at higher CPU. CPU was measured at 8 concurrent jobs for 3.6.1, at 30 for the other arms; the higher concurrency inflates CPU by 5 to 30%.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">1</span>Reference data and leakage control</h2>
+  <p>The re-fit used two pools of reference alignments, matching Kalign's two sequence types. Every file is downloaded from its original source and checked against a recorded SHA-256, 28 exact duplicates were removed, and no simulated alignments were used.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>pool</th><th>benchmark</th><th>cases</th><th>reference</th></tr></thead>
+      <tbody>
+        <tr><th>protein</th><td>BAliBASE 3 (BB and BBS)</td><td>385</td><td>structure-based, core blocks</td></tr>
+        <tr><th>protein</th><td>PREFAB 4</td><td>1,666</td><td>structural pair</td></tr>
+        <tr><th>protein</th><td>OXBench</td><td>395</td><td>structure-based</td></tr>
+        <tr><th>protein</th><td>SABRE</td><td>411</td><td>structure-based</td></tr>
+        <tr><th>protein</th><td>BaliFam100</td><td>59</td><td>BAliBASE inside Pfam homologs</td></tr>
+        <tr><th>nucleotide</th><td>Rfam 15.1 seed alignments</td><td>2,352</td><td>curated, scored as given</td></tr>
+        <tr><th>nucleotide</th><td>BRAliBASE II</td><td>574</td><td>structural RNA</td></tr>
+        <tr><th>nucleotide</th><td>MDSA (coding DNA)</td><td>299</td><td>aligned by protein structure</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Related cases share a fold. Protein cases are linked when a reference sequence of one is identical to, or contained in, a reference sequence of the other; nucleotide cases are linked by length-dependent sequence identity and by Rfam clan. Whole groups were assigned to five folds, stratified by benchmark and by the identity bin of the reference (protein 543 groups, largest 15.0% of cases; nucleotide 1,976 groups, largest 17.1%).</p>
+  <div class="note danger">
+    <span class="lbl">CAVEAT</span>
+    <p>Grouping protein cases at 50% identity put 51% of them into one group through shared PDB chains, so the stricter rule was used. As a consequence, 921 of 2,916 protein test cases (31.6%) have a homolog of at least 50% identity in another fold. The report splits every protein result by this flag; the re-fitted presets gained no more on those cases than on the others.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">2</span>Nested cross-validation and preset search</h2>
+  <div class="figure">
+{SCHEMATIC}
+    <p class="figcap">The procedure, from the frozen plan to the decision. Boxes in slate are repeated once per fold; ochre boxes are the two hash-recorded freezes and the frozen decision rule. Every rule, seed and search setting was fixed before the first fit, and the out-of-fold rows were hashed before the final fit started.</p>
+  </div>
+  <p>For each fold, presets were fitted on the other four folds only and then aligned on every case of the held-out fold. The scores pooled over the five held-out folds estimate the performance of the procedure and are the numbers this report gives. The presets that would ship come from running the identical procedure once on the whole pool; parameters were never averaged across folds.</p>
+  <p>Each fit drew a training core from its training folds by fixed hash order: at most 5 cases per group for protein and 25 for nucleotide, 840 protein cases including a guard set of 40, and all capped nucleotide cases (1,931 to 2,488). NSGA-III (pymoo 0.6.1.6, population 56, 56 Das-Dennis directions, seed 1234) maximised mean SP, TC and precision and minimised total CPU, with means taken per benchmark and benchmarks weighted equally. Stage 1 searched single-run presets and stage 2 ensembles of three or five runs. Every candidate was screened on 300 cases, and each stage's final front was re-scored on the full core. A stage stopped when its hypervolume improved by less than 0.1% over five generations.</p>
+  <p>A fixed rule then chose one preset per mode: within 1.2 times the CPU of the 3.7.0 preset of that mode, the non-dominated candidate with the highest mean z-score of SP, TC and precision, where recall must also reach the SP of accurate. A new preset replaces 3.7.0 only if, out of fold, both SP and TC change by at least −0.005, at least one of them by +0.005 or more, and its CPU re-timed at 4 workers stays within 1.2 times 3.7.0.</p>
+</section>
+
+<section>
+  <h2><span class="n">3</span>Speed of Kalign 3.7.0 against 3.6.1</h2>
+  <p>Kalign 3.7.0 used {SPEEDUP_RANGE} less single-thread CPU per case than Kalign 3.6.1, measured on the same {N_ALL} cases with the same harness. The difference combines the exact speed-ups of the 3.7.0 release, which leave alignments unchanged, with changes to the presets themselves, so the per-mode ratio is a release-to-release comparison and not a measure of the speed-ups alone.</p>
+  <div class="figure">
+{SVG:fig_speed}
+    <p class="figcap">Mean single-thread CPU per case of the Kalign 3.6.1 and 3.7.0 command-line programs, by mode, for all protein ({N_PROT} cases) and nucleotide ({N_NUC} cases) reference alignments; the CPU axis is logarithmic. Labels above the bars give the ratio of 3.6.1 to 3.7.0 CPU, so a value above 1 means 3.7.0 is faster. {SPEED_OBS}</p>
+  </div>
+  <div class="scroll">
+{TABLE:speed}
+  </div>
+  <div class="note">
+    <span class="lbl">MEASUREMENT</span>
+    <p>CPU is user plus system time of the aligner process (<code>wait4</code>), one thread (<code>-n 1</code>), 8 concurrent jobs on one otherwise idle 64-core workstation, the two builds alternating per mode. {SPEED_ERRORS}</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">4</span>Out-of-fold accuracy of all programs</h2>
+  <p>The table gives out-of-fold SP and TC, each benchmark weighted equally, for the three Kalign versions and the external aligners on the same cases. The 3.6.1 and 3.7.0 presets were not re-fitted per fold and were partly tuned earlier on BAliBASE, BRAliBASE and MDSA, so their scores are in-sample for part of each pool; the comparison therefore favours them slightly.</p>
+  <div class="scroll">
+{TABLE:accuracy}
+  </div>
+  <div class="figure">
+{SVG:fig_tradeoff_nucleotide}
+    <p class="figcap">Out-of-fold SP (left) and TC (right) against mean single-thread CPU per case for 3,225 nucleotide reference alignments, drawn as in the first figure. Filled rust marks the one re-fitted nucleotide preset that ships (recall); open rust marks re-fitted presets the rule rejected. {TRADEOFF_NUC_OBS}</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">5</span>Pareto fronts of the final fit</h2>
+  <div class="figure">
+{SVG:fig_pareto_protein}
+    <p class="figcap">Non-dominated parameter sets of the protein final fit (415 points) on its 840-case training core: TC (left) and precision (right) against total single-thread CPU on that core, logarithmic. Grey points are single-run presets, slate points three- or five-run ensembles, open black markers the 3.7.0 presets, ochre outlines the v1 selections and rust the v1.1 selections; marker shape is the mode. The front has four objectives, so in a two-axis view some of its points look dominated. Most of the gain over 3.7.0 is precision at the same CPU, whereas in TC the 3.7.0 presets already lie near the upper edge of the front.</p>
+  </div>
+  <div class="figure">
+{SVG:fig_pareto_nucleotide}
+    <p class="figcap">The same view for the nucleotide final fit (652 points, 2,488-case training core). The selected default and accurate ensembles trade TC for precision; the decision rule rejected both out of fold.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">6</span>Search convergence and Amendment v1.1</h2>
+  <p>In the first run (v1), stage 2 stopped at its cap of 40 generations in all 12 fits while the hypervolume was still rising. A dated amendment, written before any further computation, raised the cap to 140 and continued every fit from its saved state; nothing else changed. In v1.1 every stage-2 search met the stopping rule, after 58 to 119 generations.</p>
+  <div class="figure">
+{SVG:fig_convergence}
+    <p class="figcap">Hypervolume of the stage-2 archive per generation for the five fold fits (grey) and the final fit (rust) of each pool; the dashed line marks the v1 cap of 40 generations. A curve ends where the stopping rule (less than 0.1% gain over five generations) fired. Every curve was still rising at generation 40 and levelled off before the v1.1 cap of 140.</p>
+  </div>
+  <div class="figure">
+{SVG:fig_v1_v11}
+    <p class="figcap">Out-of-fold change in SP (left) and TC (right) against 3.7.0 for each pool and mode, benchmark-weighted, with 95% BCa intervals; dashed lines mark the ±0.005 decision margin. Ochre points are v1 (stage 2 stopped at 40 generations), rust points v1.1 (stage 2 run to convergence). The longer search moved protein accurate from −0.005 to −0.002 in SP and from +0.007 to +0.011 in TC, and changed no ship-or-keep decision.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">7</span>Gains and losses by benchmark and identity</h2>
+  <div class="figure">
+{SVG:fig_breakdown}
+    <p class="figcap">Out-of-fold change in SP (slate) and TC (rust) of the re-fitted protein default and accurate presets against 3.7.0, overall and by benchmark and reference identity bin (case-weighted below the first row), with 95% BCa intervals; dashed lines mark the ±0.005 margin. PREFAB references are pairs, so SP equals TC there. Both presets lose on alignments below 20% identity (accurate: SP −0.025, TC −0.025) and on PREFAB 4 (−0.013), and gain on OXBench, BaliFam100 and BAliBASE 3 and between 20% and 40% identity.</p>
+  </div>
+  <div class="note danger">
+    <span class="lbl">CAVEAT</span>
+    <p>Weighted by case instead of by benchmark, protein accurate is 0.007 below 3.7.0 in SP and 0.003 in TC, because PREFAB contributes 1,666 of the 2,916 cases. The decision rule uses the benchmark-weighted estimate, which was fixed in advance as the fit's objective.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">8</span>Overfitting estimate</h2>
+  <div class="figure">
+{SVG:fig_optimism}
+    <p class="figcap">Optimism, the score of the final presets on the cases they were fitted on minus the pooled out-of-fold score on the same cases, benchmark-weighted, for SP (slate) and TC (rust) with 95% BCa intervals. A value near zero means the procedure performs as well on unseen cases as on its own training cases. Protein optimism is at most +0.006 in every mode; nucleotide default (+0.016 SP, +0.018 TC) and accurate (−0.009, −0.007) move because the final fit and the fold fits chose different ensembles on a flat front, and neither of these modes ships.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">9</span>Decision per pool and mode</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>pool and mode</th><th>dSP</th><th>dTC</th><th>dPrecision</th><th>CPU ratio</th><th>preset</th></tr></thead>
+      <tbody>
+        <tr><th>protein fast</th><td>+0.001</td><td>+0.001</td><td>−0.002</td><td>1.00</td><td><span class="keep">3.7.0 kept</span></td></tr>
+        <tr><th>protein default</th><td>+0.002</td><td>+0.015</td><td>+0.056</td><td>1.02</td><td><span class="change">re-fit</span></td></tr>
+        <tr><th>protein accurate = recall</th><td>−0.002</td><td>+0.011</td><td>+0.043</td><td>1.16</td><td><span class="change">re-fit</span></td></tr>
+        <tr><th>nucleotide fast</th><td>+0.001</td><td>+0.005</td><td>+0.000</td><td>0.82</td><td><span class="keep">3.7.0 kept</span></td></tr>
+        <tr><th>nucleotide default</th><td>−0.039</td><td>−0.042</td><td>+0.035</td><td>1.12</td><td><span class="keep">3.7.0 kept</span></td></tr>
+        <tr><th>nucleotide recall</th><td>+0.002</td><td>+0.011</td><td>−0.001</td><td>0.71</td><td><span class="change">re-fit</span></td></tr>
+        <tr><th>nucleotide accurate</th><td>−0.011</td><td>−0.012</td><td>+0.006</td><td>0.92</td><td><span class="keep">3.7.0 kept</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Differences are re-fit minus 3.7.0, out of fold, pooled over all cases with each benchmark weighted equally. The CPU ratio is re-fit over 3.7.0 on the final-fit training core, re-timed at 4 workers; the limit is 1.2.</p>
+</section>
+
+<section>
+  <h2><span class="n">10</span>Limitations of the comparison</h2>
+  <p>The bootstrap resamples cases, not groups, so the intervals may be slightly narrow; the decision rule uses point estimates only. Protein leakage control works at the level of identical or contained sequences, and nucleotide leakage control at the level of sequence identity and Rfam clan; relatedness beyond that is not measured. Rfam seed alignments are curated rather than derived from structure. CPU measured under load is 5 to 30% above the unloaded value, which is why the decision used a separate re-timing at 4 workers. The selection rule weights SP, TC and precision equally and can trade SP for precision, which the decision rule then guards out of fold. These properties may limit the generalisability of the comparison to other reference sets.</p>
+</section>
+
+<section>
+  <h2><span class="n">11</span>Draft text for the paper</h2>
+  <h3>Methods</h3>
+  <p>We re-fitted Kalign's presets on two pools of public reference alignments, 2,916 protein cases (BAliBASE 3, PREFAB 4, OXBench, SABRE, BaliFam100) and 3,225 nucleotide cases (Rfam 15.1 seed alignments, BRAliBASE II, MDSA), after removing 28 exact duplicates. Cases sharing a reference sequence (protein) or linked by sequence identity or Rfam clan (nucleotide) were grouped, and whole groups were assigned to five folds stratified by benchmark and reference identity. For each fold, presets were fitted on the other four folds and evaluated on every case of the held-out fold; the pooled held-out scores estimate the performance of the fitting procedure. The shipped presets come from the same procedure applied to the whole pool.</p>
+  <p>Each fit optimised mean SP, TC and precision and total single-thread CPU with NSGA-III (population 56, seed 1234) in two stages, single-run presets and then ensembles of three or five runs, on a training core of at most five cases per group (840 protein, 1,931 to 2,488 nucleotide cases). Each stage stopped when its hypervolume improved by less than 0.1% over five generations. A fixed rule chose one preset per mode within 1.2 times the CPU of the corresponding 3.7.0 preset, and a new preset replaced 3.7.0 only if its out-of-fold SP and TC each changed by at least −0.005 with one of them improving by at least 0.005. Intervals are 95% BCa bootstrap intervals (10,000 resamples). The plan, code, seeds and rules were committed before any fit, the held-out results were hashed before the final fit, and the one later change, a higher generation limit for the ensemble stage, was recorded as a dated amendment before it ran. Kalign 3.6.1, Kalign 3.7.0, MAFFT L-INS-i, MUSCLE 5 and Clustal Omega were run single-threaded on the same cases for comparison.</p>
+  <h3>Results</h3>
+  <p>Kalign 3.7.0 required {SPEEDUP_RANGE} less single-thread CPU than Kalign 3.6.1 across modes and sequence types, 2.5 times in protein accurate, while raising protein SP by 0.040 in accurate and 0.044 in default. The re-fit replaced three of seven presets. Out of fold, the new protein accurate preset reached SP 0.755, TC 0.590 and precision 0.760 against 0.757, 0.579 and 0.717 for the 3.7.0 preset, at 1.16 times its CPU on the training core; the new protein default raised TC from 0.548 to 0.563 and precision from 0.685 to 0.741 at 1.02 times the CPU; and the new nucleotide recall preset raised TC from 0.688 to 0.699. The protein gains were concentrated between 20% and 40% identity and on BAliBASE, OXBench and BaliFam, whereas alignments below 20% identity and PREFAB pairs lost SP (−0.025 and −0.013 for accurate). Final-fit scores exceeded the out-of-fold estimates by at most 0.006 in SP and TC for protein, consistent with little overfitting. MUSCLE 5 (SP 0.796, TC 0.639) and MAFFT L-INS-i (0.784, 0.627) remained more accurate than Kalign accurate on protein at about 18 and 2.4 times its CPU, although Kalign accurate had the highest precision of all programs (0.760).</p>
+</section>
+
+<section>
+  <h2><span class="n">12</span>Reproducing the run and the figures</h2>
+  <span class="code-lbl">WORKSTATION</span>
+  <pre class="code">presets/run_all.sh start --freeze FREEZE1_v11.json --out runs/v1_1   <span class="c"># the whole re-fit</span>
+presets_a1/../runs/addendum_a1/run_a1.sh                              <span class="c"># Addendum A1: Kalign 3.6.1 and 3.7.0 CLI</span>
+</pre>
+  <span class="code-lbl">LAPTOP</span>
+  <pre class="code">~/.local/share/uv/tools/andamentum/bin/python -m recipe.report_figures \
+    --run RUN_V11 --compare RUN_V1 --a1 A1_DIR --out FIGS             <span class="c"># every chart on this page</span>
+</pre>
+</section>
+
+<hr>
+
+<div class="foot">
+  <h3>Sources and status</h3>
+  <p>Re-fit numbers: <code>presets/results/v1_1/report/tables/*.tsv</code> (run v1.1, tags <code>exp/refit-v1.1-freeze1</code> and <code>exp/refit-v1.1-results</code>) and <code>presets/results/v1/</code> for v1. Kalign 3.6.1 and 3.7.0 command-line numbers: Addendum A1 rows and pooled tables (<code>presets/results/v1_1/addendum_a1/</code>). Every chart is drawn by <code>presets/recipe/report_figures.py</code> from those files, and the plotted numbers are saved beside each figure as CSV. Checked: the rendered page at full and narrow width; each chart with the local vision model (qwen3.8 27B), no issues reported. Not checked: whether the 3.6.1 build reproduces the released 3.6.1 binaries byte for byte. Placeholders: {PLACEHOLDERS}. 2026-10-07.</p>
+</div>

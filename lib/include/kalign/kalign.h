@@ -85,6 +85,11 @@ EXTERN int kalign_write_confidence(struct msa* msa, const char* path);
 /* Memory */
 EXTERN void kalign_free_msa(struct msa* msa);
 
+/* The first error message reported on the calling thread since kalign_clear_error()
+   (e.g. why kalign_read_input failed); "" if none. */
+EXTERN const char* kalign_last_error(void);
+EXTERN void kalign_clear_error(void);
+
 /* Query MSA properties */
 EXTERN int kalign_msa_get_biotype(struct msa *msa);
 
@@ -130,12 +135,16 @@ EXTERN int kalign_generate_ensemble_runs(const struct kalign_run_config* base,
 
 /* Get a built-in mode preset.
  *
- * Presets were derived from NSGA-III multi-objective optimization
- * (objectives: F1, TC, wall_time) with 5-fold cross-validation on
- * BAliBASE v4 (protein) and BRAliBASE (RNA).
+ * Kalign 4 has two modes per sequence type, "fast" and "accurate", chosen at
+ * the knees of the accuracy-versus-CPU Pareto front of a pooled nested
+ * cross-validation (protein: BAliBASE 3, PREFAB 4, OXBench, SABRE,
+ * BaliFam100; nucleotide: BRAliBASE II, MDSA, Rfam seeds). "fast" is a
+ * single run; "accurate" is a 5-run ensemble for protein (member 1 = protein
+ * fast) and for nucleotide. "default" is an alias of "fast", "recall" an alias of
+ * "accurate". Parameters: lib/src/mode_presets.h.
  *
- * mode:    "fast", "default", "recall", or "accurate" (case-insensitive).
- *          NULL is treated as "default".
+ * mode:    "fast", "accurate", "default" or "recall" (case-insensitive).
+ *          NULL is treated as "fast".
  * biotype: ALN_BIOTYPE_PROTEIN, ALN_BIOTYPE_DNA, or ALN_BIOTYPE_RNA.
  *          Determines which preset grid slot to use.
  * runs:    caller-allocated array of at least KALIGN_MAX_PRESET_RUNS configs.
@@ -150,6 +159,38 @@ EXTERN int kalign_get_mode_preset(const char *mode,
                                    struct kalign_run_config *runs,
                                    int *n_runs,
                                    struct kalign_ensemble_config *ens);
+
+/* "accurate" (protein and nucleotide) is not feasible above this many
+ * sequences (CPU and memory of the 5-member ensemble); callers refuse such
+ * inputs. */
+#define KALIGN_ACCURATE_MAX_SEQ 5000
+
+/* Returns 1 if mode can be run on numseq sequences, 0 if not ("accurate"/
+ * "recall" above KALIGN_ACCURATE_MAX_SEQ, for every sequence type). */
+EXTERN int kalign_mode_size_ok(const char *mode, int biotype, int numseq);
+
+/* Sequence type requested by the user (CLI --type, Python seq_type).
+ * AUTO keeps the type detected from the input; the others override it and
+ * select the protein or the nucleotide presets. DNA and RNA both select the
+ * nucleotide presets. */
+#define KALIGN_SEQ_AUTO    0
+#define KALIGN_SEQ_PROTEIN 1
+#define KALIGN_SEQ_DNA     2
+#define KALIGN_SEQ_RNA     3
+
+/* Parse "auto", "protein", "dna" or "rna" (case-insensitive; NULL = auto).
+ * Returns 0 on success, -1 if the name is not one of these. */
+EXTERN int kalign_parse_seq_type(const char *name, int *seq_type);
+
+/* Apply a requested sequence type to msa (after reading it, before choosing
+ * a preset). KALIGN_SEQ_AUTO leaves the detected type. *overridden (may be
+ * NULL) is set to 1 if the detected type differed from the requested one, so
+ * the caller can warn. Returns 0 on success, -1 on a bad seq_type. */
+EXTERN int kalign_set_seq_type(struct msa *msa, int seq_type, int *overridden);
+
+/* Name of the type msa will be aligned as: "protein", "DNA/RNA" or
+ * "unknown". */
+EXTERN const char *kalign_seq_type_name(struct msa *msa);
 
 #undef KALIGN_IMPORT
 #undef EXTERN

@@ -1,0 +1,45 @@
+    <svg viewBox="0 0 720 470" role="img" aria-label="Procedure: freeze, two pools, grouped folds, per-fold fit and held-out test, pooled out-of-fold results, freeze 2, final fit, decision">
+      <rect class="svg-box-warm" x="20" y="10" width="680" height="40" rx="6"/>
+      <text class="svg-t" x="360" y="35" text-anchor="middle" font-size="14">Freeze 1: plan, code, seeds, search settings and rules tagged before any fit</text>
+      <line class="svg-line" x1="360" y1="50" x2="360" y2="66"/>
+      <rect class="svg-box" x="20" y="66" width="330" height="52" rx="6"/>
+      <text class="svg-t" x="185" y="88" text-anchor="middle" font-size="14">Protein pool, 2,916 cases</text>
+      <text class="svg-t2" x="185" y="107" text-anchor="middle" font-size="13">BAliBASE 3, PREFAB 4, OXBench, SABRE, BaliFam100</text>
+      <rect class="svg-box" x="370" y="66" width="330" height="52" rx="6"/>
+      <text class="svg-t" x="535" y="88" text-anchor="middle" font-size="14">Nucleotide pool, 3,225 cases</text>
+      <text class="svg-t2" x="535" y="107" text-anchor="middle" font-size="13">Rfam 15.1 seeds, BRAliBASE II, MDSA</text>
+      <line class="svg-line" x1="185" y1="118" x2="185" y2="134"/>
+      <line class="svg-line" x1="535" y1="118" x2="535" y2="134"/>
+      <rect class="svg-box" x="20" y="134" width="680" height="40" rx="6"/>
+      <text class="svg-t" x="360" y="159" text-anchor="middle" font-size="14">Related cases grouped; whole groups into 5 folds, stratified by benchmark and identity</text>
+      <line class="svg-line" x1="360" y1="174" x2="360" y2="192"/>
+      <path class="svg-membrane" d="M20 192 H700 V318 H20 Z"/>
+      <text class="svg-t2" x="32" y="211" font-size="13">for each fold k = 1 to 5</text>
+      <rect class="svg-box-accent" x="36" y="222" width="190" height="56" rx="6"/>
+      <text class="svg-t" x="131" y="245" text-anchor="middle" font-size="14">training core</text>
+      <text class="svg-t2" x="131" y="264" text-anchor="middle" font-size="13">from the other 4 folds</text>
+      <line class="svg-line" x1="226" y1="250" x2="260" y2="250"/>
+      <rect class="svg-box-accent" x="260" y="222" width="200" height="56" rx="6"/>
+      <text class="svg-t" x="360" y="245" text-anchor="middle" font-size="14">NSGA-III, 2 stages</text>
+      <text class="svg-t2" x="360" y="264" text-anchor="middle" font-size="13">SP, TC, precision, CPU</text>
+      <line class="svg-line" x1="460" y1="250" x2="494" y2="250"/>
+      <rect class="svg-box-accent" x="494" y="222" width="190" height="56" rx="6"/>
+      <text class="svg-t" x="589" y="245" text-anchor="middle" font-size="14">fixed rule picks</text>
+      <text class="svg-t2" x="589" y="264" text-anchor="middle" font-size="13">one preset per mode</text>
+      <text class="svg-t2" x="360" y="304" text-anchor="middle" font-size="13">selected presets aligned on every case of held-out fold k</text>
+      <line class="svg-line" x1="360" y1="318" x2="360" y2="336"/>
+      <rect class="svg-box-good" x="20" y="336" width="680" height="40" rx="6"/>
+      <text class="svg-t" x="360" y="361" text-anchor="middle" font-size="14">Pooled out-of-fold scores on all cases, with 3.6.1, 3.7.0 and external aligners</text>
+      <line class="svg-line" x1="360" y1="376" x2="360" y2="394"/>
+      <rect class="svg-box-warm" x="20" y="394" width="210" height="64" rx="6"/>
+      <text class="svg-t" x="125" y="420" text-anchor="middle" font-size="14">Freeze 2</text>
+      <text class="svg-t2" x="125" y="440" text-anchor="middle" font-size="13">out-of-fold rows hashed</text>
+      <line class="svg-line" x1="230" y1="426" x2="255" y2="426"/>
+      <rect class="svg-box" x="255" y="394" width="210" height="64" rx="6"/>
+      <text class="svg-t" x="360" y="420" text-anchor="middle" font-size="14">Final fit</text>
+      <text class="svg-t2" x="360" y="440" text-anchor="middle" font-size="13">same procedure, whole pool</text>
+      <line class="svg-line" x1="465" y1="426" x2="490" y2="426"/>
+      <rect class="svg-box-warm" x="490" y="394" width="210" height="64" rx="6"/>
+      <text class="svg-t" x="595" y="420" text-anchor="middle" font-size="14">Decision rule</text>
+      <text class="svg-t2" x="595" y="440" text-anchor="middle" font-size="13">ship or keep 3.7.0, per mode</text>
+    </svg>

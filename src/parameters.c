@@ -7,9 +7,6 @@
 #else
 #include <unistd.h>
 #endif
-#ifdef HAVE_OPENMP
-#include <omp.h>
-#endif
 #define PARAMETERS_IMPORT
 #include "parameters.h"
 
@@ -17,9 +14,7 @@ static int get_default_thread_count(void)
 {
         int cores = 1;
 
-#ifdef HAVE_OPENMP
-        cores = omp_get_num_procs();
-#elif defined(_WIN32)
+#if defined(_WIN32)
         SYSTEM_INFO sysinfo;
         GetSystemInfo(&sysinfo);
         cores = sysinfo.dwNumberOfProcessors;
@@ -50,9 +45,14 @@ struct parameters*init_param(void)
         param->gpo = -1.0;
         param->gpe = -1.0;
         param->tgpe = -1.0;
+        param->vsm_mode = -1;
+        param->vsm_kappa = -1.0f;
+        param->vsm_dzero = -1.0f;
+        param->guide_dist = -1;
         param->nthreads = get_default_thread_count();
-        param->min_support = 0;
-        param->load_poar = NULL;
+        param->fill_in = -1;
+        param->fill_anchor_frac = -1.0f;
+        param->fill_support = 0;
         param->mode = NULL;
         param->quiet = 0;
         param->out_format = 0;

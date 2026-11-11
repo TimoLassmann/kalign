@@ -6,9 +6,7 @@
 #include <mm_malloc.h>
 #endif
 
-#ifdef USE_THREADPOOL
 #include "threadpool.h"
-#endif
 
 #define ALN_APAIR_DIST_IMPORT
 #include "aln_apair_dist.h"
@@ -17,7 +15,6 @@ float pairwise_identity_dist(const char* a, const char* b, int alnlen);
 
 #define REALIGN_NUM_ANCHORS 32
 
-#ifdef USE_THREADPOOL
 struct apair_ctx {
         struct msa_seq** seqs;
         float** dm;
@@ -37,7 +34,6 @@ static void apair_row_fn(int row_start, int row_end, void *arg)
                 }
         }
 }
-#endif
 
 int compute_aln_pairwise_dist(struct msa* msa, float*** dm_ptr)
 {
@@ -59,12 +55,10 @@ int compute_aln_pairwise_dist(struct msa* msa, float*** dm_ptr)
                 dm[i][i] = 0.0f;
         }
 
-#ifdef USE_THREADPOOL
         if(msa->pool && n >= KALIGN_DIST_MIN_SEQS){
                 struct apair_ctx ctx = { msa->sequences, dm, n, msa->alnlen };
                 tp_parallel_for_chunked(msa->pool, 0, n - 1, KALIGN_PFOR_MIN_CHUNK, apair_row_fn, &ctx);
         }else{
-#endif
         for(i = 0; i < n - 1; i++){
                 const char* seq_i = msa->sequences[i]->seq;
                 for(j = i + 1; j < n; j++){
@@ -74,9 +68,7 @@ int compute_aln_pairwise_dist(struct msa* msa, float*** dm_ptr)
                         dm[j][i] = d;
                 }
         }
-#ifdef USE_THREADPOOL
         }
-#endif
 
         *dm_ptr = dm;
         return OK;
@@ -126,8 +118,9 @@ float pairwise_identity_dist(const char* a, const char* b, int alnlen) {
 /* Pairwise identity distance callback for bisecting k-means leaf clusters. */
 /* ======================================================================== */
 
-float** aln_identity_pair_dist(struct msa* msa, int* samples, int n)
+float** aln_identity_pair_dist(struct msa* msa, int* samples, int n, void* ctx)
 {
+        (void)ctx;
         float** dm = NULL;
         int i, j;
 
@@ -160,7 +153,6 @@ ERROR:
 /* with O(N×K) distances + parallel bisecting k-means.                      */
 /* ======================================================================== */
 
-#ifdef USE_THREADPOOL
 struct anchor_aln_ctx {
         struct msa_seq** seqs;
         float* min_dist;
@@ -211,11 +203,10 @@ static void anchor_dm_row_fn(int start, int end, void* arg)
                 }
         }
 }
-#endif
 
 int pick_anchor_from_alignment(struct msa* msa, int K,
                                 int** anchors_out, int* K_out)
-{
+{ KPERF_PHASE_REGION(KP_REALIGN_DIST, KPH_REALIGN);
         int numseq = msa->numseq;
         int* anchors = NULL;
         float* min_dist = NULL;
@@ -251,7 +242,6 @@ int pick_anchor_from_alignment(struct msa* msa, int K,
         }
 
         /* Initialize min_dist: identity distance from each seq to first anchor */
-#ifdef USE_THREADPOOL
         if(msa->pool && numseq >= KALIGN_DIST_MIN_SEQS){
                 struct anchor_aln_ctx ctx = { msa->sequences, min_dist,
                                                anchors[0], msa->alnlen };
@@ -259,16 +249,13 @@ int pick_anchor_from_alignment(struct msa* msa, int K,
                                          KALIGN_PFOR_MIN_CHUNK,
                                          anchor_aln_init_fn, &ctx);
         }else{
-#endif
         for(i = 0; i < numseq; i++){
                 min_dist[i] = pairwise_identity_dist(
                         msa->sequences[i]->seq,
                         msa->sequences[anchors[0]]->seq,
                         msa->alnlen);
         }
-#ifdef USE_THREADPOOL
         }
-#endif
         min_dist[anchors[0]] = -1.0f;
 
         /* Farthest-first: pick remaining K-1 anchors */
@@ -285,7 +272,6 @@ int pick_anchor_from_alignment(struct msa* msa, int K,
                 min_dist[best_idx] = -1.0f;
 
                 /* Update min_dist with new anchor */
-#ifdef USE_THREADPOOL
                 if(msa->pool && numseq >= KALIGN_DIST_MIN_SEQS){
                         struct anchor_aln_ctx ctx = { msa->sequences, min_dist,
                                                        best_idx, msa->alnlen };
@@ -293,7 +279,6 @@ int pick_anchor_from_alignment(struct msa* msa, int K,
                                                  KALIGN_PFOR_MIN_CHUNK,
                                                  anchor_aln_update_fn, &ctx);
                 }else{
-#endif
                 for(i = 0; i < numseq; i++){
                         if(min_dist[i] < 0.0f) continue;
                         float d = pairwise_identity_dist(
@@ -304,9 +289,7 @@ int pick_anchor_from_alignment(struct msa* msa, int K,
                                 min_dist[i] = d;
                         }
                 }
-#ifdef USE_THREADPOOL
                 }
-#endif
         }
 
         MFREE(min_dist);
@@ -321,7 +304,7 @@ ERROR:
 
 int compute_aln_anchor_dist(struct msa* msa, int* anchors, int K,
                              float*** dm_out)
-{
+{ KPERF_PHASE_REGION(KP_REALIGN_DIST, KPH_REALIGN);
         float** dm = NULL;
         int numseq = msa->numseq;
         int i, j;
@@ -354,7 +337,6 @@ int compute_aln_anchor_dist(struct msa* msa, int* anchors, int K,
         }
 
         /* Fill N×K: identity distance from each seq to each anchor */
-#ifdef USE_THREADPOOL
         if(msa->pool && numseq >= KALIGN_DIST_MIN_SEQS){
                 struct anchor_dm_ctx ctx = { msa->sequences, anchors, K,
                                               msa->alnlen, dm };
@@ -362,7 +344,6 @@ int compute_aln_anchor_dist(struct msa* msa, int* anchors, int K,
                                          KALIGN_PFOR_MIN_CHUNK,
                                          anchor_dm_row_fn, &ctx);
         }else{
-#endif
         for(i = 0; i < numseq; i++){
                 const char* seq_i = msa->sequences[i]->seq;
                 for(j = 0; j < K; j++){
@@ -371,9 +352,7 @@ int compute_aln_anchor_dist(struct msa* msa, int* anchors, int K,
                                 msa->alnlen);
                 }
         }
-#ifdef USE_THREADPOOL
         }
-#endif
 
         *dm_out = dm;
         return OK;

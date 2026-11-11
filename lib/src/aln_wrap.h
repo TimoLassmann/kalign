@@ -19,7 +19,7 @@
 struct msa;
 
 /* Internal single-run entry point.  Caller must set msa->pool before
-   calling (if USE_THREADPOOL is enabled).  Does NOT create or destroy
+   calling (NULL runs serially).  Does NOT create or destroy
    the threadpool.  Used by kalign_align_full and ensemble.c. */
 EXTERN int kalign_single_run(struct msa *msa,
                              const struct kalign_run_config *cfg,

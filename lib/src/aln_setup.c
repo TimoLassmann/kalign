@@ -7,11 +7,13 @@
 
 #include "aln_mem.h"
 
+#include "aln_gapmodel.h"
+
 #define ALN_SETUP_IMPORT
 #include "aln_setup.h"
 
 int init_alnmem(struct aln_mem* m)
-{
+{ KPERF_REGION(KP_ALNMEM);
         int i;
         int g;
         m->starta = 0;
@@ -38,7 +40,7 @@ ERROR:
 }
 
 int make_profile_n(struct aln_param* ap,const uint8_t* seq,const int len, float weight, float** p)
-{
+{ KPERF_REGION(KP_PROF_MAKE);
         float** subm = NULL;
         float* prof = NULL;
         float gpo;
@@ -92,6 +94,9 @@ int make_profile_n(struct aln_param* ap,const uint8_t* seq,const int len, float 
         prof[23+32] = -gpo;
         prof[24+32] = -gpe;
         prof[25+32] = -tgpe;
+        if(ap->gap_model){
+                gm_leaf_counts(prof, len);
+        }
         *p = prof;
         return OK;
 ERROR:
@@ -99,7 +104,7 @@ ERROR:
 }
 
 int set_gap_penalties_n(float* prof,int len,int nsip)
-{
+{ KPERF_REGION(KP_PROF_GAPS);
         int i;
 
         prof +=  (64 *(len+1));
@@ -119,7 +124,7 @@ int set_gap_penalties_n(float* prof,int len,int nsip)
 }
 
 int add_gap_info_to_path_n(struct aln_mem* m)
-{
+{ KPERF_REGION(KP_PATH_CONV);
         int* path = NULL;
         int* o_path = NULL;
         int* tmp_path = NULL;
@@ -228,7 +233,10 @@ int add_gap_info_to_path_n(struct aln_mem* m)
 }
 
 int update_n(const float* profa, const float* profb,float* newp, struct aln_param*ap, int* path,int sipa,int sipb)
-{
+{ KPERF_REGION(KP_PROF_UPDATE);
+        if(ap->gap_model){
+                return update_n_gm(profa, profb, newp, ap, path, sipa, sipb);
+        }
         float gp;
         int i;
         int j;
@@ -436,7 +444,7 @@ int update_n(const float* profa, const float* profb,float* newp, struct aln_para
 }
 
 int mirror_path_n(struct aln_mem* m,int len_a,int len_b)
-{
+{ KPERF_REGION(KP_PATH_CONV);
         int* apath = NULL;
         int* opath = NULL;
         int* tmppath = NULL;

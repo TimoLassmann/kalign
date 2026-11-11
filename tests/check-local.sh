@@ -150,7 +150,6 @@ phase_python() {
         return 0
     fi
     if ! uv pip install -e . \
-            --config-settings cmake.args="-DUSE_OPENMP=OFF;-DUSE_THREADPOOL=ON" \
             --force-reinstall --no-deps --quiet; then
         record_fail "Phase 4 (pytest — install)"
         return 1

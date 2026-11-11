@@ -26,8 +26,6 @@ EXTERN float compute_subm_offset(struct msa* msa, struct aln_param* ap, int a, i
 EXTERN int create_chaos_msa_serial(struct msa* msa, struct aln_param* ap,struct aln_tasks* t);
 EXTERN int create_msa_serial(struct msa* msa, struct aln_param* ap,struct aln_tasks* t);
 
-/* EXTERN int create_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tasks* t); */
-EXTERN int create_chaos_msa_openMP(struct msa* msa, struct aln_param* ap,struct aln_tasks* t);
 
 #undef ALN_RUN_IMPORT
 #undef EXTERN

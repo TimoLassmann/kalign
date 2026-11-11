@@ -104,10 +104,14 @@ int aln_param_init(struct aln_param **aln_param,int biotype , int n_threads, int
         ap->dist_scale = 0.0f;
         ap->vsm_amax = (biotype == ALN_BIOTYPE_PROTEIN) ? 2.0f : 0.0f;
         ap->subm_offset = 0.0f;
+        ap->vsm_mode = 0;
+        ap->vsm_kappa = 1.0f;
+        ap->vsm_dzero = 1.0f;
         ap->adaptive_budget = 0;
         ap->use_seq_weights = 0.0f;
         ap->consistency_anchors = 0;
         ap->consistency_weight = 2.0f;
+        ap->gap_model = 0;
         *aln_param = ap;
         return OK;
 ERROR:

@@ -2,7 +2,6 @@
 #include "msa_struct.h"
 #include "bpm.h"
 
-#ifdef USE_THREADPOOL
 #include "threadpool.h"
 
 struct anchor_dist_ctx {
@@ -10,6 +9,8 @@ struct anchor_dist_ctx {
         float* min_dist;
         uint8_t* anchor_s;
         int anchor_len;
+        float** dist;   /* optional N x K cache of the BPM distances, or NULL */
+        int k;
 };
 
 static void anchor_init_fn(int start, int end, void *arg)
@@ -22,6 +23,7 @@ static void anchor_init_fn(int start, int end, void *arg)
                         c->min_dist[i] = (float)BPM(si, c->anchor_s, li, c->anchor_len);
                 else
                         c->min_dist[i] = (float)BPM(c->anchor_s, si, c->anchor_len, li);
+                if (c->dist) c->dist[i][c->k] = c->min_dist[i];
         }
 }
 
@@ -37,11 +39,11 @@ static void anchor_update_fn(int start, int end, void *arg)
                         d = (float)BPM(si, c->anchor_s, li, c->anchor_len);
                 else
                         d = (float)BPM(c->anchor_s, si, c->anchor_len, li);
+                if (c->dist) c->dist[i][c->k] = d;
                 if (d < c->min_dist[i])
                         c->min_dist[i] = d;
         }
 }
-#endif
 
 #define PICK_ANCHOR_IMPORT
 #include "pick_anchor.h"
@@ -56,7 +58,11 @@ static void anchor_update_fn(int start, int end, void *arg)
  *
  * Cost: K * N BPM calls — microseconds for typical inputs.
  */
-static int* pick_anchor_farthest_first(struct msa* msa, int K, int* n_out)
+/* dist (optional): numseq x K matrix, filled with -1 by the caller; on
+   return dist[i][k] holds the BPM distance between sequence i and anchor k
+   wherever it was computed here, called exactly as calc_distance() calls it,
+   so d_estimation can reuse it instead of recomputing it. */
+static int* pick_anchor_farthest_first(struct msa* msa, int K, int* n_out, float** dist)
 {
         int numseq = msa->numseq;
         int* anchors = NULL;
@@ -95,12 +101,10 @@ static int* pick_anchor_farthest_first(struct msa* msa, int K, int* n_out)
         {
                 uint8_t* anchor_s = msa->sequences[anchors[0]]->s;
                 int anchor_len = msa->sequences[anchors[0]]->len;
-#ifdef USE_THREADPOOL
                 if(msa->pool && numseq >= KALIGN_DIST_MIN_SEQS){
-                        struct anchor_dist_ctx ctx = { msa->sequences, min_dist, anchor_s, anchor_len };
+                        struct anchor_dist_ctx ctx = { msa->sequences, min_dist, anchor_s, anchor_len, dist, 0 };
                         tp_parallel_for_chunked(msa->pool, 0, numseq, KALIGN_PFOR_MIN_CHUNK, anchor_init_fn, &ctx);
                 }else{
-#endif
                 for(i = 0; i < numseq; i++){
                         uint8_t* si = msa->sequences[i]->s;
                         int li = msa->sequences[i]->len;
@@ -109,10 +113,9 @@ static int* pick_anchor_farthest_first(struct msa* msa, int K, int* n_out)
                         }else{
                                 min_dist[i] = (float)BPM(anchor_s, si, anchor_len, li);
                         }
+                        if(dist) dist[i][0] = min_dist[i];
                 }
-#ifdef USE_THREADPOOL
                 }
-#endif
                 min_dist[anchors[0]] = -1.0f;  /* mark as selected */
         }
 
@@ -133,12 +136,10 @@ static int* pick_anchor_farthest_first(struct msa* msa, int K, int* n_out)
                 /* Update min_dist with new anchor */
                 uint8_t* anchor_s = msa->sequences[best_idx]->s;
                 int anchor_len = msa->sequences[best_idx]->len;
-#ifdef USE_THREADPOOL
                 if(msa->pool && numseq >= KALIGN_DIST_MIN_SEQS){
-                        struct anchor_dist_ctx ctx = { msa->sequences, min_dist, anchor_s, anchor_len };
+                        struct anchor_dist_ctx ctx = { msa->sequences, min_dist, anchor_s, anchor_len, dist, k };
                         tp_parallel_for_chunked(msa->pool, 0, numseq, KALIGN_PFOR_MIN_CHUNK, anchor_update_fn, &ctx);
                 }else{
-#endif
                 for(i = 0; i < numseq; i++){
                         if(min_dist[i] < 0.0f) continue;  /* already selected */
                         uint8_t* si = msa->sequences[i]->s;
@@ -149,13 +150,12 @@ static int* pick_anchor_farthest_first(struct msa* msa, int K, int* n_out)
                         }else{
                                 d = (float)BPM(anchor_s, si, anchor_len, li);
                         }
+                        if(dist) dist[i][k] = d;
                         if(d < min_dist[i]){
                                 min_dist[i] = d;
                         }
                 }
-#ifdef USE_THREADPOOL
                 }
-#endif
         }
 
         MFREE(min_dist);
@@ -168,17 +168,59 @@ ERROR:
 }
 
 int* pick_anchor(struct msa* msa, int* n)
-{
+{ KPERF_REGION(KP_TREE_PICK_ANCHOR);
         ASSERT(msa != NULL, "No alignment.");
-        return pick_anchor_farthest_first(msa, DEFAULT_NUM_ANCHORS, n);
+        return pick_anchor_farthest_first(msa, DEFAULT_NUM_ANCHORS, n, NULL);
 ERROR:
         return NULL;
 }
 
-int* pick_anchor_n(struct msa* msa, int requested, int* n)
-{
+int* pick_anchor_dist(struct msa* msa, int* n, float*** dist_out)
+{ KPERF_REGION(KP_TREE_PICK_ANCHOR);
+        float** dist = NULL;
+        int* anchors = NULL;
+        int i, k;
+        int K = DEFAULT_NUM_ANCHORS;
         ASSERT(msa != NULL, "No alignment.");
-        return pick_anchor_farthest_first(msa, requested, n);
+        if(K > msa->numseq) K = msa->numseq;
+        if(K < 1) K = 1;
+        MMALLOC(dist, sizeof(float*) * msa->numseq);
+        for(i = 0; i < msa->numseq; i++){
+                dist[i] = NULL;
+        }
+        for(i = 0; i < msa->numseq; i++){
+                MMALLOC(dist[i], sizeof(float) * K);
+                for(k = 0; k < K; k++){
+                        dist[i][k] = -1.0F;
+                }
+        }
+        RUNP(anchors = pick_anchor_farthest_first(msa, K, n, dist));
+        *dist_out = dist;
+        return anchors;
+ERROR:
+        if(dist){
+                for(i = 0; i < msa->numseq; i++){
+                        if(dist[i]) MFREE(dist[i]);
+                }
+                MFREE(dist);
+        }
+        return NULL;
+}
+
+void pick_anchor_dist_free(float** dist, int numseq)
+{
+        int i;
+        if(!dist) return;
+        for(i = 0; i < numseq; i++){
+                MFREE(dist[i]);
+        }
+        MFREE(dist);
+}
+
+int* pick_anchor_n(struct msa* msa, int requested, int* n)
+{ KPERF_REGION(KP_TREE_PICK_ANCHOR);
+        ASSERT(msa != NULL, "No alignment.");
+        return pick_anchor_farthest_first(msa, requested, n, NULL);
 ERROR:
         return NULL;
 }

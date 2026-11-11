@@ -5,14 +5,22 @@
 
 #include "aln_param.h"
 #include "aln_struct.h"
+#ifdef KALIGN_WAVE
+#include "aln_wave.h"
+#endif
 #include "anchor_consistency.h"
+#include "aln_gapmodel.h"
 #define ALN_SEQPROFILE_IMPORT
 #include "aln_seqprofile.h"
 #define MAX(a, b) (a > b ? a : b)
 #define MAX3(a,b,c) MAX(MAX(a,b),c)
 
 int aln_seqprofile_foward(struct aln_mem* m)
-{
+{ KPERF_DP(KPERF_DP_SP, KPERF_DP_FWD, m, (int64_t)(m->enda - m->starta) * (m->endb - m->startb));
+        if(m->gm) return gm_sp_forward(m);   /* member gap model */
+#ifdef KALIGN_WAVE
+        if(m->wave && !aln_wave_sp(m, 1)) return OK;
+#endif
         struct states* s = m->f;
         const float* prof1 = m->prof1;
         const uint8_t* seq2 = m->seq2;
@@ -81,7 +89,7 @@ int aln_seqprofile_foward(struct aln_mem* m)
 
                         pa += prof1[32 + seq2[j]];
                         if(m->consistency){
-                                pa += sparse_bonus_lookup(m->consistency, i, j);
+                                pa += sparse_bonus_lookup(m->consistency, i, j - 1);
                         }
 
                         s[j].a = pa;
@@ -106,7 +114,7 @@ int aln_seqprofile_foward(struct aln_mem* m)
 
                 pa += prof1[32 + seq2[j]];
                 if(m->consistency){
-                        pa += sparse_bonus_lookup(m->consistency, i, j);
+                        pa += sparse_bonus_lookup(m->consistency, i, j - 1);
                 }
 
                 s[j].a = pa;
@@ -116,7 +124,7 @@ int aln_seqprofile_foward(struct aln_mem* m)
                 if (m->endb != m->len_b){
                         s[j].gb = MAX(s[j].gb+prof1[28] ,ca+prof1[27]);
                 }else{
-                        s[j].gb = MAX(s[j].gb,ca)+ prof1[29];
+                        s[j].gb = MAX(s[j].gb, ca + prof1[27]) + prof1[29];
                 }
         }
         //prof1 -= m->enda << 6;
@@ -124,7 +132,11 @@ int aln_seqprofile_foward(struct aln_mem* m)
 }
 
 int aln_seqprofile_backward(struct aln_mem* m)
-{
+{ KPERF_DP(KPERF_DP_SP, KPERF_DP_BWD, m, (int64_t)(m->enda_2 - m->starta_2) * (m->endb - m->startb));
+        if(m->gm) return gm_sp_backward(m);   /* member gap model */
+#ifdef KALIGN_WAVE
+        if(m->wave && !aln_wave_sp(m, -1)) return OK;
+#endif
         struct states* s = m->b;
         const float* prof1 = m->prof1;
         const uint8_t* seq2 = m->seq2;
@@ -181,7 +193,7 @@ int aln_seqprofile_backward(struct aln_mem* m)
                 xga = s[m->endb].ga;
 
                 if(m->endb != m->len_b){
-                        s[m->endb].gb = MAX(pgb+prof1[28],pa+prof1[27]);
+                        s[m->endb].gb = MAX(pgb+prof1[92],pa+prof1[27]);
                 }else{
                         s[m->endb].gb = MAX(pgb,pa) +prof1[29];
                 }
@@ -204,7 +216,7 @@ int aln_seqprofile_backward(struct aln_mem* m)
 
                         pgb = s[j].gb;
 
-                        s[j].gb = MAX(pgb+prof1[28],ca+prof1[27]);
+                        s[j].gb = MAX(pgb+prof1[92],ca+prof1[27]);
 
                         pa = ca;
                         xa = s[j].a;
@@ -222,16 +234,17 @@ int aln_seqprofile_backward(struct aln_mem* m)
 
                 s[j].ga = -FLT_MAX;//MAX(s[j+1].ga-ext,s[j+1].a-open);
                 if(m->startb){
-                        s[j].gb = MAX(s[j].gb+prof1[28], ca+prof1[27]);
+                        s[j].gb = MAX(s[j].gb+prof1[92], ca+prof1[27]);
                 }else{
-                        s[j].gb = MAX(s[j].gb,ca)+prof1[29];
+                        s[j].gb = MAX(s[j].gb, ca + prof1[27]) + prof1[29];
                 }
         }
         return OK;
 }
 
 int aln_seqprofile_meetup(struct aln_mem* m,int old_cor[],int* meet,int* t,float* score)
-{
+{ KPERF_DP(KPERF_DP_SP, KPERF_DP_MEET, m, (int64_t)(old_cor[3] - old_cor[2] + 1));
+        if(m->gm) return gm_sp_meetup(m, old_cor, meet, t, score);   /* member gap model */
         struct states* f = m->f;
         struct states* b = m->b;
         const float* prof1 = m->prof1;
@@ -314,8 +327,10 @@ int aln_seqprofile_meetup(struct aln_mem* m,int old_cor[],int* meet,int* t,float
                 }
 
 
-                if(m->startb == 0){
-                        s_tmp = f[i].gb+b[i].gb+prof1[29]-sub;
+                /* gb -> gb join: in column 0 (startb == 0) both halves
+                   already carry their rows' terminal cost; elsewhere extend */
+                if(i == 0){
+                        s_tmp = f[i].gb+b[i].gb-sub;
                 }else{
                         s_tmp = f[i].gb+b[i].gb+prof1[28]-sub;
                 }
@@ -354,8 +369,9 @@ int aln_seqprofile_meetup(struct aln_mem* m,int old_cor[],int* meet,int* t,float
                 max2 = s_tmp; c2 = i; transition2 = 3;
         }
 
+        /* last column: trailing row gap, already priced by both halves */
         if(m->endb == m->len_b){
-                s_tmp = f[i].gb+b[i].gb+prof1[29]-sub;
+                s_tmp = f[i].gb+b[i].gb-sub;
         }else{
                 s_tmp = f[i].gb+b[i].gb+prof1[28]-sub;
         }

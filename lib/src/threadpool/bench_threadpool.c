@@ -5,8 +5,7 @@
  *   2. Recursive tree    (task spawning)
  *   3. Fork-join 2 tasks (Hirschberg-like)
  *
- * Each benchmark compares serial, threadpool (1..N threads),
- * and optionally OpenMP.
+ * Each benchmark compares serial and threadpool (1..N threads).
  */
 
 #include "threadpool.h"
@@ -17,9 +16,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#ifdef HAVE_OPENMP
-#include <omp.h>
-#endif
 
 /* ── Timing ───────────────────────────────────────────────────── */
 
@@ -122,24 +118,6 @@ static double bench_dm_tp(uint8_t **seqs, float **dm,
     return elapsed;
 }
 
-#ifdef HAVE_OPENMP
-static double bench_dm_omp(uint8_t **seqs, float **dm,
-                           int N, int M, int L)
-{
-    double t0 = now();
-    int i, j, k;
-    #pragma omp parallel for shared(dm, seqs) private(i, j, k) schedule(static)
-    for (i = 0; i < N; i++) {
-        for (j = 0; j < M; j++) {
-            int diff = 0;
-            for (k = 0; k < L; k++)
-                diff += (seqs[i][k] != seqs[j][k]);
-            dm[i][j] = (float)diff / (float)L;
-        }
-    }
-    return now() - t0;
-}
-#endif
 
 /* ══════════════════════════════════════════════════════════════════
  * 2. RECURSIVE TREE (task spawning)
@@ -232,20 +210,6 @@ static void tree_tp_task(void *arg)
     n->result = n->left->result + n->right->result;
 }
 
-#ifdef HAVE_OPENMP
-static void tree_omp_task(struct tree_node *n)
-{
-    if (n->leaf_id >= 0) { n->result = leaf_work(n->leaf_id); return; }
-
-    #pragma omp task shared(n)
-    tree_omp_task(n->left);
-    #pragma omp task shared(n)
-    tree_omp_task(n->right);
-    #pragma omp taskwait
-
-    n->result = n->left->result + n->right->result;
-}
-#endif
 
 /* ══════════════════════════════════════════════════════════════════
  * 3. FORK-JOIN (Hirschberg-style: 2 independent tasks)
@@ -362,9 +326,6 @@ int main(void)
         printf("  %-14s %10s", "Size", "serial");
         for (int t = 0; t < ntc; t++)
             printf("  tp(%2d)  ", tc[t]);
-#ifdef HAVE_OPENMP
-        printf("  omp     ");
-#endif
         printf("\n");
 
         for (int s = 0; s < nsizes; s++) {
@@ -397,13 +358,6 @@ int main(void)
                 printf(" %s", buf);
             }
 
-#ifdef HAVE_OPENMP
-            for (int r = 0; r < NREPS; r++)
-                times[r] = bench_dm_omp(seqs, dm, N, M, L);
-            double omp_t = median(times, NREPS);
-            fmt_time(omp_t, buf, sizeof(buf));
-            printf(" %s", buf);
-#endif
             printf("\n");
 
             for (int i = 0; i < N; i++) free(dm[i]);
@@ -422,9 +376,6 @@ int main(void)
         printf("  %-14s %10s", "Depth/Leaves", "serial");
         for (int t = 0; t < ntc; t++)
             printf("  tp(%2d)  ", tc[t]);
-#ifdef HAVE_OPENMP
-        printf("  omp     ");
-#endif
         printf("\n");
 
         for (int d = 0; d < ndepths; d++) {
@@ -467,20 +418,6 @@ int main(void)
                 printf(" %s", buf);
             }
 
-#ifdef HAVE_OPENMP
-            for (int r = 0; r < NREPS; r++) {
-                int id = 0;
-                struct tree_node *root = build_tree(depth, &id);
-                double t0 = now();
-                #pragma omp parallel
-                #pragma omp single nowait
-                tree_omp_task(root);
-                times[r] = now() - t0;
-                free_tree(root);
-            }
-            fmt_time(median(times, NREPS), buf, sizeof(buf));
-            printf(" %s", buf);
-#endif
             printf("\n");
         }
         printf("\n");

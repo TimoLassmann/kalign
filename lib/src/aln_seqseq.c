@@ -6,6 +6,9 @@
 #include "aln_param.h"
 
 #include "aln_struct.h"
+#ifdef KALIGN_WAVE
+#include "aln_wave.h"
+#endif
 #include "anchor_consistency.h"
 
 #define ALN_SEQSEQ_IMPORT
@@ -14,7 +17,10 @@
 #define MAX3(a,b,c) MAX(MAX(a,b),c)
 
 int aln_seqseq_foward(struct aln_mem* m)
-{
+{ KPERF_DP(KPERF_DP_SS, KPERF_DP_FWD, m, (int64_t)(m->enda - m->starta) * (m->endb - m->startb));
+#ifdef KALIGN_WAVE
+        if(m->wave && !aln_wave_ss(m, 1)) return OK;
+#endif
         struct states* s = m->f;
         const uint8_t* seq1 = m->seq1;
         const uint8_t* seq2 = m->seq2;
@@ -82,7 +88,7 @@ int aln_seqseq_foward(struct aln_mem* m)
                         pa = MAX3(pa,pga-gpo,pgb-gpo);
                         pa += subp[seq2[j]] - soff;
                         if(m->consistency){
-                                pa += sparse_bonus_lookup(m->consistency, i, j);
+                                pa += sparse_bonus_lookup(m->consistency, i, j - 1);
                         }
 
                         s[j].a = pa;
@@ -104,7 +110,7 @@ int aln_seqseq_foward(struct aln_mem* m)
                 pa = MAX3(pa,pga-gpo,pgb-gpo);
                 pa += subp[seq2[j]] - soff;
                 if(m->consistency){
-                        pa += sparse_bonus_lookup(m->consistency, i, j);
+                        pa += sparse_bonus_lookup(m->consistency, i, j - 1);
                 }
 
                 s[j].a = pa;
@@ -113,14 +119,17 @@ int aln_seqseq_foward(struct aln_mem* m)
                 if (endb != m->len_b){
                         s[j].gb = MAX(s[j].gb-gpe ,ca-gpo);
                 }else{
-                        s[j].gb = MAX(s[j].gb,ca)-tgpe;
+                        s[j].gb = MAX(s[j].gb, ca - gpo) - tgpe;
                 }
         }
         return OK;
 }
 
 int aln_seqseq_backward(struct aln_mem* m)
-{
+{ KPERF_DP(KPERF_DP_SS, KPERF_DP_BWD, m, (int64_t)(m->enda_2 - m->starta_2) * (m->endb - m->startb));
+#ifdef KALIGN_WAVE
+        if(m->wave && !aln_wave_ss(m, -1)) return OK;
+#endif
         struct states* s = m->b;
         const uint8_t* seq1 = m->seq1;
         const uint8_t* seq2 = m->seq2;
@@ -232,7 +241,7 @@ int aln_seqseq_backward(struct aln_mem* m)
                 if(startb){
                         s[j].gb = MAX(s[j].gb-gpe,ca-gpo);
                 }else{
-                        s[j].gb = MAX(s[j].gb,ca)-tgpe;
+                        s[j].gb = MAX(s[j].gb, ca - gpo) - tgpe;
                 }
         }
         return OK;
@@ -240,14 +249,13 @@ int aln_seqseq_backward(struct aln_mem* m)
 
 
 int aln_seqseq_meetup(struct aln_mem* m,int old_cor[],int* meet,int* t,float* score)
-{
+{ KPERF_DP(KPERF_DP_SS, KPERF_DP_MEET, m, (int64_t)(old_cor[3] - old_cor[2] + 1));
         struct states* f = m->f;
         struct states* b = m->b;
 
 
         const float gpo = m->ap->gpo;
         const float gpe = m->ap->gpe;
-        const float tgpe = m->ap->tgpe;
         int i;
         int c;
         int c2 = -1;
@@ -320,8 +328,10 @@ int aln_seqseq_meetup(struct aln_mem* m,int old_cor[],int* meet,int* t,float* sc
                 }
 
 
-                if(m->startb == 0){
-                        s_tmp = f[i].gb+b[i].gb-tgpe-sub;
+                /* gb -> gb join: in column 0 (startb == 0) both halves
+                   already carry their rows' terminal cost; elsewhere extend */
+                if(i == 0){
+                        s_tmp = f[i].gb+b[i].gb-sub;
                 }else{
                         s_tmp = f[i].gb+b[i].gb-gpe-sub;
                 }
@@ -359,8 +369,9 @@ int aln_seqseq_meetup(struct aln_mem* m,int old_cor[],int* meet,int* t,float* sc
                 max2 = s_tmp; c2 = i; transition2 = 3;
         }
 
+        /* last column: trailing row gap, already priced by both halves */
         if(m->endb == m->len_b){
-                s_tmp = f[i].gb+b[i].gb-tgpe-sub;
+                s_tmp = f[i].gb+b[i].gb-sub;
         }else{
                 s_tmp = f[i].gb+b[i].gb-gpe-sub;
         }

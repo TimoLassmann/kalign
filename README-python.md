@@ -29,36 +29,36 @@ sequences = [
     "ATCGATCATCG"
 ]
 
-# Default mode — single run with consistency anchors (best general-purpose)
+# Default mode (= fast): a single run
 aligned = kalign.align(sequences)
 
-# Fast mode — single run, fastest
-aligned = kalign.align(sequences, mode="fast")
-
-# Accurate mode — ensemble, highest precision
+# Accurate mode: a 5-member ensemble with per-column confidence
 aligned = kalign.align(sequences, mode="accurate")
 ```
 
 ## Modes
 
-Kalign v3.5 provides four named modes, exposed identically through the Python API
-and the `kalign` command-line tool. Presets were derived from NSGA-III
-multi-objective optimization on BAliBASE v4 (protein) and BRAliBASE (RNA).
+Kalign 4 has two modes, each with a protein and a DNA/RNA setting, exposed
+identically through the Python API and the `kalign` command-line tool. The
+sequence type is detected from the input.
 
 | Mode | Python | CLI | Description |
 |------|--------|-----|-------------|
-| **fast** | `mode="fast"` | `kalign --mode fast` | Single run, fastest. |
-| **default** | `mode="default"` or omit | `kalign` (or `--mode default`) | Single run with consistency anchors. Best general-purpose. |
-| **recall** | `mode="recall"` | `kalign --mode recall` | Ensemble, optimized for recall. |
-| **accurate** | `mode="accurate"` | `kalign --mode accurate` | Ensemble, highest precision. |
+| **fast** | `mode="fast"`, or omit | `kalign` (or `--mode fast`) | Single run, fastest. The default. `"default"` is an alias. |
+| **accurate** | `mode="accurate"` | `kalign --mode accurate` | 5-member ensemble with per-column confidence, slower. At most 5,000 sequences. `"recall"` is an alias. |
+
+The four settings were fitted on reference alignments inside grouped nested
+cross-validation: fast by multi-objective search (NSGA-III); accurate by an
+NSGA-III ensemble search followed by a small grid over guide-tree noise and
+consensus support. Each shipped setting is the final fit on all training data,
+then scored on held-out data that the fit did not use. The fit code, the records and
+the settings are in [presets/](presets/) (`presets/recipe`, `presets/docs`,
+`presets/results`).
 
 Explicit parameters always override mode defaults:
 
 ```python
-# Fast base + 5 ensemble runs
-aligned = kalign.align(sequences, mode="fast", ensemble=5)
-
-# Accurate base + custom gap penalty
+# Accurate mode with a custom gap-open penalty
 aligned = kalign.align(sequences, mode="accurate", gap_open=8.0)
 ```
 
@@ -73,22 +73,22 @@ Mode constants are also available: `kalign.MODE_FAST`, `kalign.MODE_DEFAULT`,
 aligned = kalign.align(
     sequences,              # list of str
     mode=None,              # "fast", "default", "recall", "accurate", or None (= default)
-    seq_type="auto",        # "auto", "dna", "rna", "protein", "divergent", "internal"
+    seq_type="auto",        # "auto", "protein", "dna", "rna"
     gap_open=None,          # positive float, or None for defaults
     gap_extend=None,        # positive float, or None for defaults
     terminal_gap_extend=None,
     n_threads=None,         # int, or None for global default
-    refine="none",          # refinement mode: "none", "all", "confident", "inline"
-    ensemble=0,             # number of ensemble runs (0 = off, try 3-5)
-    min_support=0,          # explicit consensus threshold (0 = auto)
     fmt="plain",            # "plain", "biopython", "skbio"
     ids=None,               # list of str (for biopython/skbio output)
+    fill_in=None,           # ensemble modes only: None/"off", "realign", "project", "attach"
+    fill_anchor_frac=None,  # fill-in anchor column threshold (0-1)
+    fill_support=None,      # "attach" vote threshold (int >= 1)
 )
 ```
 
 Returns a list of aligned strings (default), a `Bio.Align.MultipleSeqAlignment` (`fmt="biopython"`), or a `skbio.TabularMSA` (`fmt="skbio"`).
 
-When `ensemble > 0` and `fmt="biopython"`, per-residue confidence is attached as HMMER-style PP `letter_annotations["posterior_probability"]`.
+For the ensemble modes (`mode="accurate"` or `mode="recall"`) with `fmt="biopython"`, per-residue confidence is attached as HMMER-style PP `letter_annotations["posterior_probability"]`.
 
 ### `kalign.align_from_file()`
 
@@ -108,11 +108,9 @@ Additional parameters for advanced use:
 result = kalign.align_from_file(
     "input.fasta",
     mode="accurate",             # or "fast", "default", "recall"
-    ensemble=5,                  # override: 5 runs instead of mode default
-    min_support=0,               # consensus threshold (0 = auto)
-    save_poar="consensus.poar",  # save POAR table for re-thresholding
-    # load_poar="consensus.poar",  # OR load pre-computed POAR
-    refine="none",               # refinement mode
+    seq_type="protein",          # "auto", "protein", "dna", "rna"
+    gap_open=None,               # override the preset's gap penalties
+    n_threads=4,
 )
 ```
 
@@ -146,16 +144,13 @@ Supported formats: `fasta`, `clustal`, `stockholm`, `phylip` (non-FASTA formats 
 
 ## Ensemble Alignment & Confidence Scores
 
-Ensemble mode runs multiple alignments with varied parameters and combines results via POAR (Pairs of Aligned Residues) consensus. The simplest way to use it is `mode="accurate"` (5-run ensemble) or `mode="recall"` (recall-tuned ensemble). For more control, set `ensemble` directly.
+Ensemble mode runs multiple alignments with varied parameters and combines results via POAR (Pairs of Aligned Residues) consensus. Use `mode="accurate"` (5-member ensemble; `mode="recall"` is an alias). The number of runs and their parameters come from the mode preset; the Python API does not take an explicit run count.
 
 ```python
 import kalign
 
-# Accurate mode: 5-run ensemble — highest precision
+# Accurate mode: 5-member ensemble
 result = kalign.align_from_file("proteins.fasta", mode="accurate")
-
-# Or: explicit 5 ensemble runs
-result = kalign.align_from_file("proteins.fasta", ensemble=5)
 
 # Per-column confidence: average agreement across ensemble runs [0..1]
 print(result.column_confidence[:10])   # e.g. [0.93, 0.87, 1.0, ...]
@@ -164,26 +159,12 @@ print(result.column_confidence[:10])   # e.g. [0.93, 0.87, 1.0, ...]
 print(result.residue_confidence[0][:10])  # e.g. [0.95, 0.90, 1.0, ...]
 ```
 
-### POAR Save/Load
-
-Save the POAR consensus table to avoid re-running the ensemble when experimenting with thresholds:
-
-```python
-# First run: compute ensemble and save POAR
-kalign.align_file_to_file("input.fa", "output.fa", ensemble=5,
-                          save_poar="consensus.poar")
-
-# Later: instant re-threshold from saved POAR (no re-alignment)
-kalign.align_file_to_file("input.fa", "output2.fa",
-                          load_poar="consensus.poar", min_support=3)
-```
-
 ### Stockholm Output with Confidence
 
 Write confidence annotations in Stockholm format (`#=GR PP` per-residue, `#=GC PP_cons` per-column):
 
 ```python
-result = kalign.align_from_file("input.fasta", ensemble=5)
+result = kalign.align_from_file("input.fasta", mode="accurate")
 kalign.write_alignment(
     result.sequences, "output.sto", format="stockholm",
     ids=result.names,
@@ -196,10 +177,10 @@ Confidence uses HMMER-style PP encoding: `*`=95%+, `9`=85-95%, ..., `0`=0-5%, `.
 
 ### Biopython Per-Residue PP
 
-When using `fmt="biopython"` with ensemble, per-residue confidence is attached as `letter_annotations["posterior_probability"]`:
+When using `fmt="biopython"` with an ensemble mode, per-residue confidence is attached as `letter_annotations["posterior_probability"]`:
 
 ```python
-aln = kalign.align(seqs, ensemble=3, fmt="biopython", ids=ids)
+aln = kalign.align(seqs, mode="accurate", fmt="biopython", ids=ids)
 print(aln[0].letter_annotations["posterior_probability"])  # e.g. "998.76*9..."
 ```
 
@@ -279,14 +260,17 @@ print(type(aln))  # <class 'skbio.alignment._tabular_msa.TabularMSA'>
 
 ### Sequence Types
 
+The same four types as the command line's `--type`. Anything but `"auto"`
+overrides detection and selects the protein or the DNA/RNA presets (`"dna"`
+and `"rna"` use the same presets); a `UserWarning` is issued when it differs
+from the detected type.
+
 | String | Constant | Description |
 |--------|----------|-------------|
-| `"auto"` | `kalign.AUTO` | Auto-detect (default) |
-| `"dna"` | `kalign.DNA` | DNA sequences |
-| `"rna"` | `kalign.RNA` | RNA sequences |
-| `"protein"` | `kalign.PROTEIN` | Protein sequences |
-| `"divergent"` | `kalign.PROTEIN_DIVERGENT` | Divergent protein sequences |
-| `"internal"` | `kalign.DNA_INTERNAL` | DNA with internal gap preference |
+| `"auto"` | `kalign.AUTO` | Detect from the input (default) |
+| `"protein"` | `kalign.PROTEIN` | Protein presets |
+| `"dna"` | `kalign.DNA` | DNA/RNA presets |
+| `"rna"` | `kalign.RNA` | DNA/RNA presets |
 
 ### Refinement Modes
 
@@ -303,17 +287,12 @@ print(type(aln))  # <class 'skbio.alignment._tabular_msa.TabularMSA'>
 # Modes
 kalign-py -i sequences.fasta -o aligned.fasta                    # default mode
 kalign-py --mode fast -i sequences.fasta -o aligned.fasta        # fast mode
-kalign-py --mode recall -i sequences.fasta -o aligned.fasta      # recall mode
 kalign-py --mode accurate -i sequences.fasta -o aligned.fasta    # accurate mode
 
 # I/O options
 kalign-py -i sequences.fasta -o - --format clustal               # stdout
 cat input.fa | kalign-py -i - -o aligned.fasta                   # stdin
 kalign-py -i sequences.fasta -o aligned.fasta --type protein     # explicit type
-
-# Ensemble with POAR save/load
-kalign-py -i input.fa -o output.fa --ensemble 5 --save-poar consensus.poar
-kalign-py -i input.fa -o output.fa --load-poar consensus.poar --min-support 3
 
 kalign-py --version
 ```

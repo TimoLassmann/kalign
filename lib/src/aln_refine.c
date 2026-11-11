@@ -13,15 +13,38 @@
 #include "sp_score.h"
 #include "aln_run.h"
 #include "anchor_consistency.h"
+#include "aln_vsm.h"
 
 #define ALN_REFINE_IMPORT
 #include "aln_refine.h"
 
 #define REFINE_N_TRIALS 5
 
+#include <stdatomic.h>
+#include "threadpool.h"
+
+struct refine_ctx {
+        struct msa* msa;
+        struct aln_param* ap;
+        struct aln_tasks* t;
+        int refine_mode;
+        float threshold;
+        int* parent;
+        atomic_int* pending;
+        atomic_int error;
+};
+struct refine_arg {
+        struct refine_ctx* ctx;
+        int node;
+};
+static void refine_run_chain(struct refine_ctx* c, int node);
+static int refine_tree(struct msa* msa, struct aln_param* ap, struct aln_tasks* t,
+                       int refine_mode, float threshold);
+
+static int refine_or_replay(struct msa* msa, struct aln_param* ap, struct aln_tasks* t,
+                            int refine_mode, float threshold, int task_id);
 static int refine_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int task_id);
 static int replay_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int task_id);
-static int dispatch_alignment(struct msa* msa, struct aln_mem* ml, float* prof_a, float* prof_b, int a, int b, int len_a, int len_b);
 static int convert_raw_path(struct aln_mem* m);
 static int compute_confidence_threshold(struct aln_tasks* t, float* threshold);
 
@@ -34,7 +57,7 @@ static float leaf_weight(struct msa* msa, int node)
 }
 
 int refine_alignment(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int refine_mode)
-{
+{ KPERF_PHASE_REGION(KP_REFINE, KPH_REFINE);
         int i;
         float threshold = 0.0F;
 
@@ -61,20 +84,15 @@ int refine_alignment(struct msa* msa, struct aln_param* ap, struct aln_tasks* t,
 
         /* Process all edges bottom-up using progressive profile building.
            Each edge builds profiles from its children (identical to original
-           progressive alignment), then refined edges run multi-trial DP. */
-        for(i = 0; i < t->n_tasks; i++){
-                int should_refine = 0;
-                if(refine_mode == KALIGN_REFINE_ALL){
-                        should_refine = 1;
-                }else if(refine_mode == KALIGN_REFINE_CONFIDENT){
-                        should_refine = (t->list[i]->confidence <= threshold);
+           progressive alignment), then refined edges run multi-trial DP.
+           An edge depends only on its own subtree, so with a thread pool
+           the two subtrees of every node are refined concurrently (as in
+           create_msa_tree); the result does not depend on the order. */
+        {
+                for(i = 0; i < t->n_tasks; i++){
+                        ASSERT(t->list[i]->c == msa->numseq + i, "Tasks not in tree order");
                 }
-
-                if(should_refine){
-                        RUN(refine_edge(msa, ap, t, i));
-                }else{
-                        RUN(replay_edge(msa, ap, t, i));
-                }
+                RUN(refine_tree(msa, ap, t, refine_mode, threshold));
         }
 
         return OK;
@@ -82,9 +100,307 @@ ERROR:
         return FAIL;
 }
 
+static int refine_or_replay(struct msa* msa, struct aln_param* ap, struct aln_tasks* t,
+                            int refine_mode, float threshold, int task_id)
+{
+        int should_refine = 0;
+        if(refine_mode == KALIGN_REFINE_ALL){
+                should_refine = 1;
+        }else if(refine_mode == KALIGN_REFINE_CONFIDENT){
+                should_refine = (t->list[task_id]->confidence <= threshold);
+        }
+        if(should_refine){
+                return refine_edge(msa, ap, t, task_id);
+        }
+        return replay_edge(msa, ap, t, task_id);
+}
+
+static void refine_task(void* arg)
+{
+        struct refine_arg* a = (struct refine_arg*)arg;
+        refine_run_chain(a->ctx, a->node);
+}
+
+/* Refine node, then keep going up the tree for as long as this thread
+   finishes the last unfinished child of the parent.  Nothing here waits
+   on another tree task, so stack use does not depend on tree depth. */
+static void refine_run_chain(struct refine_ctx* c, int node)
+{
+        while(node >= 0){
+                int p;
+                if(atomic_load(&c->error)){
+                        return;
+                }
+                if(refine_or_replay(c->msa, c->ap, c->t, c->refine_mode, c->threshold, node) != OK){
+                        atomic_store(&c->error, 1);
+                        return;
+                }
+                p = c->parent[node];
+                if(p < 0){
+                        return;
+                }
+                if(atomic_fetch_sub_explicit(&c->pending[p], 1, memory_order_acq_rel) != 1){
+                        return;
+                }
+                node = p;
+        }
+}
+
+static int refine_tree(struct msa* msa, struct aln_param* ap, struct aln_tasks* t,
+                       int refine_mode, float threshold)
+{
+        struct refine_ctx c;
+        struct refine_arg* args = NULL;
+        int* ready = NULL;
+        int n = t->n_tasks;
+        int n_ready = 0;
+        int i;
+
+        c.msa = msa;
+        c.ap = ap;
+        c.t = t;
+        c.refine_mode = refine_mode;
+        c.threshold = threshold;
+        c.parent = NULL;
+        c.pending = NULL;
+        atomic_init(&c.error, 0);
+
+        MMALLOC(c.parent, sizeof(int) * n);
+        MMALLOC(c.pending, sizeof(atomic_int) * n);
+        MMALLOC(ready, sizeof(int) * n);
+        for(i = 0; i < n; i++){
+                c.parent[i] = -1;
+                atomic_init(&c.pending[i], 0);
+        }
+        for(i = 0; i < n; i++){
+                int ch[2];
+                int j;
+                ch[0] = t->list[i]->a - msa->numseq;
+                ch[1] = t->list[i]->b - msa->numseq;
+                for(j = 0; j < 2; j++){
+                        if(ch[j] >= 0){
+                                c.parent[ch[j]] = i;
+                                atomic_fetch_add(&c.pending[i], 1);
+                        }
+                }
+        }
+        for(i = 0; i < n; i++){
+                if(atomic_load(&c.pending[i]) == 0){
+                        ready[n_ready++] = i;
+                }
+        }
+        if(ap->pool){
+                tp_group_t* g = tp_group_create(ap->pool);
+                MMALLOC(args, sizeof(struct refine_arg) * n_ready);
+                for(i = 0; i < n_ready; i++){
+                        args[i].ctx = &c;
+                        args[i].node = ready[i];
+                        if(!g || tp_group_submit(g, refine_task, &args[i]) != 0){
+                                refine_run_chain(&c, ready[i]);
+                        }
+                }
+                if(g){
+                        tp_group_wait(g);
+                        tp_group_destroy(g);
+                }
+                MFREE(args);
+                args = NULL;
+        }else{
+                for(i = 0; i < n_ready; i++){
+                        refine_run_chain(&c, ready[i]);
+                }
+        }
+        if(atomic_load(&c.error)){
+                ERROR_MSG("Refinement failed");
+        }
+        MFREE(ready);
+        MFREE(c.pending);
+        MFREE(c.parent);
+        return OK;
+ERROR:
+        if(args){
+                MFREE(args);
+        }
+        if(ready){
+                MFREE(ready);
+        }
+        if(c.pending){
+                MFREE(c.pending);
+        }
+        if(c.parent){
+                MFREE(c.parent);
+        }
+        return FAIL;
+}
+
 /* Process an edge with multi-trial DP: builds progressive profiles
    (identical to do_align), runs K alignment trials (one deterministic
    baseline plus threshold-based alternatives), keeps the best by SP score. */
+/* One alignment trial on ml: trial 0 is the deterministic baseline, trial
+   k > 0 flips meetups whose margin is below avg_margin (every
+   (n_trials-1)-th one, offset k).  Leaves the 0/1/2 path in ml->path and
+   its sum-of-pairs score in *sp. */
+static int run_trial(struct msa* msa, struct aln_param* ap, struct aln_mem* ml,
+                     float* prof_a, float* prof_b, int a, int b, int len_a, int len_b,
+                     int k, int n_trials, float avg_margin, float* sp)
+{
+        /* Re-initialize DP state before each trial. The Hirschberg
+           recursion only writes matched positions to the path array;
+           unmatched positions must be -1. After convert_raw_path swaps
+           path/tmp_path, the buffer contains stale 0/1/2 values. */
+        {
+                int _g = MACRO_MAX(len_a, len_b) + 2;
+                int _i;
+                for(_i = 0; _i < _g; _i++){
+                        ml->path[_i] = -1;
+                }
+        }
+        ml->starta = 0;
+        ml->startb = 0;
+        ml->enda = len_a;
+        ml->endb = len_b;
+        ml->len_a = len_a;
+        ml->len_b = len_b;
+        ml->f[0].a = 0.0F;
+        ml->f[0].ga = -FLT_MAX;
+        ml->f[0].gb = -FLT_MAX;
+        ml->b[0].a = 0.0F;
+        ml->b[0].ga = -FLT_MAX;
+        ml->b[0].gb = -FLT_MAX;
+        ml->margin_sum = 0.0F;
+        ml->margin_count = 0;
+
+        if(k == 0){
+                ml->flip_threshold = 0.0F;
+                ml->flip_trial = 0;
+        }else{
+                ml->flip_threshold = avg_margin;
+                ml->flip_trial = k;
+                ml->flip_stride = n_trials - 1;
+                ml->flip_counter = 0;
+        }
+
+        RUN(dispatch_alignment(msa, ml, prof_a, prof_b, a, b, len_a, len_b));
+
+        /* Convert raw DP path to 0/1/2 format with gap info */
+        RUN(convert_raw_path(ml));
+
+        /* Score this candidate with sum-of-pairs */
+        *sp = 0.0F;
+        RUN(compute_sp_score(msa, ap, ml->path,
+                             msa->sip[a], msa->nsip[a],
+                             msa->sip[b], msa->nsip[b], sp));
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+struct trial_arg {
+        struct msa* msa;
+        struct aln_param* ap;
+        struct aln_mem* ml;
+        float* prof_a;
+        float* prof_b;
+        int a, b, len_a, len_b;
+        int k, n_trials;
+        float avg_margin;
+        float sp;
+        int ret;
+};
+
+static void trial_task(void* arg)
+{
+        struct trial_arg* x = (struct trial_arg*)arg;
+        x->ret = run_trial(x->msa, x->ap, x->ml, x->prof_a, x->prof_b, x->a, x->b,
+                           x->len_a, x->len_b, x->k, x->n_trials, x->avg_margin, &x->sp);
+}
+
+/* Trials 1..n_trials-1 concurrently, each on a copy of base's settings
+   with its own DP memory (the consistency bonus is shared read-only).
+   Then the serial loop's selection, in trial order: a trial replaces the
+   best only if its score is strictly higher. */
+static int run_trials_parallel(struct msa* msa, struct aln_param* ap, threadpool_t* pool,
+                               struct aln_mem* base, float* prof_a, float* prof_b,
+                               int a, int b, int len_a, int len_b, int n_trials, float avg_margin,
+                               float* best_sp, float* best_margin_sum, int* best_margin_count,
+                               int* best_path)
+{
+        struct trial_arg* x = NULL;
+        tp_group_t* g = NULL;
+        int k;
+        const int n = n_trials - 1;
+
+        MMALLOC(x, sizeof(struct trial_arg) * n);
+        for(k = 0; k < n; k++){
+                x[k].ml = NULL;
+        }
+        for(k = 0; k < n; k++){
+                struct aln_mem* m = NULL;
+                RUN(alloc_aln_mem(&m, 256));
+                x[k].ml = m;
+                m->pool = base->pool;
+                m->run_parallel = base->run_parallel;
+                m->ap = base->ap;
+                m->mode = base->mode;
+                m->len_a = len_a;
+                m->len_b = len_b;
+                RUN(init_alnmem(m));
+                m->consistency = base->consistency;
+                x[k].msa = msa;
+                x[k].ap = ap;
+                x[k].prof_a = prof_a;
+                x[k].prof_b = prof_b;
+                x[k].a = a;
+                x[k].b = b;
+                x[k].len_a = len_a;
+                x[k].len_b = len_b;
+                x[k].k = k + 1;
+                x[k].n_trials = n_trials;
+                x[k].avg_margin = avg_margin;
+                x[k].sp = 0.0F;
+                x[k].ret = FAIL;
+        }
+
+        g = tp_group_create(pool);
+        for(k = 0; k < n; k++){
+                if(!g || tp_group_submit(g, trial_task, &x[k]) != 0){
+                        trial_task(&x[k]);
+                }
+        }
+        if(g){
+                tp_group_wait(g);
+                tp_group_destroy(g);
+        }
+
+        for(k = 0; k < n; k++){
+                ASSERT(x[k].ret == OK, "Refinement trial %d failed", k + 1);
+                if(x[k].sp > *best_sp){
+                        *best_sp = x[k].sp;
+                        *best_margin_sum = x[k].ml->margin_sum;
+                        *best_margin_count = x[k].ml->margin_count;
+                        memcpy(best_path, x[k].ml->path,
+                               sizeof(int) * (x[k].ml->path[0] + 2));
+                }
+        }
+        for(k = 0; k < n; k++){
+                x[k].ml->consistency = NULL;
+                free_aln_mem(x[k].ml);
+        }
+        MFREE(x);
+        return OK;
+ERROR:
+        if(x){
+                for(k = 0; k < n; k++){
+                        if(x[k].ml){
+                                x[k].ml->consistency = NULL;
+                                free_aln_mem(x[k].ml);
+                        }
+                }
+                MFREE(x);
+        }
+        return FAIL;
+}
+
 int refine_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int task_id)
 {
         struct aln_mem* ml = NULL;
@@ -106,6 +422,8 @@ int refine_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
         /* Distance-dependent parameter scaling (must match do_align) */
         struct aln_param* orig_ap = ap;
         struct aln_param scaled_ap;
+        float* vsm_save_a = NULL;
+        float* vsm_save_b = NULL;
         float gap_scale = compute_gap_scale(msa, ap, a, b);
         float subm_off = compute_subm_offset(msa, ap, a, b);
         if(gap_scale < 1.0f || subm_off > 0.0f){
@@ -134,8 +452,23 @@ int refine_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
                 RUN(set_gap_penalties_n(t->profile[b], len_b, msa->nsip[a]));
         }
 
+        {
+                float vsm_off = 0.0f;
+                RUN(vsm_merge_offset(msa, t, ap, a, b, len_a, len_b, &vsm_off));
+                if(vsm_off > 0.0f){
+                        if(ap != &scaled_ap){
+                                scaled_ap = *ap;
+                                ap = &scaled_ap;
+                        }
+                        scaled_ap.subm_offset = vsm_off;
+                        RUN(vsm_shift_profiles(t, a, b, len_a, len_b, vsm_off, &vsm_save_a, &vsm_save_b));
+                }
+        }
+
         /* Allocate alignment memory */
         RUN(alloc_aln_mem(&ml, 256));
+        ml->pool = orig_ap->pool;
+        ml->run_parallel = (orig_ap->pool != NULL);
         ml->ap = ap;
         ml->mode = ALN_MODE_FULL;
         ml->len_a = len_a;
@@ -192,55 +525,21 @@ int refine_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
         }
 
         /* Multi-trial alignment: trial 0 is deterministic (baseline),
-           trials 1..n_trials-1 use increasing flip thresholds. */
+           trials 1..n_trials-1 use increasing flip thresholds.  Trials
+           1..n_trials-1 depend only on avg_margin from trial 0, so with a
+           thread pool they run concurrently, each on its own aln_mem; the
+           best is then picked in trial order exactly as in the serial loop. */
         for(k = 0; k < n_trials; k++){
                 float sp = 0.0F;
 
-                /* Re-initialize DP state before each trial. The Hirschberg
-                   recursion only writes matched positions to the path array;
-                   unmatched positions must be -1. After convert_raw_path swaps
-                   path/tmp_path, the buffer contains stale 0/1/2 values. */
-                {
-                        int _g = MACRO_MAX(len_a, len_b) + 2;
-                        int _i;
-                        for(_i = 0; _i < _g; _i++){
-                                ml->path[_i] = -1;
-                        }
+                if(k == 1 && orig_ap->pool != NULL && n_trials > 2){
+                        RUN(run_trials_parallel(msa, ap, orig_ap->pool, ml, t->profile[a], t->profile[b],
+                                                a, b, len_a, len_b, n_trials, avg_margin,
+                                                &best_sp, &best_margin_sum, &best_margin_count, best_path));
+                        break;
                 }
-                ml->starta = 0;
-                ml->startb = 0;
-                ml->enda = len_a;
-                ml->endb = len_b;
-                ml->len_a = len_a;
-                ml->len_b = len_b;
-                ml->f[0].a = 0.0F;
-                ml->f[0].ga = -FLT_MAX;
-                ml->f[0].gb = -FLT_MAX;
-                ml->b[0].a = 0.0F;
-                ml->b[0].ga = -FLT_MAX;
-                ml->b[0].gb = -FLT_MAX;
-                ml->margin_sum = 0.0F;
-                ml->margin_count = 0;
-
-                if(k == 0){
-                        ml->flip_threshold = 0.0F;
-                        ml->flip_trial = 0;
-                }else{
-                        ml->flip_threshold = avg_margin;
-                        ml->flip_trial = k;
-                        ml->flip_stride = n_trials - 1;
-                        ml->flip_counter = 0;
-                }
-
-                RUN(dispatch_alignment(msa, ml, t->profile[a], t->profile[b], a, b, len_a, len_b));
-
-                /* Convert raw DP path to 0/1/2 format with gap info */
-                RUN(convert_raw_path(ml));
-
-                /* Score this candidate with sum-of-pairs */
-                RUN(compute_sp_score(msa, ap, ml->path,
-                                     msa->sip[a], msa->nsip[a],
-                                     msa->sip[b], msa->nsip[b], &sp));
+                RUN(run_trial(msa, ap, ml, t->profile[a], t->profile[b], a, b, len_a, len_b,
+                              k, n_trials, avg_margin, &sp));
 
                 if(sp > best_sp){
                         best_sp = sp;
@@ -297,6 +596,8 @@ int refine_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
                 t->list[task_id]->confidence = 0.0F;
         }
 
+        vsm_unshift_profiles(t, a, b, &vsm_save_a, &vsm_save_b);
+
         /* Restore original aln_param for profile update (unscaled base penalties) */
         ap = orig_ap;
 
@@ -338,6 +639,12 @@ ERROR:
         if(best_path){
                 MFREE(best_path);
         }
+        /* Leave the profiles as they were before this edge. */
+        if(ml && ml->consistency){
+                sparse_bonus_free(ml->consistency);
+                ml->consistency = NULL;
+        }
+        vsm_unshift_profiles(t, a, b, &vsm_save_a, &vsm_save_b);
         free_aln_mem(ml);
         return FAIL;
 }
@@ -360,6 +667,8 @@ int replay_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
         /* Distance-dependent parameter scaling (must match do_align) */
         struct aln_param* orig_ap = ap;
         struct aln_param scaled_ap;
+        float* vsm_save_a = NULL;
+        float* vsm_save_b = NULL;
         float gap_scale = compute_gap_scale(msa, ap, a, b);
         float subm_off = compute_subm_offset(msa, ap, a, b);
         if(gap_scale < 1.0f || subm_off > 0.0f){
@@ -388,8 +697,23 @@ int replay_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
                 RUN(set_gap_penalties_n(t->profile[b], len_b, msa->nsip[a]));
         }
 
+        {
+                float vsm_off = 0.0f;
+                RUN(vsm_merge_offset(msa, t, ap, a, b, len_a, len_b, &vsm_off));
+                if(vsm_off > 0.0f){
+                        if(ap != &scaled_ap){
+                                scaled_ap = *ap;
+                                ap = &scaled_ap;
+                        }
+                        scaled_ap.subm_offset = vsm_off;
+                        RUN(vsm_shift_profiles(t, a, b, len_a, len_b, vsm_off, &vsm_save_a, &vsm_save_b));
+                }
+        }
+
         /* Allocate alignment memory and run alignment */
         RUN(alloc_aln_mem(&ml, 256));
+        ml->pool = orig_ap->pool;
+        ml->run_parallel = (orig_ap->pool != NULL);
         ml->ap = ap;
         ml->mode = ALN_MODE_FULL;
         ml->len_a = len_a;
@@ -450,6 +774,8 @@ int replay_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
 
         RUN(convert_raw_path(ml));
 
+        vsm_unshift_profiles(t, a, b, &vsm_save_a, &vsm_save_b);
+
         /* Restore original aln_param for profile update (unscaled base penalties) */
         ap = orig_ap;
 
@@ -486,6 +812,12 @@ int replay_edge(struct msa* msa, struct aln_param* ap, struct aln_tasks* t, int 
         free_aln_mem(ml);
         return OK;
 ERROR:
+        /* Leave the profiles as they were before this edge. */
+        if(ml && ml->consistency){
+                sparse_bonus_free(ml->consistency);
+                ml->consistency = NULL;
+        }
+        vsm_unshift_profiles(t, a, b, &vsm_save_a, &vsm_save_b);
         free_aln_mem(ml);
         return FAIL;
 }
@@ -582,7 +914,7 @@ ERROR:
    interleaved gap patterns. This function tracks b_last correctly:
    only updated on actual matches (path[i] != -1). */
 int convert_raw_path(struct aln_mem* m)
-{
+{ KPERF_REGION(KP_PATH_CONV);
         int* path = NULL;
         int* o_path = NULL;
         int* tmp_path = NULL;

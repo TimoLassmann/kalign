@@ -32,6 +32,8 @@ set(source_files
   src/task.c
 
   src/bisectingKmeans.c
+  src/sl_tree.c
+  src/aln_gapmodel.c
   src/sequence_distance.c
   src/bpm.c
   src/euclidean_dist.c
@@ -39,6 +41,7 @@ set(source_files
   
   src/aln_wrap.c
   src/aln_apair_dist.c
+  src/guide_dist.c
   src/aln_add.c
 
   src/aln_param.c
@@ -46,33 +49,30 @@ set(source_files
   src/aln_mem.c
   src/aln_setup.c
   src/aln_controller.c
+  src/aln_wave.c
   src/aln_seqseq.c
   src/aln_seqprofile.c
   src/aln_profileprofile.c
   src/aln_refine.c
+  src/aln_vsm.c
   src/sp_score.c
   src/weave_alignment.c
   src/poar.c
   src/consensus_msa.c
+  src/consensus_fill.c
   src/anchor_consistency.c
   src/msa_consistency.c
   src/ensemble.c
+  src/threadpool/threadpool.c
   )
 
-# Add threadpool source when enabled
-if(USE_THREADPOOL)
-  list(APPEND source_files src/threadpool/threadpool.c)
-endif()
-
 add_library(${PROJECT_NAME}_OBJ OBJECT ${source_files})
-
-if(OpenMP_C_FOUND AND NOT USE_THREADPOOL)
-  target_link_libraries(${PROJECT_NAME}_OBJ PRIVATE OpenMP::OpenMP_C)
+# the member gap model's scalar and wavefront kernels must round identically on every platform
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+  set_source_files_properties(src/aln_gapmodel.c PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
 endif()
 
-if(USE_THREADPOOL)
-  target_link_libraries(${PROJECT_NAME}_OBJ PRIVATE Threads::Threads)
-endif()
+target_link_libraries(${PROJECT_NAME}_OBJ PRIVATE Threads::Threads)
 
 target_include_directories(${PROJECT_NAME}_OBJ
   PRIVATE
@@ -104,7 +104,11 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
   CXX_STANDARD_REQUIRED ON
   CXX_EXTENSIONS OFF
   VERSION ${KALIGN_LIBRARY_VERSION_STRING}
-  SOVERSION ${KALIGN_LIBRARY_VERSION_MAJOR}
+  SOVERSION ${KALIGN_LIBRARY_SOVERSION}
+  # macOS: keep the dylib's current version >= its compatibility version
+  # (SOVERSION is decoupled from the project major version).
+  MACHO_COMPATIBILITY_VERSION ${KALIGN_LIBRARY_SOVERSION}.0.0
+  MACHO_CURRENT_VERSION ${KALIGN_LIBRARY_SOVERSION}.${KALIGN_LIBRARY_VERSION_MINOR}.${KALIGN_LIBRARY_VERSION_PATCH}
   PUBLIC_HEADER "${public_header_files}"
   CXX_VISIBILITY_PRESET hidden
   VISIBILITY_INLINES_HIDDEN 1
@@ -134,12 +138,7 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME} PRIVATE m)
 
-if(OpenMP_C_FOUND AND NOT USE_THREADPOOL)
-  target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_C)
-endif()
-if(USE_THREADPOOL)
-  target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads)
-endif()
+target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads)
 
 add_library(${PROJECT_NAME}_static STATIC
   ${public_header_files}
@@ -152,7 +151,7 @@ set_target_properties(${PROJECT_NAME}_static PROPERTIES
   CXX_STANDARD_REQUIRED ON
   CXX_EXTENSIONS OFF
   VERSION ${KALIGN_LIBRARY_VERSION_STRING}
-  SOVERSION ${KALIGN_LIBRARY_VERSION_MAJOR}
+  SOVERSION ${KALIGN_LIBRARY_SOVERSION}
   PUBLIC_HEADER "${public_header_files}"
   CXX_VISIBILITY_PRESET hidden
   VISIBILITY_INLINES_HIDDEN 1
@@ -172,12 +171,7 @@ target_include_directories(${PROJECT_NAME}_static
 
 target_link_libraries(${PROJECT_NAME}_static PRIVATE m)
 
-if(OpenMP_C_FOUND AND NOT USE_THREADPOOL)
-  target_link_libraries(${PROJECT_NAME}_static PRIVATE OpenMP::OpenMP_C)
-endif()
-if(USE_THREADPOOL)
-  target_link_libraries(${PROJECT_NAME}_static PRIVATE Threads::Threads)
-endif()
+target_link_libraries(${PROJECT_NAME}_static PRIVATE Threads::Threads)
 
 
 add_library(tldevel STATIC

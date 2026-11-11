@@ -177,8 +177,6 @@ def thread_count(request):
         ("dna", "dna"),
         ("rna", "rna"),
         ("protein", "protein"),
-        ("divergent", "divergent"),
-        ("internal", "internal"),
     ]
 )
 def sequence_type_spec(request):

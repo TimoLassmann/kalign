@@ -24,9 +24,13 @@
  *     recycling eliminates virtually all malloc/free after warmup.
  *
  *   Stack depth:
- *     LIFO pop means a recursive tree traversal nests O(tree_depth) wait
- *     frames per thread, not O(tree_size).  For a balanced tree of 1M
- *     leaves (depth ~20), each frame is ~500 bytes → ~10 KB total.
+ *     A waiting thread runs other tasks inline.  Tasks of its own group
+ *     nest O(tree_depth) frames, but tasks taken from elsewhere (steals,
+ *     the external queue) belong to unrelated subtrees, and each of them
+ *     can wait and take another: unbounded, that chain grows with the
+ *     number of tasks (stack overflow at 200,000 Kalign sequences).  So
+ *     foreign tasks nest at most TP_MAX_FOREIGN_DEPTH deep per thread;
+ *     beyond that a waiting thread runs only tasks of its own group.
  *
  * Ref: Chase & Lev, "Dynamic Circular Work-Stealing Deque", SPAA 2005.
  */
@@ -41,6 +45,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sched.h>
+
+#ifndef KALIGN_TP_STACK_SIZE
+#define KALIGN_TP_STACK_SIZE (64UL * 1024UL * 1024UL)
+#endif
 
 /* ── TSan annotations for Chase-Lev deque ────────────────────────
  * TSan can't track happens-before through atomic_thread_fence,
@@ -231,6 +239,26 @@ static int ext_grow_locked(ext_queue_t *q)
     return 0;
 }
 
+/* Remove one task of the group whose counter is `pending`. */
+static int ext_take_group(ext_queue_t *q, atomic_int *pending, tp_task_t *out)
+{
+    int found = -1;
+    PTHREAD_CHECK(pthread_mutex_lock(&q->lock));
+    for (int i = 0; i < q->count; i++) {
+        int k = (q->head + i) % q->cap;
+        if (q->buf[k].pending == pending) {
+            *out = q->buf[k];
+            q->buf[k] = q->buf[q->head];
+            q->head = (q->head + 1) % q->cap;
+            q->count--;
+            found = 0;
+            break;
+        }
+    }
+    PTHREAD_CHECK(pthread_mutex_unlock(&q->lock));
+    return found;
+}
+
 static int ext_push(ext_queue_t *q, tp_task_t task)
 {
     PTHREAD_CHECK(pthread_mutex_lock(&q->lock));
@@ -298,6 +326,9 @@ struct tp_group {
 
 /* ── Thread-local: current worker (NULL on non-worker threads) ── */
 static _Thread_local worker_t *tl_worker = NULL;
+
+/* Foreign tasks currently running nested inside tp_group_wait on this thread. */
+static _Thread_local int tl_foreign_depth = 0;
 
 /* ── RNG for steal-target selection ───────────────────────────── */
 
@@ -372,6 +403,24 @@ static int try_find_work_ext(threadpool_t *pool, tp_task_t *out,
     return -1;
 }
 
+/* Failed work searches before an idle worker parks on the condition
+ * variable.  Scheduling only: it cannot change any result.  Loops that
+ * start one short parallel-for per step (the guide tree's Prim step) lose
+ * most of their time to wake-ups when workers park after a few searches;
+ * 1000 searches keep them awake across the serial gaps between steps. */
+#ifndef TP_WORKER_SPINS
+#define TP_WORKER_SPINS 1000
+#endif
+
+static inline void tp_cpu_relax(void)
+{
+#if defined(__x86_64__) || defined(__i386__)
+    __builtin_ia32_pause();
+#elif defined(__aarch64__) || defined(__arm__)
+    __asm__ __volatile__("yield");
+#endif
+}
+
 /* ── Worker thread ────────────────────────────────────────────── */
 
 static void *worker_main(void *arg)
@@ -392,8 +441,10 @@ static void *worker_main(void *arg)
         if (atomic_load(&pool->shutdown))
             break;
 
-        if (++spins < 64)
-            continue;           /* brief spin before parking */
+        if (++spins < TP_WORKER_SPINS) {
+            tp_cpu_relax();
+            continue;           /* spin before parking */
+        }
 
         /* Park until new work arrives (event-count protocol). */
         int gen = atomic_load_explicit(&pool->wake_gen,
@@ -476,11 +527,23 @@ threadpool_t *tp_create(int nthreads)
         w->rng  = (unsigned)(i + 1) * 2654435761u;
     }
 
-    /* Default stacks are fine: LIFO pop bounds stack depth to
-     * O(tree_depth), which is a few KB at most. */
+    /* Explicit worker stack size (macOS defaults to only 512 KB).  Tree walks
+     * no longer recurse per tree level, so this is a safety net for deep
+     * Hirschberg recursion and nested waits.  Override with
+     * -DKALIGN_TP_STACK_SIZE=<bytes>.  If the attribute cannot be set the
+     * system default is used. */
+    pthread_attr_t attr;
+    int have_attr = 0;
+    if (pthread_attr_init(&attr) == 0) {
+        if (pthread_attr_setstacksize(&attr, (size_t)KALIGN_TP_STACK_SIZE) == 0)
+            have_attr = 1;
+        else
+            pthread_attr_destroy(&attr);
+    }
     for (int i = 0; i < nthreads; i++) {
-        if (pthread_create(&pool->workers[i].thread, NULL,
+        if (pthread_create(&pool->workers[i].thread, have_attr ? &attr : NULL,
                            worker_main, &pool->workers[i]) != 0) {
+            if (have_attr) pthread_attr_destroy(&attr);
             atomic_store(&pool->shutdown, 1);
             PTHREAD_CHECK(pthread_mutex_lock(&pool->wake_lock));
             PTHREAD_CHECK(pthread_cond_broadcast(&pool->wake_cond));
@@ -498,6 +561,7 @@ threadpool_t *tp_create(int nthreads)
         }
     }
 
+    if (have_attr) pthread_attr_destroy(&attr);
     return pool;
 }
 
@@ -570,6 +634,12 @@ tp_group_t *tp_group_create(threadpool_t *pool)
 
 int tp_group_submit(tp_group_t *group, void (*fn)(void *), void *arg)
 {
+    /* No pool: run the task now, on the calling thread. */
+    if (!group->pool) {
+        fn(arg);
+        return 0;
+    }
+
     atomic_fetch_add(&group->pending, 1);
     tp_task_t task = { .fn = fn, .arg = arg, .pending = &group->pending };
 
@@ -595,6 +665,7 @@ void tp_group_wait(tp_group_t *group)
 {
     threadpool_t *pool = group->pool;
     worker_t *w = tl_worker;
+    if (!pool) return;          /* tasks already ran in tp_group_submit */
     unsigned ext_rng = (unsigned)(uintptr_t)group * 2654435761u;
     if (ext_rng == 0) ext_rng = 1;
     unsigned spins = 0;
@@ -606,13 +677,35 @@ void tp_group_wait(tp_group_t *group)
         tp_task_t task;
         int found;
 
-        if (w && w->pool == pool)
-            found = (try_find_work(w, &task) == 0);
-        else
-            found = (try_find_work_ext(pool, &task, &ext_rng) == 0);
+        if (tl_foreign_depth < TP_MAX_FOREIGN_DEPTH) {
+            if (w && w->pool == pool)
+                found = (try_find_work(w, &task) == 0);
+            else
+                found = (try_find_work_ext(pool, &task, &ext_rng) == 0);
+        } else {
+            /* At the cap: only this group's own tasks.  They are at the
+             * bottom of this worker's deque (anything pushed later was
+             * consumed by the nested waits that have returned), or in the
+             * external queue when submitted by a non-worker or on overflow. */
+            found = 0;
+            if (w && w->pool == pool && deque_pop(&w->deque, &task) == 0) {
+                if (task.pending == &group->pending)
+                    found = 1;
+                else if (deque_push(&w->deque, task) != 0 &&
+                         ext_push(&pool->ext, task) != 0) {
+                    /* Cannot requeue it: run it rather than lose it. */
+                    found = 1;
+                }
+            }
+            if (!found)
+                found = (ext_take_group(&pool->ext, &group->pending, &task) == 0);
+        }
 
         if (found) {
+            int foreign = (task.pending != &group->pending);
+            tl_foreign_depth += foreign;
             execute_task(&task);
+            tl_foreign_depth -= foreign;
             spins = 0;
         } else if (++spins < 128) {
             /* spin */
@@ -654,15 +747,21 @@ static void pfor_worker(void *arg)
 }
 
 #define MAX_STACK_CHUNKS 64
+#define TP_PFOR_CHUNKS_PER_THREAD 4
 
 void tp_parallel_for_chunked(threadpool_t *pool, int start, int end,
                               int min_chunk_size,
                               void (*fn)(int, int, void *), void *arg)
 {
     if (start >= end) return;
+    if (!pool) { fn(start, end, arg); return; }
 
+    /* Several chunks per thread: loops over pairs (j > i) give the first
+     * rows far more work than the last, and with one chunk per thread the
+     * thread holding the first chunk dominates.  Smaller chunks let the
+     * work-stealing deques balance the load. */
     int n       = end - start;
-    int nchunks = pool->nworkers + 1;
+    int nchunks = (pool->nworkers + 1) * TP_PFOR_CHUNKS_PER_THREAD;
     if (nchunks > n) nchunks = n;
 
     /* Limit parallelism so each chunk has at least min_chunk_size iterations */

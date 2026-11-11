@@ -34,6 +34,12 @@
  *     inside a task (nested parallelism).
  *   - tp_request_shutdown: safe to call from any thread or signal handler.
  *
+ * NULL POOL (serial mode):
+ *   tp_group_create(NULL), tp_group_submit, tp_group_wait, tp_group_destroy
+ *   and tp_parallel_for(_chunked)(NULL, ...) are valid: every task runs
+ *   immediately on the calling thread, in submission order.  Kalign uses this
+ *   for n_threads = 1 so that no worker thread exists.
+ *
  * ERROR HANDLING:
  *   - tp_create returns NULL on failure (out of memory, pthread errors).
  *   - tp_group_create returns NULL on out of memory.
@@ -120,6 +126,13 @@ int tp_group_submit(tp_group_t *group, void (*fn)(void *), void *arg);
  * The calling thread participates in executing queued work while waiting.
  * Returns early if tp_request_shutdown() has been called. */
 void tp_group_wait(tp_group_t *group);
+
+/* While a thread waits it runs other pending tasks inline.  Tasks that
+ * belong to another group ("foreign" tasks) may nest at most this many
+ * levels deep on one thread's stack; beyond that the thread runs only
+ * tasks of the group it waits on.  Stack use is then bounded by
+ * (TP_MAX_FOREIGN_DEPTH + 1) * task-tree depth wait frames. */
+#define TP_MAX_FOREIGN_DEPTH 8
 
 /* Free a group.  Must be called after tp_group_wait(). */
 void tp_group_destroy(tp_group_t *group);

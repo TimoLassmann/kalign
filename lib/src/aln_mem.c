@@ -36,12 +36,14 @@ int alloc_aln_mem(struct aln_mem** mem, int x)
         m->flip_n_targets = 0;
         m->flip_n_uncertain = 0;
         m->run_parallel = 0;
-#ifdef USE_THREADPOOL
         m->pool = NULL;
-#endif
         m->ap = NULL;
 
         m->consistency = NULL;
+        m->gm = NULL;
+#ifdef KALIGN_WAVE
+        m->wave = NULL;
+#endif
 
         m->starta = 0;
         m->startb = 0;

@@ -7,6 +7,9 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <limits.h>
 #include <unistd.h>
 #include <getopt.h>
 
@@ -16,15 +19,21 @@
 #define OPT_TGPE 8
 #define OPT_ALN_TYPE 13
 #define OPT_MODE 22
-#define OPT_LOAD_POAR 20
-#define OPT_MIN_SUPPORT 18
 #define OPT_CONF_THRESHOLD 30
 #define OPT_CONF_STYLE 31
 #define OPT_CONF_OUTPUT 32
 #define OPT_ADD 33
 #define OPT_EXISTING 34
+#define OPT_VSM_MODE 35
+#define OPT_VSM_KAPPA 36
+#define OPT_VSM_DZERO 37
+#define OPT_FILL_IN 38
+#define OPT_FILL_ANCHOR_FRAC 39
+#define OPT_FILL_SUPPORT 40
+#define OPT_GUIDE_DIST 41
 
 static int set_aln_type(char* in, int* type);
+static int apply_seq_type(struct msa* msa, struct parameters* param, const char* what);
 
 static int run_kalign(struct parameters* param);
 
@@ -42,21 +51,25 @@ int print_kalign_help(char * argv[])
         fprintf(stdout,"\nUsage: %s %s\n\n",basename ,usage);
 
         fprintf(stdout,"Modes (--mode <name>):\n\n");
-        fprintf(stdout,"%*s%-*s: %s\n",3,"",MESSAGE_MARGIN-3,"fast","Single run, fastest");
-        fprintf(stdout,"%*s%-*s: %s\n",3,"",MESSAGE_MARGIN-3,"default","Single run with consistency anchors (default)");
-        fprintf(stdout,"%*s%-*s: %s\n",3,"",MESSAGE_MARGIN-3,"recall","Ensemble, optimized for recall");
-        fprintf(stdout,"%*s%-*s: %s\n",3,"",MESSAGE_MARGIN-3,"accurate","Ensemble, highest precision");
+        fprintf(stdout,"%*s%-*s: %s\n",3,"",MESSAGE_MARGIN-3,"fast","Single run, fastest (default)");
+        fprintf(stdout,"%*s%-*s: %s\n",3,"",MESSAGE_MARGIN-3,"accurate","5-member ensemble with per-column confidence; at most 5,000 sequences");
+        fprintf(stdout,"%*s%-*s: %s\n",3,"",MESSAGE_MARGIN-3,"default","Alias of fast");
 
         fprintf(stdout,"\nOptions:\n\n");
 
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--format","Output format." ,"[Fasta]"  );
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--type","Sequence type." ,"[auto]"  );
-        fprintf(stdout,"%*s%-*s  %s %s\n",3,"",MESSAGE_MARGIN-3,"","Options: protein, dna, rna." ,""  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--type","Sequence type: protein, dna or rna (overrides detection)." ,"[auto]"  );
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpo","Gap open penalty (overrides preset)." ,"[]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpe","Gap extension penalty (overrides preset)." ,"[]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--tgpe","Terminal gap extension penalty (overrides preset)." ,"[]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--vsm-mode","VSM: 0 legacy, 1 per-merge (overrides preset)." ,"[]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--vsm-kappa","Per-merge VSM: fraction of offset bound." ,"[]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--vsm-dzero","Per-merge VSM: distance where offset is 0." ,"[]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--guide-dist","Guide-tree distance: 0 BPM, 1 pairwise alignment." ,"[preset]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"-n/--nthreads","Number of threads." ,"[auto]");
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--load-poar","Load POAR table for re-threshold." ,"[off]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--fill-in 0-3","Ensembles: place unaligned consensus residues (1 realign, 2 project, 3 attach)." ,"[preset]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--fill-anchor-frac F","Fill-in anchor needs >= F*numseq residues (min 2)." ,"[preset]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--fill-support N","Attach fill-in: votes needed to join a column." ,"[preset]");
 
         fprintf(stdout,"\n");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--add FILE","New sequences to add to existing alignment." ,"[off]");
@@ -120,6 +133,33 @@ int print_kalign_header(void)
         return OK;
 }
 
+/* Strict numeric option parsing: the whole argument must be a number. */
+static int parse_int_arg(const char* s, int* out)
+{
+        char* end = NULL;
+        long v;
+        errno = 0;
+        v = strtol(s, &end, 10);
+        if(end == s || *end != '\0' || errno != 0 || v < INT_MIN || v > INT_MAX){
+                return FAIL;
+        }
+        *out = (int) v;
+        return OK;
+}
+
+static int parse_float_arg(const char* s, float* out)
+{
+        char* end = NULL;
+        float v;
+        errno = 0;
+        v = strtof(s, &end);
+        if(end == s || *end != '\0' || errno != 0){
+                return FAIL;
+        }
+        *out = v;
+        return OK;
+}
+
 int main(int argc, char *argv[])
 {
         int version = 0;
@@ -140,9 +180,14 @@ int main(int argc, char *argv[])
                         {"gpo",  required_argument, 0, OPT_GPO},
                         {"gpe",  required_argument, 0, OPT_GPE},
                         {"tgpe",  required_argument, 0, OPT_TGPE},
+                        {"vsm-mode",  required_argument, 0, OPT_VSM_MODE},
+                        {"vsm-kappa",  required_argument, 0, OPT_VSM_KAPPA},
+                        {"vsm-dzero",  required_argument, 0, OPT_VSM_DZERO},
+                        {"guide-dist",  required_argument, 0, OPT_GUIDE_DIST},
                         {"mode",  required_argument, 0, OPT_MODE},
-                        {"load-poar",  required_argument, 0, OPT_LOAD_POAR},
-                        {"min-support",  required_argument, 0, OPT_MIN_SUPPORT},
+                        {"fill-in",  required_argument, 0, OPT_FILL_IN},
+                        {"fill-anchor-frac",  required_argument, 0, OPT_FILL_ANCHOR_FRAC},
+                        {"fill-support",  required_argument, 0, OPT_FILL_SUPPORT},
                         {"nthreads",  required_argument, 0, 'n'},
                         {"confidence-threshold", required_argument, 0, OPT_CONF_THRESHOLD},
                         {"confidence-style", required_argument, 0, OPT_CONF_STYLE},
@@ -193,14 +238,42 @@ int main(int argc, char *argv[])
                 case OPT_TGPE:
                         param->tgpe = atof(optarg);
                         break;
+                case OPT_VSM_MODE:
+                        if(parse_int_arg(optarg, &param->vsm_mode) != OK ||
+                           (param->vsm_mode != 0 && param->vsm_mode != 1)){
+                                ERROR_MSG("--vsm-mode must be 0 (legacy) or 1 (per-merge), got '%s'", optarg);
+                        }
+                        break;
+                case OPT_VSM_KAPPA:
+                        param->vsm_kappa = atof(optarg);
+                        break;
+                case OPT_VSM_DZERO:
+                        param->vsm_dzero = atof(optarg);
+                        break;
+                case OPT_GUIDE_DIST:
+                        param->guide_dist = atoi(optarg);
+                        if(param->guide_dist != KALIGN_GUIDE_DIST_BPM &&
+                           param->guide_dist != KALIGN_GUIDE_DIST_PAIRALN){
+                                ERROR_MSG("--guide-dist must be 0 (BPM) or 1 (pairwise alignment)");
+                        }
+                        break;
                 case OPT_MODE:
                         param->mode = optarg;
                         break;
-                case OPT_LOAD_POAR:
-                        param->load_poar = optarg;
+                case OPT_FILL_IN:
+                        if(parse_int_arg(optarg, &param->fill_in) != OK ||
+                           param->fill_in < KALIGN_FILL_OFF || param->fill_in > KALIGN_FILL_ATTACH){
+                                ERROR_MSG("--fill-in must be 0 (off), 1 (realign), 2 (project) or 3 (attach), got '%s'", optarg);
+                        }
                         break;
-                case OPT_MIN_SUPPORT:
-                        param->min_support = atoi(optarg);
+                case OPT_FILL_ANCHOR_FRAC:
+                        if(parse_float_arg(optarg, &param->fill_anchor_frac) != OK ||
+                           !(param->fill_anchor_frac >= 0.0f && param->fill_anchor_frac <= 1.0f)){
+                                ERROR_MSG("--fill-anchor-frac must be a number in [0, 1], got '%s'", optarg);
+                        }
+                        break;
+                case OPT_FILL_SUPPORT:
+                        param->fill_support = atoi(optarg);
                         break;
                 case OPT_CONF_THRESHOLD:
                         param->confidence_threshold = (float)atof(optarg);
@@ -348,6 +421,10 @@ int run_kalign(struct parameters* param)
 
                 /* Read new sequences (allows single sequence) */
                 RUN(kalign_read_sequences(param->add_file, &new_seqs, param->quiet));
+                RUN(apply_seq_type(msa, param, param->existing_file));
+                if(new_seqs){
+                        RUN(apply_seq_type(new_seqs, param, param->add_file));
+                }
 
                 if(!param->quiet){
                         LOG_MSG("Adding %d sequences to existing alignment of %d sequences",
@@ -371,33 +448,48 @@ int run_kalign(struct parameters* param)
                         RUN(kalign_read_input(param->infile[i], &msa, param->quiet));
                 }
         }
-
-        if(param->load_poar != NULL){
-                RUN(kalign_consensus_from_poar(msa,
-                                               param->load_poar,
-                                               param->min_support > 0 ? param->min_support : 2));
-        }else{
-                /* Use mode preset (fast/default/recall/accurate).
-                   kalign_get_mode_preset auto-selects protein vs nucleotide
-                   based on the detected biotype. */
-                const char* mode = param->mode ? param->mode : "default";
-                int ret = kalign_get_mode_preset(mode,
-                                                  kalign_msa_get_biotype(msa),
-                                                  runs, &n_runs, &ens);
-                if(ret != 0){
-                        ERROR_MSG("Unknown mode: '%s'. Use: fast, default, recall, accurate.", mode);
-                }
-
-                /* Override preset values with explicit user parameters.
-                   Sentinel -1.0 means "use preset default". */
-                for(int k = 0; k < n_runs; k++){
-                        if(param->gpo >= 0.0f)  runs[k].gpo  = param->gpo;
-                        if(param->gpe >= 0.0f)  runs[k].gpe  = param->gpe;
-                        if(param->tgpe >= 0.0f) runs[k].tgpe = param->tgpe;
-                }
-
-                RUN(kalign_align_full(msa, runs, n_runs, &ens, param->nthreads));
+        if(msa == NULL){
+                ERROR_MSG("No sequences were found in the input files or standard input.");
         }
+        RUN(apply_seq_type(msa, param, param->num_infiles == 1 && param->infile[0] ? param->infile[0] : "input"));
+
+        /* Use mode preset (fast/default/recall/accurate).
+           kalign_get_mode_preset auto-selects protein vs nucleotide
+           based on the detected biotype. */
+        const char* mode = param->mode ? param->mode : "fast";
+        if(!kalign_mode_size_ok(mode, kalign_msa_get_biotype(msa), msa->numseq)){
+                WARNING_MSG("Mode '%s' is not feasible above %d sequences (input: %d). Use --mode fast.",
+                            mode, KALIGN_ACCURATE_MAX_SEQ, msa->numseq);
+                goto ERROR;
+        }
+        int ret = kalign_get_mode_preset(mode,
+                                          kalign_msa_get_biotype(msa),
+                                          runs, &n_runs, &ens);
+        if(ret != 0){
+                ERROR_MSG("Unknown mode: '%s'. Use: fast or accurate.", mode);
+        }
+
+        /* Override preset values with explicit user parameters.
+           Sentinel -1.0 means "use preset default". */
+        for(int k = 0; k < n_runs; k++){
+                if(param->gpo >= 0.0f)  runs[k].gpo  = param->gpo;
+                if(param->gpe >= 0.0f)  runs[k].gpe  = param->gpe;
+                if(param->tgpe >= 0.0f) runs[k].tgpe = param->tgpe;
+                if(param->vsm_mode >= 0) runs[k].vsm_mode = param->vsm_mode;
+                if(param->vsm_kappa >= 0.0f) runs[k].vsm_kappa = param->vsm_kappa;
+                if(param->vsm_dzero >= 0.0f) runs[k].vsm_dzero = param->vsm_dzero;
+                if(param->guide_dist >= 0) runs[k].guide_dist = param->guide_dist;
+        }
+        if(param->fill_in >= 0) ens.fill_in = param->fill_in;
+        if(param->fill_anchor_frac >= 0.0f) ens.fill_anchor_frac = param->fill_anchor_frac;
+        if(param->fill_support >= 1) ens.fill_support = param->fill_support;
+
+        /* Without confidence options the alignment is written straight from
+           the gap counts (kalign_write_msa), never held as numseq x alnlen */
+        if(param->confidence_threshold <= 0.0f && param->confidence_output == NULL){
+                msa->defer_finalise = 1;
+        }
+        RUN(kalign_align_full(msa, runs, n_runs, &ens, param->nthreads));
 
         /* Apply confidence masking if requested */
         if(param->confidence_threshold > 0.0f){
@@ -420,23 +512,26 @@ ERROR:
 
 int set_aln_type(char* in, int* type)
 {
-        int t = 0;
-        if(in){
-                if(strstr(in,"rna")){
-                        t = KALIGN_TYPE_RNA;
-                }else if(strstr(in,"dna")){
-                        t = KALIGN_TYPE_DNA;
-                }else if(strstr(in,"internal")){
-                        t = KALIGN_TYPE_DNA_INTERNAL;
-                }else if(strstr(in,"protein")){
-                        t = KALIGN_TYPE_PROTEIN;
-                }else{
-                        ERROR_MSG("Sequence type '%s' not recognized. Use: protein, dna, rna.",in);
-                }
-        }else{
-                t = KALIGN_TYPE_UNDEFINED;
+        if(kalign_parse_seq_type(in, type) != 0){
+                ERROR_MSG("Sequence type '%s' not recognized. Use: auto, protein, dna, rna.",in);
         }
-        *type = t;
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+/* Apply --type to msa; warn (unless quiet) when it overrides the detected type. */
+static int apply_seq_type(struct msa* msa, struct parameters* param, const char* what)
+{
+        int overridden = 0;
+        const char* detected = kalign_seq_type_name(msa);
+        if(kalign_set_seq_type(msa, param->type, &overridden) != 0){
+                ERROR_MSG("Invalid sequence type.");
+        }
+        if(overridden && !param->quiet){
+                WARNING_MSG("%s: sequences look like %s, aligning as %s as requested (--type).",
+                            what, detected, kalign_seq_type_name(msa));
+        }
         return OK;
 ERROR:
         return FAIL;

@@ -11,10 +11,17 @@ include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 include(GenerateExportHeader)
 
-set(KALIGN_LIBRARY_VERSION_MAJOR 3)
-set(KALIGN_LIBRARY_VERSION_MINOR 6)
+set(KALIGN_LIBRARY_VERSION_MAJOR 4)
+set(KALIGN_LIBRARY_VERSION_MINOR 0)
 set(KALIGN_LIBRARY_VERSION_PATCH 0)
 set(KALIGN_LIBRARY_VERSION_STRING ${KALIGN_LIBRARY_VERSION_MAJOR}.${KALIGN_LIBRARY_VERSION_MINOR}.${KALIGN_LIBRARY_VERSION_PATCH})
+
+# Shared-library ABI version, independent of the project version. Bump it
+# whenever the C ABI breaks. 4: kalign 3.7.0 added fields to the public
+# kalign_run_config / kalign_ensemble_config structs, which
+# kalign_run_config_defaults() / kalign_ensemble_config_defaults() return by
+# value (the 3.x releases before 3.7.0 used SOVERSION 3).
+set(KALIGN_LIBRARY_SOVERSION 4)
 
 
 set (CMAKE_C_STANDARD 11)
@@ -23,9 +30,6 @@ set (CMAKE_C_STANDARD 11)
 # SET(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -pg")
 # SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
 # SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
-
-# to compile without open mp:
-# cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DUSE_OPENMP=OFF ..
 
 # Compiler-specific flags
 if(MSVC)
@@ -61,8 +65,6 @@ include(GNUInstallDirs)
 include(CTest)
 include(CheckCSourceRuns)
 
-option(USE_OPENMP      "Use OpenMP for parallelization" OFF)
-option(USE_THREADPOOL  "Use built-in threadpool instead of OpenMP" ON)
 option(ENABLE_SSE    "Enable compile-time SSE4.1 support." ON)
 option(ENABLE_AVX    "Enable compile-time AVX support."    ON)
 option(ENABLE_AVX2   "Enable compile-time AVX2 support."   ON)
@@ -78,42 +80,9 @@ set(KALIGN_PFOR_MIN_CHUNK "10" CACHE STRING "Minimum iterations per chunk in tp_
 # option(ENABLE_AVX512 "Enable compile-time AVX512 support." ON)
 
 
-if(USE_OPENMP)
-  # Configure OpenMP for macOS with Homebrew (only for arm64 native builds)
-  if(APPLE AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "arm64" AND NOT CMAKE_OSX_ARCHITECTURES MATCHES "x86_64")
-    list(APPEND CMAKE_PREFIX_PATH /opt/homebrew)
-    # Set OpenMP flags for Apple Clang + Homebrew libomp
-    set(OpenMP_C_FLAGS "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
-    set(OpenMP_C_LIB_NAMES "omp")
-    set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include")
-    set(OpenMP_CXX_LIB_NAMES "omp")
-    set(OpenMP_omp_LIBRARY /opt/homebrew/opt/libomp/lib/libomp.dylib)
-  endif()
-
-  find_package(OpenMP)
-  if(OPENMP_FOUND OR OpenMP_FOUND)
-    message(STATUS "OpenMP is enabled.")
-
-    add_definitions (-DHAVE_OPENMP)
-  else(OPENMP_FOUND OR OpenMP_FOUND)
-    message(STATUS "OpenMP not supported")
-  endif(OPENMP_FOUND OR OpenMP_FOUND)
-endif(USE_OPENMP)
-
-# Built-in threadpool (alternative to OpenMP)
-if(USE_THREADPOOL)
-  if(USE_OPENMP AND (OPENMP_FOUND OR OpenMP_FOUND))
-    message(WARNING "Both USE_OPENMP and USE_THREADPOOL are ON. Threadpool takes precedence.")
-  endif()
-  find_package(Threads QUIET)
-  if(Threads_FOUND)
-    add_definitions(-DUSE_THREADPOOL)
-    message(STATUS "Built-in threadpool is enabled.")
-  else()
-    set(USE_THREADPOOL OFF)
-    message(STATUS "pthreads not found — falling back to serial execution.")
-  endif()
-endif()
+# Parallelism: built-in work-stealing threadpool (pthreads). With one thread
+# no pool is created and every task runs on the calling thread.
+find_package(Threads REQUIRED)
 
 if (ENABLE_SSE)
   #
@@ -219,10 +188,22 @@ add_definitions(-DKALIGN_ALN_SERIAL_THRESHOLD=${KALIGN_ALN_SERIAL_THRESHOLD})
 add_definitions(-DKALIGN_KMEANS_UPGMA_THRESHOLD=${KALIGN_KMEANS_UPGMA_THRESHOLD})
 add_definitions(-DKALIGN_DIST_MIN_SEQS=${KALIGN_DIST_MIN_SEQS})
 add_definitions(-DKALIGN_PFOR_MIN_CHUNK=${KALIGN_PFOR_MIN_CHUNK})
+option(KALIGN_WAVE "Wavefront SIMD (NEON/AVX2) DP passes, bit-identical to the scalar kernels (lib/src/aln_wave.c)" ON)
+if(KALIGN_WAVE)
+  add_definitions(-DKALIGN_WAVE)
+endif()
 
 add_subdirectory(lib)
 add_subdirectory(src)
 add_subdirectory(tests)
+
+# DP performance harness (research only, off by default): builds an
+# instrumented library variant plus profiling/benchmark tools in perf/dp.
+# The regular kalign library and binary are not affected by this option.
+option(KALIGN_PERF "Build the perf/dp profiling and DP benchmark harness" OFF)
+if(KALIGN_PERF)
+  add_subdirectory(perf/dp)
+endif()
 
 # Python module build (optional) ##########################################
 option(BUILD_PYTHON_MODULE "Build Python extension module" OFF)
@@ -243,12 +224,7 @@ if(BUILD_PYTHON_MODULE)
         # Link against the static kalign library
         target_link_libraries(_core PRIVATE kalign_static)
 
-        # Link OpenMP or threadpool
-        if(USE_THREADPOOL)
-            target_link_libraries(_core PRIVATE Threads::Threads)
-        elseif(OpenMP_CXX_FOUND)
-            target_link_libraries(_core PRIVATE OpenMP::OpenMP_CXX)
-        endif()
+        target_link_libraries(_core PRIVATE Threads::Threads)
 
         # Add include directories for DSSim and lib headers
         target_include_directories(_core PRIVATE
@@ -319,8 +295,6 @@ MESSAGE(STATUS "Compiler c debug flags    : " ${CMAKE_C_FLAGS_DEBUG})
 MESSAGE(STATUS "Compiler c release flags  : " ${CMAKE_C_FLAGS_RELEASE})
 MESSAGE(STATUS "Compiler c min size flags : " ${CMAKE_C_FLAGS_MINSIZEREL})
 MESSAGE(STATUS "Compiler c flags          : " ${CMAKE_C_FLAGS})
-message(STATUS "OpenMP version            : " ${OpenMP_C_VERSION})
-message(STATUS "OpenMP flags              : " ${OpenMP_C_FLAGS})
 
 # Package Generator  #######################################################
 set(CPACK_PACKAGE_VENDOR "Timo Lassmann")

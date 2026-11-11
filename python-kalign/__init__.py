@@ -60,15 +60,10 @@ __author__ = "Timo Lassmann"
 __email__ = "timolassmann@icloud.com"
 
 # Re-export constants for convenience
+# Sequence types (seq_type): the same four as the C command line's --type
 DNA = _core.DNA
-DNA_INTERNAL = _core.DNA_INTERNAL
 RNA = _core.RNA
 PROTEIN = _core.PROTEIN
-PROTEIN_PFASUM43 = _core.PROTEIN_PFASUM43
-PROTEIN_PFASUM60 = _core.PROTEIN_PFASUM60
-PROTEIN_PFASUM_AUTO = _core.PROTEIN_PFASUM_AUTO
-PROTEIN_DIVERGENT = _core.PROTEIN_DIVERGENT
-PROTEIN_CORBLOSUM66 = _core.PROTEIN_CORBLOSUM66
 AUTO = _core.AUTO
 
 # Refinement mode constants (used by ensemble_custom_file_to_file optimizer path)
@@ -79,8 +74,8 @@ REFINE_INLINE = _core.REFINE_INLINE
 
 # Mode constants
 MODE_FAST = "fast"
-MODE_DEFAULT = "default"
-MODE_RECALL = "recall"
+MODE_DEFAULT = "default"  # alias of MODE_FAST (Kalign 4)
+MODE_RECALL = "recall"  # alias of MODE_ACCURATE (Kalign 4)
 MODE_ACCURATE = "accurate"
 
 # Valid preset modes (resolved by C library)
@@ -90,30 +85,35 @@ _PRESET_MODES = {"fast", "default", "recall", "accurate"}
 _thread_local = threading.local()
 _default_threads = 1
 
-# Sequence type string->int mapping (shared by all entry points)
-_SEQ_TYPE_MAP = {
-    "auto": AUTO,
-    "dna": DNA,
-    "rna": RNA,
-    "protein": PROTEIN,
-    "pfasum43": PROTEIN_PFASUM43,
-    "pfasum60": PROTEIN_PFASUM60,
-    "pfasum": PROTEIN_PFASUM_AUTO,
-    "divergent": PROTEIN_DIVERGENT,
-    "internal": DNA_INTERNAL,
-}
+# Sequence types accepted by every entry point (same as the C --type)
+_SEQ_TYPES = ("auto", "protein", "dna", "rna")
+_SEQ_TYPE_CONSTANTS = {AUTO: "auto", PROTEIN: "protein", DNA: "dna", RNA: "rna"}
 
 
 def _resolve_seq_type(seq_type):
-    """Convert string or int seq_type to integer constant."""
-    if isinstance(seq_type, int):
-        return seq_type
-    lower = seq_type.lower()
-    if lower not in _SEQ_TYPE_MAP:
+    """Normalise seq_type to "auto", "protein", "dna" or "rna".
+
+    Accepts those names (any case) or the constants kalign.AUTO,
+    kalign.PROTEIN, kalign.DNA, kalign.RNA. Anything but "auto" overrides
+    the detected sequence type; "dna" and "rna" both select the nucleotide
+    presets.
+    """
+    if isinstance(seq_type, bool):
         raise ValueError(
-            f"Invalid seq_type: {seq_type}. Must be one of: {list(_SEQ_TYPE_MAP.keys())}"
+            f"Invalid seq_type: {seq_type!r}. Must be one of: {list(_SEQ_TYPES)}"
         )
-    return _SEQ_TYPE_MAP[lower]
+    if isinstance(seq_type, int):
+        if seq_type not in _SEQ_TYPE_CONSTANTS:
+            raise ValueError(
+                f"Invalid seq_type: {seq_type!r}. Must be one of: {list(_SEQ_TYPES)} "
+                "(or kalign.AUTO, kalign.PROTEIN, kalign.DNA, kalign.RNA)"
+            )
+        return _SEQ_TYPE_CONSTANTS[seq_type]
+    if not isinstance(seq_type, str) or seq_type.lower() not in _SEQ_TYPES:
+        raise ValueError(
+            f"Invalid seq_type: {seq_type!r}. Must be one of: {list(_SEQ_TYPES)}"
+        )
+    return seq_type.lower()
 
 
 def _resolve_mode_name(mode):
@@ -144,6 +144,45 @@ def _confidence_to_pp_string(seq: str, confidences: list) -> str:
         else:
             pp.append(_conf_to_pp(conf))
     return "".join(pp)
+
+
+_FILL_MODES = {"off": 0, "realign": 1, "project": 2, "attach": 3}
+
+
+def _parse_fill(fill_in, fill_anchor_frac, fill_support):
+    """Return (fill_in, fill_anchor_frac, fill_support) for _core; negative/0 keeps the preset."""
+    if fill_in is None:
+        f = -1
+    elif isinstance(fill_in, bool):
+        f = 1 if fill_in else 0
+    elif isinstance(fill_in, str):
+        key = fill_in.lower()
+        if key not in _FILL_MODES:
+            raise ValueError(
+                f"fill_in must be one of {sorted(_FILL_MODES)}, got {fill_in!r}"
+            )
+        f = _FILL_MODES[key]
+    elif isinstance(fill_in, int) and fill_in in _FILL_MODES.values():
+        f = fill_in
+    else:
+        raise ValueError(f"Invalid fill_in: {fill_in!r}")
+    if fill_anchor_frac is None:
+        a = -1.0
+    else:
+        a = float(fill_anchor_frac)
+        if not 0.0 <= a <= 1.0:
+            raise ValueError("fill_anchor_frac must be in [0, 1]")
+    if fill_support is None:
+        n = 0
+    elif (
+        isinstance(fill_support, int)
+        and not isinstance(fill_support, bool)
+        and fill_support >= 1
+    ):
+        n = fill_support
+    else:
+        raise ValueError("fill_support must be an integer >= 1")
+    return f, a, n
 
 
 def _parse_refine_mode(refine):
@@ -244,6 +283,9 @@ def align(
     mode: Optional[str] = None,
     fmt: Literal["plain", "biopython", "skbio"] = "plain",
     ids: Optional[List[str]] = None,
+    fill_in: Optional[Union[str, int, bool]] = None,
+    fill_anchor_frac: Optional[float] = None,
+    fill_support: Optional[int] = None,
 ) -> Union[List[str], Any]:
     """
     Multiple sequence alignment via Kalign.
@@ -253,7 +295,11 @@ def align(
     sequences : list of str
         List of sequences to align.
     seq_type : str or int, optional
-        Sequence type: "auto", "dna", "rna", "protein" (default: "auto")
+        Sequence type: "auto", "protein", "dna" or "rna" (default: "auto",
+        detected from the input). Any other value overrides detection and
+        selects the protein or nucleotide presets ("dna" and "rna" both use
+        the nucleotide presets); a UserWarning is issued if it differs from
+        the detected type.
     gap_open : float, optional
         Gap opening penalty. When set, mode is ignored and "fast" preset
         is used with the specified penalty.
@@ -264,11 +310,27 @@ def align(
     n_threads : int, optional
         Number of threads (default: global setting).
     mode : str, optional
-        Preset mode: "fast", "default", "accurate" (default: "default").
+        Preset mode: "fast" or "accurate" (default: "fast"; "default" is
+        an alias of "fast", "recall" of "accurate"). "accurate" is a 5-member
+        ensemble with per-column confidence (at most 5,000 sequences);
+        "fast" is a single run.
     fmt : {'plain', 'biopython', 'skbio'}, default 'plain'
         Return format.
     ids : list of str, optional
         Sequence IDs (for Biopython/scikit-bio formats).
+    fill_in : {'off', 'realign', 'project', 'attach'} or int, optional
+        Ensemble modes only: what to do with residues the POAR consensus
+        leaves in columns of their own. 'realign' realigns each segment
+        between anchor columns afresh; 'project' places segment residues
+        as in the POAR-best run; 'attach' lets such a residue join an
+        existing column on a pair with >= fill_support votes. None keeps
+        the preset (off).
+    fill_anchor_frac : float, optional
+        'realign'/'project' anchors are consensus columns with at least
+        max(2, ceil(fill_anchor_frac * n_seq)) residues. None keeps the
+        preset (0.0).
+    fill_support : int, optional
+        'attach' vote threshold (1..n_runs). None keeps the preset (1).
 
     Returns
     -------
@@ -276,7 +338,7 @@ def align(
     """
     _validate_sequences(sequences)
 
-    seq_type_int = _resolve_seq_type(seq_type)
+    seq_type_name = _resolve_seq_type(seq_type)
 
     # Parameter validation for gap penalties
     if gap_open is not None:
@@ -326,11 +388,12 @@ def align(
     result = _core.align_mode(
         sequences,
         effective_mode,
-        seq_type_int,
+        seq_type_name,
         gap_open if gap_open is not None else -1.0,
         gap_extend if gap_extend is not None else -1.0,
         terminal_gap_extend if terminal_gap_extend is not None else -1.0,
         n_threads,
+        *_parse_fill(fill_in, fill_anchor_frac, fill_support),
     )
     if isinstance(result, tuple):
         aligned_seqs = result[0]
@@ -339,11 +402,11 @@ def align(
         aligned_seqs = result
 
     return _format_result(
-        aligned_seqs, sequences, seq_type_int, confidence_data, fmt, ids
+        aligned_seqs, sequences, seq_type_name, confidence_data, fmt, ids
     )
 
 
-def _format_result(aligned_seqs, sequences, seq_type_int, confidence_data, fmt, ids):
+def _format_result(aligned_seqs, sequences, seq_type_name, confidence_data, fmt, ids):
     """Format alignment result based on requested format."""
     if ids is not None and len(ids) != len(aligned_seqs):
         raise ValueError(
@@ -388,14 +451,12 @@ def _format_result(aligned_seqs, sequences, seq_type_int, confidence_data, fmt, 
             ) from e
 
         skbio_type_map = {
-            DNA: skbio_seq.DNA,
-            DNA_INTERNAL: skbio_seq.DNA,
-            RNA: skbio_seq.RNA,
-            PROTEIN: skbio_seq.Protein,
-            PROTEIN_DIVERGENT: skbio_seq.Protein,
+            "dna": skbio_seq.DNA,
+            "rna": skbio_seq.RNA,
+            "protein": skbio_seq.Protein,
         }
-        if seq_type_int in skbio_type_map:
-            SeqClass = skbio_type_map[seq_type_int]
+        if seq_type_name in skbio_type_map:
+            SeqClass = skbio_type_map[seq_type_name]
         else:
             SeqClass = _infer_skbio_type(sequences, skbio_seq)
 
@@ -428,6 +489,9 @@ def align_from_file(
     terminal_gap_extend: Optional[float] = None,
     n_threads: Optional[int] = None,
     mode: Optional[str] = None,
+    fill_in: Optional[Union[str, int, bool]] = None,
+    fill_anchor_frac: Optional[float] = None,
+    fill_support: Optional[int] = None,
 ) -> AlignedSequences:
     """
     Align sequences from a file using Kalign.
@@ -437,13 +501,33 @@ def align_from_file(
     input_file : str
         Path to input file (FASTA, MSF, Clustal).
     seq_type : str or int, optional
-        Sequence type (default: "auto").
+        Sequence type: "auto", "protein", "dna" or "rna" (default: "auto",
+        detected from the input). Any other value overrides detection and
+        selects the protein or nucleotide presets ("dna" and "rna" both use
+        the nucleotide presets); a UserWarning is issued if it differs from
+        the detected type.
     gap_open, gap_extend, terminal_gap_extend : float, optional
         Gap penalties. When set, mode is ignored and "fast" preset is used.
     n_threads : int, optional
         Number of threads.
     mode : str, optional
-        Preset mode: "fast", "default", "accurate" (default: "default").
+        Preset mode: "fast" or "accurate" (default: "fast"; "default" is
+        an alias of "fast", "recall" of "accurate"). "accurate" is a 5-member
+        ensemble with per-column confidence (at most 5,000 sequences);
+        "fast" is a single run.
+    fill_in : {'off', 'realign', 'project', 'attach'} or int, optional
+        Ensemble modes only: what to do with residues the POAR consensus
+        leaves in columns of their own. 'realign' realigns each segment
+        between anchor columns afresh; 'project' places segment residues
+        as in the POAR-best run; 'attach' lets such a residue join an
+        existing column on a pair with >= fill_support votes. None keeps
+        the preset (off).
+    fill_anchor_frac : float, optional
+        'realign'/'project' anchors are consensus columns with at least
+        max(2, ceil(fill_anchor_frac * n_seq)) residues. None keeps the
+        preset (0.0).
+    fill_support : int, optional
+        'attach' vote threshold (1..n_runs). None keeps the preset (1).
 
     Returns
     -------
@@ -452,7 +536,7 @@ def align_from_file(
     if not os.path.exists(input_file):
         raise FileNotFoundError(f"Input file not found: {input_file}")
 
-    seq_type_int = _resolve_seq_type(seq_type)
+    seq_type_name = _resolve_seq_type(seq_type)
 
     if n_threads is None:
         n_threads = get_num_threads()
@@ -472,11 +556,12 @@ def align_from_file(
     result = _core.align_from_file_mode(
         input_file,
         effective_mode,
-        seq_type_int,
+        seq_type_name,
         gap_open if gap_open is not None else -1.0,
         gap_extend if gap_extend is not None else -1.0,
         terminal_gap_extend if terminal_gap_extend is not None else -1.0,
         n_threads,
+        *_parse_fill(fill_in, fill_anchor_frac, fill_support),
     )
     if len(result) == 3:
         names, sequences, conf = result
@@ -636,6 +721,9 @@ def align_file_to_file(
     terminal_gap_extend: Optional[float] = None,
     n_threads: Optional[int] = None,
     mode: Optional[str] = None,
+    fill_in: Optional[Union[str, int, bool]] = None,
+    fill_anchor_frac: Optional[float] = None,
+    fill_support: Optional[int] = None,
 ) -> None:
     """
     Align sequences from input file and write result to output file.
@@ -649,18 +737,38 @@ def align_file_to_file(
     format : str, optional
         Output format: "fasta", "msf", "clu" (default: "fasta")
     seq_type : str or int, optional
-        Sequence type (default: "auto")
+        Sequence type: "auto", "protein", "dna" or "rna" (default: "auto",
+        detected from the input). Any other value overrides detection and
+        selects the protein or nucleotide presets ("dna" and "rna" both use
+        the nucleotide presets); a UserWarning is issued if it differs from
+        the detected type.
     gap_open, gap_extend, terminal_gap_extend : float, optional
         Gap penalties. When set, mode is ignored and "fast" preset is used.
     n_threads : int, optional
         Number of threads.
     mode : str, optional
-        Preset mode: "fast", "default", "accurate" (default: "default").
+        Preset mode: "fast" or "accurate" (default: "fast"; "default" is
+        an alias of "fast", "recall" of "accurate"). "accurate" is a 5-member
+        ensemble with per-column confidence (at most 5,000 sequences);
+        "fast" is a single run.
+    fill_in : {'off', 'realign', 'project', 'attach'} or int, optional
+        Ensemble modes only: what to do with residues the POAR consensus
+        leaves in columns of their own. 'realign' realigns each segment
+        between anchor columns afresh; 'project' places segment residues
+        as in the POAR-best run; 'attach' lets such a residue join an
+        existing column on a pair with >= fill_support votes. None keeps
+        the preset (off).
+    fill_anchor_frac : float, optional
+        'realign'/'project' anchors are consensus columns with at least
+        max(2, ceil(fill_anchor_frac * n_seq)) residues. None keeps the
+        preset (0.0).
+    fill_support : int, optional
+        'attach' vote threshold (1..n_runs). None keeps the preset (1).
     """
     if not os.path.exists(input_file):
         raise FileNotFoundError(f"Input file not found: {input_file}")
 
-    seq_type_int = _resolve_seq_type(seq_type)
+    seq_type_name = _resolve_seq_type(seq_type)
 
     if n_threads is None:
         n_threads = get_num_threads()
@@ -681,10 +789,11 @@ def align_file_to_file(
         effective_mode,
         format,
         n_threads,
-        seq_type_int,
+        seq_type_name,
         gap_open if gap_open is not None else -1.0,
         gap_extend if gap_extend is not None else -1.0,
         terminal_gap_extend if terminal_gap_extend is not None else -1.0,
+        *_parse_fill(fill_in, fill_anchor_frac, fill_support),
     )
 
 
@@ -803,6 +912,7 @@ def add_to_alignment(
     output: str,
     format: str = "fasta",
     n_threads: Optional[int] = None,
+    seq_type: Union[str, int] = "auto",
 ) -> None:
     """Add new sequences to an existing alignment.
 
@@ -822,6 +932,12 @@ def add_to_alignment(
         Output format: "fasta", "msf", "clu" (default: "fasta").
     n_threads : int, optional
         Number of threads.
+    seq_type : str or int, optional
+        Sequence type: "auto", "protein", "dna" or "rna" (default: "auto",
+        detected from the input). Any other value overrides detection and
+        selects the protein or nucleotide presets ("dna" and "rna" both use
+        the nucleotide presets); a UserWarning is issued if it differs from
+        the detected type.
     """
     if not os.path.exists(existing):
         raise FileNotFoundError(f"Existing alignment not found: {existing}")
@@ -831,7 +947,11 @@ def add_to_alignment(
     if n_threads is None:
         n_threads = get_num_threads()
 
-    _core.add_to_alignment_file(existing, new_sequences, output, format, n_threads)
+    seq_type_name = _resolve_seq_type(seq_type)
+
+    _core.add_to_alignment_file(
+        existing, new_sequences, output, format, n_threads, seq_type_name
+    )
 
 
 def write_confidence(path: str, result: AlignedSequences) -> None:
@@ -868,14 +988,8 @@ __all__ = [
     "write_confidence",
     "add_to_alignment",
     "DNA",
-    "DNA_INTERNAL",
     "RNA",
     "PROTEIN",
-    "PROTEIN_PFASUM43",
-    "PROTEIN_PFASUM60",
-    "PROTEIN_PFASUM_AUTO",
-    "PROTEIN_DIVERGENT",
-    "PROTEIN_CORBLOSUM66",
     "AUTO",
     "REFINE_NONE",
     "REFINE_ALL",

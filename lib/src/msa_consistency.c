@@ -7,13 +7,6 @@
 #define MSA_CONSISTENCY_IMPORT
 #include "msa_consistency.h"
 
-/* Flat index for pair (i,j) where i < j.
-   Duplicated from poar.c (static there). */
-static inline int poar_pair_idx(int i, int j, int numseq)
-{
-        return i * numseq - (i * (i + 1)) / 2 + (j - i - 1);
-}
-
 /* Build ungapped_pos -> DP_position map for a member sequence.
  * Walks gaps[] to find the DP column for each ungapped residue.
  * Caller must free the returned array. */
@@ -61,19 +54,22 @@ int poar_consistency_get_bonus(struct poar_consistency_ctx* ctx,
                                 int node_a, int len_a,
                                 int node_b, int len_b,
                                 struct sparse_bonus** bonus_out)
-{
+{ KPERF_REGION(KP_CONS_BONUS);
         struct sparse_bonus* sb = NULL;
         int* map_a = NULL;
         int* map_b = NULL;
         int K = POAR_BONUS_K;
-        int numseq = ctx->poar->numseq;
         int n_members_a = msa->nsip[node_a];
         int n_members_b = msa->nsip[node_b];
         int* members_a = msa->sip[node_a];
         int* members_b = msa->sip[node_b];
         float denom = (float)n_members_a * (float)n_members_b * (float)ctx->n_runs;
         float pair_weight = ctx->weight / denom;
-        int ma, mb, e, i;
+        int ma, mb, i;
+        size_t e;
+        struct poar_scratch scratch;
+
+        poar_scratch_init(&scratch);
 
         /* Allocate sparse bonus */
         MMALLOC(sb, sizeof(struct sparse_bonus));
@@ -100,8 +96,8 @@ int poar_consistency_get_bonus(struct poar_consistency_ctx* ctx,
                         int sb_seq = members_b[mb];
                         int sb_len = 0;
                         int lo, hi;
-                        int pidx;
-                        struct poar_pair* pp;
+                        const struct poar_entry* pe = NULL;
+                        size_t n_pe = 0;
                         int swapped;
 
                         if(sa == sb_seq) continue;
@@ -117,15 +113,14 @@ int poar_consistency_get_bonus(struct poar_consistency_ctx* ctx,
                                 swapped = 1;
                         }
 
-                        pidx = poar_pair_idx(lo, hi, numseq);
-                        pp = ctx->poar->pairs[pidx];
+                        RUN(poar_pair_entries(ctx->poar, lo, hi, &scratch, &pe, &n_pe));
 
-                        if(pp != NULL){
-                                for(e = 0; e < pp->n_entries; e++){
-                                        uint32_t key = pp->entries[e].key;
-                                        uint32_t support = pp->entries[e].support;
-                                        int pos_lo = (int)(key >> 20);
-                                        int pos_hi = (int)(key & 0xFFFFF);
+                        {
+                                for(e = 0; e < n_pe; e++){
+                                        uint64_t key = pe[e].key;
+                                        uint32_t support = pe[e].support;
+                                        int pos_lo = POAR_KEY_I(key);
+                                        int pos_hi = POAR_KEY_J(key);
                                         int pos_sa, pos_sb;
                                         int dp_row, dp_col;
                                         int count, base, slot, s;
@@ -174,9 +169,11 @@ int poar_consistency_get_bonus(struct poar_consistency_ctx* ctx,
                 if(map_a){ MFREE(map_a); map_a = NULL; }
         }
 
+        poar_scratch_free(&scratch);
         *bonus_out = sb;
         return OK;
 ERROR:
+        poar_scratch_free(&scratch);
         sparse_bonus_free(sb);
         if(map_a) MFREE(map_a);
         if(map_b) MFREE(map_b);

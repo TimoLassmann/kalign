@@ -5,6 +5,7 @@
 
 #define MSA_ALLOC_IMPORT
 #include "msa_alloc.h"
+#include "sl_tree.h"
 
 int alloc_msa(struct msa** msa, int numseq)
 {
@@ -19,6 +20,7 @@ int alloc_msa(struct msa** msa, int numseq)
         m->biotype = ALN_BIOTYPE_UNDEF;
         m->aligned = 0;
         m->alnlen = 0;
+        m->defer_finalise = 0;
         m->quiet = 0;
         m->seq_distances = NULL;
         m->col_confidence = NULL;
@@ -28,6 +30,7 @@ int alloc_msa(struct msa** msa, int numseq)
         m->nsip = NULL;
         m->consistency_table = NULL;
         m->poar_consistency = NULL;
+        RUN(sl_opts_resolve(&m->tree, NULL));
 
         MMALLOC(m->sequences, sizeof(struct msa_seq*) * m->alloc_numseq);
 

@@ -105,21 +105,32 @@ std::vector<std::string> generate_test_sequences(
     return sequences;
 }
 
+// Append the C library's first error message on this thread (the root cause) to a
+// failure message, and reset it for the next call.
+static std::string with_reason(const std::string& what, const char* fallback = "") {
+    const char* r = kalign_last_error();
+    std::string msg = (r && r[0]) ? what + ": " + r : (fallback[0] ? what + ": " + fallback : what);
+    kalign_clear_error();
+    return msg;
+}
+
 // Compare two MSA files (reference vs test), returning SP score
 float compare_msa_files(const std::string& reference_file, const std::string& test_file) {
     struct msa* ref = nullptr;
     struct msa* test = nullptr;
     float score = 0.0f;
 
+    kalign_clear_error();
     int result = kalign_read_input(const_cast<char*>(reference_file.c_str()), &ref, 1);
     if (result != 0 || !ref) {
-        throw std::runtime_error("Failed to read reference file: " + reference_file);
+        throw std::runtime_error(with_reason("Failed to read reference file: " + reference_file, result == 0 ? "no sequences found" : ""));
     }
 
+    kalign_clear_error();
     result = kalign_read_input(const_cast<char*>(test_file.c_str()), &test, 1);
     if (result != 0 || !test) {
         kalign_free_msa(ref);
-        throw std::runtime_error("Failed to read test file: " + test_file);
+        throw std::runtime_error(with_reason("Failed to read test file: " + test_file, result == 0 ? "no sequences found" : ""));
     }
 
     result = kalign_msa_compare(ref, test, &score);
@@ -141,15 +152,17 @@ py::dict compare_detailed_files(const std::string& reference_file,
     struct msa* test = nullptr;
     struct poar_score score;
 
+    kalign_clear_error();
     int result = kalign_read_input(const_cast<char*>(reference_file.c_str()), &ref, 1);
     if (result != 0 || !ref) {
-        throw std::runtime_error("Failed to read reference file: " + reference_file);
+        throw std::runtime_error(with_reason("Failed to read reference file: " + reference_file, result == 0 ? "no sequences found" : ""));
     }
 
+    kalign_clear_error();
     result = kalign_read_input(const_cast<char*>(test_file.c_str()), &test, 1);
     if (result != 0 || !test) {
         kalign_free_msa(ref);
-        throw std::runtime_error("Failed to read test file: " + test_file);
+        throw std::runtime_error(with_reason("Failed to read test file: " + test_file, result == 0 ? "no sequences found" : ""));
     }
 
     result = kalign_msa_compare_detailed(ref, test, max_gap_frac, &score);
@@ -179,15 +192,17 @@ py::dict compare_detailed_with_mask_files(const std::string& reference_file,
     struct msa* test = nullptr;
     struct poar_score score;
 
+    kalign_clear_error();
     int result = kalign_read_input(const_cast<char*>(reference_file.c_str()), &ref, 1);
     if (result != 0 || !ref) {
-        throw std::runtime_error("Failed to read reference file: " + reference_file);
+        throw std::runtime_error(with_reason("Failed to read reference file: " + reference_file, result == 0 ? "no sequences found" : ""));
     }
 
+    kalign_clear_error();
     result = kalign_read_input(const_cast<char*>(test_file.c_str()), &test, 1);
     if (result != 0 || !test) {
         kalign_free_msa(ref);
-        throw std::runtime_error("Failed to read test file: " + test_file);
+        throw std::runtime_error(with_reason("Failed to read test file: " + test_file, result == 0 ? "no sequences found" : ""));
     }
 
     // Convert py::list to int array
@@ -219,7 +234,7 @@ py::dict compare_detailed_with_mask_files(const std::string& reference_file,
 // Ensemble with per-run parameters — playground for optimization.
 // Each run gets its own gap penalties, matrix type, and tree noise.
 // Now uses kalign_align_full with per-run configs.
-void ensemble_custom_file_to_file(
+py::object ensemble_custom_file_to_file(
     const std::string& input_file,
     const std::string& output_file,
     const std::vector<float>& run_gpo,
@@ -247,7 +262,27 @@ void ensemble_custom_file_to_file(
     const std::vector<int>& run_consistency_anchors = {},
     const std::vector<float>& run_consistency_weight = {},
     int consistency_merge = 0,
-    float consistency_merge_weight = 2.0f
+    float consistency_merge_weight = 2.0f,
+    int vsm_mode = 0,
+    float vsm_kappa = 1.0f,
+    float vsm_dzero = 1.0f,
+    const std::vector<float>& run_vsm_kappa = {},
+    const std::vector<float>& run_vsm_dzero = {},
+    int fill_in = 0,
+    float fill_anchor_frac = 0.0f,
+    int fill_support = 1,
+    int guide_dist = KALIGN_GUIDE_DIST_BPM,
+    const std::vector<int>& run_guide_dist = {},
+    const std::vector<int>& run_tree_method = {},
+    const std::vector<int>& run_tree_dist = {},
+    const std::vector<int>& run_tree_alpha = {},
+    const std::vector<int>& run_tree_maxlen = {},
+    const std::vector<int>& run_tree_leaf = {},
+    const std::vector<int>& run_tree_kmeans_dist = {},
+    const std::vector<int>& run_realign_tree = {},
+    const std::vector<int>& run_gap_model = {},
+    const std::vector<int>& run_vsm_mode = {},
+    const std::vector<float>& run_tree_sl_noise = {}
 ) {
     int n_runs = static_cast<int>(run_gpo.size());
     if (n_runs < 1) {
@@ -265,6 +300,29 @@ void ensemble_custom_file_to_file(
     if (!run_vsm_amax.empty() && static_cast<int>(run_vsm_amax.size()) != n_runs) {
         throw std::invalid_argument("run_vsm_amax must be empty or same length as run_gpo");
     }
+    if (!run_vsm_kappa.empty() && static_cast<int>(run_vsm_kappa.size()) != n_runs) {
+        throw std::invalid_argument("run_vsm_kappa must be empty or same length as run_gpo");
+    }
+    if (!run_vsm_dzero.empty() && static_cast<int>(run_vsm_dzero.size()) != n_runs) {
+        throw std::invalid_argument("run_vsm_dzero must be empty or same length as run_gpo");
+    }
+    if (vsm_mode != 0 && vsm_mode != 1) {
+        throw std::invalid_argument("vsm_mode must be 0 (legacy) or 1 (per-merge)");
+    }
+    if (!run_vsm_mode.empty() && static_cast<int>(run_vsm_mode.size()) != n_runs) {
+        throw std::invalid_argument("run_vsm_mode must be empty or same length as run_gpo");
+    }
+    for (int v : run_vsm_mode) {
+        if (v != 0 && v != 1) {
+            throw std::invalid_argument("run_vsm_mode must be 0 (legacy) or 1 (per-merge)");
+        }
+    }
+    if (fill_in < KALIGN_FILL_OFF || fill_in > KALIGN_FILL_ATTACH) {
+        throw std::invalid_argument("fill_in must be 0 (off), 1 (realign), 2 (project) or 3 (attach)");
+    }
+    if (!(fill_anchor_frac >= 0.0f && fill_anchor_frac <= 1.0f)) {
+        throw std::invalid_argument("fill_anchor_frac must be in [0, 1]");
+    }
     if (!run_seq_weights.empty() && static_cast<int>(run_seq_weights.size()) != n_runs) {
         throw std::invalid_argument("run_seq_weights must be empty or same length as run_gpo");
     }
@@ -280,11 +338,61 @@ void ensemble_custom_file_to_file(
     if (!run_consistency_weight.empty() && static_cast<int>(run_consistency_weight.size()) != n_runs) {
         throw std::invalid_argument("run_consistency_weight must be empty or same length as run_gpo");
     }
+    if (!run_guide_dist.empty() && static_cast<int>(run_guide_dist.size()) != n_runs) {
+        throw std::invalid_argument("run_guide_dist must be empty or same length as run_gpo");
+    }
+    if (!run_tree_method.empty() && static_cast<int>(run_tree_method.size()) != n_runs) {
+        throw std::invalid_argument("run_tree_method must be empty or same length as run_gpo");
+    }
+    if (!run_tree_dist.empty() && static_cast<int>(run_tree_dist.size()) != n_runs) {
+        throw std::invalid_argument("run_tree_dist must be empty or same length as run_gpo");
+    }
+    if (!run_tree_alpha.empty() && static_cast<int>(run_tree_alpha.size()) != n_runs) {
+        throw std::invalid_argument("run_tree_alpha must be empty or same length as run_gpo");
+    }
+    if (!run_tree_maxlen.empty() && static_cast<int>(run_tree_maxlen.size()) != n_runs) {
+        throw std::invalid_argument("run_tree_maxlen must be empty or same length as run_gpo");
+    }
+    if (!run_tree_leaf.empty() && static_cast<int>(run_tree_leaf.size()) != n_runs) {
+        throw std::invalid_argument("run_tree_leaf must be empty or same length as run_gpo");
+    }
+    if (!run_tree_kmeans_dist.empty() && static_cast<int>(run_tree_kmeans_dist.size()) != n_runs) {
+        throw std::invalid_argument("run_tree_kmeans_dist must be empty or same length as run_gpo");
+    }
+    if (!run_realign_tree.empty() && static_cast<int>(run_realign_tree.size()) != n_runs) {
+        throw std::invalid_argument("run_realign_tree must be empty or same length as run_gpo");
+    }
+    if (!run_gap_model.empty() && static_cast<int>(run_gap_model.size()) != n_runs) {
+        throw std::invalid_argument("run_gap_model must be empty or same length as run_gpo");
+    }
+    for (int v : run_gap_model) {
+        if (v != 0 && v != 1) {
+            throw std::invalid_argument("run_gap_model must be 0 (Kalign gap rule) or 1 (member gap model)");
+        }
+    }
+    if (!run_tree_sl_noise.empty() && static_cast<int>(run_tree_sl_noise.size()) != n_runs) {
+        throw std::invalid_argument("run_tree_sl_noise must be empty or same length as run_gpo");
+    }
+    for (float v : run_tree_sl_noise) {
+        if (!(v >= 0.0f)) {
+            throw std::invalid_argument("run_tree_sl_noise must be >= 0");
+        }
+    }
+    {
+        std::vector<int> gd = run_guide_dist;
+        gd.push_back(guide_dist);
+        for (int v : gd) {
+            if (v != KALIGN_GUIDE_DIST_BPM && v != KALIGN_GUIDE_DIST_PAIRALN) {
+                throw std::invalid_argument("guide_dist must be 0 (BPM) or 1 (pairwise alignment)");
+            }
+        }
+    }
 
     struct msa* msa_data = nullptr;
+    kalign_clear_error();
     int result = kalign_read_input(const_cast<char*>(input_file.c_str()), &msa_data, 1);
     if (result != 0 || !msa_data) {
-        throw std::runtime_error("Failed to read input file: " + input_file);
+        throw std::runtime_error(with_reason("Failed to read input file: " + input_file, result == 0 ? "no sequences found" : ""));
     }
 
     /* Build per-run configs.  Each optional per-run array overrides the
@@ -305,38 +413,109 @@ void ensemble_custom_file_to_file(
         runs[k].realign = (!run_realign.empty()) ? run_realign[k] : realign;
         runs[k].consistency_anchors = (!run_consistency_anchors.empty()) ? run_consistency_anchors[k] : consistency_anchors;
         runs[k].consistency_weight = (!run_consistency_weight.empty()) ? run_consistency_weight[k] : consistency_weight;
+        runs[k].vsm_mode = (!run_vsm_mode.empty()) ? run_vsm_mode[k] : vsm_mode;
+        runs[k].vsm_kappa = (!run_vsm_kappa.empty()) ? run_vsm_kappa[k] : vsm_kappa;
+        runs[k].vsm_dzero = (!run_vsm_dzero.empty()) ? run_vsm_dzero[k] : vsm_dzero;
+        runs[k].guide_dist = (!run_guide_dist.empty()) ? run_guide_dist[k] : guide_dist;
+        if (!run_tree_method.empty()) runs[k].tree_method = run_tree_method[k];
+        if (!run_tree_dist.empty()) runs[k].tree_dist = run_tree_dist[k];
+        if (!run_tree_alpha.empty()) runs[k].tree_alpha = run_tree_alpha[k];
+        if (!run_tree_maxlen.empty()) runs[k].tree_maxlen = run_tree_maxlen[k];
+        if (!run_tree_leaf.empty()) runs[k].tree_leaf = run_tree_leaf[k];
+        if (!run_tree_kmeans_dist.empty()) runs[k].tree_kmeans_dist = run_tree_kmeans_dist[k];
+        if (!run_realign_tree.empty()) runs[k].realign_tree = run_realign_tree[k];
+        if (!run_gap_model.empty()) runs[k].gap_model = run_gap_model[k];
+        if (!run_tree_sl_noise.empty()) runs[k].tree_sl_noise = run_tree_sl_noise[k];
     }
 
     struct kalign_ensemble_config ens = kalign_ensemble_config_defaults();
     ens.min_support = min_support;
     ens.consistency_merge = consistency_merge;
     ens.consistency_merge_weight = consistency_merge_weight;
+    ens.fill_in = fill_in;
+    ens.fill_anchor_frac = fill_anchor_frac;
+    ens.fill_support = fill_support;
 
+    kalign_clear_error();
     result = kalign_align_full(msa_data, runs.data(), n_runs, &ens, n_threads);
     if (result != 0) {
         kalign_free_msa(msa_data);
-        throw std::runtime_error("Ensemble alignment failed with error code: " + std::to_string(result));
+        throw std::runtime_error(with_reason("Ensemble alignment failed with error code: " + std::to_string(result)));
     }
 
+    /* Confidence (None for a 1-member run) and the row names in the same order, taken before the write. */
+    py::object confidence = extract_confidence(msa_data, msa_data->numseq);
+    py::list names;
+    for (int i = 0; i < msa_data->numseq; i++) {
+        names.append(std::string(msa_data->sequences[i]->name));
+    }
+
+    kalign_clear_error();
     result = kalign_write_msa(msa_data, const_cast<char*>(output_file.c_str()),
                                const_cast<char*>(format.c_str()));
     kalign_free_msa(msa_data);
 
     if (result != 0) {
-        throw std::runtime_error("Failed to write output file: " + output_file);
+        throw std::runtime_error(with_reason("Failed to write output file: " + output_file));
     }
+    if (confidence.is_none()) {
+        return py::none();
+    }
+    py::dict out = confidence.cast<py::dict>();
+    out["names"] = names;
+    return out;
 }
 
 // Align in-memory sequences using a named mode preset.
+// Sequence type (seq_type), shared by every entry point: the same names and
+// the same behaviour as the C command line's --type (kalign_parse_seq_type /
+// kalign_set_seq_type). "auto" keeps the detected type; "protein", "dna" and
+// "rna" override it and select the protein or nucleotide presets. A
+// UserWarning is issued when the override differs from the detected type.
+// Does not free msa; callers free it if this throws.
+static void apply_seq_type(struct msa* msa, const std::string& seq_type, const std::string& what)
+{
+    int st = KALIGN_SEQ_AUTO;
+    if (kalign_parse_seq_type(seq_type.c_str(), &st) != 0) {
+        throw std::invalid_argument("Invalid seq_type: '" + seq_type +
+                                    "'. Must be one of: auto, protein, dna, rna");
+    }
+    std::string detected = kalign_seq_type_name(msa);
+    int overridden = 0;
+    if (kalign_set_seq_type(msa, st, &overridden) != 0) {
+        throw std::invalid_argument("Invalid seq_type: '" + seq_type + "'");
+    }
+    if (overridden) {
+        std::string msg = what + ": sequences look like " + detected + ", aligning as " +
+                          kalign_seq_type_name(msa) + " as requested (seq_type='" + seq_type + "').";
+        if (PyErr_WarnEx(PyExc_UserWarning, msg.c_str(), 2) != 0) {
+            throw py::error_already_set();
+        }
+    }
+}
+
+static void apply_seq_type_or_free(struct msa* msa, const std::string& seq_type, const std::string& what)
+{
+    try {
+        apply_seq_type(msa, seq_type, what);
+    } catch (...) {
+        kalign_free_msa(msa);
+        throw;
+    }
+}
+
 // Detects biotype from sequences and delegates to C preset system.
 py::object align_mode(
     const std::vector<std::string>& sequences,
     const std::string& mode,
-    int seq_type = KALIGN_TYPE_UNDEFINED,
+    const std::string& seq_type = "auto",
     float gap_open = -1.0f,
     float gap_extend = -1.0f,
     float terminal_gap_extend = -1.0f,
-    int n_threads = 1
+    int n_threads = 1,
+    int fill_in = -1,
+    float fill_anchor_frac = -1.0f,
+    int fill_support = 0
 ) {
     if (sequences.empty()) {
         throw std::invalid_argument("Empty sequence list provided");
@@ -353,23 +532,15 @@ py::object align_mode(
     if (n_threads < 1) n_threads = 1;
 
     struct msa* msa_data = nullptr;
+    kalign_clear_error();
     int result = kalign_arr_to_msa(seq_ptrs.data(), seq_lengths.data(),
                                     static_cast<int>(sequences.size()), &msa_data);
     if (result != 0 || !msa_data) {
-        throw std::runtime_error("Failed to create MSA from input sequences");
+        throw std::runtime_error(with_reason("Failed to create MSA from input sequences"));
     }
     msa_data->quiet = 1;
 
-    /* Force biotype if caller specified one */
-    if (seq_type == KALIGN_MATRIX_DNA || seq_type == KALIGN_MATRIX_DNA_INTERNAL ||
-        seq_type == KALIGN_MATRIX_NUC_1PAM || seq_type == KALIGN_MATRIX_NUC_20PAM ||
-        seq_type == KALIGN_MATRIX_NUC_200PAM) {
-        msa_data->biotype = ALN_BIOTYPE_DNA;
-    } else if (seq_type == KALIGN_MATRIX_RNA) {
-        msa_data->biotype = ALN_BIOTYPE_DNA;  /* RNA uses DNA biotype internally */
-    } else if (seq_type != KALIGN_MATRIX_AUTO && seq_type != KALIGN_TYPE_UNDEFINED) {
-        msa_data->biotype = ALN_BIOTYPE_PROTEIN;
-    }
+    apply_seq_type_or_free(msa_data, seq_type, "sequences");
 
     /* Detect biotype if not already set */
     if (msa_data->biotype == ALN_BIOTYPE_UNDEF) {
@@ -391,6 +562,13 @@ py::object align_mode(
         kalign_free_msa(msa_data);
         throw std::invalid_argument("Unknown mode: " + mode);
     }
+    if (!kalign_mode_size_ok(mode.c_str(), msa_data->biotype, msa_data->numseq)) {
+        int n = msa_data->numseq;
+        kalign_free_msa(msa_data);
+        throw std::invalid_argument("Mode '" + mode + "' is not feasible above " +
+                                    std::to_string(KALIGN_ACCURATE_MAX_SEQ) + " sequences (input: " +
+                                    std::to_string(n) + "). Use mode='fast'.");
+    }
 
     /* Apply user gap penalty overrides to all runs */
     for (int k = 0; k < n_runs; k++) {
@@ -398,12 +576,17 @@ py::object align_mode(
         if (gap_extend >= 0.0f) runs[k].gpe = gap_extend;
         if (terminal_gap_extend >= 0.0f) runs[k].tgpe = terminal_gap_extend;
     }
+    /* Fill-in overrides (negative = keep preset) */
+    if (fill_in >= 0) ens.fill_in = fill_in;
+    if (fill_anchor_frac >= 0.0f) ens.fill_anchor_frac = fill_anchor_frac;
+    if (fill_support >= 1) ens.fill_support = fill_support;
 
+    kalign_clear_error();
     result = kalign_align_full(msa_data, runs, n_runs,
                                 n_runs > 1 ? &ens : nullptr, n_threads);
     if (result != 0) {
         kalign_free_msa(msa_data);
-        throw std::runtime_error("Alignment failed with error code: " + std::to_string(result));
+        throw std::runtime_error(with_reason("Alignment failed with error code: " + std::to_string(result)));
     }
 
     py::object confidence = extract_confidence(msa_data, static_cast<int>(sequences.size()));
@@ -429,26 +612,23 @@ py::object align_mode(
 py::object align_from_file_mode(
     const std::string& input_file,
     const std::string& mode,
-    int seq_type = KALIGN_TYPE_UNDEFINED,
+    const std::string& seq_type = "auto",
     float gap_open = -1.0f,
     float gap_extend = -1.0f,
     float terminal_gap_extend = -1.0f,
-    int n_threads = 1
+    int n_threads = 1,
+    int fill_in = -1,
+    float fill_anchor_frac = -1.0f,
+    int fill_support = 0
 ) {
     struct msa* msa_data = nullptr;
+    kalign_clear_error();
     int result = kalign_read_input(const_cast<char*>(input_file.c_str()), &msa_data, 1);
     if (result != 0 || !msa_data) {
-        throw std::runtime_error("Failed to read input file: " + input_file);
+        throw std::runtime_error(with_reason("Failed to read input file: " + input_file, result == 0 ? "no sequences found" : ""));
     }
 
-    /* Force biotype if caller specified one */
-    if (seq_type == KALIGN_MATRIX_DNA || seq_type == KALIGN_MATRIX_DNA_INTERNAL) {
-        msa_data->biotype = ALN_BIOTYPE_DNA;
-    } else if (seq_type == KALIGN_MATRIX_RNA) {
-        msa_data->biotype = ALN_BIOTYPE_DNA;
-    } else if (seq_type != KALIGN_MATRIX_AUTO && seq_type != KALIGN_TYPE_UNDEFINED) {
-        msa_data->biotype = ALN_BIOTYPE_PROTEIN;
-    }
+    apply_seq_type_or_free(msa_data, seq_type, input_file);
 
     if (msa_data->biotype == ALN_BIOTYPE_UNDEF) {
         result = detect_alphabet(msa_data);
@@ -468,18 +648,30 @@ py::object align_from_file_mode(
         kalign_free_msa(msa_data);
         throw std::invalid_argument("Unknown mode: " + mode);
     }
+    if (!kalign_mode_size_ok(mode.c_str(), msa_data->biotype, msa_data->numseq)) {
+        int n = msa_data->numseq;
+        kalign_free_msa(msa_data);
+        throw std::invalid_argument("Mode '" + mode + "' is not feasible above " +
+                                    std::to_string(KALIGN_ACCURATE_MAX_SEQ) + " sequences (input: " +
+                                    std::to_string(n) + "). Use mode='fast'.");
+    }
 
     for (int k = 0; k < n_runs; k++) {
         if (gap_open >= 0.0f) runs[k].gpo = gap_open;
         if (gap_extend >= 0.0f) runs[k].gpe = gap_extend;
         if (terminal_gap_extend >= 0.0f) runs[k].tgpe = terminal_gap_extend;
     }
+    /* Fill-in overrides (negative = keep preset) */
+    if (fill_in >= 0) ens.fill_in = fill_in;
+    if (fill_anchor_frac >= 0.0f) ens.fill_anchor_frac = fill_anchor_frac;
+    if (fill_support >= 1) ens.fill_support = fill_support;
 
+    kalign_clear_error();
     result = kalign_align_full(msa_data, runs, n_runs,
                                 n_runs > 1 ? &ens : nullptr, n_threads);
     if (result != 0) {
         kalign_free_msa(msa_data);
-        throw std::runtime_error("Alignment failed with error code: " + std::to_string(result));
+        throw std::runtime_error(with_reason("Alignment failed with error code: " + std::to_string(result)));
     }
 
     py::object confidence = extract_confidence(msa_data, msa_data->numseq);
@@ -513,25 +705,22 @@ void align_file_to_file_mode(
     const std::string& mode,
     const std::string& format = "fasta",
     int n_threads = 1,
-    int seq_type = KALIGN_TYPE_UNDEFINED,
+    const std::string& seq_type = "auto",
     float gap_open = -1.0f,
     float gap_extend = -1.0f,
-    float terminal_gap_extend = -1.0f
+    float terminal_gap_extend = -1.0f,
+    int fill_in = -1,
+    float fill_anchor_frac = -1.0f,
+    int fill_support = 0
 ) {
     struct msa* msa_data = nullptr;
+    kalign_clear_error();
     int result = kalign_read_input(const_cast<char*>(input_file.c_str()), &msa_data, 1);
     if (result != 0 || !msa_data) {
-        throw std::runtime_error("Failed to read input file: " + input_file);
+        throw std::runtime_error(with_reason("Failed to read input file: " + input_file, result == 0 ? "no sequences found" : ""));
     }
 
-    /* Force biotype if caller specified one */
-    if (seq_type == KALIGN_MATRIX_DNA || seq_type == KALIGN_MATRIX_DNA_INTERNAL) {
-        msa_data->biotype = ALN_BIOTYPE_DNA;
-    } else if (seq_type == KALIGN_MATRIX_RNA) {
-        msa_data->biotype = ALN_BIOTYPE_DNA;
-    } else if (seq_type != KALIGN_MATRIX_AUTO && seq_type != KALIGN_TYPE_UNDEFINED) {
-        msa_data->biotype = ALN_BIOTYPE_PROTEIN;
-    }
+    apply_seq_type_or_free(msa_data, seq_type, input_file);
 
     /* Detect biotype from sequences so we can select the right preset grid slot */
     if (msa_data->biotype == ALN_BIOTYPE_UNDEF) {
@@ -552,6 +741,13 @@ void align_file_to_file_mode(
         kalign_free_msa(msa_data);
         throw std::invalid_argument("Unknown mode: " + mode);
     }
+    if (!kalign_mode_size_ok(mode.c_str(), msa_data->biotype, msa_data->numseq)) {
+        int n = msa_data->numseq;
+        kalign_free_msa(msa_data);
+        throw std::invalid_argument("Mode '" + mode + "' is not feasible above " +
+                                    std::to_string(KALIGN_ACCURATE_MAX_SEQ) + " sequences (input: " +
+                                    std::to_string(n) + "). Use mode='fast'.");
+    }
 
     /* Apply user gap penalty overrides to all runs */
     for (int k = 0; k < n_runs; k++) {
@@ -559,20 +755,26 @@ void align_file_to_file_mode(
         if (gap_extend >= 0.0f) runs[k].gpe = gap_extend;
         if (terminal_gap_extend >= 0.0f) runs[k].tgpe = terminal_gap_extend;
     }
+    /* Fill-in overrides (negative = keep preset) */
+    if (fill_in >= 0) ens.fill_in = fill_in;
+    if (fill_anchor_frac >= 0.0f) ens.fill_anchor_frac = fill_anchor_frac;
+    if (fill_support >= 1) ens.fill_support = fill_support;
 
+    kalign_clear_error();
     result = kalign_align_full(msa_data, runs, n_runs,
                                 n_runs > 1 ? &ens : nullptr, n_threads);
     if (result != 0) {
         kalign_free_msa(msa_data);
-        throw std::runtime_error("Alignment failed with error code: " + std::to_string(result));
+        throw std::runtime_error(with_reason("Alignment failed with error code: " + std::to_string(result)));
     }
 
+    kalign_clear_error();
     result = kalign_write_msa(msa_data, const_cast<char*>(output_file.c_str()),
                                const_cast<char*>(format.c_str()));
     kalign_free_msa(msa_data);
 
     if (result != 0) {
-        throw std::runtime_error("Failed to write output file: " + output_file);
+        throw std::runtime_error(with_reason("Failed to write output file: " + output_file));
     }
 }
 
@@ -704,6 +906,26 @@ PYBIND11_MODULE(_core, m) {
           py::arg("run_consistency_weight") = std::vector<float>{},
           py::arg("consistency_merge") = 0,
           py::arg("consistency_merge_weight") = 2.0f,
+          py::arg("vsm_mode") = 0,
+          py::arg("vsm_kappa") = 1.0f,
+          py::arg("vsm_dzero") = 1.0f,
+          py::arg("run_vsm_kappa") = std::vector<float>{},
+          py::arg("run_vsm_dzero") = std::vector<float>{},
+          py::arg("fill_in") = 0,
+          py::arg("fill_anchor_frac") = 0.0f,
+          py::arg("fill_support") = 1,
+          py::arg("guide_dist") = static_cast<int>(KALIGN_GUIDE_DIST_BPM),
+          py::arg("run_guide_dist") = std::vector<int>{},
+          py::arg("run_tree_method") = std::vector<int>{},
+          py::arg("run_tree_dist") = std::vector<int>{},
+          py::arg("run_tree_alpha") = std::vector<int>{},
+          py::arg("run_tree_maxlen") = std::vector<int>{},
+          py::arg("run_tree_leaf") = std::vector<int>{},
+          py::arg("run_tree_kmeans_dist") = std::vector<int>{},
+          py::arg("run_realign_tree") = std::vector<int>{},
+          py::arg("run_gap_model") = std::vector<int>{},
+          py::arg("run_vsm_mode") = std::vector<int>{},
+          py::arg("run_tree_sl_noise") = std::vector<float>{},
           R"pbdoc(
           Ensemble alignment with per-run parameters.
 
@@ -740,46 +962,94 @@ PYBIND11_MODULE(_core, m) {
               Per-run consistency rounds. Empty = use consistency_anchors for all.
           run_consistency_weight : list of float, optional
               Per-run consistency weight. Empty = use consistency_weight for all.
+          vsm_mode : int, optional
+              0 = legacy VSM (offset from vsm_amax and mean distance to anchors,
+              the shipped behaviour); 1 = per-merge VSM: offset
+              min(kappa,1) * max(0, 2*gpe + mu_bg) * max(0, 1 - d/dzero), with d the
+              Kimura-corrected distance between the two groups being merged.
+              vsm_amax is ignored when vsm_mode = 1.
+          vsm_kappa, vsm_dzero : float, optional
+              Per-merge VSM parameters (fraction of the offset bound, 0-1; distance in
+              substitutions/site at which the offset reaches 0).
+          run_vsm_mode : list of int, optional
+              Per-run vsm_mode. Empty = use vsm_mode for all runs.
+          run_vsm_kappa, run_vsm_dzero : list of float, optional
+              Per-run overrides. Empty = use the shared value for all runs.
+          guide_dist : int, optional
+              Guide-tree distance. 0 = alignment-free BPM edit distance (shipped
+              behaviour); 1 = Kimura (protein) / Jukes-Cantor (DNA/RNA) corrected
+              distance from independent pairwise global alignments with the run's
+              matrix and gap penalties. Clustering is unchanged.
+          run_guide_dist : list of int, optional
+              Per-run guide_dist. Empty = use guide_dist for all runs.
+          run_tree_method, run_tree_dist, run_tree_alpha, run_tree_maxlen, run_tree_leaf,
+          run_tree_kmeans_dist, run_realign_tree : list of int, optional
+              Per-run guide-tree options, see struct tree_opts in lib/src/msa_struct.h.
+              Empty or -1 = the shipped tree.
+          run_gap_model : list of int, optional
+              Per-run gap model: 0 = Kalign gap rule, 1 = member gap model.
+              Empty = 0 for all runs.
+          run_tree_sl_noise : list of float, optional
+              Per-run sigma of the noise on the hybrid tree's single-linkage subtrees
+              (tree_method 3), keyed by the run's tree seed. Empty = 0 (no noise).
+
+          Returns
+          -------
+          dict or None
+              For an ensemble with confidence: column_confidence, residue_confidence and
+              names (row order of residue_confidence); None otherwise.
           )pbdoc");
 
     // In-memory alignment using a named mode preset
     m.def("align", &align_mode,
           py::arg("sequences"),
           py::arg("mode"),
-          py::arg("seq_type") = KALIGN_TYPE_UNDEFINED,
+          py::arg("seq_type") = "auto",
           py::arg("gap_open") = -1.0f,
           py::arg("gap_extend") = -1.0f,
           py::arg("terminal_gap_extend") = -1.0f,
           py::arg("n_threads") = 1,
+          py::arg("fill_in") = -1,
+          py::arg("fill_anchor_frac") = -1.0f,
+          py::arg("fill_support") = 0,
           "Align sequences using a named mode preset (fast/default/recall/accurate).");
     m.def("align_mode", &align_mode,
           py::arg("sequences"),
           py::arg("mode"),
-          py::arg("seq_type") = KALIGN_TYPE_UNDEFINED,
+          py::arg("seq_type") = "auto",
           py::arg("gap_open") = -1.0f,
           py::arg("gap_extend") = -1.0f,
           py::arg("terminal_gap_extend") = -1.0f,
           py::arg("n_threads") = 1,
+          py::arg("fill_in") = -1,
+          py::arg("fill_anchor_frac") = -1.0f,
+          py::arg("fill_support") = 0,
           "Alias for align(). Align sequences using a named mode preset.");
 
     // File alignment returning (names, sequences) using a named mode preset
     m.def("align_from_file", &align_from_file_mode,
           py::arg("input_file"),
           py::arg("mode"),
-          py::arg("seq_type") = KALIGN_TYPE_UNDEFINED,
+          py::arg("seq_type") = "auto",
           py::arg("gap_open") = -1.0f,
           py::arg("gap_extend") = -1.0f,
           py::arg("terminal_gap_extend") = -1.0f,
           py::arg("n_threads") = 1,
+          py::arg("fill_in") = -1,
+          py::arg("fill_anchor_frac") = -1.0f,
+          py::arg("fill_support") = 0,
           "Align from file using a named mode preset. Returns (names, sequences) tuple.");
     m.def("align_from_file_mode", &align_from_file_mode,
           py::arg("input_file"),
           py::arg("mode"),
-          py::arg("seq_type") = KALIGN_TYPE_UNDEFINED,
+          py::arg("seq_type") = "auto",
           py::arg("gap_open") = -1.0f,
           py::arg("gap_extend") = -1.0f,
           py::arg("terminal_gap_extend") = -1.0f,
           py::arg("n_threads") = 1,
+          py::arg("fill_in") = -1,
+          py::arg("fill_anchor_frac") = -1.0f,
+          py::arg("fill_support") = 0,
           "Alias for align_from_file(). Align from file using a named mode preset.");
 
     // File-to-file alignment using a named mode preset
@@ -789,10 +1059,13 @@ PYBIND11_MODULE(_core, m) {
           py::arg("mode"),
           py::arg("format") = "fasta",
           py::arg("n_threads") = 1,
-          py::arg("seq_type") = KALIGN_TYPE_UNDEFINED,
+          py::arg("seq_type") = "auto",
           py::arg("gap_open") = -1.0f,
           py::arg("gap_extend") = -1.0f,
           py::arg("terminal_gap_extend") = -1.0f,
+          py::arg("fill_in") = -1,
+          py::arg("fill_anchor_frac") = -1.0f,
+          py::arg("fill_support") = 0,
           "Align file to file using a named mode preset (fast/default/recall/accurate).");
     m.def("align_file_to_file_mode", &align_file_to_file_mode,
           py::arg("input_file"),
@@ -800,10 +1073,13 @@ PYBIND11_MODULE(_core, m) {
           py::arg("mode"),
           py::arg("format") = "fasta",
           py::arg("n_threads") = 1,
-          py::arg("seq_type") = KALIGN_TYPE_UNDEFINED,
+          py::arg("seq_type") = "auto",
           py::arg("gap_open") = -1.0f,
           py::arg("gap_extend") = -1.0f,
           py::arg("terminal_gap_extend") = -1.0f,
+          py::arg("fill_in") = -1,
+          py::arg("fill_anchor_frac") = -1.0f,
+          py::arg("fill_support") = 0,
           "Alias for align_file_to_file(). Align file to file using a named mode preset.");
 
     m.def("add_to_alignment_file", [](
@@ -811,39 +1087,53 @@ PYBIND11_MODULE(_core, m) {
             const std::string& new_seqs_file,
             const std::string& output_file,
             const std::string& format,
-            int n_threads
+            int n_threads,
+            const std::string& seq_type
     ) {
         struct msa* existing = nullptr;
         struct msa* new_seqs = nullptr;
 
+        kalign_clear_error();
         int result = kalign_read_input(
             const_cast<char*>(existing_file.c_str()), &existing, 1);
         if (result != 0 || !existing) {
-            throw std::runtime_error("Failed to read existing alignment: " + existing_file);
+            throw std::runtime_error(with_reason("Failed to read existing alignment: " + existing_file, result == 0 ? "no sequences found" : ""));
         }
 
+        kalign_clear_error();
         result = kalign_read_sequences(
             const_cast<char*>(new_seqs_file.c_str()), &new_seqs, 1);
         if (result != 0 || !new_seqs) {
             kalign_free_msa(existing);
-            throw std::runtime_error("Failed to read new sequences: " + new_seqs_file);
+            throw std::runtime_error(with_reason("Failed to read new sequences: " + new_seqs_file, result == 0 ? "no sequences found" : ""));
         }
 
+        try {
+            apply_seq_type(existing, seq_type, existing_file);
+            apply_seq_type(new_seqs, seq_type, new_seqs_file);
+        } catch (...) {
+            kalign_free_msa(existing);
+            kalign_free_msa(new_seqs);
+            throw;
+        }
+
+        kalign_clear_error();
         result = kalign_add_sequences(existing, new_seqs, n_threads);
         if (result != 0) {
             kalign_free_msa(existing);
             kalign_free_msa(new_seqs);
-            throw std::runtime_error("Failed to add sequences to alignment");
+            throw std::runtime_error(with_reason("Failed to add sequences to alignment"));
         }
 
         kalign_free_msa(new_seqs);
 
+        kalign_clear_error();
         result = kalign_write_msa(existing,
             const_cast<char*>(output_file.c_str()),
             const_cast<char*>(format.c_str()));
         kalign_free_msa(existing);
         if (result != 0) {
-            throw std::runtime_error("Failed to write output alignment");
+            throw std::runtime_error(with_reason("Failed to write output alignment"));
         }
     },
     py::arg("existing_file"),
@@ -851,6 +1141,7 @@ PYBIND11_MODULE(_core, m) {
     py::arg("output_file"),
     py::arg("format") = "fasta",
     py::arg("n_threads") = 1,
+    py::arg("seq_type") = "auto",
     "Add new sequences to an existing alignment without re-aligning existing sequences.");
 
     // Matrix constants (canonical names)
@@ -882,5 +1173,11 @@ PYBIND11_MODULE(_core, m) {
     m.attr("REFINE_ALL") = KALIGN_REFINE_ALL;
     m.attr("REFINE_CONFIDENT") = KALIGN_REFINE_CONFIDENT;
     m.attr("REFINE_INLINE") = KALIGN_REFINE_INLINE;
+
+    // Consensus fill-in modes (ensemble modes only)
+    m.attr("FILL_OFF") = KALIGN_FILL_OFF;
+    m.attr("FILL_REALIGN") = KALIGN_FILL_REALIGN;
+    m.attr("FILL_PROJECT") = KALIGN_FILL_PROJECT;
+    m.attr("FILL_ATTACH") = KALIGN_FILL_ATTACH;
 
 }

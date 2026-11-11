@@ -39,7 +39,7 @@ int clean_aln(struct msa* msa)
 }
 
 int make_seq(struct msa* msa,int a,int b,int* path)
-{
+{ KPERF_REGION(KP_MAKE_SEQ);
         int* gap_a = NULL;
         int* gap_b = NULL;
 

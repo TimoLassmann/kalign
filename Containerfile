@@ -54,15 +54,14 @@ RUN git clone --branch ${KALIGN_REF} --depth 1 \
     https://github.com/TimoLassmann/kalign.git /kalign
 WORKDIR /kalign
 
-# Build kalign C binary (threadpool, no OpenMP)
+# Build kalign C binary
 RUN mkdir cbuild && cd cbuild && \
-    cmake -DCMAKE_BUILD_TYPE=Release -DUSE_OPENMP=OFF -DUSE_THREADPOOL=ON .. && \
+    cmake -DCMAKE_BUILD_TYPE=Release .. && \
     make -j"$(nproc)" && \
     cp src/kalign /usr/local/bin/kalign
 
 # Install Python package with benchmark dependencies
-RUN uv pip install --no-cache -e ".[benchmark]" \
-      --config-settings='cmake.args=-DUSE_OPENMP=OFF;-DUSE_THREADPOOL=ON'
+RUN uv pip install --no-cache -e ".[benchmark]"
 
 # ---------- Verify all tools ----------
 RUN kalign --version && clustalo --version && mafft --version && muscle -version

@@ -1,0 +1,7 @@
+fold	core cases	screen cases	stage 1 generations	stage 1 stop	stage 1 HV	stage 2 generations	stage 2 stop	stage 2 HV
+0	2201	300	66	hypervolume +0.09746% over 5 generations (< 0.1%)	0.1137	71	hypervolume +0.08610% over 5 generations (< 0.1%)	0.0940
+1	1938	300	49	hypervolume +0.08150% over 5 generations (< 0.1%)	0.1137	58	hypervolume +0.04810% over 5 generations (< 0.1%)	0.0958
+2	1934	300	57	hypervolume +0.07309% over 5 generations (< 0.1%)	0.1271	82	hypervolume +0.08645% over 5 generations (< 0.1%)	0.1137
+3	1931	300	64	hypervolume +0.08771% over 5 generations (< 0.1%)	0.0983	58	hypervolume +0.07848% over 5 generations (< 0.1%)	0.0815
+4	1948	300	63	hypervolume +0.09673% over 5 generations (< 0.1%)	0.1140	86	hypervolume +0.07512% over 5 generations (< 0.1%)	0.0964
+all	2488	300	60	hypervolume +0.09542% over 5 generations (< 0.1%)	0.1117	85	hypervolume +0.08019% over 5 generations (< 0.1%)	0.0954

@@ -1,0 +1,11 @@
+time	event	step
+2026-10-06T12:07:22	DONE	cv_nucleotide elapsed=83316s
+2026-10-06T12:10:09	DONE	cv_protein elapsed=83483s
+2026-10-06T12:12:18	DONE	pool_oof elapsed=129s
+2026-10-06T12:12:18	FREEZE2	recorded: b72b4bb29b783e9c (~/tmp/kalign-refit/runs/full/freeze2.json)
+2026-10-06T17:31:40	DONE	final_nucleotide elapsed=19162s
+2026-10-06T18:57:30	DONE	final_protein elapsed=24312s
+2026-10-06T19:57:48	DONE	externals elapsed=3618s
+2026-10-06T20:28:23	DONE	retime elapsed=1835s
+2026-10-06T20:31:16	DONE	pool_full elapsed=173s
+2026-10-06T20:31:16	DONE	decide elapsed=0s

@@ -1,0 +1,8 @@
+row,v1_dSP,v1_dTC,v11_dSP,v11_dTC
+protein fast,0.001,0.0006,0.001,0.0006
+protein default,0.003,0.0149,0.0018,0.0149
+protein accurate = recall,-0.0047,0.0069,-0.002,0.0105
+nucleotide fast,0.0012,0.0048,0.0012,0.0048
+nucleotide default,-0.0337,-0.0351,-0.0391,-0.0424
+nucleotide recall,0.0024,0.0105,0.0024,0.0105
+nucleotide accurate,-0.0115,-0.0128,-0.0105,-0.0119

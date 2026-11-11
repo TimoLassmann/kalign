@@ -31,7 +31,7 @@ EXTERN float pairwise_identity_dist(const char* a, const char* b, int alnlen);
 /* Pairwise identity distance callback for bisecting k-means leaf clusters.
    Returns an n×n distance matrix (allocated with galloc, freed by gfree).
    Sequences must be finalized (seq->seq has gap characters, msa->alnlen set). */
-EXTERN float** aln_identity_pair_dist(struct msa* msa, int* samples, int n);
+EXTERN float** aln_identity_pair_dist(struct msa* msa, int* samples, int n, void* ctx);
 
 /* Select K diverse anchors from a finalized alignment using farthest-first
    traversal with identity distance.  Returns anchor indices and actual K. */

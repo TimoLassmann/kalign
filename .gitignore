@@ -61,6 +61,7 @@ Makefile
 cmake_install.cmake
 install_manifest.txt
 *.cmake
+!tests/*.cmake
 !CMakeLists.txt
 CTestTestfile.cmake
 _deps/

@@ -24,9 +24,7 @@
 #include "aln_controller.h"
 #include "kalign/kalign.h"
 
-#ifdef USE_THREADPOOL
 #include "threadpool/threadpool.h"
-#endif
 
 #define ALN_ADD_IMPORT
 #include "aln_add.h"
@@ -308,6 +306,8 @@ int kalign_add_sequences(struct msa* existing,
         if(new_seqs->biotype == ALN_BIOTYPE_UNDEF){
                 new_seqs->biotype = existing->biotype;
         }
+
+        RUN(msa_report_foreign_chars(new_seqs, existing->biotype));
 
         /* Encode new sequences to internal representation */
         if(existing->biotype == ALN_BIOTYPE_DNA){

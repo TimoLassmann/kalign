@@ -6,6 +6,7 @@
 /* #include "strnlen_compat.h" */
 
 #include "msa_struct.h"
+#include "msa_op.h"
 
 
 
@@ -90,6 +91,9 @@ int kalign_essential_input_check(struct msa *msa, int exit_on_error)
                         /* c++; */
                         msa->numseq = c;
                         ASSERT(msa->numseq > 1,"only %d sequences found.", msa->numseq);
+                        /* the profile lists were sized for the sequences read; size them for the
+                           ones left (refinement walks all num_profiles of them) */
+                        RUN(set_sip_nsip(msa));
                         /* exit(0); */
                 }
         }else{

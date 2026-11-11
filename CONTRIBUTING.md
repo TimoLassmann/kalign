@@ -67,10 +67,9 @@ For large changes, please open an issue first to discuss what you would like to 
 
 ### Prerequisites
 
-- **C compiler** - GCC, Clang, or MSVC
+- **C compiler** - GCC or Clang (Linux, macOS)
 - **CMake** (3.18 or higher)
 - **Git**
-- **OpenMP** (optional, for parallelization)
 
 ### Optional Dependencies
 

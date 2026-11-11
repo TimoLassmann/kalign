@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 #include <ctype.h>
 #include <time.h>
 
@@ -58,6 +59,7 @@ static int read_msf(struct in_buffer* b, struct msa** msa);
 static int read_clu(struct in_buffer* b, struct msa** msa);
 
 static int write_msa_fasta(struct msa* msa,char* outfile);
+static int write_msa_fasta_from_gaps(struct msa* msa,char* outfile);
 static int write_msa_clu(struct msa* msa,char* outfile);
 static int write_msa_msf(struct msa* msa,char* outfile);
 
@@ -130,9 +132,9 @@ int kalign_read_input(char* infile, struct msa** msa, int quiet)
                 RUN(read_clu(b,&m));
         }else if(type == FORMAT_DETECT_FAIL){
                 if(infile){
-                        WARNING_MSG("Could not detect input in file: %s", infile);
+                        error(AT, "Could not read %s: not FASTA, MSF or Clustal format.", infile);
                 }else{
-                        WARNING_MSG("Could not detect input in standard input");
+                        error(AT, "Could not read standard input: not FASTA, MSF or Clustal format.");
                 }
                 /* clean up allocated structures */
                 free_in_buffer(b);
@@ -163,7 +165,7 @@ int kalign_read_input(char* infile, struct msa** msa, int quiet)
         }else{
                 *msa = m;
         }
-        /* LOG_MSG("%d " , (*msa)->aligned); */
+        m = NULL;       /* owned by *msa now (or merged and freed): the caller frees it */
         RUN(check_for_sequences(*msa));
         return OK;
 ERROR:
@@ -237,6 +239,16 @@ ERROR:
         return FAIL;
 }
 
+const char* kalign_last_error(void)
+{
+        return tl_first_error();
+}
+
+void kalign_clear_error(void)
+{
+        tl_clear_error();
+}
+
 int check_for_sequences(struct msa* msa)
 {
         if(!msa){
@@ -246,7 +258,7 @@ int check_for_sequences(struct msa* msa)
                 if(msa->numseq == 0){
                         ERROR_MSG("No sequences were found in the input files or standard input.");
                 }else if (msa->numseq == 1){
-                        ERROR_MSG("Only 1 sequence was found in the input files or standard input");
+                        ERROR_MSG("Only 1 sequence was found in the input files or standard input; at least 2 are needed.");
                 }
         }
         return OK;
@@ -259,10 +271,17 @@ int kalign_write_msa(struct msa* msa, char* outfile, char* format)
         int type = FORMAT_FA;
 
         ASSERT(msa!= NULL, "No alignment");
+        RUN(parse_format_argument(format, &type));
+        if(msa->defer_finalise && msa->aligned == ALN_STATUS_ALIGNED){
+                if(type == FORMAT_FA){
+                        RUN(write_msa_fasta_from_gaps(msa, outfile));
+                        return OK;
+                }
+                RUN(finalise_alignment(msa));
+        }
         if(msa->aligned != ALN_STATUS_FINAL){
                 ERROR_MSG("Cannot produce msa output: Sequences are not aligned.");
         }
-        RUN(parse_format_argument(format, &type));
         /* LOG_MSG("Aligned? %d", msa->aligned); */
         if(type == FORMAT_FA){
                 RUN(write_msa_fasta(msa, outfile));
@@ -725,7 +744,9 @@ int write_msa_fasta(struct msa* msa,char* outfile)
         if(!outfile){
                 f_ptr = stdout;
         }else{
-                RUNP(f_ptr = fopen(outfile, "w"));
+                if((f_ptr = fopen(outfile, "w")) == NULL){
+                        ERROR_MSG("Could not open output file %s: %s", outfile, strerror(errno));
+                }
         }
 
         for(i = 0; i < msa->numseq;i++){
@@ -768,6 +789,62 @@ ERROR:
         return FAIL;
 }
 
+/* Same bytes as write_msa_fasta after finalise_alignment, but builds one
+   gapped row at a time from seq[] and gaps[] instead of holding all of them:
+   memory is one row instead of numseq x alnlen. */
+int write_msa_fasta_from_gaps(struct msa* msa,char* outfile)
+{
+        FILE* f_ptr = NULL;
+        char* row = NULL;
+        int aln_len = 0;
+        int row_len;
+        int i,j,n;
+
+        for(j = 0; j <= msa->sequences[0]->len;j++){
+                aln_len += msa->sequences[0]->gaps[j];
+        }
+        aln_len += msa->sequences[0]->len;
+        MMALLOC(row, sizeof(char) * (aln_len + 1));
+
+        if(!outfile){
+                f_ptr = stdout;
+        }else{
+                if((f_ptr = fopen(outfile, "w")) == NULL){
+                        ERROR_MSG("Could not open output file %s: %s", outfile, strerror(errno));
+                }
+        }
+
+        for(i = 0; i < msa->numseq;i++){
+                struct msa_seq* seq = msa->sequences[i];
+                RUN(make_linear_sequence(seq, row, &row_len));
+                if(row_len != aln_len){
+                        ERROR_MSG("Alignment length mismatch: seq %d (%s) "
+                                  "has length %d, expected %d",
+                                  i, seq->name, row_len, aln_len);
+                }
+                fprintf(f_ptr,">%s\n", seq->name);
+                for(j = 0; j < aln_len; j += 60){
+                        n = MACRO_MIN(60, aln_len - j);
+                        fwrite(row + j, sizeof(char), n, f_ptr);
+                        fputc('\n', f_ptr);
+                }
+        }
+        if(outfile){
+                fclose(f_ptr);
+                f_ptr = NULL;
+        }
+        MFREE(row);
+        return OK;
+ERROR:
+        if(f_ptr && outfile){
+                fclose(f_ptr);
+        }
+        if(row){
+                MFREE(row);
+        }
+        return FAIL;
+}
+
 int write_msa_clu(struct msa* msa,char* outfile)
 {
         struct line_buffer* lb = NULL;
@@ -791,7 +868,9 @@ int write_msa_clu(struct msa* msa,char* outfile)
         if(!outfile){
                 f_ptr = stdout;
         }else{
-                RUNP(f_ptr = fopen(outfile, "w"));
+                if((f_ptr = fopen(outfile, "w")) == NULL){
+                        ERROR_MSG("Could not open output file %s: %s", outfile, strerror(errno));
+                }
         }
 
         for(i = 0; i < msa->numseq;i++){
@@ -946,7 +1025,9 @@ int write_msa_msf(struct msa* msa,char* outfile)
         if(!outfile){
                 f_ptr = stdout;
         }else{
-                RUNP(f_ptr = fopen(outfile, "w"));
+                if((f_ptr = fopen(outfile, "w")) == NULL){
+                        ERROR_MSG("Could not open output file %s: %s", outfile, strerror(errno));
+                }
         }
 
         for(i = 0; i < msa->numseq;i++){
