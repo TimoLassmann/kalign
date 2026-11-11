@@ -26,11 +26,7 @@
 #define VF8_INLINE static inline
 #endif
 
-#if defined(_MSC_VER) && !defined(__clang__)
-/* MSVC: the kernels use GNU attributes and C11 thread-local storage */
-#define WAVE_SIMD 0
-
-#elif defined(__ARM_NEON)
+#if defined(__ARM_NEON)
 #include <arm_neon.h>
 #define WAVE_SIMD 1
 

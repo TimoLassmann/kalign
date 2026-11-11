@@ -308,10 +308,7 @@ int esl_stopwatch_Include(ESL_STOPWATCH *master, ESL_STOPWATCH *w)
  *   a reasonable test of the minimal resolution, including call overhead; that gives
  *   me about 0.1 microseconds (12 Jan 2016).
  */
-#if defined(_WIN32)
-#include <Windows.h>
-
-#elif defined(__unix__) || defined(__unix) || defined(unix) || (defined(__APPLE__) && defined(__MACH__))
+#if defined(__unix__) || defined(__unix) || defined(unix) || (defined(__APPLE__) && defined(__MACH__))
 #include <unistd.h>	/* POSIX flags */
 #include <time.h>	/* clock_gettime(), time() */
 #include <sys/time.h>	/* gethrtime(), gettimeofday() */
@@ -334,20 +331,7 @@ int esl_stopwatch_Include(ESL_STOPWATCH *master, ESL_STOPWATCH *w)
  */
 static double stopwatch_getRealTime(void)
 {
-#if defined(_WIN32)
-        FILETIME tm;
-        ULONGLONG t;
-#if defined(NTDDI_WIN8) && NTDDI_VERSION >= NTDDI_WIN8
-        /* Windows 8, Windows Server 2012 and later. ---------------- */
-        GetSystemTimePreciseAsFileTime( &tm );
-#else
-        /* Windows 2000 and later. ---------------------------------- */
-        GetSystemTimeAsFileTime( &tm );
-#endif
-        t = ((ULONGLONG)tm.dwHighDateTime << 32) | (ULONGLONG)tm.dwLowDateTime;
-        return (double)t / 10000000.0;
-
-#elif (defined(__hpux) || defined(hpux)) || ((defined(__sun__) || defined(__sun) || defined(sun)) && (defined(__SVR4) || defined(__svr4__)))
+#if (defined(__hpux) || defined(hpux)) || ((defined(__sun__) || defined(__sun) || defined(sun)) && (defined(__SVR4) || defined(__svr4__)))
         /* HP-UX, Solaris. ------------------------------------------ */
         return (double)gethrtime( ) / 1000000000.0;
 

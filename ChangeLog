@@ -84,6 +84,38 @@
 	- Python source package: only what building and testing needs (12 MB
 	  -> 0.36 MB); experiments, preset fitting, benchmarks and development
 	  notes are left out.
+	- Options follow the modes, on the command line and in Python. Gap
+	  penalties (--gpo, --gpe, --tgpe; gap_open, gap_extend,
+	  terminal_gap_extend), the VSM options and --guide-dist change one
+	  alignment and are accepted with fast only; with accurate they are
+	  an error ("--gpo cannot be used with --mode accurate: the accurate
+	  ensemble uses its fitted settings"). The fill-in options are
+	  accepted with accurate only. Before, the Python package ran fast
+	  without notice when a gap penalty was given with accurate, and the
+	  command line applied the value to all five members.
+	- Command line: numbers are checked ("--gpo abc" and "-n 0" are
+	  errors); a run without input exits with status 1; output format
+	  names are matched exactly and case-insensitively (fasta, fa, afa,
+	  msf, clu, clustal); --add and --existing must be given together;
+	  the help text lists options by mode; confidence options with fast
+	  give a warning (confidence needs accurate).
+	- C library: kalign() runs fast mode with the fitted settings (same
+	  signature; a gap penalty below 0 keeps the fitted value). New
+	  kalign_align_mode(msa, mode, seq_type, n_threads) runs a named
+	  mode like the command line. Library, command line and Python give
+	  the same alignment for the same mode (tests/kalign_unity_test.c).
+	- MSF output of protein alignments has a protein header.
+	- Python: default 1 thread (n_threads= or set_num_threads() for
+	  more), documented; the low-level _core functions are documented as
+	  a development interface. benchmarks/downstream removed.
+	- Fix (Linux): the Python module's error path called glibc's error()
+	  and ended the interpreter (library functions error and basename
+	  renamed or removed); thread-local DP buffers are freed when a
+	  thread ends (lib/src/tl_scratch.c); spare sequence entries were
+	  leaked when empty sequences were dropped.
+	- Build: Windows/MSVC leftovers removed; the zig build enables AVX2
+	  on x86-64, like CMake (an AVX2 CPU is required; use CMake with
+	  -DENABLE_AVX2=OFF otherwise).
 	- Library ABI: SOVERSION 4 (as 3.7.0).
 
 2026-10-15  Timo Lassmann  <timolassmann@icloud.com>

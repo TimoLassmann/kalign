@@ -40,7 +40,8 @@ def run_benchmark(
     if methods is None:
         methods = ["cli"]
     if modes is None:
-        modes = ["default"]
+        modes = ["fast"]
+    modes = list(dict.fromkeys(modes))
 
     cases = get_cases(dataset, max_cases=max_cases if max_cases > 0 else None)
 
@@ -61,7 +62,7 @@ def run_benchmark(
     for case in cases:
         for method in methods:
             if method in EXTERNAL_TOOLS:
-                work.append((case, method, binary, n_threads, "default"))
+                work.append((case, method, binary, n_threads, "fast"))
             else:
                 for mode in modes:
                     work.append((case, method, binary, n_threads, mode))
@@ -213,9 +214,9 @@ def main() -> None:
     parser.add_argument(
         "--mode",
         nargs="+",
-        default=["default"],
-        choices=["fast", "default", "recall", "accurate"],
-        help="Kalign mode preset(s) to test (default: default)",
+        default=["fast"],
+        choices=["fast", "accurate"],
+        help="Kalign mode(s) to test: fast, accurate (default: fast)",
     )
     parser.add_argument(
         "--max-cases",

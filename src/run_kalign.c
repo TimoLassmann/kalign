@@ -12,6 +12,8 @@
 #include <limits.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <math.h>
+#include <strings.h>
 
 #define OPT_SHOWW 5
 #define OPT_GPO 6
@@ -51,36 +53,43 @@ int print_kalign_help(char * argv[])
         fprintf(stdout,"\nUsage: %s %s\n\n",basename ,usage);
 
         fprintf(stdout,"Modes (--mode <name>):\n\n");
-        fprintf(stdout,"%*s%-*s: %s\n",3,"",MESSAGE_MARGIN-3,"fast","Single run, fastest (default)");
-        fprintf(stdout,"%*s%-*s: %s\n",3,"",MESSAGE_MARGIN-3,"accurate","5-member ensemble with per-column confidence; at most 5,000 sequences");
-        fprintf(stdout,"%*s%-*s: %s\n",3,"",MESSAGE_MARGIN-3,"default","Alias of fast");
+        fprintf(stdout,"%*s%-*s: %s\n",3,"",MESSAGE_MARGIN-3,"fast","Single run, fastest (default). Alias: default");
+        fprintf(stdout,"%*s%-*s: %s\n",3,"",MESSAGE_MARGIN-3,"accurate","5-member ensemble with per-column confidence; at most 5,000 sequences. Alias: recall");
 
-        fprintf(stdout,"\nOptions:\n\n");
-
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--format","Output format." ,"[Fasta]"  );
+        fprintf(stdout,"\nGeneral options (both modes):\n\n");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"-i/--input FILE","Input file (or - for stdin)." ,"[]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"-o/--output FILE","Output file." ,"[stdout]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"-f/--format","Output format: fasta (fa, afa), msf or clu (clustal)." ,"[fasta]"  );
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--type","Sequence type: protein, dna or rna (overrides detection)." ,"[auto]"  );
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpo","Gap open penalty (overrides preset)." ,"[]");
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpe","Gap extension penalty (overrides preset)." ,"[]");
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--tgpe","Terminal gap extension penalty (overrides preset)." ,"[]");
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--vsm-mode","VSM: 0 legacy, 1 per-merge (overrides preset)." ,"[]");
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--vsm-kappa","Per-merge VSM: fraction of offset bound." ,"[]");
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--vsm-dzero","Per-merge VSM: distance where offset is 0." ,"[]");
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--guide-dist","Guide-tree distance: 0 BPM, 1 pairwise alignment." ,"[preset]");
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"-n/--nthreads","Number of threads." ,"[auto]");
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--fill-in 0-3","Ensembles: place unaligned consensus residues (1 realign, 2 project, 3 attach)." ,"[preset]");
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--fill-anchor-frac F","Fill-in anchor needs >= F*numseq residues (min 2)." ,"[preset]");
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--fill-support N","Attach fill-in: votes needed to join a column." ,"[preset]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"-n/--nthreads","Number of threads (at least 1; capped at the number of cores)." ,"[cores-1, max 16]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"-q/--quiet","Do not print the banner or progress messages." ,"[off]");
 
-        fprintf(stdout,"\n");
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--add FILE","New sequences to add to existing alignment." ,"[off]");
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--existing FILE","Existing alignment (new seqs added to this)." ,"[off]");
+        fprintf(stdout,"\nFast only (cannot be used with --mode accurate):\n\n");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpo","Gap open penalty (number >= 0)." ,"[fitted]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--gpe","Gap extension penalty (number >= 0)." ,"[fitted]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--tgpe","Terminal gap extension penalty (number >= 0)." ,"[fitted]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--vsm-mode","Substitution offset: 0 from mean distance to anchor sequences, 1 from identity at each merge (bounded)." ,"[fitted]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--vsm-kappa","Per-merge offset: fraction of the offset bound (number >= 0)." ,"[fitted]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--vsm-dzero","Per-merge offset: distance where the offset is 0 (number >= 0)." ,"[fitted]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--guide-dist","Guide-tree distance: 0 BPM, 1 pairwise alignment." ,"[fitted]");
 
-        fprintf(stdout,"\n");
+        fprintf(stdout,"\nAccurate only (cannot be used with --mode fast):\n\n");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--fill-in 0-3","Place unaligned consensus residues (0 off, 1 realign, 2 project, 3 attach)." ,"[fitted]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--fill-anchor-frac F","Fill-in anchor needs >= F*numseq residues (min 2; 0-1)." ,"[fitted]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--fill-support N","Attach fill-in: votes needed to join a column (integer >= 1)." ,"[fitted]");
+
+        fprintf(stdout,"\nConfidence (per-column confidence exists only with --mode accurate;\nwith --mode fast these options have no effect):\n\n");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--confidence-threshold","Mask columns below this confidence (0-1)." ,"[off]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--confidence-style","Masking style: lowercase or remove." ,"[lowercase]");
         fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--confidence-output","Write per-column confidence to file." ,"[off]");
 
-        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--version (-V/-v)","Prints version." ,"[NA]"  );
+        fprintf(stdout,"\nAdding sequences (cannot be combined with --mode or the fast-only and accurate-only options):\n\n");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--add FILE","New sequences to add to existing alignment." ,"[off]");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"--existing FILE","Existing alignment (new seqs added to this)." ,"[off]");
+
+        fprintf(stdout,"\n");
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"-V/-v/--version","Prints version." ,"[NA]"  );
+        fprintf(stdout,"%*s%-*s: %s %s\n",3,"",MESSAGE_MARGIN-3,"-h/--help","Prints this help." ,"[NA]"  );
 
         fprintf(stdout,"\nExamples:\n\n");
 
@@ -160,6 +169,28 @@ static int parse_float_arg(const char* s, float* out)
         return OK;
 }
 
+/* Finite number >= 0. */
+static int parse_nonneg_float_arg(const char* s, float* out)
+{
+        float v;
+        if(parse_float_arg(s, &v) != OK || !isfinite(v) || v < 0.0f){
+                return FAIL;
+        }
+        *out = v;
+        return OK;
+}
+
+static int mode_is_accurate(const char* mode)
+{
+        return mode != NULL && (strcasecmp(mode, "accurate") == 0 || strcasecmp(mode, "recall") == 0);
+}
+
+static int mode_is_known(const char* mode)
+{
+        return mode == NULL || mode_is_accurate(mode) ||
+                strcasecmp(mode, "fast") == 0 || strcasecmp(mode, "default") == 0;
+}
+
 int main(int argc, char *argv[])
 {
         int version = 0;
@@ -168,6 +199,8 @@ int main(int argc, char *argv[])
         struct parameters* param = NULL;
         char* in = NULL;
         char* in_type = NULL;
+        const char* fast_only_opt = NULL;      /* first fast-only option seen */
+        const char* accurate_only_opt = NULL;  /* first accurate-only option seen */
         RUNP(param = init_param());
 
         param->num_infiles = 0;
@@ -224,38 +257,57 @@ int main(int argc, char *argv[])
                         param->format = optarg;
                         break;
                 case 'n':
-                        param->nthreads = atoi(optarg);
+                        if(parse_int_arg(optarg, &param->nthreads) != OK || param->nthreads < 1){
+                                ERROR_MSG("-n/--nthreads must be an integer >= 1, got '%s'", optarg);
+                        }
                         break;
                 case 'q':
                         param->quiet = 1;
                         break;
                 case OPT_GPO:
-                        param->gpo = atof(optarg);
+                        if(parse_nonneg_float_arg(optarg, &param->gpo) != OK){
+                                ERROR_MSG("--gpo must be a number >= 0, got '%s'", optarg);
+                        }
+                        if(!fast_only_opt) fast_only_opt = "--gpo";
                         break;
                 case OPT_GPE:
-                        param->gpe = atof(optarg);
+                        if(parse_nonneg_float_arg(optarg, &param->gpe) != OK){
+                                ERROR_MSG("--gpe must be a number >= 0, got '%s'", optarg);
+                        }
+                        if(!fast_only_opt) fast_only_opt = "--gpe";
                         break;
                 case OPT_TGPE:
-                        param->tgpe = atof(optarg);
+                        if(parse_nonneg_float_arg(optarg, &param->tgpe) != OK){
+                                ERROR_MSG("--tgpe must be a number >= 0, got '%s'", optarg);
+                        }
+                        if(!fast_only_opt) fast_only_opt = "--tgpe";
                         break;
                 case OPT_VSM_MODE:
                         if(parse_int_arg(optarg, &param->vsm_mode) != OK ||
                            (param->vsm_mode != 0 && param->vsm_mode != 1)){
-                                ERROR_MSG("--vsm-mode must be 0 (legacy) or 1 (per-merge), got '%s'", optarg);
+                                ERROR_MSG("--vsm-mode must be 0 (distance to anchors) or 1 (per-merge identity), got '%s'", optarg);
                         }
+                        if(!fast_only_opt) fast_only_opt = "--vsm-mode";
                         break;
                 case OPT_VSM_KAPPA:
-                        param->vsm_kappa = atof(optarg);
+                        if(parse_nonneg_float_arg(optarg, &param->vsm_kappa) != OK){
+                                ERROR_MSG("--vsm-kappa must be a number >= 0, got '%s'", optarg);
+                        }
+                        if(!fast_only_opt) fast_only_opt = "--vsm-kappa";
                         break;
                 case OPT_VSM_DZERO:
-                        param->vsm_dzero = atof(optarg);
+                        if(parse_nonneg_float_arg(optarg, &param->vsm_dzero) != OK){
+                                ERROR_MSG("--vsm-dzero must be a number >= 0, got '%s'", optarg);
+                        }
+                        if(!fast_only_opt) fast_only_opt = "--vsm-dzero";
                         break;
                 case OPT_GUIDE_DIST:
-                        param->guide_dist = atoi(optarg);
-                        if(param->guide_dist != KALIGN_GUIDE_DIST_BPM &&
-                           param->guide_dist != KALIGN_GUIDE_DIST_PAIRALN){
-                                ERROR_MSG("--guide-dist must be 0 (BPM) or 1 (pairwise alignment)");
+                        if(parse_int_arg(optarg, &param->guide_dist) != OK ||
+                           (param->guide_dist != KALIGN_GUIDE_DIST_BPM &&
+                            param->guide_dist != KALIGN_GUIDE_DIST_PAIRALN)){
+                                ERROR_MSG("--guide-dist must be 0 (BPM) or 1 (pairwise alignment), got '%s'", optarg);
                         }
+                        if(!fast_only_opt) fast_only_opt = "--guide-dist";
                         break;
                 case OPT_MODE:
                         param->mode = optarg;
@@ -265,24 +317,34 @@ int main(int argc, char *argv[])
                            param->fill_in < KALIGN_FILL_OFF || param->fill_in > KALIGN_FILL_ATTACH){
                                 ERROR_MSG("--fill-in must be 0 (off), 1 (realign), 2 (project) or 3 (attach), got '%s'", optarg);
                         }
+                        if(!accurate_only_opt) accurate_only_opt = "--fill-in";
                         break;
                 case OPT_FILL_ANCHOR_FRAC:
                         if(parse_float_arg(optarg, &param->fill_anchor_frac) != OK ||
                            !(param->fill_anchor_frac >= 0.0f && param->fill_anchor_frac <= 1.0f)){
                                 ERROR_MSG("--fill-anchor-frac must be a number in [0, 1], got '%s'", optarg);
                         }
+                        if(!accurate_only_opt) accurate_only_opt = "--fill-anchor-frac";
                         break;
                 case OPT_FILL_SUPPORT:
-                        param->fill_support = atoi(optarg);
+                        if(parse_int_arg(optarg, &param->fill_support) != OK || param->fill_support < 1){
+                                ERROR_MSG("--fill-support must be an integer >= 1, got '%s'", optarg);
+                        }
+                        if(!accurate_only_opt) accurate_only_opt = "--fill-support";
                         break;
                 case OPT_CONF_THRESHOLD:
-                        param->confidence_threshold = (float)atof(optarg);
+                        if(parse_float_arg(optarg, &param->confidence_threshold) != OK ||
+                           !(param->confidence_threshold >= 0.0f && param->confidence_threshold <= 1.0f)){
+                                ERROR_MSG("--confidence-threshold must be a number in [0, 1], got '%s'", optarg);
+                        }
                         break;
                 case OPT_CONF_STYLE:
                         if(strcmp(optarg, "remove") == 0){
                                 param->confidence_style = KALIGN_MASK_REMOVE;
-                        }else{
+                        }else if(strcmp(optarg, "lowercase") == 0){
                                 param->confidence_style = KALIGN_MASK_LOWERCASE;
+                        }else{
+                                ERROR_MSG("--confidence-style must be 'lowercase' or 'remove', got '%s'", optarg);
                         }
                         break;
                 case OPT_CONF_OUTPUT:
@@ -340,11 +402,23 @@ int main(int argc, char *argv[])
                 return EXIT_SUCCESS;
         }
 
-        if(param->nthreads < 1){
+        if(argc == 1){
                 RUN(print_kalign_help(argv));
-                LOG_MSG("Number of threads has to be >= 1.");
                 free_parameters(param);
-                return EXIT_FAILURE;
+                return EXIT_SUCCESS;
+        }
+
+        if(!mode_is_known(param->mode)){
+                ERROR_MSG("Unknown mode: '%s'. Use: fast or accurate.", param->mode);
+        }
+
+        if(param->add_file == NULL && param->existing_file == NULL){
+                if(mode_is_accurate(param->mode) && fast_only_opt){
+                        ERROR_MSG("%s cannot be used with --mode accurate: the accurate ensemble uses its fitted settings. Use --mode fast to set alignment parameters.", fast_only_opt);
+                }
+                if(!mode_is_accurate(param->mode) && accurate_only_opt){
+                        ERROR_MSG("%s cannot be used with --mode fast: it only applies to the accurate ensemble. Use --mode accurate.", accurate_only_opt);
+                }
         }
 
         param->num_infiles = 0;
@@ -359,17 +433,20 @@ int main(int argc, char *argv[])
 
         /* --add mode doesn't need -i input files */
         if(param->add_file != NULL && param->existing_file != NULL){
-                /* Validate both files exist */
+                const char* add_conflict = NULL;
+                if(param->mode) add_conflict = "--mode";
+                else if(fast_only_opt) add_conflict = fast_only_opt;
+                else if(accurate_only_opt) add_conflict = accurate_only_opt;
+                if(add_conflict){
+                        ERROR_MSG("%s cannot be used with --add: adding sequences uses its own settings.", add_conflict);
+                }
                 param->num_infiles = 0;  /* not using normal input */
         }else if(param->add_file != NULL || param->existing_file != NULL){
                 LOG_MSG("Both --add and --existing must be specified together.");
                 free_parameters(param);
                 return EXIT_FAILURE;
         }else if(param->num_infiles == 0){
-                RUN(print_kalign_help(argv));
-                LOG_MSG("No input files");
-                free_parameters(param);
-                return EXIT_SUCCESS;
+                ERROR_MSG("No input files.");
         }
         if(param->num_infiles > 0){
                 MMALLOC(param->infile, sizeof(char*) * param->num_infiles);
@@ -457,6 +534,11 @@ int run_kalign(struct parameters* param)
            kalign_get_mode_preset auto-selects protein vs nucleotide
            based on the detected biotype. */
         const char* mode = param->mode ? param->mode : "fast";
+        if(!mode_is_accurate(mode) &&
+           (param->confidence_threshold > 0.0f || param->confidence_output != NULL) &&
+           !param->quiet){
+                WARNING_MSG("Per-column confidence needs --mode accurate; the confidence options have no effect with --mode fast.");
+        }
         if(!kalign_mode_size_ok(mode, kalign_msa_get_biotype(msa), msa->numseq)){
                 WARNING_MSG("Mode '%s' is not feasible above %d sequences (input: %d). Use --mode fast.",
                             mode, KALIGN_ACCURATE_MAX_SEQ, msa->numseq);

@@ -70,8 +70,9 @@ int kalign_essential_input_check(struct msa *msa, int exit_on_error)
                                         e--;
                                 }
                         }
+                        /* keep the spare (pre-allocated) entries: kalign_free_msa frees them */
                         for(int i = msa->numseq; i < msa->alloc_numseq;i++){
-                                 tmp[i] = NULL;
+                                 tmp[i] = msa->sequences[i];
                         }
 
                         MFREE(msa->sequences);
@@ -156,9 +157,9 @@ int kalign_check_msa(struct msa* msa, int exit_on_error)
                                 a[i-1]->action = 1;
                                 a[i]->action = 1;
                                 if(exit_on_error){
-                                        ERROR_MSG("This is a problem if we want to compare alignments down the track. Will append \"_X\" to the sequence name.");
+                                        ERROR_MSG("Sequence names must be unique. This is a problem if we want to compare alignments down the track.");
                                 }else{
-                                        WARNING_MSG("This is a problem if we want to compare alignments down the track. Will append \"_X\" to the sequence name.");
+                                        WARNING_MSG("This is a problem if we want to compare alignments down the track. Will append \"_<number>\" to the names of the duplicated sequences.");
                                 }
                         }
                 }

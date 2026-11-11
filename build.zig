@@ -5,8 +5,8 @@ const kalignPackageVersion = "4.0.0";
 const targets: []const std.Target.Query = &.{
     .{ .cpu_arch = .aarch64, .os_tag = .macos },
     .{ .cpu_arch = .aarch64, .os_tag = .linux },
-    .{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .gnu },
-    .{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .musl },
+    .{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .gnu, .cpu_features_add = std.Target.x86.featureSet(&.{.avx2}) },
+    .{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .musl, .cpu_features_add = std.Target.x86.featureSet(&.{.avx2}) },
 };
 
 const cflags = [_][]const u8{
@@ -19,8 +19,16 @@ const cflags = [_][]const u8{
     "-DKALIGN_WAVE",
 };
 
+// x86_64 targets use AVX2 at build time, as the CMake build does (ENABLE_AVX2=ON); there is no run-time CPU check
+const avx2_flag = [_][]const u8{"-DHAVE_AVX2"};
+
 // the member gap model's scalar and wavefront kernels must round identically on every platform
 const cflags_gapmodel = cflags ++ [_][]const u8{"-ffp-contract=off"};
+
+fn flagsFor(b: *std.Build, t: std.Target.Query, base: []const []const u8) []const []const u8 {
+    if (t.cpu_arch != .x86_64) return base;
+    return std.mem.concat(b.allocator, []const u8, &.{ base, &avx2_flag }) catch @panic("OOM");
+}
 
 pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
@@ -35,8 +43,8 @@ pub fn build(b: *std.Build) !void {
         lib_mod.addIncludePath(b.path("lib/src"));
         lib_mod.addIncludePath(b.path("lib/include"));
         lib_mod.addIncludePath(b.path("lib/src/threadpool"));
-        lib_mod.addCSourceFiles(.{ .files = &kalign_lib_sources, .flags = &cflags });
-        lib_mod.addCSourceFiles(.{ .files = &.{"lib/src/aln_gapmodel.c"}, .flags = &cflags_gapmodel });
+        lib_mod.addCSourceFiles(.{ .files = &kalign_lib_sources, .flags = flagsFor(b, t, &cflags) });
+        lib_mod.addCSourceFiles(.{ .files = &.{"lib/src/aln_gapmodel.c"}, .flags = flagsFor(b, t, &cflags_gapmodel) });
 
         const lib = b.addLibrary(.{
             .name = "tldevel",
@@ -53,7 +61,7 @@ pub fn build(b: *std.Build) !void {
         });
         bin_mod.addIncludePath(b.path("lib/src"));
         bin_mod.addIncludePath(b.path("lib/include"));
-        bin_mod.addCSourceFiles(.{ .files = &kalign_sources, .flags = &cflags });
+        bin_mod.addCSourceFiles(.{ .files = &kalign_sources, .flags = flagsFor(b, t, &cflags) });
         bin_mod.linkLibrary(lib);
 
         const kalign_bin = b.addExecutable(.{
@@ -120,6 +128,7 @@ const kalign_lib_sources = [_][]const u8{
     "lib/src/msa_consistency.c",
     "lib/src/ensemble.c",
     "lib/src/threadpool/threadpool.c",
+    "lib/src/tl_scratch.c",
 };
 
 const kalign_sources = [_][]const u8{

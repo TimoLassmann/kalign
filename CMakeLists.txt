@@ -32,28 +32,18 @@ set (CMAKE_C_STANDARD 11)
 # SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pg")
 
 # Compiler-specific flags
-if(MSVC)
-    add_compile_options("$<$<CONFIG:RELEASE>:/W3;/O2>")
-    add_compile_options("$<$<CONFIG:DEBUG>:/W3;/Od;/Zi>")
-else()
-    add_compile_options("$<$<CONFIG:RELEASE>:-W;-Wall;-O3;-pedantic>")
-    add_compile_options("$<$<CONFIG:DEBUG>:-W;-Wall;-O0;-g;-pedantic>")
-    add_compile_options("$<$<CONFIG:ASAN>:-W;-Wall;-Wextra;-O0;-g;-DDEBUG;-pedantic;-ffunction-sections;-fdata-sections;-fstack-protector-strong;-fsanitize=address>")
-endif()
+add_compile_options("$<$<CONFIG:RELEASE>:-W;-Wall;-O3;-pedantic>")
+add_compile_options("$<$<CONFIG:DEBUG>:-W;-Wall;-O0;-g;-pedantic>")
+add_compile_options("$<$<CONFIG:ASAN>:-W;-Wall;-Wextra;-O0;-g;-DDEBUG;-pedantic;-ffunction-sections;-fdata-sections;-fstack-protector-strong;-fsanitize=address>")
 
-if(CMAKE_BUILD_TYPE MATCHES ASAN AND NOT MSVC)
+if(CMAKE_BUILD_TYPE MATCHES ASAN)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=address")
 endif()
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-  if (MSVC)
-    # warning level 3 for Windows builds (level 4 too strict for wheel builds)
-    add_compile_options(/W3)
-  else()
-    # lots of warnings and all warnings as errors
-    add_compile_options(-Wall -Wextra -pedantic )
-  endif()
+  # lots of warnings
+  add_compile_options(-Wall -Wextra -pedantic )
 endif()
 
 if(NOT CMAKE_BUILD_TYPE)

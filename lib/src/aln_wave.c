@@ -20,6 +20,7 @@
 #include <string.h>
 
 #include "tldevel.h"
+#include "tl_scratch.h"
 #include "aln_param.h"
 #include "aln_struct.h"
 #include "anchor_consistency.h"
@@ -113,6 +114,7 @@ static void sw_reserve(int W)
                 wb.bl = calloc(n * WL, sizeof(float));
                 if(!wb.ra || !wb.rga || !wb.rgb || !wb.rd || !wb.bl) abort();
                 wb.cap = n;
+                tl_scratch_track(TL_SCRATCH_WAVE_SS, (void*[]){wb.ra, wb.rga, wb.rgb, wb.rd, wb.bl}, 5);
         }
 }
 
@@ -425,6 +427,7 @@ static void pw_reserve(int W)
                 pb.bl = calloc(n * WL, sizeof(float));
                 if(!pb.ra || !pb.rga || !pb.rgb || !pb.rd || !pb.bl) abort();
                 pb.cap = n;
+                tl_scratch_track(TL_SCRATCH_WAVE_PP, (void*[]){pb.ra, pb.rga, pb.rgb, pb.rd, pb.bl}, 5);
         }
 }
 
@@ -742,6 +745,7 @@ static void spw_reserve(int W)
                 spb.bl = calloc(n * WL, sizeof(float));
                 if(!spb.ra || !spb.rga || !spb.rgb || !spb.rd || !spb.bl) abort();
                 spb.cap = n;
+                tl_scratch_track(TL_SCRATCH_WAVE_SP, (void*[]){spb.ra, spb.rga, spb.rgb, spb.rd, spb.bl}, 5);
         }
 }
 

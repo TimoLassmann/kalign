@@ -5,6 +5,7 @@ This package provides Python bindings for the Kalign multiple sequence alignment
 Kalign is a fast and accurate multiple sequence alignment tool for biological sequences.
 """
 
+import numbers
 import os
 import threading
 import warnings
@@ -66,7 +67,9 @@ RNA = _core.RNA
 PROTEIN = _core.PROTEIN
 AUTO = _core.AUTO
 
-# Refinement mode constants (used by ensemble_custom_file_to_file optimizer path)
+# Development interface: the REFINE_* constants belong to the low-level
+# kalign._core functions that were used to fit the Kalign 4 settings. They are
+# not part of the supported API and may change.
 REFINE_NONE = _core.REFINE_NONE
 REFINE_ALL = _core.REFINE_ALL
 REFINE_CONFIDENT = _core.REFINE_CONFIDENT
@@ -128,6 +131,82 @@ def _resolve_mode_name(mode):
     return lower
 
 
+_FAST_ONLY_OPTIONS = ("gap_open", "gap_extend", "terminal_gap_extend")
+_ACCURATE_ONLY_OPTIONS = ("fill_in", "fill_anchor_frac", "fill_support")
+_ACCURATE_MODES = ("accurate", "recall")
+
+
+def _check_gap_penalties(gap_open, gap_extend, terminal_gap_extend):
+    """Require each given gap penalty to be a number >= 0."""
+    for name, value in (
+        ("gap_open", gap_open),
+        ("gap_extend", gap_extend),
+        ("terminal_gap_extend", terminal_gap_extend),
+    ):
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, numbers.Real):
+            raise ValueError(f"{name} must be a number")
+        value = float(value)
+        if not value >= 0 or value == float("inf"):
+            raise ValueError(f"{name} must be a finite number >= 0 (penalty value)")
+
+
+def _resolve_mode_for_options(
+    mode,
+    gap_open,
+    gap_extend,
+    terminal_gap_extend,
+    fill_in,
+    fill_anchor_frac,
+    fill_support,
+):
+    """Resolve the mode name and enforce the option rule.
+
+    Gap penalties change a single alignment, so they are only allowed with
+    "fast". The fill options only apply to the "accurate" ensemble.
+    """
+    _check_gap_penalties(gap_open, gap_extend, terminal_gap_extend)
+    effective_mode = _resolve_mode_name(mode)
+    accurate = effective_mode in _ACCURATE_MODES
+    given = {
+        "gap_open": gap_open,
+        "gap_extend": gap_extend,
+        "terminal_gap_extend": terminal_gap_extend,
+        "fill_in": fill_in,
+        "fill_anchor_frac": fill_anchor_frac,
+        "fill_support": fill_support,
+    }
+    if accurate:
+        for name in _FAST_ONLY_OPTIONS:
+            if given[name] is not None:
+                raise ValueError(
+                    f"{name} cannot be used with mode='accurate': the accurate "
+                    "ensemble uses its fitted settings. Use mode='fast' to set "
+                    "alignment parameters."
+                )
+    else:
+        for name in _ACCURATE_ONLY_OPTIONS:
+            if given[name] is not None:
+                raise ValueError(
+                    f"{name} cannot be used with mode='fast': it only applies to "
+                    "the accurate ensemble. Use mode='accurate'."
+                )
+    return effective_mode
+
+
+def _resolve_threads(n_threads):
+    """Return a validated thread count; None gives the current default."""
+    if n_threads is None:
+        return get_num_threads()
+    if isinstance(n_threads, bool) or not isinstance(n_threads, numbers.Integral):
+        raise ValueError("n_threads must be an integer")
+    n_threads = int(n_threads)
+    if n_threads < 1:
+        raise ValueError("n_threads must be at least 1")
+    return n_threads
+
+
 def _conf_to_pp(conf: float) -> str:
     """Convert a confidence value [0..1] to HMMER-style PP character."""
     if conf >= 0.95:
@@ -183,24 +262,6 @@ def _parse_fill(fill_in, fill_anchor_frac, fill_support):
     else:
         raise ValueError("fill_support must be an integer >= 1")
     return f, a, n
-
-
-def _parse_refine_mode(refine):
-    """Convert string or int refine mode to integer constant."""
-    if isinstance(refine, int):
-        return refine
-    refine_map = {
-        "none": REFINE_NONE,
-        "all": REFINE_ALL,
-        "confident": REFINE_CONFIDENT,
-        "inline": REFINE_INLINE,
-    }
-    refine_lower = refine.lower()
-    if refine_lower not in refine_map:
-        raise ValueError(
-            f"Invalid refine mode: {refine}. Must be one of: {list(refine_map.keys())}"
-        )
-    return refine_map[refine_lower]
 
 
 def _infer_skbio_type(sequences, skbio_seq):
@@ -301,14 +362,18 @@ def align(
         the nucleotide presets); a UserWarning is issued if it differs from
         the detected type.
     gap_open : float, optional
-        Gap opening penalty. When set, mode is ignored and "fast" preset
-        is used with the specified penalty.
+        Gap opening penalty (>= 0). Fast mode only: ValueError with
+        mode="accurate", which uses its fitted settings. None keeps the
+        fitted value.
     gap_extend : float, optional
-        Gap extension penalty.
+        Gap extension penalty (>= 0). Fast mode only.
     terminal_gap_extend : float, optional
-        Terminal gap extension penalty.
+        Terminal gap extension penalty (>= 0). Fast mode only.
     n_threads : int, optional
-        Number of threads (default: global setting).
+        Number of threads. The default is 1 (see set_num_threads()), unlike
+        the kalign command line, which uses all but one core (at most 16).
+        Pass n_threads= to use more; the library caps the number at the
+        number of cores and warns.
     mode : str, optional
         Preset mode: "fast" or "accurate" (default: "fast"; "default" is
         an alias of "fast", "recall" of "accurate"). "accurate" is a 5-member
@@ -319,7 +384,7 @@ def align(
     ids : list of str, optional
         Sequence IDs (for Biopython/scikit-bio formats).
     fill_in : {'off', 'realign', 'project', 'attach'} or int, optional
-        Ensemble modes only: what to do with residues the POAR consensus
+        mode="accurate" only (ValueError with mode="fast"): what to do with residues the POAR consensus
         leaves in columns of their own. 'realign' realigns each segment
         between anchor columns afresh; 'project' places segment residues
         as in the POAR-best run; 'attach' lets such a residue join an
@@ -328,9 +393,10 @@ def align(
     fill_anchor_frac : float, optional
         'realign'/'project' anchors are consensus columns with at least
         max(2, ceil(fill_anchor_frac * n_seq)) residues. None keeps the
-        preset (0.0).
+        preset (0.0). mode="accurate" only.
     fill_support : int, optional
         'attach' vote threshold (1..n_runs). None keeps the preset (1).
+        mode="accurate" only.
 
     Returns
     -------
@@ -340,58 +406,25 @@ def align(
 
     seq_type_name = _resolve_seq_type(seq_type)
 
-    # Parameter validation for gap penalties
-    if gap_open is not None:
-        if not isinstance(gap_open, (int, float)):
-            raise ValueError("gap_open must be a number")
-        if gap_open < 0:
-            raise ValueError("gap_open must be a positive number (penalty value)")
-    if gap_extend is not None:
-        if not isinstance(gap_extend, (int, float)):
-            raise ValueError("gap_extend must be a number")
-        if gap_extend < 0:
-            raise ValueError("gap_extend must be a positive number (penalty value)")
-    if terminal_gap_extend is not None:
-        if not isinstance(terminal_gap_extend, (int, float)):
-            raise ValueError("terminal_gap_extend must be a number")
-        if terminal_gap_extend < 0:
-            raise ValueError(
-                "terminal_gap_extend must be a positive number (penalty value)"
-            )
-
-    # Handle thread count
-    if n_threads is None:
-        n_threads = get_num_threads()
-    elif not isinstance(n_threads, int):
-        raise ValueError("n_threads must be an integer")
-    elif n_threads < 1:
-        raise ValueError("n_threads must be at least 1")
-    elif n_threads > 1024:
-        warnings.warn(
-            f"Very high thread count ({n_threads}) may not improve performance.",
-            UserWarning,
-            stacklevel=2,
-        )
-
-    # Gap penalty override rule: if any gap penalty is set, use "fast" preset
-    has_gap_override = (
-        gap_open is not None
-        or gap_extend is not None
-        or terminal_gap_extend is not None
+    effective_mode = _resolve_mode_for_options(
+        mode,
+        gap_open,
+        gap_extend,
+        terminal_gap_extend,
+        fill_in,
+        fill_anchor_frac,
+        fill_support,
     )
-    if has_gap_override:
-        effective_mode = "fast"
-    else:
-        effective_mode = _resolve_mode_name(mode)
+    n_threads = _resolve_threads(n_threads)
 
     confidence_data = None
     result = _core.align_mode(
         sequences,
         effective_mode,
         seq_type_name,
-        gap_open if gap_open is not None else -1.0,
-        gap_extend if gap_extend is not None else -1.0,
-        terminal_gap_extend if terminal_gap_extend is not None else -1.0,
+        float(gap_open) if gap_open is not None else -1.0,
+        float(gap_extend) if gap_extend is not None else -1.0,
+        float(terminal_gap_extend) if terminal_gap_extend is not None else -1.0,
         n_threads,
         *_parse_fill(fill_in, fill_anchor_frac, fill_support),
     )
@@ -468,7 +501,14 @@ def _format_result(aligned_seqs, sequences, seq_type_name, confidence_data, fmt,
 
 
 def set_num_threads(n: int) -> None:
-    """Set the default number of threads for alignment operations."""
+    """Set the default number of threads for alignment operations.
+
+    The built-in default is 1 thread. The kalign command line instead uses
+    all but one core (at most 16); call set_num_threads() or pass n_threads=
+    to align() and the other functions to use more here. The new default
+    applies to the calling thread and to every thread that has not set its
+    own. The library caps the count at the number of cores and warns.
+    """
     global _default_threads
     if n < 1:
         raise ValueError("Number of threads must be at least 1")
@@ -477,7 +517,7 @@ def set_num_threads(n: int) -> None:
 
 
 def get_num_threads() -> int:
-    """Get the current default number of threads."""
+    """Get the default number of threads for the calling thread (1 unless changed)."""
     return getattr(_thread_local, "num_threads", _default_threads)
 
 
@@ -507,16 +547,20 @@ def align_from_file(
         the nucleotide presets); a UserWarning is issued if it differs from
         the detected type.
     gap_open, gap_extend, terminal_gap_extend : float, optional
-        Gap penalties. When set, mode is ignored and "fast" preset is used.
+        Gap penalties (>= 0). Fast mode only: ValueError with
+        mode="accurate". None keeps the fitted value.
     n_threads : int, optional
-        Number of threads.
+        Number of threads. The default is 1 (see set_num_threads()), unlike
+        the kalign command line, which uses all but one core (at most 16).
+        Pass n_threads= to use more; the library caps the number at the
+        number of cores and warns.
     mode : str, optional
         Preset mode: "fast" or "accurate" (default: "fast"; "default" is
         an alias of "fast", "recall" of "accurate"). "accurate" is a 5-member
         ensemble with per-column confidence (at most 5,000 sequences);
         "fast" is a single run.
     fill_in : {'off', 'realign', 'project', 'attach'} or int, optional
-        Ensemble modes only: what to do with residues the POAR consensus
+        mode="accurate" only (ValueError with mode="fast"): what to do with residues the POAR consensus
         leaves in columns of their own. 'realign' realigns each segment
         between anchor columns afresh; 'project' places segment residues
         as in the POAR-best run; 'attach' lets such a residue join an
@@ -525,9 +569,10 @@ def align_from_file(
     fill_anchor_frac : float, optional
         'realign'/'project' anchors are consensus columns with at least
         max(2, ceil(fill_anchor_frac * n_seq)) residues. None keeps the
-        preset (0.0).
+        preset (0.0). mode="accurate" only.
     fill_support : int, optional
         'attach' vote threshold (1..n_runs). None keeps the preset (1).
+        mode="accurate" only.
 
     Returns
     -------
@@ -538,28 +583,24 @@ def align_from_file(
 
     seq_type_name = _resolve_seq_type(seq_type)
 
-    if n_threads is None:
-        n_threads = get_num_threads()
-    if n_threads < 1:
-        raise ValueError("n_threads must be at least 1")
-
-    has_gap_override = (
-        gap_open is not None
-        or gap_extend is not None
-        or terminal_gap_extend is not None
+    effective_mode = _resolve_mode_for_options(
+        mode,
+        gap_open,
+        gap_extend,
+        terminal_gap_extend,
+        fill_in,
+        fill_anchor_frac,
+        fill_support,
     )
-    if has_gap_override:
-        effective_mode = "fast"
-    else:
-        effective_mode = _resolve_mode_name(mode)
+    n_threads = _resolve_threads(n_threads)
 
     result = _core.align_from_file_mode(
         input_file,
         effective_mode,
         seq_type_name,
-        gap_open if gap_open is not None else -1.0,
-        gap_extend if gap_extend is not None else -1.0,
-        terminal_gap_extend if terminal_gap_extend is not None else -1.0,
+        float(gap_open) if gap_open is not None else -1.0,
+        float(gap_extend) if gap_extend is not None else -1.0,
+        float(terminal_gap_extend) if terminal_gap_extend is not None else -1.0,
         n_threads,
         *_parse_fill(fill_in, fill_anchor_frac, fill_support),
     )
@@ -596,9 +637,16 @@ def write_alignment(
     output_file : str
         Path to output file
     format : str, optional
-        Output format: "fasta", "clustal", "stockholm", "phylip" (default: "fasta")
+        Output format, matched case-insensitively: "fasta" ("fa"), "clustal"
+        ("aln"), "stockholm" ("sto"), "phylip" ("phy") (default: "fasta").
+        The names "msf" and "clu" are not accepted here; use
+        align_file_to_file() for those.
     ids : list of str, optional
         Sequence IDs. If None, generates seq0, seq1, etc.
+    column_confidence : list of float, optional
+        Per-column confidence, written by the "stockholm" format only.
+    residue_confidence : list of list of float, optional
+        Per-residue confidence, written by the "stockholm" format only.
     """
     if not sequences:
         raise ValueError("Empty sequence list provided")
@@ -735,7 +783,9 @@ def align_file_to_file(
     output_file : str
         Path to output alignment file
     format : str, optional
-        Output format: "fasta", "msf", "clu" (default: "fasta")
+        Output format, matched case-insensitively: "fasta" ("fa", "afa"),
+        "msf", "clu" ("clustal") (default: "fasta"). Any other name raises
+        an error from the C library.
     seq_type : str or int, optional
         Sequence type: "auto", "protein", "dna" or "rna" (default: "auto",
         detected from the input). Any other value overrides detection and
@@ -743,16 +793,20 @@ def align_file_to_file(
         the nucleotide presets); a UserWarning is issued if it differs from
         the detected type.
     gap_open, gap_extend, terminal_gap_extend : float, optional
-        Gap penalties. When set, mode is ignored and "fast" preset is used.
+        Gap penalties (>= 0). Fast mode only: ValueError with
+        mode="accurate". None keeps the fitted value.
     n_threads : int, optional
-        Number of threads.
+        Number of threads. The default is 1 (see set_num_threads()), unlike
+        the kalign command line, which uses all but one core (at most 16).
+        Pass n_threads= to use more; the library caps the number at the
+        number of cores and warns.
     mode : str, optional
         Preset mode: "fast" or "accurate" (default: "fast"; "default" is
         an alias of "fast", "recall" of "accurate"). "accurate" is a 5-member
         ensemble with per-column confidence (at most 5,000 sequences);
         "fast" is a single run.
     fill_in : {'off', 'realign', 'project', 'attach'} or int, optional
-        Ensemble modes only: what to do with residues the POAR consensus
+        mode="accurate" only (ValueError with mode="fast"): what to do with residues the POAR consensus
         leaves in columns of their own. 'realign' realigns each segment
         between anchor columns afresh; 'project' places segment residues
         as in the POAR-best run; 'attach' lets such a residue join an
@@ -761,27 +815,26 @@ def align_file_to_file(
     fill_anchor_frac : float, optional
         'realign'/'project' anchors are consensus columns with at least
         max(2, ceil(fill_anchor_frac * n_seq)) residues. None keeps the
-        preset (0.0).
+        preset (0.0). mode="accurate" only.
     fill_support : int, optional
         'attach' vote threshold (1..n_runs). None keeps the preset (1).
+        mode="accurate" only.
     """
     if not os.path.exists(input_file):
         raise FileNotFoundError(f"Input file not found: {input_file}")
 
     seq_type_name = _resolve_seq_type(seq_type)
 
-    if n_threads is None:
-        n_threads = get_num_threads()
-
-    has_gap_override = (
-        gap_open is not None
-        or gap_extend is not None
-        or terminal_gap_extend is not None
+    effective_mode = _resolve_mode_for_options(
+        mode,
+        gap_open,
+        gap_extend,
+        terminal_gap_extend,
+        fill_in,
+        fill_anchor_frac,
+        fill_support,
     )
-    if has_gap_override:
-        effective_mode = "fast"
-    else:
-        effective_mode = _resolve_mode_name(mode)
+    n_threads = _resolve_threads(n_threads)
 
     _core.align_file_to_file_mode(
         input_file,
@@ -790,9 +843,9 @@ def align_file_to_file(
         format,
         n_threads,
         seq_type_name,
-        gap_open if gap_open is not None else -1.0,
-        gap_extend if gap_extend is not None else -1.0,
-        terminal_gap_extend if terminal_gap_extend is not None else -1.0,
+        float(gap_open) if gap_open is not None else -1.0,
+        float(gap_extend) if gap_extend is not None else -1.0,
+        float(terminal_gap_extend) if terminal_gap_extend is not None else -1.0,
         *_parse_fill(fill_in, fill_anchor_frac, fill_support),
     )
 
@@ -816,23 +869,24 @@ def mask_alignment(
     Parameters
     ----------
     result : AlignedSequences
-        Alignment result with confidence scores (from ensemble modes).
+        Alignment result with confidence scores (from mode='accurate').
     threshold : float
         Columns with confidence below this value are masked.
     style : str
         "lowercase" — uncertain residues become lowercase (default).
         "remove" — uncertain residues replaced with '-'.
+        Any other value raises ValueError.
 
     Returns
     -------
     AlignedSequences
         New result with masked sequences. Confidence arrays unchanged.
     """
+    if style not in ("lowercase", "remove"):
+        raise ValueError(f"style must be 'lowercase' or 'remove', got {style!r}")
     if result.column_confidence is None:
-        import warnings
-
         warnings.warn(
-            "No confidence scores available (requires ensemble mode). "
+            "No confidence scores available (requires mode='accurate'). "
             "Returning unmasked alignment."
         )
         return result
@@ -866,7 +920,7 @@ def filter_alignment(
     Parameters
     ----------
     result : AlignedSequences
-        Alignment result with confidence scores (from ensemble modes).
+        Alignment result with confidence scores (from mode='accurate').
     threshold : float
         Columns with confidence below this value are removed entirely.
 
@@ -876,10 +930,8 @@ def filter_alignment(
         New result with only high-confidence columns. Shorter sequences.
     """
     if result.column_confidence is None:
-        import warnings
-
         warnings.warn(
-            "No confidence scores available (requires ensemble mode). "
+            "No confidence scores available (requires mode='accurate'). "
             "Returning unfiltered alignment."
         )
         return result
@@ -929,9 +981,11 @@ def add_to_alignment(
     output : str
         Path to output file (existing + new sequences, all aligned).
     format : str, optional
-        Output format: "fasta", "msf", "clu" (default: "fasta").
+        Output format, matched case-insensitively: "fasta" ("fa", "afa"),
+        "msf", "clu" ("clustal") (default: "fasta"). Any other name raises
+        an error from the C library.
     n_threads : int, optional
-        Number of threads.
+        Number of threads (default 1, see set_num_threads()).
     seq_type : str or int, optional
         Sequence type: "auto", "protein", "dna" or "rna" (default: "auto",
         detected from the input). Any other value overrides detection and
@@ -944,8 +998,7 @@ def add_to_alignment(
     if not os.path.exists(new_sequences):
         raise FileNotFoundError(f"New sequences file not found: {new_sequences}")
 
-    if n_threads is None:
-        n_threads = get_num_threads()
+    n_threads = _resolve_threads(n_threads)
 
     seq_type_name = _resolve_seq_type(seq_type)
 
@@ -965,7 +1018,7 @@ def write_confidence(path: str, result: AlignedSequences) -> None:
         Alignment result with confidence scores.
     """
     if result.column_confidence is None:
-        raise ValueError("No confidence scores available (requires ensemble mode)")
+        raise ValueError("No confidence scores available (requires mode='accurate')")
     with open(path, "w") as f:
         for val in result.column_confidence:
             f.write(f"{val:.4f}\n")
@@ -991,6 +1044,7 @@ __all__ = [
     "RNA",
     "PROTEIN",
     "AUTO",
+    # Development interface (see the comment at the REFINE_* definitions)
     "REFINE_NONE",
     "REFINE_ALL",
     "REFINE_CONFIDENT",

@@ -27,6 +27,7 @@
 #include <string.h>
 
 #include "tldevel.h"
+#include "tl_scratch.h"
 #include "aln_param.h"
 #include "aln_struct.h"
 #include "anchor_consistency.h"
@@ -964,6 +965,7 @@ static void gmw_reserve(int W)
                 gb.bl = calloc(n * GMW_WL, sizeof(float));
                 if(!gb.ra || !gb.rga || !gb.rgb || !gb.rd || !gb.bl) abort();
                 gb.cap = n;
+                tl_scratch_track(TL_SCRATCH_GAPMODEL, (void*[]){gb.ra, gb.rga, gb.rgb, gb.rd, gb.bl}, 5);
         }
 }
 

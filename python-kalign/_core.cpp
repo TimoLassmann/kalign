@@ -231,9 +231,13 @@ py::dict compare_detailed_with_mask_files(const std::string& reference_file,
     return d;
 }
 
-// Ensemble with per-run parameters — playground for optimization.
+// Ensemble with per-run parameters.
+// DEVELOPMENT INTERFACE: this function was used to fit the Kalign 4
+// settings. It is not part of the supported API and may change. Its
+// defaults are those of the low-level library, not of the fast or accurate
+// mode. Use align, align_from_file or align_file_to_file with mode instead.
 // Each run gets its own gap penalties, matrix type, and tree noise.
-// Now uses kalign_align_full with per-run configs.
+// Uses kalign_align_full with per-run configs.
 py::object ensemble_custom_file_to_file(
     const std::string& input_file,
     const std::string& output_file,
@@ -779,7 +783,23 @@ void align_file_to_file_mode(
 }
 
 PYBIND11_MODULE(_core, m) {
-    m.doc() = "Python bindings for Kalign multiple sequence alignment";
+    m.doc() =
+        "Python bindings for Kalign multiple sequence alignment.\n\n"
+        "Supported API: align, align_from_file and align_file_to_file (each "
+        "takes mode 'fast' or 'accurate'), add_to_alignment_file, and the "
+        "AUTO, PROTEIN, DNA and RNA sequence type constants. Most users "
+        "should call these through the kalign package. The helpers "
+        "generate_test_sequences, compare, compare_detailed and "
+        "compare_detailed_with_mask are utilities for testing and "
+        "benchmarking.\n\n"
+        "Development interface: ensemble_custom_file_to_file (per-run arrays "
+        "for gap penalties, noise, refinement, realignment, sequence weights, "
+        "consistency, VSM and guide-tree options), the REFINE_*, FILL_* and "
+        "MATRIX_* constants and the sequence type constants other than AUTO, "
+        "PROTEIN, DNA and RNA (such as PROTEIN_DIVERGENT and DNA_INTERNAL) "
+        "were used to fit the Kalign 4 settings. They are "
+        "not part of the supported API and may change without notice. "
+        "Settings built this way have not been validated.";
     
     // Generate test sequences using DSSim
     m.def("generate_test_sequences", &generate_test_sequences,
@@ -878,7 +898,7 @@ PYBIND11_MODULE(_core, m) {
               Keys: recall, precision, f1, tc, ref_pairs, test_pairs, common_pairs
           )pbdoc");
 
-    // Ensemble with per-run parameters (optimization playground)
+    // Ensemble with per-run parameters (development interface, see above)
     m.def("ensemble_custom_file_to_file", &ensemble_custom_file_to_file,
           py::arg("input_file"),
           py::arg("output_file"),
@@ -929,6 +949,13 @@ PYBIND11_MODULE(_core, m) {
           R"pbdoc(
           Ensemble alignment with per-run parameters.
 
+          Development interface. This function was used to fit the Kalign 4
+          settings. It is not part of the supported API and may change without
+          notice. Its refine, realign, seq_weights, consistency, VSM and guide-tree
+          options can build configurations that were never fitted or validated.
+          To align sequences, use align, align_from_file or align_file_to_file with
+          mode="fast" or mode="accurate".
+
           Each run gets its own gap penalties, matrix type, and tree noise.
           Additional parameters can optionally be varied per-run by passing
           arrays of the same length as run_gpo. When empty (default), the
@@ -964,7 +991,7 @@ PYBIND11_MODULE(_core, m) {
               Per-run consistency weight. Empty = use consistency_weight for all.
           vsm_mode : int, optional
               0 = legacy VSM (offset from vsm_amax and mean distance to anchors,
-              the shipped behaviour); 1 = per-merge VSM: offset
+              the legacy behaviour); 1 = per-merge VSM: offset
               min(kappa,1) * max(0, 2*gpe + mu_bg) * max(0, 1 - d/dzero), with d the
               Kimura-corrected distance between the two groups being merged.
               vsm_amax is ignored when vsm_mode = 1.
@@ -976,7 +1003,7 @@ PYBIND11_MODULE(_core, m) {
           run_vsm_kappa, run_vsm_dzero : list of float, optional
               Per-run overrides. Empty = use the shared value for all runs.
           guide_dist : int, optional
-              Guide-tree distance. 0 = alignment-free BPM edit distance (shipped
+              Guide-tree distance. 0 = alignment-free BPM edit distance (default
               behaviour); 1 = Kimura (protein) / Jukes-Cantor (DNA/RNA) corrected
               distance from independent pairwise global alignments with the run's
               matrix and gap penalties. Clustering is unchanged.
@@ -985,7 +1012,7 @@ PYBIND11_MODULE(_core, m) {
           run_tree_method, run_tree_dist, run_tree_alpha, run_tree_maxlen, run_tree_leaf,
           run_tree_kmeans_dist, run_realign_tree : list of int, optional
               Per-run guide-tree options, see struct tree_opts in lib/src/msa_struct.h.
-              Empty or -1 = the shipped tree.
+              Empty or -1 = the default guide tree.
           run_gap_model : list of int, optional
               Per-run gap model: 0 = Kalign gap rule, 1 = member gap model.
               Empty = 0 for all runs.
@@ -1144,6 +1171,12 @@ PYBIND11_MODULE(_core, m) {
     py::arg("seq_type") = "auto",
     "Add new sequences to an existing alignment without re-aligning existing sequences.");
 
+    // The matrix, REFINE_* and FILL_* constants, and the sequence type constants
+    // other than AUTO, PROTEIN, DNA and RNA, belong to the development interface
+    // used to fit the Kalign 4 settings. They are not part of the supported API
+    // and may change. AUTO, PROTEIN, DNA and RNA are supported values for
+    // seq_type. Use align with mode and seq_type.
+
     // Matrix constants (canonical names)
     m.attr("MATRIX_AUTO") = KALIGN_MATRIX_AUTO;
     m.attr("MATRIX_PFASUM43") = KALIGN_MATRIX_PFASUM43;
@@ -1156,7 +1189,10 @@ PYBIND11_MODULE(_core, m) {
     m.attr("MATRIX_NUC_20PAM") = KALIGN_MATRIX_NUC_20PAM;
     m.attr("MATRIX_NUC_200PAM") = KALIGN_MATRIX_NUC_200PAM;
 
-    // Backward compat: old names point to new values
+    // Sequence type constants. AUTO, PROTEIN, DNA and RNA are supported values
+    // for seq_type, the same as the strings "auto"/"protein"/"dna"/"rna".
+    // DNA_INTERNAL and the PROTEIN_* variants are development interface. Note
+    // that ensemble_custom_file_to_file defaults to PROTEIN, not AUTO.
     m.attr("DNA") = KALIGN_TYPE_DNA;
     m.attr("DNA_INTERNAL") = KALIGN_TYPE_DNA_INTERNAL;
     m.attr("RNA") = KALIGN_TYPE_RNA;
@@ -1168,13 +1204,14 @@ PYBIND11_MODULE(_core, m) {
     m.attr("PROTEIN_CORBLOSUM66") = KALIGN_TYPE_PROTEIN_CORBLOSUM66;
     m.attr("AUTO") = KALIGN_TYPE_UNDEFINED;
 
-    // Constants for refinement modes
+    // Constants for refinement modes (development interface, used only by
+    // ensemble_custom_file_to_file)
     m.attr("REFINE_NONE") = KALIGN_REFINE_NONE;
     m.attr("REFINE_ALL") = KALIGN_REFINE_ALL;
     m.attr("REFINE_CONFIDENT") = KALIGN_REFINE_CONFIDENT;
     m.attr("REFINE_INLINE") = KALIGN_REFINE_INLINE;
 
-    // Consensus fill-in modes (ensemble modes only)
+    // Consensus fill-in modes (accurate ensemble only; development interface)
     m.attr("FILL_OFF") = KALIGN_FILL_OFF;
     m.attr("FILL_REALIGN") = KALIGN_FILL_REALIGN;
     m.attr("FILL_PROJECT") = KALIGN_FILL_PROJECT;

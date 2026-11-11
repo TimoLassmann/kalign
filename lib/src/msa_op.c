@@ -719,7 +719,7 @@ int kalign_mask_by_confidence(struct msa* msa, float threshold, int style)
         }
 
         if(msa->col_confidence == NULL){
-                WARNING_MSG("No confidence scores available (requires ensemble mode). "
+                WARNING_MSG("No confidence scores available (requires --mode accurate / mode=\"accurate\"). "
                             "Skipping masking.");
                 return OK;
         }
