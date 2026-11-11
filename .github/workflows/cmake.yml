@@ -34,8 +34,8 @@ jobs:
     - name: Install dependencies (Ubuntu)
       if: runner.os == 'Linux'
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake
+        # cmake is preinstalled on the runner; install it only if it is missing.
+        command -v cmake || (sudo apt-get update && sudo apt-get install -y cmake)
 
     - name: Install dependencies (macOS)
       if: runner.os == 'macOS'
@@ -83,8 +83,8 @@ jobs:
     
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake
+        # cmake is preinstalled on the runner; install it only if it is missing.
+        command -v cmake || (sudo apt-get update && sudo apt-get install -y cmake)
         
     - name: Configure CMake with ASAN
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=ASAN

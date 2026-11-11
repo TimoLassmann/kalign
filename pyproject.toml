@@ -178,7 +178,7 @@ test-command = "python -c 'import kalign; print(kalign.__version__)'"
 # Linux settings
 [tool.cibuildwheel.linux]
 before-all = [
-    "yum install -y cmake3 || apt-get update && apt-get install -y cmake",
+    "command -v cmake || yum install -y cmake3 || (apt-get update && apt-get install -y cmake)",
 ]
 repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"
 

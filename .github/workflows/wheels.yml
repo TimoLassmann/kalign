@@ -64,8 +64,9 @@ jobs:
           MACOSX_DEPLOYMENT_TARGET=14.0
           CMAKE_OSX_DEPLOYMENT_TARGET=14.0
         
-        # Linux specific settings - handle different package managers
+        # Linux: the build image ships cmake; install it only if it is missing.
         CIBW_BEFORE_ALL_LINUX: >
+          (command -v cmake) ||
           (yum install -y cmake3) ||
           (apt-get update && apt-get install -y cmake) ||
           (apk add --no-cache cmake)
