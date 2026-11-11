@@ -5,13 +5,20 @@
 #include <stddef.h>
 
 /* Guide-tree distance (kalign_run_config.guide_dist) */
-#define KALIGN_GUIDE_DIST_BPM     0  /* alignment-free BPM edit distance (shipped)       */
+#define KALIGN_GUIDE_DIST_BPM     0  /* alignment-free BPM edit distance (default)        */
 #define KALIGN_GUIDE_DIST_PAIRALN 1  /* Kimura/JC distance from pairwise global alignments */
 
 /* Per-run alignment configuration.
    Each field controls one aspect of a single alignment run.
-   All values are concrete — no sentinel values.
-   Use kalign_run_config_defaults() for sensible PFASUM43 protein defaults. */
+   Some fields take a sentinel value: gpo, gpe and tgpe below 0 keep the
+   default penalty of the matrix; matrix KALIGN_MATRIX_AUTO selects the
+   matrix from the sequences; tree_* and realign_tree of -1 give the
+   default tree.
+   kalign_run_config_defaults() gives a plain PFASUM43 protein configuration;
+   the fitted fast and accurate settings come from kalign_get_mode_preset().
+   Fields such as tree_*, vsm_*, realign, refine, adaptive_budget and gap_model
+   are experimental options that the fitted settings use; they are not meant
+   to be tuned by callers. */
 struct kalign_run_config {
         int matrix;                  /* KALIGN_MATRIX_* constant (AUTO = auto-detect) */
         float gpo;                   /* gap open penalty                              */
@@ -27,12 +34,12 @@ struct kalign_run_config {
         float tree_noise;            /* guide tree perturbation sigma (0.0 = none)    */
         int consistency_anchors;     /* anchor consistency rounds (0 = off)           */
         float consistency_weight;    /* anchor consistency bonus weight (default: 2.0)*/
-        int vsm_mode;                /* 0 = legacy VSM (vsm_amax), 1 = per-merge VSM  */
+        int vsm_mode;                /* 0 = VSM with vsm_amax, 1 = per-merge VSM      */
         float vsm_kappa;             /* per-merge VSM: fraction of offset bound (0-1) */
         float vsm_dzero;             /* per-merge VSM: distance where offset hits 0   */
         int guide_dist;              /* KALIGN_GUIDE_DIST_* (default: BPM)            */
         int gap_model;               /* 0 = Kalign gap rule (default), 1 = member gap model */
-        /* Guide-tree options; -1 = default (the shipped tree).  See struct tree_opts (msa_struct.h). */
+        /* Guide-tree options; -1 = default tree.  See struct tree_opts (msa_struct.h). */
         int tree_method;
         int tree_dist;
         int tree_alpha;

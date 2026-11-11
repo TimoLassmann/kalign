@@ -345,15 +345,22 @@ int kalign_add_sequences(struct msa* existing,
            may change alignment properties). */
         {
                 int total = numseq_existing + numseq_new;
+                int old_alloc = existing->alloc_numseq;
                 if(total > existing->alloc_numseq){
                         MREALLOC(existing->sequences,
                                  sizeof(struct msa_seq*) * total);
                         existing->alloc_numseq = total;
                 }
                 for(i = 0; i < numseq_new; i++){
-                        /* Transfer ownership of the new sequence from new_seqs to existing */
+                        /* Swap: the new sequence goes to existing; the spare
+                           (pre-allocated) entry it replaces, if any, goes to
+                           new_seqs, which frees it. */
+                        struct msa_seq* spare = NULL;
+                        if(numseq_existing + i < old_alloc){
+                                spare = existing->sequences[numseq_existing + i];
+                        }
                         existing->sequences[numseq_existing + i] = new_seqs->sequences[i];
-                        new_seqs->sequences[i] = NULL;
+                        new_seqs->sequences[i] = spare;
                         /* Update len to alnlen (gapped length) */
                         existing->sequences[numseq_existing + i]->len =
                                 (int)strlen(existing->sequences[numseq_existing + i]->seq);

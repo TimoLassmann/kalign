@@ -67,24 +67,6 @@ ERROR:
 }
 
 
-char* basename(const char* name)
-{
-        int i= 0;
-        int c = 0;
-
-        while(1){
-                if(name[i] == '/'){
-                        c = i+1;
-                }
-                if(!name[i]){
-                        break;
-                }
-                i++;
-        }
-        return (char*)(name +c);
-}
-
-
 int my_file_exists(const char* name)
 {
         struct stat buf;

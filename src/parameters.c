@@ -2,11 +2,8 @@
 #include "kalign/kalign.h"
 
 #include <string.h>
-#ifdef _WIN32
-#include <windows.h>
-#else
+#include <strings.h>
 #include <unistd.h>
-#endif
 #define PARAMETERS_IMPORT
 #include "parameters.h"
 
@@ -14,11 +11,7 @@ static int get_default_thread_count(void)
 {
         int cores = 1;
 
-#if defined(_WIN32)
-        SYSTEM_INFO sysinfo;
-        GetSystemInfo(&sysinfo);
-        cores = sysinfo.dwNumberOfProcessors;
-#elif defined(_SC_NPROCESSORS_ONLN)
+#if defined(_SC_NPROCESSORS_ONLN)
         cores = sysconf(_SC_NPROCESSORS_ONLN);
         if (cores <= 0) cores = 1;
 #endif
@@ -74,7 +67,7 @@ ERROR:
 void free_parameters(struct parameters* param)
 {
         if(param){
-                if(param->num_infiles){
+                if(param->infile){
                         MFREE(param->infile);
                 }
                 MFREE(param);
@@ -83,21 +76,13 @@ void free_parameters(struct parameters* param)
 
 int check_msa_format_string(char* format)
 {
-        int ok = 0;
         if(format){
-                if(strstr(format,"msf")){
-                        ok = 1;
-                }else if(strstr(format,"clu")){
-                        ok = 1;
-                }else if(strstr(format,"fasta")){
-                        ok = 1;
-                }else if(strstr(format,"fa")){
-                        ok = 1;
-                }else{
-                        ok = 0;
-                        ERROR_MSG("Format %s not recognized.",format);
-                }
-                if(!ok){
+                if(strcasecmp(format,"fasta") != 0 &&
+                   strcasecmp(format,"fa") != 0 &&
+                   strcasecmp(format,"afa") != 0 &&
+                   strcasecmp(format,"msf") != 0 &&
+                   strcasecmp(format,"clu") != 0 &&
+                   strcasecmp(format,"clustal") != 0){
                         ERROR_MSG("Format %s not recognized.",format);
                 }
         }

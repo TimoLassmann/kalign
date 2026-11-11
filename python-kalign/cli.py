@@ -54,7 +54,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--format",
         default="fasta",
-        help="Output format: fasta, clustal, stockholm, phylip (default: fasta).",
+        help=(
+            "Output format: fasta (fa), clustal (aln), stockholm (sto), "
+            "phylip (phy). Case-insensitive (default: fasta). "
+            "Confidence annotations are written only for stockholm."
+        ),
     )
     parser.add_argument(
         "--type",
@@ -65,34 +69,43 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--mode",
-        default="default",
+        default="fast",
         choices=["fast", "default", "recall", "accurate"],
-        help="Alignment mode preset (default: default).",
+        help=(
+            "fast: single run (default; alias: default). "
+            "accurate: fitted 5-member ensemble with consensus and per-column "
+            "confidence, at most 5,000 sequences (alias: recall). "
+            "--gpo, --gpe and --tgpe can only be used with fast."
+        ),
     )
     parser.add_argument(
         "--gpo",
         type=float,
         default=None,
-        help="Gap open penalty (overrides mode preset).",
+        help="Gap open penalty. Fast mode only.",
     )
     parser.add_argument(
         "--gpe",
         type=float,
         default=None,
-        help="Gap extension penalty (overrides mode preset).",
+        help="Gap extension penalty. Fast mode only.",
     )
     parser.add_argument(
         "--tgpe",
         type=float,
         default=None,
-        help="Terminal gap extension penalty (overrides mode preset).",
+        help="Terminal gap extension penalty. Fast mode only.",
     )
     parser.add_argument(
         "-n",
         "--nthreads",
         type=int,
         default=1,
-        help="Number of threads to use (default: 1).",
+        help=(
+            "Number of threads. The default is 1 (the kalign command-line "
+            "program uses more by default). Use -n to request more; the "
+            "count is capped at the number of cores."
+        ),
     )
 
     parser.add_argument(
@@ -105,7 +118,13 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _write_stdout(names: list[str], sequences: list[str], fmt: str) -> None:
+def _write_stdout(
+    names: list[str],
+    sequences: list[str],
+    fmt: str,
+    column_confidence: Optional[list[float]] = None,
+    residue_confidence: Optional[list[list[float]]] = None,
+) -> None:
     import kalign
 
     fmt_lower = fmt.lower()
@@ -118,7 +137,13 @@ def _write_stdout(names: list[str], sequences: list[str], fmt: str) -> None:
         return
 
     if fmt_lower in {"stockholm", "sto"}:
-        kalign.io.write_stockholm(sequences, sys.stdout, ids=names)
+        kalign.io.write_stockholm(
+            sequences,
+            sys.stdout,
+            ids=names,
+            column_confidence=column_confidence,
+            residue_confidence=residue_confidence,
+        )
         return
 
     if fmt_lower in {"phylip", "phy"}:
@@ -167,7 +192,13 @@ def main(argv: Optional[list[str]] = None) -> int:
             write_kwargs["residue_confidence"] = result.residue_confidence
 
         if args.output == "-":
-            _write_stdout(result.names, result.sequences, args.format)
+            _write_stdout(
+                result.names,
+                result.sequences,
+                args.format,
+                column_confidence=result.column_confidence,
+                residue_confidence=result.residue_confidence,
+            )
         else:
             kalign.write_alignment(
                 result.sequences,

@@ -73,9 +73,8 @@ For large changes, please open an issue first to discuss what you would like to 
 
 ### Optional Dependencies
 
-- **Zig** (for alternative build system)
-- **Python** (3.9+ for Python bindings)
-- **pybind11** (for Python module development)
+- **Zig** 0.17 (for the alternative build system)
+- **Python** 3.11 or later, and [uv](https://docs.astral.sh/uv/) (for the Python package; pybind11 and scikit-build-core are installed by the build)
 
 ### Building from Source
 
@@ -98,9 +97,9 @@ make test
 ### Python Development
 
 ```bash
-cd python
-pip install -e .
-python -c "import kalign; print(kalign.__version__)"
+# from the repository root (the package is in python-kalign/)
+uv pip install -e .
+uv run python -c "import kalign; print(kalign.__version__)"
 ```
 
 ## Pull Request Process
@@ -117,8 +116,8 @@ python -c "import kalign; print(kalign.__version__)"
 - **One feature per PR** - Keep changes focused and atomic
 - **Clear commit messages** - Use descriptive commit messages
 - **Link related issues** - Reference any related issue numbers
-- **Update CHANGELOG** - Add a brief description of your changes
-- **Cross-platform compatibility** - Ensure changes work on Linux, macOS, and Windows
+- **Update ChangeLog** - Add a brief description of your changes
+- **Cross-platform compatibility** - Ensure changes work on Linux and macOS (Windows is not supported)
 
 ## Issue Guidelines
 
@@ -191,18 +190,18 @@ Examples:
 ```bash
 # C/C++ tests
 cd build
-make test
+ctest
 
-# Python tests
-cd python
-python -m pytest
+# Python tests (from the repository root)
+uv run pytest tests/python/ -v
 ```
 
 ### Test Requirements
 
 - **All tests must pass** before submitting PRs
 - **Add tests** for new features and bug fixes
-- **Cross-platform testing** - Test on different operating systems when possible
+- **Cross-platform testing** - Test on Linux and macOS when possible
+- **Alignments must not change** - Unless a change is meant to alter results, the output of `kalign` must stay byte-identical
 - **Performance tests** - Include benchmarks for performance-critical changes
 
 ### Test Data
@@ -232,4 +231,4 @@ By contributing to Kalign, you agree that your contributions will be licensed un
 
 Don't hesitate to ask! The worst thing that can happen is that you'll be politely asked to change something. We appreciate any sort of contribution and don't want a wall of rules to get in the way of that.
 
-Thank you for contributing to Kalign! 🧬
+Thank you for contributing to Kalign!

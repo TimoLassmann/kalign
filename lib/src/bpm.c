@@ -354,9 +354,7 @@ void bitShiftLeft256ymm (__m256i *data, int count)
    have finished too, and the result is read from the last block while it is
    active.  Used from BPM_SIMD_MIN_BLOCKS blocks on (NEON pays off only for
    long patterns: the scalar integer path is already fast on Apple cores). */
-#if defined(_MSC_VER) && !defined(__clang__)
-#define BPM_SIMD 0
-#elif defined(__ARM_NEON)
+#if defined(__ARM_NEON)
 #include <arm_neon.h>
 #define BPM_SIMD 1
 #define BPM_SIMD_MIN_BLOCKS 6

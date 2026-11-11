@@ -5,6 +5,7 @@ harness (perf/dp/kernels/{ss,sp,pp}_wave.c, bench_dp --check).  This script
 copies their sweep code into the library unchanged, except for:
   - per-alignment tables taken from m->wave instead of kdp_kernel_state,
   - thread-local scratch (forward and backward can run on different threads),
+    freed at thread exit through tl_scratch_track,
   - renamed seq-profile internals (they share names with the seq-seq code).
 
 usage (from the repository root):
@@ -46,9 +47,17 @@ def main():
     pp_body = pp_body.replace("const struct pw_state* st = kdp_kernel_state;",
                               "const struct pw_state* st = ((const struct aln_wave*)m->wave)->pp;")
 
+    # free the thread-local scratch when a thread exits (see tl_scratch_track)
+    track = "                {b}.cap = n;\n"
+    reg = ("                tl_scratch_track({slot}, (void*[]){{{b}.ra, {b}.rga, {b}.rgb, {b}.rd, {b}.bl}}, 5);\n")
+    ss_body = ss_body.replace(track.format(b="wb"), track.format(b="wb") + reg.format(slot="TL_SCRATCH_WAVE_SS", b="wb"))
+    sp_body = sp_body.replace(track.format(b="spb"), track.format(b="spb") + reg.format(slot="TL_SCRATCH_WAVE_SP", b="spb"))
+    pp_body = pp_body.replace(track.format(b="pb"), track.format(b="pb") + reg.format(slot="TL_SCRATCH_WAVE_PP", b="pb"))
+
     for body, name in ((ss_body, "ss"), (sp_body, "sp"), (pp_body, "pp")):
         assert "kdp_kernel_state" not in body, name
         assert "_Thread_local" in body, name
+        assert body.count("tl_scratch_track(") == 1, name
 
     out = HEAD + ss_prep + ss_body + pp_prep + pp_body + \
         "\n/* ---- seq-profile ---- */\n" + sp_body + TAIL
@@ -78,6 +87,7 @@ HEAD = '''/* aln_wave.c -- wavefront SIMD DP passes (built with -DKALIGN_WAVE, t
 #include <string.h>
 
 #include "tldevel.h"
+#include "tl_scratch.h"
 #include "aln_param.h"
 #include "aln_struct.h"
 #include "anchor_consistency.h"

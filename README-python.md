@@ -8,6 +8,12 @@ Python bindings for [Kalign](https://github.com/TimoLassmann/kalign), a fast mul
 pip install kalign-python
 ```
 
+Python 3.11 or later is required. On x86-64 the wheels are built with AVX2
+and do not check the CPU at run time, so they need a CPU with AVX2 (Intel
+Haswell, 2013, or later; AMD Excavator, 2015, or later). On older CPUs build
+from source with `-DENABLE_AVX2=OFF`. The Apple silicon (arm64) wheels and Arm builds from
+source do not use AVX2. Windows is not supported.
+
 Optional dependencies for ecosystem integration:
 
 ```bash
@@ -39,8 +45,9 @@ aligned = kalign.align(sequences, mode="accurate")
 ## Modes
 
 Kalign 4 has two modes, each with a protein and a DNA/RNA setting, exposed
-identically through the Python API and the `kalign` command-line tool. The
-sequence type is detected from the input.
+in the Python API and the `kalign` command-line tool with the same settings
+and the same results. The sequence type is detected from the input. The one
+difference is the default number of threads (see [Threading](#threading)).
 
 | Mode | Python | CLI | Description |
 |------|--------|-----|-------------|
@@ -55,11 +62,23 @@ then scored on held-out data that the fit did not use. The fit code, the records
 the settings are in [presets/](presets/) (`presets/recipe`, `presets/docs`,
 `presets/results`).
 
-Explicit parameters always override mode defaults:
+Options that change a single alignment are only allowed with fast mode, and
+options for the ensemble only with accurate mode. Anything else raises a
+`ValueError`; nothing is changed silently.
+
+- Fast mode only: `gap_open`, `gap_extend`, `terminal_gap_extend`. They
+  override the fitted values. With `mode="accurate"` they raise
+  `ValueError`, because the accurate ensemble uses its fitted settings.
+- Accurate mode only: `fill_in`, `fill_anchor_frac`, `fill_support`. With
+  fast mode they raise `ValueError`.
+- Allowed in both modes: `seq_type`, `n_threads`, `fmt`, `ids`.
 
 ```python
-# Accurate mode with a custom gap-open penalty
-aligned = kalign.align(sequences, mode="accurate", gap_open=8.0)
+# Fast mode with a custom gap-open penalty
+aligned = kalign.align(sequences, mode="fast", gap_open=8.0)
+
+# Raises ValueError: the accurate ensemble uses its fitted settings
+kalign.align(sequences, mode="accurate", gap_open=8.0)
 ```
 
 Mode constants are also available: `kalign.MODE_FAST`, `kalign.MODE_DEFAULT`,
@@ -72,15 +91,15 @@ Mode constants are also available: `kalign.MODE_FAST`, `kalign.MODE_DEFAULT`,
 ```python
 aligned = kalign.align(
     sequences,              # list of str
-    mode=None,              # "fast", "default", "recall", "accurate", or None (= default)
+    mode=None,              # "fast", "default", "recall", "accurate", or None (= fast)
     seq_type="auto",        # "auto", "protein", "dna", "rna"
-    gap_open=None,          # positive float, or None for defaults
-    gap_extend=None,        # positive float, or None for defaults
-    terminal_gap_extend=None,
-    n_threads=None,         # int, or None for global default
+    gap_open=None,          # float >= 0 (fast mode only), or None for the fitted value
+    gap_extend=None,        # float >= 0 (fast mode only), or None for the fitted value
+    terminal_gap_extend=None,  # float >= 0 (fast mode only), or None for the fitted value
+    n_threads=None,         # int >= 1, or None for the default (1; see Threading)
     fmt="plain",            # "plain", "biopython", "skbio"
     ids=None,               # list of str (for biopython/skbio output)
-    fill_in=None,           # ensemble modes only: None/"off", "realign", "project", "attach"
+    fill_in=None,           # accurate mode only: None/"off", "realign", "project", "attach"
     fill_anchor_frac=None,  # fill-in anchor column threshold (0-1)
     fill_support=None,      # "attach" vote threshold (int >= 1)
 )
@@ -88,7 +107,7 @@ aligned = kalign.align(
 
 Returns a list of aligned strings (default), a `Bio.Align.MultipleSeqAlignment` (`fmt="biopython"`), or a `skbio.TabularMSA` (`fmt="skbio"`).
 
-For the ensemble modes (`mode="accurate"` or `mode="recall"`) with `fmt="biopython"`, per-residue confidence is attached as HMMER-style PP `letter_annotations["posterior_probability"]`.
+With `mode="accurate"` (or `mode="recall"`) and `fmt="biopython"`, per-residue confidence is attached as HMMER-style PP `letter_annotations["posterior_probability"]`.
 
 ### `kalign.align_from_file()`
 
@@ -108,8 +127,8 @@ Additional parameters for advanced use:
 result = kalign.align_from_file(
     "input.fasta",
     mode="accurate",             # or "fast", "default", "recall"
+    # gap_open=8.0,              # only with mode="fast"
     seq_type="protein",          # "auto", "protein", "dna", "rna"
-    gap_open=None,               # override the preset's gap penalties
     n_threads=4,
 )
 ```
@@ -140,11 +159,20 @@ Write aligned sequences to a file:
 kalign.write_alignment(aligned, "output.fasta", format="fasta", ids=ids)
 ```
 
-Supported formats: `fasta`, `clustal`, `stockholm`, `phylip` (non-FASTA formats require Biopython).
+Supported formats: `fasta`, `clustal`, `stockholm`, `phylip` (non-FASTA formats require Biopython). `column_confidence` and `residue_confidence` are written only in Stockholm format.
 
-## Ensemble Alignment & Confidence Scores
+### Other functions
 
-Ensemble mode runs multiple alignments with varied parameters and combines results via POAR (Pairs of Aligned Residues) consensus. Use `mode="accurate"` (5-member ensemble; `mode="recall"` is an alias). The number of runs and their parameters come from the mode preset; the Python API does not take an explicit run count.
+- `kalign.align_file_to_file(input_file, output_file, format="fasta", ...)`: align a file and write the result in one call, without building Python lists. Output formats: `fasta`, `msf`, `clu`. Takes the same `mode`, `seq_type`, `n_threads` and fast-mode gap options as `align()`.
+- `kalign.add_to_alignment(existing, new_sequences, output, format="fasta", n_threads=None, seq_type="auto")`: add sequences from a file to an existing alignment file. The existing rows keep their gaps. Output formats: `fasta`, `msf`, `clu`.
+- `kalign.mask_alignment(result, threshold=0.5, style="lowercase")`: return a copy of an `AlignedSequences` result from `align_from_file(..., mode="accurate")` in which residues in columns below the confidence threshold are lowercased (`style="lowercase"`) or replaced by `-` (`style="remove"`).
+- `kalign.filter_alignment(result, threshold=0.5)`: return a copy of such a result without the columns below the confidence threshold.
+- `kalign.write_confidence(path, result)`: write the per-column confidence of such a result to a text file, one value per line.
+- `kalign.generate_test_sequences(n_seq, n_obs, dna, length, seed=42)`: simulate sequences, for tests and benchmarks.
+
+## Accurate Mode & Confidence Scores
+
+Accurate mode runs multiple alignments with varied parameters and combines results via POAR (Pairs of Aligned Residues) consensus. The 5-member ensemble and its parameters come from the fitted setting (`mode="recall"` is an alias); the Python API does not take a run count.
 
 ```python
 import kalign
@@ -173,11 +201,11 @@ kalign.write_alignment(
 )
 ```
 
-Confidence uses HMMER-style PP encoding: `*`=95%+, `9`=85-95%, ..., `0`=0-5%, `.`=gap.
+Confidence uses HMMER-style PP encoding: a confidence of 0.95 or more is `*`; below that the character is the first digit of the confidence, so `9`=0.90-0.95, `8`=0.80-0.90, ..., `1`=0.10-0.20, `0`=below 0.10; `.`=gap.
 
 ### Biopython Per-Residue PP
 
-When using `fmt="biopython"` with an ensemble mode, per-residue confidence is attached as `letter_annotations["posterior_probability"]`:
+When using `fmt="biopython"` with `mode="accurate"`, per-residue confidence is attached as `letter_annotations["posterior_probability"]`:
 
 ```python
 aln = kalign.align(seqs, mode="accurate", fmt="biopython", ids=ids)
@@ -189,14 +217,25 @@ print(aln[0].letter_annotations["posterior_probability"])  # e.g. "998.76*9..."
 ```python
 import kalign
 
-kalign.set_num_threads(4)        # set global default
-n = kalign.get_num_threads()     # query current default
+kalign.set_num_threads(4)        # set the default
+n = kalign.get_num_threads()     # query the default
 
 # or override per call
 aligned = kalign.align(sequences, n_threads=8)
 ```
 
-Thread settings are thread-local, so different threads can use different defaults.
+The Python library and `kalign-py` use 1 thread by default. The `kalign`
+command line instead defaults to the number of cores minus one, at most 16.
+To use more threads from Python, pass `n_threads=`, call
+`kalign.set_num_threads()`, or use `kalign-py -n`.
+
+Kalign uses at most as many threads as there are cores. A larger request is
+reduced to the core count, without a warning from Python. The result does not
+depend on the number of threads.
+
+`kalign.set_num_threads(n)` sets the default for the calling thread and for
+every thread that has not set its own. A thread that has called it keeps its own
+value.
 
 ## Utilities (`kalign.utils`)
 
@@ -272,14 +311,14 @@ from the detected type.
 | `"dna"` | `kalign.DNA` | DNA/RNA presets |
 | `"rna"` | `kalign.RNA` | DNA/RNA presets |
 
-### Refinement Modes
+## Development interface
 
-| String | Constant | Description |
-|--------|----------|-------------|
-| `"none"` | `kalign.REFINE_NONE` | No refinement (default) |
-| `"all"` | `kalign.REFINE_ALL` | Refine all columns |
-| `"confident"` | `kalign.REFINE_CONFIDENT` | Refine only confident columns |
-| `"inline"` | `kalign.REFINE_INLINE` | Inline refinement (disables parallelism) |
+The compiled module `kalign._core` also has functions that take per-run
+arrays of parameters, and constants such as the `REFINE_*` values and
+`PROTEIN_DIVERGENT`. These were used during development to fit the settings.
+They are not part of the supported API and may change. Use `kalign.align()`
+and the other functions described above. The `kalign.REFINE_*` constants
+re-exported at the top level belong to this interface too.
 
 ## Command-line Interface
 
@@ -294,6 +333,8 @@ kalign-py -i sequences.fasta -o - --format clustal               # stdout
 cat input.fa | kalign-py -i - -o aligned.fasta                   # stdin
 kalign-py -i sequences.fasta -o aligned.fasta --type protein     # explicit type
 
+kalign-py -i sequences.fasta -o aligned.fasta -n 4               # more threads (default 1)
+
 kalign-py --version
 ```
 
@@ -306,7 +347,7 @@ uv pip install -e .
 uv run pytest tests/python/ -v
 ```
 
-Requirements: Python 3.9+, CMake 3.18+, C++11 compiler, NumPy.
+Requirements: Python 3.11+, CMake 3.18+, C++11 compiler, NumPy.
 
 ## Citation
 

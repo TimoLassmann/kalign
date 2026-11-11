@@ -2,7 +2,7 @@ name: Python
 
 on:
   push:
-    branches: [ main, python ]
+    branches: [ main ]
     paths:
       - 'python-kalign/**'
       - 'lib/**'

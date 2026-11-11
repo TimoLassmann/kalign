@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <errno.h>
 #include <ctype.h>
 #include <time.h>
@@ -62,6 +63,7 @@ static int write_msa_fasta(struct msa* msa,char* outfile);
 static int write_msa_fasta_from_gaps(struct msa* msa,char* outfile);
 static int write_msa_clu(struct msa* msa,char* outfile);
 static int write_msa_msf(struct msa* msa,char* outfile);
+static int msf_is_protein(struct msa* msa);
 
 static struct line_buffer* alloc_line_buffer(int max_line_len);
 static int resize_line_buffer(struct line_buffer* lb);
@@ -132,9 +134,9 @@ int kalign_read_input(char* infile, struct msa** msa, int quiet)
                 RUN(read_clu(b,&m));
         }else if(type == FORMAT_DETECT_FAIL){
                 if(infile){
-                        error(AT, "Could not read %s: not FASTA, MSF or Clustal format.", infile);
+                        tl_error(AT, "Could not read %s: not FASTA, MSF or Clustal format.", infile);
                 }else{
-                        error(AT, "Could not read standard input: not FASTA, MSF or Clustal format.");
+                        tl_error(AT, "Could not read standard input: not FASTA, MSF or Clustal format.");
                 }
                 /* clean up allocated structures */
                 free_in_buffer(b);
@@ -307,13 +309,11 @@ int parse_format_argument(char* format, int* type)
 {
         int out_format = -1;
         if(format){
-                if(strstr(format,"msf")){
+                if(!strcasecmp(format,"msf")){
                         out_format = FORMAT_MSF;
-                }else if(strstr(format,"clu")){
+                }else if(!strcasecmp(format,"clu") || !strcasecmp(format,"clustal")){
                         out_format = FORMAT_CLU;
-                }else if(strstr(format,"fasta")){
-                        out_format  = FORMAT_FA;
-                }else if(strstr(format,"fa")){
+                }else if(!strcasecmp(format,"fasta") || !strcasecmp(format,"fa") || !strcasecmp(format,"afa")){
                         out_format  = FORMAT_FA;
                 }else{
                         ERROR_MSG("Format %s not recognized.",format);
@@ -997,6 +997,20 @@ ERROR:
 }
 
 
+/* Protein or nucleotide for the MSF header. The alphabet code in msa->L
+   changes during alignment (e.g. ALPHA_ambigiousPROTEIN), so the biotype is
+   used first and all protein codes are accepted as a fall-back. */
+int msf_is_protein(struct msa* msa)
+{
+        if(msa->biotype == ALN_BIOTYPE_PROTEIN){
+                return 1;
+        }
+        if(msa->biotype == ALN_BIOTYPE_DNA){
+                return 0;
+        }
+        return msa->L == ALPHA_defPROTEIN || msa->L == ALPHA_ambigiousPROTEIN || msa->L == ALPHA_redPROTEIN || msa->L == ALPHA_redPROTEIN2;
+}
+
 int write_msa_msf(struct msa* msa,char* outfile)
 {
         struct line_buffer* lb = NULL;
@@ -1071,12 +1085,8 @@ int write_msa_msf(struct msa* msa,char* outfile)
         header_index = -1 * (msa->numseq+10);
         ol = lb->lines[lb->num_line];
         //LOG_MSG("Alphabet : %d", msa->L);
-        if(msa->L == ALPHA_defPROTEIN){
+        if(msf_is_protein(msa)){
                 snprintf(ol->line, line_length,"!!AA_MULTIPLE_ALIGNMENT 1.0");
-        }else if(msa->L == ALPHA_redPROTEIN){
-                snprintf(ol->line, line_length,"!!AA_MULTIPLE_ALIGNMENT 1.0");
-        }else if(msa->L == ALPHA_defDNA){
-                snprintf(ol->line, line_length,"!!NA_MULTIPLE_ALIGNMENT 1.0");
         }else{
                 snprintf(ol->line, line_length,"!!NA_MULTIPLE_ALIGNMENT 1.0");
         }
@@ -1108,12 +1118,12 @@ int write_msa_msf(struct msa* msa,char* outfile)
                 RUN(tlfilename(outfile, &basename));
         }
 
-        written = snprintf(ol->line, line_length," %s  MSF: %d  Type: %c  %s  Check: %d  ..", outfile == NULL ? "stdout" :   basename,aln_len, msa->L == ALPHA_defPROTEIN ? 'P' : 'N', date, GCGMultchecksum(msa));
+        written = snprintf(ol->line, line_length," %s  MSF: %d  Type: %c  %s  Check: %d  ..", outfile == NULL ? "stdout" :   basename,aln_len, msf_is_protein(msa) ? 'P' : 'N', date, GCGMultchecksum(msa));
 
         if(written >= line_length){
                 MREALLOC(lb->lines[lb->num_line]->line,sizeof(char) * (written+1));
                 ol = lb->lines[lb->num_line];
-                written = snprintf(ol->line, written+1," %s  MSF: %d  Type: %c  %s  Check: %d  ..", outfile == NULL ? "stdout" : basename,aln_len, msa->L == ALPHA_defPROTEIN ? 'P' : 'N', date, GCGMultchecksum(msa));
+                written = snprintf(ol->line, written+1," %s  MSF: %d  Type: %c  %s  Check: %d  ..", outfile == NULL ? "stdout" : basename,aln_len, msf_is_protein(msa) ? 'P' : 'N', date, GCGMultchecksum(msa));
 
         }
 

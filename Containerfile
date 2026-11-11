@@ -3,7 +3,7 @@
 # Includes kalign, Clustal Omega, MAFFT, and MUSCLE v5 for comparative
 # benchmarking on BAliBASE, BRAliBASE, and BaliFam100 datasets.
 #
-# Build (installs kalign from the 'extra' branch):
+# Build (installs kalign from the 'main' branch):
 #   podman build -t kalign-benchmark .
 #
 # Build from a specific commit for reproducibility:
@@ -11,16 +11,14 @@
 #
 # Run benchmarks:
 #   podman run -it \
-#     -v ./benchmarks/data:/data \
+#     -v ./benchmarks/data:/kalign/benchmarks/data \
 #     kalign-benchmark \
 #     python -m benchmarks \
 #       --dataset balibase --method cli clustalo mafft muscle \
 #       --mode fast default recall accurate -v
 #
-# Run the interactive dashboard:
-#   podman run -it -p 8050:8050 \
-#     -v ./benchmarks/data:/data \
-#     kalign-benchmark
+# Run with no arguments to print the benchmark help:
+#   podman run -it kalign-benchmark
 
 FROM ubuntu:24.04
 
@@ -49,7 +47,7 @@ ENV PATH="/venv/bin:$PATH"
 RUN pip install --no-cache-dir uv
 
 # ---------- Clone kalign and build ----------
-ARG KALIGN_REF=extra
+ARG KALIGN_REF=main
 RUN git clone --branch ${KALIGN_REF} --depth 1 \
     https://github.com/TimoLassmann/kalign.git /kalign
 WORKDIR /kalign
@@ -69,6 +67,4 @@ RUN kalign --version && clustalo --version && mafft --version && muscle -version
 # ---------- Data directory (mount point for BAliBASE etc.) ----------
 RUN mkdir -p /kalign/benchmarks/data/downloads /kalign/benchmarks/results
 
-EXPOSE 8050
-
-CMD ["python", "-m", "benchmarks.app", "--host", "0.0.0.0", "--port", "8050"]
+CMD ["python", "-m", "benchmarks", "--help"]

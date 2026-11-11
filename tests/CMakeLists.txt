@@ -115,8 +115,9 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   )
 
-# Protein presets default/accurate/recall must reproduce the confirmed 3.7.0
-# arms byte for byte (golden SHA-256; see preset_golden.cmake to regenerate).
+# The Kalign 4.0 fast and accurate presets (protein and nucleotide) and the
+# "default" alias must reproduce the golden SHA-256 values byte for byte (see
+# preset_golden.cmake to regenerate). The "recall" alias is not run here.
 add_test(
   NAME kalign_preset_golden
   COMMAND ${CMAKE_COMMAND}
@@ -134,6 +135,16 @@ add_test(
           -DDATA=${CMAKE_CURRENT_SOURCE_DIR}/data
           -DOUT=${CMAKE_CURRENT_BINARY_DIR}/seq_type_cli
           -P ${CMAKE_CURRENT_SOURCE_DIR}/seq_type_cli.cmake
+  )
+
+# Option rules, strict number parsing, format names and --add conflicts.
+add_test(
+  NAME kalign_cli_options
+  COMMAND ${CMAKE_COMMAND}
+          -DKALIGN=$<TARGET_FILE:kalign-bin>
+          -DDATA=${CMAKE_CURRENT_SOURCE_DIR}/data
+          -DOUT=${CMAKE_CURRENT_BINARY_DIR}/cli_options
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/cli_options.cmake
   )
 
 add_executable(kalign_api_test
@@ -212,4 +223,24 @@ add_test(
 add_test(
   NAME kalign_deep_tree_fast_n8
   COMMAND ${CMAKE_COMMAND} -DKALIGN=$<TARGET_FILE:kalign-bin> -DWORKDIR=${CMAKE_CURRENT_BINARY_DIR}/deep_tree -DNSEQ=20000 -DMODE=fast -DTHREADS=8 -P ${CMAKE_CURRENT_SOURCE_DIR}/deep_tree_test.cmake
+  )
+
+# The library (kalign, kalign_align_mode) gives the same alignments as the command line.
+add_executable(kalign_unity_test
+  kalign_unity_test.c
+  )
+target_link_libraries(kalign_unity_test tldevel ${PROJECT_NAME}_static)
+
+add_test(
+  NAME kalign_unity_test
+  COMMAND kalign_unity_test $<TARGET_FILE:kalign-bin>
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/BB11001.tfa
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/small.fa
+          ${CMAKE_CURRENT_BINARY_DIR}/unity_test
+  )
+
+# MSF header text (AA/NA, Type P/N) and exact output format names.
+add_test(
+  NAME kalign_msf_header
+  COMMAND ${CMAKE_COMMAND} -DKALIGN=$<TARGET_FILE:kalign-bin> -DDATA=${CMAKE_CURRENT_SOURCE_DIR}/data -DOUT=${CMAKE_CURRENT_BINARY_DIR}/msf_header -P ${CMAKE_CURRENT_SOURCE_DIR}/msf_header.cmake
   )

@@ -41,7 +41,8 @@ keywords = [
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
-    "Operating System :: OS Independent",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
     "Programming Language :: C",
     "Programming Language :: C++",
     "Programming Language :: Python :: 3",
@@ -169,7 +170,7 @@ BUILD_PYTHON_MODULE = "ON"
 build = "cp311-* cp312-* cp313-* cp314-*"
 
 # Skip 32-bit builds (PyPy wheels are not built by default)
-skip = "*-win32 *-manylinux_i686"
+skip = "*-manylinux_i686"
 
 # Test command
 test-command = "python -c 'import kalign; print(kalign.__version__)'"

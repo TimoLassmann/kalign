@@ -40,7 +40,7 @@
 
 
 #define ERROR_MSG(...) do {                     \
-                error(AT, __VA_ARGS__ );        \
+                tl_error(AT, __VA_ARGS__ );        \
                 goto ERROR;                     \
         }while (0)
 
@@ -54,15 +54,15 @@
         }while (0)
 
 #define ASSERT(TEST,...)  if(!(TEST)) {         \
-                error(AT, __VA_ARGS__);         \
-                error(AT,#TEST );               \
+                tl_error(AT, __VA_ARGS__);         \
+                tl_error(AT,#TEST );               \
                 goto ERROR;                     \
         }
 
 #if (DEBUGLEVEL >= 1)
 #define DASSERT(TEST,...) if(!(TEST)) {         \
-                error(AT, __VA_ARGS__);         \
-                error(AT,#TEST );               \
+                tl_error(AT, __VA_ARGS__);         \
+                tl_error(AT,#TEST );               \
                 goto ERROR;                     \
         }
 #else
@@ -276,7 +276,7 @@ EXTERN int galloc_too_few_arg_error (void* p);
 
 /* functions  */
 
-EXTERN void error(const char *location, const char *format, ...);
+EXTERN void tl_error(const char *location, const char *format, ...);
 /* first error message reported on this thread since tl_clear_error() ("" if none) */
 EXTERN const char* tl_first_error(void);
 EXTERN void tl_clear_error(void);

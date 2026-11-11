@@ -37,7 +37,7 @@ class AlignmentResult:
 
 def align_with_python_api(
     case: BenchmarkCase, output: Path, n_threads: int = 1,
-    mode: str = "default",
+    mode: str = "fast",
 ) -> float:
     """Align using kalign Python API. Returns wall time in seconds."""
     start = time.perf_counter()
@@ -57,12 +57,14 @@ def align_with_cli(
     output: Path,
     binary: str = "kalign",
     n_threads: int = 1,
-    mode: str = "default",
+    mode: str = "fast",
 ) -> float:
     """Align using kalign C binary via subprocess. Returns wall time in seconds."""
+    # The CLI defaults to several threads, so pass the count explicitly to
+    # match the Python path. Pass the sequence type as the Python path does.
     cmd = [binary, "-i", str(case.unaligned), "-f", "fasta", "-o", str(output)]
-    if n_threads > 1:
-        cmd.extend(["--nthreads", str(n_threads)])
+    cmd.extend(["--nthreads", str(n_threads)])
+    cmd.extend(["--type", case.seq_type])
     cmd.extend(["--mode", mode])
 
     start = time.perf_counter()
@@ -181,7 +183,7 @@ def run_case(
     method: str = "python_api",
     binary: str = "kalign",
     n_threads: int = 1,
-    mode: str = "default",
+    mode: str = "fast",
 ) -> AlignmentResult:
     """Run alignment + scoring for a single benchmark case."""
     with tempfile.TemporaryDirectory() as tmpdir:

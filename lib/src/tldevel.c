@@ -33,14 +33,14 @@ const char* tldevel_version(void)
 int galloc_unknown_type_error (void* p, ...)
 {
         UNUSED(p);
-        error(AT, "galloc was called with pointer of unknown type");
+        tl_error(AT, "galloc was called with pointer of unknown type");
         return FAIL;
 }
 
 int galloc_too_few_arg_error (void* p)
 {
         UNUSED(p);
-        error(AT,"galloc was called with only one argument");
+        tl_error(AT,"galloc was called with only one argument");
         return FAIL;
 }
 #undef UNUSED
@@ -187,7 +187,7 @@ ALLOC_2D_ARRAY(double)
 
 #define FREE_VOID(type)                         \
         void gfree_void_ ##type(type *a){\
-                error(AT, "free was called on wrong type (%p)",(void*)a); \
+                tl_error(AT, "free was called on wrong type (%p)",(void*)a); \
         }
 
 FREE_VOID(char)
@@ -258,7 +258,7 @@ FREE_2D_ARRAY(double)
 
 static _Thread_local char tl_first_err[512];
 
-void error(const char *location, const char *format, ...)
+void tl_error(const char *location, const char *format, ...)
 {
         va_list argp;
         va_start(argp, format);

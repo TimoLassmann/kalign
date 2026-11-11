@@ -23,7 +23,7 @@ struct parameters{
         float gpo;
         float gpe;
         float tgpe;
-        int vsm_mode;      /* -1 = preset; 0 = legacy VSM; 1 = per-merge VSM */
+        int vsm_mode;      /* -1 = preset; 0 = offset from distance to anchors; 1 = bounded per-merge offset */
         float vsm_kappa;   /* -1 = preset */
         float vsm_dzero;   /* -1 = preset */
         int guide_dist;    /* -1 = preset; 0 = BPM (shipped); 1 = pairwise-alignment distance */

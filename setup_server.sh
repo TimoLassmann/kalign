@@ -1,9 +1,9 @@
 #!/bin/bash
-# Setup script for running kalign parameter optimization on a Linux server.
+# Setup script for running kalign benchmarks on a Linux server.
 # Usage: bash setup_server.sh
 set -euo pipefail
 
-echo "=== Kalign optimization server setup ==="
+echo "=== Kalign benchmark server setup ==="
 
 # Check basics
 echo "Checking prerequisites..."
@@ -24,10 +24,10 @@ echo ""
 echo "=== Building kalign Python package ==="
 uv pip install -e ".[dev]" 2>/dev/null || uv pip install -e .
 
-# Install optimizer dependencies
+# Install benchmark dependencies
 echo ""
-echo "=== Installing optimizer dependencies ==="
-uv pip install pymoo rich
+echo "=== Installing benchmark dependencies ==="
+uv pip install -e ".[benchmark]"
 
 # Quick smoke test
 echo ""
@@ -49,13 +49,6 @@ echo "Python: $(uv run python --version)"
 echo ""
 echo "=== Ready! ==="
 echo ""
-echo "Example runs:"
+echo "Run the benchmark suite (see: uv run python -m benchmarks --help):"
 echo ""
-echo "  # Quick test (10 minutes):"
-echo "  uv run python -m benchmarks.optimize_params --pop-size 20 --n-gen 5 --n-workers 8 --n-threads 1"
-echo ""
-echo "  # Single-run optimization (~2-3 hours):"
-echo "  uv run python -m benchmarks.optimize_params --pop-size 60 --n-gen 50 --n-workers 56 --n-threads 1"
-echo ""
-echo "  # Resume after interrupt:"
-echo "  uv run python -m benchmarks.optimize_params --resume benchmarks/results/optim/gen_checkpoint.pkl --n-gen 80 --n-workers 56 --n-threads 1"
+echo "  uv run python -m benchmarks --dataset balibase --method python_api --mode fast accurate -v"

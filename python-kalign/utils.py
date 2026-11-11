@@ -62,7 +62,8 @@ def alignment_stats(alignment: List[str]) -> Dict[str, float]:
         - n_sequences: number of sequences
         - gap_fraction: fraction of positions that are gaps
         - conservation: fraction of positions that are fully conserved
-        - identity: average pairwise identity
+        - identity: pooled pairwise identity (identical pairs divided by all
+          non-gap pairs, summed over all sequence pairs)
 
     Examples
     --------
@@ -94,7 +95,7 @@ def alignment_stats(alignment: List[str]) -> Dict[str, float]:
 
     conservation = conserved_positions / length
 
-    # Calculate average pairwise identity
+    # Calculate pooled pairwise identity
     total_comparisons = 0
     total_matches = 0
 

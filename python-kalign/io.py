@@ -109,7 +109,7 @@ def read_sequences(
             ".gb": "genbank",
             ".gbk": "genbank",
             ".embl": "embl",
-            ".swiss": "swiss-prot",
+            ".swiss": "swiss",
         }
         format = format_map.get(ext, "fasta")  # Default to FASTA
 

@@ -3,6 +3,10 @@
 # Linux-based container with ASAN (detect_leaks), Valgrind, and glibc
 # for finding memory bugs that don't manifest on macOS.
 #
+# The C stress test runs under ASAN and under Valgrind (separate builds).
+# The Python stress test uses the normal Release build of the Python module;
+# it is not run under a sanitizer.
+#
 # Build:
 #   podman build -f Containerfile.memcheck -t kalign-memcheck .
 #
@@ -12,7 +16,7 @@
 # Run Valgrind stress test:
 #   podman run -it kalign-memcheck /kalign/run_memcheck.sh valgrind
 #
-# Run Python stress test with ASAN:
+# Run Python stress test (normal build, no sanitizer):
 #   podman run -it kalign-memcheck /kalign/run_memcheck.sh python
 #
 # Interactive shell:
@@ -34,7 +38,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY . /kalign
 WORKDIR /kalign
 
-# ---------- Build 1: ASAN build (for C tests + Python module) ----------
+# ---------- Build 1: ASAN build (for C tests) ----------
 RUN mkdir -p build-asan && cd build-asan && \
     cmake -DCMAKE_BUILD_TYPE=ASAN -DBUILD_PYTHON_MODULE=OFF .. && \
     make -j"$(nproc)"

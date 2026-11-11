@@ -353,12 +353,82 @@ ERROR:
         return FAIL;
 }
 
-/* Legacy entry point — thin wrapper around kalign_align_full */
+/* Run a mode on an msa exactly as the command line does: apply the sequence
+   type, check the size limit, take the fitted preset for the sequence type and
+   run it.  gpo, gpe and tgpe < 0 keep the fitted values, >= 0 override them in
+   every run.  Shared by kalign() and kalign_align_mode(). */
+static int run_mode_on_msa(struct msa *msa, const char *mode, int seq_type,
+                           float gpo, float gpe, float tgpe, int n_threads)
+{
+        struct kalign_run_config runs[KALIGN_MAX_PRESET_RUNS];
+        struct kalign_ensemble_config ens;
+        int n_runs = 0;
+        int k;
+        const char *m = mode ? mode : "fast";
+
+        ASSERT(msa != NULL, "No MSA");
+
+        if(kalign_set_seq_type(msa, seq_type, NULL) != 0){
+                ERROR_MSG("Invalid sequence type %d.", seq_type);
+        }
+        if(msa->biotype == ALN_BIOTYPE_UNDEF){
+                RUN(detect_alphabet(msa));
+        }
+        if(kalign_get_mode_preset(m, msa->biotype, runs, &n_runs, &ens) != 0){
+                ERROR_MSG("Unknown mode: '%s'. Use: fast or accurate.", m);
+        }
+        if(!kalign_mode_size_ok(m, msa->biotype, msa->numseq)){
+                ERROR_MSG("Mode '%s' is not feasible above %d sequences (input: %d).",
+                          m, KALIGN_ACCURATE_MAX_SEQ, msa->numseq);
+        }
+        for(k = 0; k < n_runs; k++){
+                if(gpo >= 0.0f)  runs[k].gpo  = gpo;
+                if(gpe >= 0.0f)  runs[k].gpe  = gpe;
+                if(tgpe >= 0.0f) runs[k].tgpe = tgpe;
+        }
+        RUN(kalign_align_full(msa, runs, n_runs, &ens, n_threads));
+        return OK;
+ERROR:
+        return FAIL;
+}
+
+int kalign_align_mode(struct msa *msa, const char *mode, int seq_type, int n_threads)
+{
+        return run_mode_on_msa(msa, mode, seq_type, -1.0f, -1.0f, -1.0f, n_threads);
+}
+
+/* Array entry point: the "fast" mode, as on the command line and in Python.
+   type selects the sequence type like --type; the fitted fast setting for that
+   type is used, and gpo, gpe and tgpe >= 0 override its gap penalties. */
 int kalign(char **seq, int *len, int numseq, int n_threads, int type,
            float gpo, float gpe, float tgpe, char ***aligned, int *out_aln_len)
 {
         struct msa *msa = NULL;
-        struct kalign_run_config cfg;
+        int seq_type;
+
+        switch(type){
+        case KALIGN_TYPE_UNDEFINED:
+                seq_type = KALIGN_SEQ_AUTO;
+                break;
+        case KALIGN_TYPE_PROTEIN:
+        case KALIGN_TYPE_PROTEIN_PFASUM60:
+        case KALIGN_TYPE_PROTEIN_CORBLOSUM66:
+        case KALIGN_TYPE_PROTEIN_DIVERGENT:
+                seq_type = KALIGN_SEQ_PROTEIN;
+                break;
+        case KALIGN_TYPE_DNA:
+        case KALIGN_TYPE_DNA_INTERNAL:
+        case KALIGN_MATRIX_NUC_1PAM:
+        case KALIGN_MATRIX_NUC_20PAM:
+        case KALIGN_MATRIX_NUC_200PAM:
+                seq_type = KALIGN_SEQ_DNA;
+                break;
+        case KALIGN_TYPE_RNA:
+                seq_type = KALIGN_SEQ_RNA;
+                break;
+        default:
+                ERROR_MSG("Unknown sequence type %d.", type);
+        }
 
         RUN(kalign_arr_to_msa(seq, len, numseq, &msa));
         msa->quiet = 1;
@@ -366,13 +436,7 @@ int kalign(char **seq, int *len, int numseq, int n_threads, int type,
                 n_threads = 1;
         }
 
-        cfg = kalign_run_config_defaults();
-        cfg.matrix = type;
-        cfg.gpo = gpo;
-        cfg.gpe = gpe;
-        cfg.tgpe = tgpe;
-
-        RUN(kalign_align_full(msa, &cfg, 1, NULL, n_threads));
+        RUN(run_mode_on_msa(msa, "fast", seq_type, gpo, gpe, tgpe, n_threads));
 
         RUN(kalign_msa_to_arr(msa, aligned, out_aln_len));
         kalign_free_msa(msa);
@@ -390,10 +454,10 @@ struct kalign_run_config kalign_run_config_defaults(void)
 {
         struct kalign_run_config cfg;
         cfg.matrix = KALIGN_MATRIX_PFASUM43;
-        cfg.gpo = 7.0f;          /* PFASUM43 default */
+        cfg.gpo = 7.0f;          /* PFASUM43 penalty */
         cfg.gpe = 1.25f;
         cfg.tgpe = 1.0f;
-        cfg.vsm_amax = 2.0f;     /* protein default */
+        cfg.vsm_amax = 2.0f;     /* VSM amplitude */
         cfg.seq_weights = 0.0f;
         cfg.dist_scale = 0.0f;
         cfg.refine = KALIGN_REFINE_NONE;
@@ -403,12 +467,12 @@ struct kalign_run_config kalign_run_config_defaults(void)
         cfg.tree_noise = 0.0f;
         cfg.consistency_anchors = 0;
         cfg.consistency_weight = 2.0f;
-        cfg.vsm_mode = 0;        /* legacy VSM (shipped presets) */
+        cfg.vsm_mode = 0;        /* VSM with vsm_amax */
         cfg.vsm_kappa = 1.0f;
         cfg.vsm_dzero = 1.0f;
-        cfg.guide_dist = KALIGN_GUIDE_DIST_BPM;  /* shipped guide tree */
+        cfg.guide_dist = KALIGN_GUIDE_DIST_BPM;  /* BPM guide distance (default) */
         cfg.gap_model = 0;       /* Kalign gap rule */
-        cfg.tree_method = -1;    /* -1: shipped tree (sl_opts_resolve) */
+        cfg.tree_method = -1;    /* -1: default tree (sl_opts_resolve) */
         cfg.tree_dist = -1;
         cfg.tree_alpha = -1;
         cfg.tree_maxlen = -1;

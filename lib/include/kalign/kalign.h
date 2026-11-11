@@ -18,7 +18,7 @@
 
 /* Substitution matrix constants.
    Every value maps to exactly one scoring table. No duplicates.
-   Value 4 is reserved for legacy GONNET (KALIGN_TYPE_PROTEIN_DIVERGENT). */
+   Value 4 is used by KALIGN_TYPE_PROTEIN_DIVERGENT (GONNET). */
 #define KALIGN_MATRIX_AUTO         0  /* auto-select for biotype          */
 #define KALIGN_MATRIX_PFASUM43     1  /* 1/3 bit, divergent protein       */
 #define KALIGN_MATRIX_PFASUM60     2  /* 1/3 bit, moderate protein        */
@@ -30,13 +30,16 @@
 #define KALIGN_MATRIX_NUC_20PAM   11  /* Kimura 20PAM, kappa=2 (moderate)*/
 #define KALIGN_MATRIX_NUC_200PAM  12  /* Kimura 200PAM, kappa=2 (distant)*/
 
-/* Backward compatibility — old KALIGN_TYPE_* map to KALIGN_MATRIX_*.
-   KALIGN_TYPE_PROTEIN_DIVERGENT stays at 4 (GONNET, dead code). */
+/* Sequence type constants of kalign() (the "type" argument).  They map to
+   KALIGN_MATRIX_*.  kalign() only uses them to choose protein, DNA or RNA;
+   the substitution matrix and gap penalties come from the fitted setting.
+   KALIGN_TYPE_PROTEIN_DIVERGENT (4, GONNET) is kept for old code; no fitted
+   setting uses it and it only means "protein" for kalign(). */
 #define KALIGN_TYPE_DNA              KALIGN_MATRIX_DNA
 #define KALIGN_TYPE_DNA_INTERNAL     KALIGN_MATRIX_DNA_INTERNAL
 #define KALIGN_TYPE_RNA              KALIGN_MATRIX_RNA
 #define KALIGN_TYPE_PROTEIN          KALIGN_MATRIX_PFASUM43
-#define KALIGN_TYPE_PROTEIN_DIVERGENT 4  /* GONNET — dead code, do not use */
+#define KALIGN_TYPE_PROTEIN_DIVERGENT 4  /* GONNET; kept for old code, not used by any fitted setting */
 #define KALIGN_TYPE_PROTEIN_PFASUM43 KALIGN_MATRIX_PFASUM43
 #define KALIGN_TYPE_PROTEIN_PFASUM60 KALIGN_MATRIX_PFASUM60
 #define KALIGN_TYPE_PROTEIN_PFASUM_AUTO KALIGN_MATRIX_AUTO
@@ -61,7 +64,25 @@ EXTERN int kalign_write_msa(struct msa *msa, char *outfile, char *format);
 /* EXTERN int kalign_arr_to_msa(char **input_sequences, int *len, int numseq, struct msa **multiple_aln); */
 
 
-/* Legacy C API — thin wrapper around kalign_align_full */
+/* Align sequences held in arrays.  This gives the same alignment as
+ * "kalign --mode fast" on the command line and mode="fast" in Python.
+ *
+ * seq, len, numseq: the input sequences and their lengths.
+ * n_threads:        number of threads (1 = serial); capped at the number of cores.
+ * type:             selects the sequence type, like --type.
+ *                   KALIGN_TYPE_UNDEFINED (0): detect from the sequences.
+ *                   KALIGN_TYPE_PROTEIN, _PFASUM60, _CORBLOSUM66, _DIVERGENT: protein.
+ *                   KALIGN_TYPE_DNA, KALIGN_TYPE_DNA_INTERNAL, KALIGN_MATRIX_NUC_*: DNA.
+ *                   KALIGN_TYPE_RNA: RNA (aligned with the DNA/RNA setting).
+ *                   Other values are an error. The fitted fast setting for the
+ *                   sequence type is used; the constant does not pick a matrix.
+ * gpo, gpe, tgpe:   gap open, extend and terminal extend penalties. A value < 0
+ *                   keeps the fitted value, a value >= 0 replaces it.
+ * aligned:          set to a newly allocated array of numseq aligned strings;
+ *                   the caller frees each string and the array with free().
+ * out_aln_len:      set to the alignment length.
+ *
+ * Returns 0 on success. */
 EXTERN int kalign(char **seq, int *len, int numseq, int n_threads, int type,
                   float gpo, float gpe, float tgpe, char ***aligned,
                   int *out_aln_len);
@@ -109,14 +130,17 @@ EXTERN int kalign_msa_compare_with_mask(struct msa *r, struct msa *t,
                                         int *scored_cols, int n_cols,
                                         struct poar_score *out);
 
-/* Unified alignment entry point — all callers should use this.
+/* Alignment with explicit run configurations.
  *
- * NOTE: kalign_run_config_defaults() returns a *protein-oriented* config
- * (matrix = KALIGN_MATRIX_PFASUM43, protein gap penalties).  Callers that
- * may operate on DNA or RNA input should set cfg.matrix = KALIGN_MATRIX_AUTO
- * before passing the config to kalign_align_full; the library will then
- * resolve to a biotype-appropriate matrix at alignment time.  The mode-preset
- * path (kalign_get_mode_preset) populates the matrix per biotype automatically. */
+ * Most callers want kalign() or kalign_align_mode() (below), which use the
+ * fitted settings.  kalign_align_full runs exactly the runs it is given:
+ * n_runs = 1 is a single alignment, n_runs > 1 is an ensemble with consensus
+ * (ens is then used).  The caller sets every field.
+ *
+ * kalign_run_config_defaults() is a plain protein configuration (matrix
+ * KALIGN_MATRIX_PFASUM43, PFASUM43 gap penalties), not a fitted setting.  Set
+ * cfg.matrix = KALIGN_MATRIX_AUTO for DNA or RNA input.  For the fitted
+ * settings use kalign_get_mode_preset. */
 EXTERN struct kalign_run_config kalign_run_config_defaults(void);
 EXTERN struct kalign_ensemble_config kalign_ensemble_config_defaults(void);
 
@@ -127,7 +151,7 @@ EXTERN int kalign_align_full(struct msa* msa,
                              int n_threads);
 
 /* Expand a base config into n_runs configs using the built-in diversity table.
-   Caller must pass resolved (non-sentinel) gap penalties in base.
+   Caller must pass concrete (>= 0) gap penalties in base.
    Caller allocates out[n_runs]. */
 EXTERN int kalign_generate_ensemble_runs(const struct kalign_run_config* base,
                                          int n_runs, uint64_t seed,
@@ -145,8 +169,10 @@ EXTERN int kalign_generate_ensemble_runs(const struct kalign_run_config* base,
  *
  * mode:    "fast", "accurate", "default" or "recall" (case-insensitive).
  *          NULL is treated as "fast".
- * biotype: ALN_BIOTYPE_PROTEIN, ALN_BIOTYPE_DNA, or ALN_BIOTYPE_RNA.
- *          Determines which preset grid slot to use.
+ * biotype: the sequence type of the msa, as returned by
+ *          kalign_msa_get_biotype(msa). DNA and RNA are one nucleotide type
+ *          and use the same presets. Any value that is not the nucleotide
+ *          type selects the protein presets.
  * runs:    caller-allocated array of at least KALIGN_MAX_PRESET_RUNS configs.
  * n_runs:  filled with the number of runs in the preset.
  * ens:     filled with ensemble config (only meaningful when *n_runs > 1).
@@ -159,6 +185,21 @@ EXTERN int kalign_get_mode_preset(const char *mode,
                                    struct kalign_run_config *runs,
                                    int *n_runs,
                                    struct kalign_ensemble_config *ens);
+
+/* Run a mode on an msa exactly as the command line does.
+ *
+ * mode:      "fast", "accurate", "default" or "recall" (case-insensitive);
+ *            NULL is "fast".
+ * seq_type:  KALIGN_SEQ_AUTO, _PROTEIN, _DNA or _RNA (see below), as --type.
+ * n_threads: number of threads (1 = serial); capped at the number of cores.
+ *
+ * Applies seq_type (kalign_set_seq_type), refuses a mode that is not feasible
+ * for the number of sequences (kalign_mode_size_ok), takes the fitted preset
+ * (kalign_get_mode_preset) and runs it (kalign_align_full). The msa then holds
+ * the alignment (and, for "accurate", the per-column confidence).
+ * Returns 0 on success, non-zero on an unknown mode, too many sequences or
+ * an alignment error. */
+EXTERN int kalign_align_mode(struct msa* msa, const char* mode, int seq_type, int n_threads);
 
 /* "accurate" (protein and nucleotide) is not feasible above this many
  * sequences (CPU and memory of the 5-member ensemble); callers refuse such
