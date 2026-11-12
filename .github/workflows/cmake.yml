@@ -108,6 +108,12 @@ jobs:
     # "qemu-x86_64 -cpu Nehalem". The Docker image has the plain amd64
     # libraries, which run on every x86-64 CPU.
     container: ubuntu:26.04
+    # In a container job the checkout is at /__w/..., but ${{github.workspace}}
+    # is the runner's path; $GITHUB_WORKSPACE is the path inside the container.
+    # Steps would run with sh; the scripts below are written for bash.
+    defaults:
+      run:
+        shell: bash -e {0}
 
     steps:
     - uses: actions/checkout@v5
@@ -121,16 +127,16 @@ jobs:
         qemu-x86_64 -cpu Nehalem /bin/true
 
     - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release
+      run: cmake -B $GITHUB_WORKSPACE/build -DCMAKE_BUILD_TYPE=Release
 
     - name: Build
-      run: cmake --build ${{github.workspace}}/build --parallel 2
+      run: cmake --build $GITHUB_WORKSPACE/build --parallel 2
 
     - name: Check that the build does not raise the instruction set
       run: |
         # The AVX2 kernels are separate functions chosen at run time; no flag
         # may raise the instruction set of the whole program.
-        if grep -r -E -e '-m(avx|sse4|popcnt|bmi|fma)|-march=' --include=flags.make ${{github.workspace}}/build; then
+        if grep -r -E -e '-m(avx|sse4|popcnt|bmi|fma)|-march=' --include=flags.make $GITHUB_WORKSPACE/build; then
           echo "the build raises the instruction set"; exit 1
         fi
 
@@ -146,9 +152,9 @@ jobs:
         >seq4
         ATCGATCGATCGGATCCATTG
         EOF
-        KALIGN=${{github.workspace}}/build/src/kalign
-        TESTS=${{github.workspace}}/build/tests
-        DATA=${{github.workspace}}/tests/data
+        KALIGN=$GITHUB_WORKSPACE/build/src/kalign
+        TESTS=$GITHUB_WORKSPACE/build/tests
+        DATA=$GITHUB_WORKSPACE/tests/data
         for cpu in Nehalem qemu64 Haswell max; do
           echo "=== -cpu $cpu"
           qemu-x86_64 -cpu $cpu $TESTS/kalign_simd_test
@@ -183,7 +189,7 @@ jobs:
         # The small inputs above never reach the k-means guide tree (protein:
         # more than 1,163 sequences), its Euclidean distance or the thread
         # pool. 1,300 generated protein sequences do.
-        KALIGN=${{github.workspace}}/build/src/kalign
+        KALIGN=$GITHUB_WORKSPACE/build/src/kalign
         cmake -DOUTFILE=p1300.fa -DNSEQ=1300 -DALPHABET=protein -P tests/gen_many_seqs.cmake
         for cpu in Nehalem max; do
           echo "=== -cpu $cpu"
@@ -197,15 +203,15 @@ jobs:
         cmp p_max_accurate_n4.fa p_Nehalem_accurate_n4.fa
         # the kernel unit tests on both kinds of CPU
         for cpu in Nehalem max; do
-          qemu-x86_64 -cpu $cpu ${{github.workspace}}/build/lib/bpm_utest
-          qemu-x86_64 -cpu $cpu ${{github.workspace}}/build/tests/edist_order_test
+          qemu-x86_64 -cpu $cpu $GITHUB_WORKSPACE/build/lib/bpm_utest
+          qemu-x86_64 -cpu $cpu $GITHUB_WORKSPACE/build/tests/edist_order_test
         done
 
     - name: Guide-tree ties under CPUs with and without AVX2
       run: |
         # tests/data/sl_ties: tied single-linkage distances, where the plain
         # and the AVX2 Myers kernels once made different decisions.
-        KALIGN=${{github.workspace}}/build/src/kalign
+        KALIGN=$GITHUB_WORKSPACE/build/src/kalign
         for f in tests/data/sl_ties/*.fa; do
           b=$(basename $f .fa)
           for mode in fast accurate; do
@@ -221,14 +227,14 @@ jobs:
         # Distributions may build with -march=x86-64-v3, which has FMA. The
         # library is compiled with -ffp-contract=off on x86-64, so no multiply
         # and add may be fused and the alignments must not change.
-        cmake -S ${{github.workspace}} -B ${{github.workspace}}/build_v3 -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-march=x86-64-v3 -DBUILD_SHARED_LIBS=OFF
-        cmake --build ${{github.workspace}}/build_v3 --parallel 2 --target kalign-bin
-        if objdump -d --no-show-raw-insn ${{github.workspace}}/build_v3/src/kalign | grep -E 'vf(n)?m(add|sub)'; then
+        cmake -S $GITHUB_WORKSPACE -B $GITHUB_WORKSPACE/build_v3 -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-march=x86-64-v3 -DBUILD_SHARED_LIBS=OFF
+        cmake --build $GITHUB_WORKSPACE/build_v3 --parallel 2 --target kalign-bin
+        if objdump -d --no-show-raw-insn $GITHUB_WORKSPACE/build_v3/src/kalign | grep -E 'vf(n)?m(add|sub)'; then
           echo "the -march=x86-64-v3 build contains fused multiply-add instructions"; exit 1
         fi
         for mode in fast accurate; do
-          qemu-x86_64 -cpu max ${{github.workspace}}/build_v3/src/kalign --mode $mode -n 1 -i tests/data/BB12006.tfa -o v3_${mode}.fa -f fasta
-          qemu-x86_64 -cpu max ${{github.workspace}}/build/src/kalign --mode $mode -n 1 -i tests/data/BB12006.tfa -o v1_${mode}.fa -f fasta
+          qemu-x86_64 -cpu max $GITHUB_WORKSPACE/build_v3/src/kalign --mode $mode -n 1 -i tests/data/BB12006.tfa -o v3_${mode}.fa -f fasta
+          qemu-x86_64 -cpu max $GITHUB_WORKSPACE/build/src/kalign --mode $mode -n 1 -i tests/data/BB12006.tfa -o v1_${mode}.fa -f fasta
           cmp v1_${mode}.fa v3_${mode}.fa
         done
 
@@ -238,7 +244,7 @@ jobs:
         # value in tests/preset_golden.cmake).
         GOLDEN=a59470180769f9dfa6b786a29cd510141c9bd4f1dd3b46f15a63cab83ad429ac
         for cpu in Nehalem qemu64 Haswell max; do
-          qemu-x86_64 -cpu $cpu ${{github.workspace}}/build/src/kalign --mode fast -n 1 -i tests/data/BB11001.tfa -o golden_${cpu}.fa
+          qemu-x86_64 -cpu $cpu $GITHUB_WORKSPACE/build/src/kalign --mode fast -n 1 -i tests/data/BB11001.tfa -o golden_${cpu}.fa
           got=$(sha256sum golden_${cpu}.fa | cut -d' ' -f1)
           echo "$cpu $got"
           test "$got" = "$GOLDEN"
