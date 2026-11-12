@@ -37,6 +37,8 @@ ctest -R <name>  # one test
 Executables registered with `add_test`:
 - `kaligncpp` (test name `C++Lib`) - C++ API compatibility
 - `kalign_ensemble_test` - accurate mode on BB11001 and BB40023 (consensus wider than 4096 columns)
+- `kalign_simd_test` (also run with `KALIGN_SIMD=scalar`) - run-time vector switch and aligned allocator
+- `edist_order_test` (also run with `KALIGN_SIMD=scalar`) - plain and AVX2 Euclidean distance are bitwise equal
 - `kalign_api_test` - library API
 - `poar_key_test` - POAR key handling
 - `threadpool_test` - thread pool
@@ -44,7 +46,7 @@ Executables registered with `add_test`:
 
 Executables built but not registered as tests: `kalign_io_test`, `kalign_lib_test`, `kalign_cmp_test`, `largebench`.
 
-Command-line tests run `kalign-bin` on the Balibase files in `tests/data/` (`kalign_itest_*`) or run CMake scripts: `preset_golden.cmake` (fast, accurate and the `default` alias on protein and DNA inputs must match golden SHA-256 values), `seq_type_cli.cmake`, `bad_input_cli.cmake`, `foreign_chars_test.cmake`, `deep_tree_test.cmake`. `kalign_threads_capped` checks the thread cap.
+Command-line tests run `kalign-bin` on the Balibase files in `tests/data/` (`kalign_itest_*`) or run CMake scripts: `preset_golden.cmake` (fast, accurate and the `default` alias on protein and DNA inputs must match golden SHA-256 values), `seq_type_cli.cmake`, `bad_input_cli.cmake`, `foreign_chars_test.cmake`, `deep_tree_test.cmake`. `kalign_threads_capped` checks the thread cap. `simd_compare.cmake` runs the golden cases with `KALIGN_SIMD=scalar` (`kalign_preset_golden_scalar`) and compares vector and plain output on generated inputs of 1,300 and 2,000 sequences (`kalign_simd_vs_scalar_*`, input from `gen_many_seqs.cmake`) and on DNA inputs with tied guide-tree distances (`kalign_sl_ties_*`, `tests/data/sl_ties/`, outputs pinned by SHA-256).
 
 Python tests are in `tests/python/` and are not part of `ctest` (see below).
 
@@ -95,7 +97,9 @@ Options that change one alignment (gap penalties, VSM, guide distance) apply to 
 - `task.c` and `threadpool/` - threading: a work-stealing pthread pool. `-n 1` runs serially; the library caps the thread count at the number of cores.
 
 ### Performance Notes
-- SIMD (SSE4.1, AVX, AVX2, NEON) is chosen at build time (`ENABLE_SSE`, `ENABLE_AVX`, `ENABLE_AVX2`). There is no run-time CPU detection: an AVX2 build needs an AVX2 CPU. Use `-DENABLE_AVX2=OFF` for older CPUs.
+- One binary runs on every x86-64 CPU. All code is compiled for the original x86-64 instruction set (no `-mavx2`, `-mpopcnt`, `-msse4`; never add such flags). The AVX2 kernels are separate functions marked `KALIGN_TARGET_AVX2`, inside `#if KALIGN_AVX2`, and are called only when `kalign_simd_on()` is true (CPU has AVX2, checked once; on Arm the NEON kernels use the same switch). The plain C kernels are always compiled and give byte-identical results. `lib/src/kalign_simd.h` is the one place for this; aligned memory comes only from `kalign_aligned_malloc` / `kalign_aligned_free`.
+- `KALIGN_SIMD=scalar` in the environment selects the plain kernels (testing). `-DENABLE_AVX2=OFF` leaves the AVX2 kernels out (`-DKALIGN_NO_AVX2`). Use AVX2 only, no FMA, so rounding is identical in both paths; on x86-64 the library is compiled with `-ffp-contract=off` so that a build with `-march=x86-64-v3` or `-march=native` cannot fuse either. The ASAN build type defines `KALIGN_DEBUG_ALIGNED`: aligned blocks get a header, so freeing one with `free`/`MFREE` (or the reverse) is reported.
+- CI runs the x86-64 binary under `qemu-x86_64 -cpu Nehalem`, `-cpu qemu64` (no AVX2), `-cpu Haswell` and `-cpu max` (`.github/workflows/cmake.yml`).
 - Thread defaults: the command line uses (cores - 1), at most 16; the Python package defaults to 1 thread.
 - Alignments must stay byte-identical unless a change is meant to alter results. Check this after touching DP, tree or consensus code.
 

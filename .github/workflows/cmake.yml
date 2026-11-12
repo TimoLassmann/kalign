@@ -8,6 +8,7 @@ on:
       - 'src/**'
       - 'tests/**'
       - 'CMakeLists.txt'
+      - 'build.zig'
       - '.github/workflows/cmake.yml'
   pull_request:
     branches: [ "main" ]
@@ -16,6 +17,7 @@ on:
       - 'src/**'
       - 'tests/**'
       - 'CMakeLists.txt'
+      - 'build.zig'
       - '.github/workflows/cmake.yml'
 
 jobs:
@@ -95,3 +97,155 @@ jobs:
     - name: Test with ASAN
       working-directory: ${{github.workspace}}/build
       run: ctest -C ASAN --output-on-failure
+  # One binary for every x86-64 CPU: build once for the plain x86-64 instruction
+  # set, then run it under emulated CPUs without AVX2 (Nehalem, qemu64) and with
+  # AVX2 (Haswell, max). The AVX2 kernels are chosen at run time.
+  x86-cpu-models:
+    name: x86-64 CPU models (qemu-user)
+    runs-on: ubuntu-latest
+    # The GitHub Ubuntu 26.04 image installs the amd64v3 packages, whose libc
+    # needs AVX2-class instructions: there even /bin/true dies under
+    # "qemu-x86_64 -cpu Nehalem". The Docker image has the plain amd64
+    # libraries, which run on every x86-64 CPU.
+    container: ubuntu:26.04
+    # In a container job the checkout is at /__w/..., but ${{github.workspace}}
+    # is the runner's path; $GITHUB_WORKSPACE is the path inside the container.
+    # Steps would run with sh; the scripts below are written for bash.
+    defaults:
+      run:
+        shell: bash -e {0}
+
+    steps:
+    - uses: actions/checkout@v5
+
+    - name: Install dependencies
+      run: |
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update
+        apt-get install -y --no-install-recommends gcc g++ make cmake binutils qemu-user
+        # the libc must be the plain amd64 build
+        qemu-x86_64 -cpu Nehalem /bin/true
+
+    - name: Configure CMake
+      run: cmake -B $GITHUB_WORKSPACE/build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: cmake --build $GITHUB_WORKSPACE/build --parallel 2
+
+    - name: Check that the build does not raise the instruction set
+      run: |
+        # The AVX2 kernels are separate functions chosen at run time; no flag
+        # may raise the instruction set of the whole program.
+        if grep -r -E -e '-m(avx|sse4|popcnt|bmi|fma)|-march=' --include=flags.make $GITHUB_WORKSPACE/build; then
+          echo "the build raises the instruction set"; exit 1
+        fi
+
+    - name: Run under each CPU model
+      run: |
+        cat > test.fasta <<'EOF'
+        >seq1
+        ATCGATCGATCGGATCCATCG
+        >seq2
+        ATCGTCGATCGGATCATCG
+        >seq3
+        ATCGATCATCGGATCCTTCG
+        >seq4
+        ATCGATCGATCGGATCCATTG
+        EOF
+        KALIGN=$GITHUB_WORKSPACE/build/src/kalign
+        TESTS=$GITHUB_WORKSPACE/build/tests
+        DATA=$GITHUB_WORKSPACE/tests/data
+        for cpu in Nehalem qemu64 Haswell max; do
+          echo "=== -cpu $cpu"
+          qemu-x86_64 -cpu $cpu $TESTS/kalign_simd_test
+          for mode in fast accurate; do
+            qemu-x86_64 -cpu $cpu $KALIGN --mode $mode -n 1 -i test.fasta -o out_${cpu}_${mode}.fa -f fasta
+            qemu-x86_64 -cpu $cpu $KALIGN --mode $mode -n 1 -i $DATA/BB11001.tfa -o bb_${cpu}_${mode}.fa -f fasta
+          done
+        done
+        # No AVX2 must report "scalar", AVX2 must report "avx2".
+        qemu-x86_64 -cpu Nehalem $TESTS/kalign_simd_test | grep -q 'kalign_simd_name: scalar'
+        qemu-x86_64 -cpu qemu64 $TESTS/kalign_simd_test | grep -q 'kalign_simd_name: scalar'
+        qemu-x86_64 -cpu Haswell $TESTS/kalign_simd_test | grep -q 'kalign_simd_name: avx2'
+        qemu-x86_64 -cpu max $TESTS/kalign_simd_test | grep -q 'kalign_simd_name: avx2'
+        # AVX2 without POPCNT (possible with a masked CPUID in a virtual
+        # machine): GCC puts popcnt into the AVX2 kernels, so this must be
+        # "scalar", and an input that counts bits in the guide tree must run.
+        qemu-x86_64 -cpu Haswell,-popcnt $TESTS/kalign_simd_test | grep -q 'kalign_simd_name: scalar'
+        qemu-x86_64 -cpu Haswell,-popcnt $KALIGN --mode fast -n 1 -i $DATA/BB30014.tfa -o bb3_nopopcnt.fa -f fasta
+        qemu-x86_64 -cpu max $KALIGN --mode fast -n 1 -i $DATA/BB30014.tfa -o bb3_max.fa -f fasta
+        cmp bb3_max.fa bb3_nopopcnt.fa
+        # Identical alignments whatever the CPU.
+        for mode in fast accurate; do
+          for cpu in Nehalem qemu64 Haswell; do
+            cmp out_max_${mode}.fa out_${cpu}_${mode}.fa
+            cmp bb_max_${mode}.fa bb_${cpu}_${mode}.fa
+          done
+        done
+        echo "all CPU models give the same alignments"
+
+    - name: k-means tree, Euclidean distance and threads under CPUs with and without AVX2
+      run: |
+        # The small inputs above never reach the k-means guide tree (protein:
+        # more than 1,163 sequences), its Euclidean distance or the thread
+        # pool. 1,300 generated protein sequences do.
+        KALIGN=$GITHUB_WORKSPACE/build/src/kalign
+        cmake -DOUTFILE=p1300.fa -DNSEQ=1300 -DALPHABET=protein -P tests/gen_many_seqs.cmake
+        for cpu in Nehalem max; do
+          echo "=== -cpu $cpu"
+          qemu-x86_64 -cpu $cpu $KALIGN --mode fast -n 1 -i p1300.fa -o p_${cpu}_fast_n1.fa -f fasta
+          qemu-x86_64 -cpu $cpu $KALIGN --mode fast -n 4 -i p1300.fa -o p_${cpu}_fast_n4.fa -f fasta
+          qemu-x86_64 -cpu $cpu $KALIGN --mode accurate -n 4 -i p1300.fa -o p_${cpu}_accurate_n4.fa -f fasta
+        done
+        cmp p_max_fast_n1.fa p_Nehalem_fast_n1.fa
+        cmp p_max_fast_n4.fa p_Nehalem_fast_n4.fa
+        cmp p_max_fast_n1.fa p_max_fast_n4.fa
+        cmp p_max_accurate_n4.fa p_Nehalem_accurate_n4.fa
+        # the kernel unit tests on both kinds of CPU
+        for cpu in Nehalem max; do
+          qemu-x86_64 -cpu $cpu $GITHUB_WORKSPACE/build/lib/bpm_utest
+          qemu-x86_64 -cpu $cpu $GITHUB_WORKSPACE/build/tests/edist_order_test
+        done
+
+    - name: Guide-tree ties under CPUs with and without AVX2
+      run: |
+        # tests/data/sl_ties: tied single-linkage distances, where the plain
+        # and the AVX2 Myers kernels once made different decisions.
+        KALIGN=$GITHUB_WORKSPACE/build/src/kalign
+        for f in tests/data/sl_ties/*.fa; do
+          b=$(basename $f .fa)
+          for mode in fast accurate; do
+            for cpu in Nehalem max; do
+              qemu-x86_64 -cpu $cpu $KALIGN --mode $mode -n 1 -i $f -o tie_${b}_${mode}_${cpu}.fa -f fasta
+            done
+            cmp tie_${b}_${mode}_max.fa tie_${b}_${mode}_Nehalem.fa
+          done
+        done
+
+    - name: A build with FMA switched on gives the same alignments
+      run: |
+        # Distributions may build with -march=x86-64-v3, which has FMA. The
+        # library is compiled with -ffp-contract=off on x86-64, so no multiply
+        # and add may be fused and the alignments must not change.
+        cmake -S $GITHUB_WORKSPACE -B $GITHUB_WORKSPACE/build_v3 -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-march=x86-64-v3 -DBUILD_SHARED_LIBS=OFF
+        cmake --build $GITHUB_WORKSPACE/build_v3 --parallel 2 --target kalign-bin
+        if objdump -d --no-show-raw-insn $GITHUB_WORKSPACE/build_v3/src/kalign | grep -E 'vf(n)?m(add|sub)'; then
+          echo "the -march=x86-64-v3 build contains fused multiply-add instructions"; exit 1
+        fi
+        for mode in fast accurate; do
+          qemu-x86_64 -cpu max $GITHUB_WORKSPACE/build_v3/src/kalign --mode $mode -n 1 -i tests/data/BB12006.tfa -o v3_${mode}.fa -f fasta
+          qemu-x86_64 -cpu max $GITHUB_WORKSPACE/build/src/kalign --mode $mode -n 1 -i tests/data/BB12006.tfa -o v1_${mode}.fa -f fasta
+          cmp v1_${mode}.fa v3_${mode}.fa
+        done
+
+    - name: Golden result under CPUs with and without AVX2
+      run: |
+        # SHA-256 of "kalign --mode fast -n 1" on tests/data/BB11001.tfa (the
+        # value in tests/preset_golden.cmake).
+        GOLDEN=a59470180769f9dfa6b786a29cd510141c9bd4f1dd3b46f15a63cab83ad429ac
+        for cpu in Nehalem qemu64 Haswell max; do
+          qemu-x86_64 -cpu $cpu $GITHUB_WORKSPACE/build/src/kalign --mode fast -n 1 -i tests/data/BB11001.tfa -o golden_${cpu}.fa
+          got=$(sha256sum golden_${cpu}.fa | cut -d' ' -f1)
+          echo "$cpu $got"
+          test "$got" = "$GOLDEN"
+        done

@@ -15,13 +15,8 @@
 uint8_t dyn_256_print(const uint8_t* t,const uint8_t* p,int n,int m);
 int  mutate_seq(uint8_t* s, int len,int k,int L, struct rng_state* rng);
 
-#ifdef HAVE_AVX2
-#include <immintrin.h>
-
-/* For debugging */
-void print_256(__m256i X);
-void print_256_all(__m256i X);
-#endif
+#include "kalign_simd.h"
+#include <stdlib.h>
 
 #define SIGMA 13
 #define DIV_CEIL(a,b) (a == 0 ? 1 : a/b+(a%b == 0 ? 0 : 1))
@@ -238,15 +233,22 @@ ERROR:
 
 /* The actual test.  */
 int bpm_test(void);
+int bpm_equal_test(void);
 
 int main(void)
 {
 
-        /* Important set_broadcast_mask has to be called before using bpm_256!!! */
-#ifdef HAVE_AVX2
+        /* no-op, must be harmless and repeatable */
         set_broadcast_mask();
-#endif
+        set_broadcast_mask();
+        LOG_MSG("SIMD path: %s", kalign_simd_name());
         RUN(bpm_test());
+        RUN(bpm_equal_test());
+        kalign_simd_force_scalar(1);
+        LOG_MSG("SIMD path: %s", kalign_simd_name());
+        RUN(bpm_test());
+        RUN(bpm_equal_test());
+        kalign_simd_force_scalar(0);
         return EXIT_SUCCESS;
 ERROR:
         return EXIT_FAILURE;
@@ -371,11 +373,7 @@ int bpm_test(void)
                 for (j =0 ; j < test_iter; j++){
                         RUN(mutate_seq(b,len,i,alphabet->L,rng));
                         dyn_score = dyn_256(a,b,len,len);
-#ifdef HAVE_AVX2
                         bpm_score = bpm_256(a,b,len,len);
-#else
-                        bpm_score = dyn_score;
-#endif
 
 
                         bb_score = bpm_block2(a,b,len,len, len);
@@ -451,7 +449,6 @@ int bpm_test(void)
                 /* GET_TIMING(t); */
                 dyn_timing += GET_USERTIME(t);
 
-                #ifdef HAVE_AVX2
                 START_TIMER(t);
                 for(j = 0; j < timing_iter;j++){
                         bpm_score = bpm_256(a,b,len,len);
@@ -460,7 +457,6 @@ int bpm_test(void)
                 STOP_TIMER(t);
                 /* GET_TIMING(t); */
                 bpm_timing +=GET_USERTIME(t);
-                #endif
 
                 START_TIMER(t);
                 for(j = 0; j < timing_iter;j++){
@@ -585,23 +581,80 @@ ERROR:
 
 }
 
-#ifdef HAVE_AVX2
-void print_256(__m256i X)
-{
-        alignas(32) uint64_t debug[4];
-        _mm256_store_si256( (__m256i*)& debug,X);
-        fprintf(stdout,"%lu ", debug[0]);
-}
 
-
-void print_256_all(__m256i X)
+/* Plain and dispatched kernels must agree on every input: random pairs of
+   random and related sequences, many lengths including the block edges. */
+int bpm_equal_test(void)
 {
-        alignas(32) uint64_t debug[4];
-        _mm256_store_si256( (__m256i*)& debug,X);
-        int i;
-        for(i = 0; i < 4;i++){
-                fprintf(stdout,"%lu ", debug[i]);
+        struct rng_state* rng = NULL;
+        static const int lens[] = {0,1,2,31,32,33,63,64,65,100,127,128,129,191,192,193,
+                255,256,257,300,383,384,385,511,512,513,700,1023,1024,1025,1500,2000};
+        const int nl = (int)(sizeof(lens) / sizeof(lens[0]));
+        uint8_t* a = NULL;
+        uint8_t* b = NULL;
+        long checked = 0;
+        int li,lj,it,i;
+
+        RUNP(rng = init_rng(42));
+        MMALLOC(a, 2100);
+        MMALLOC(b, 2100);
+        for(li = 0; li < nl; li++){
+                for(lj = 0; lj < nl; lj++){
+                        /* all pairs for short lengths, a sample for long ones */
+                        const int iters = (lens[li] > 700 || lens[lj] > 700) ? 2 : 6;
+                        for(it = 0; it < iters; it++){
+                                const int alpha = (it % 3 == 0) ? 2 : ((it % 3 == 1) ? 4 : 13);
+                                const int n = lens[li];
+                                const int m = lens[lj];
+                                for(i = 0; i < n; i++){
+                                        a[i] = (uint8_t)tl_random_int(rng, alpha);
+                                }
+                                if(it >= 3){
+                                        /* pattern related to the text: copy with edits */
+                                        for(i = 0; i < m; i++){
+                                                if(i < n && tl_random_int(rng, 10) != 0){
+                                                        b[i] = a[i];
+                                                }else{
+                                                        b[i] = (uint8_t)tl_random_int(rng, alpha);
+                                                }
+                                        }
+                                }else{
+                                        for(i = 0; i < m; i++){
+                                                b[i] = (uint8_t)tl_random_int(rng, alpha);
+                                        }
+                                }
+                                {
+                                        const int r_plain = bpm_block_plain(a,b,n,m);
+                                        const int r_disp = bpm_block(a,b,n,m);
+                                        if(r_plain != r_disp){
+                                                ERROR_MSG("bpm_block differs: n %d m %d plain %d dispatched %d",n,m,r_plain,r_disp);
+                                        }
+                                        if(n > 0 && m > 0){
+                                                const int p256 = bpm_256_plain(a,b,n,m);
+                                                const int d256 = bpm_256(a,b,n,m);
+                                                if(p256 != d256){
+                                                        ERROR_MSG("bpm_256 differs: n %d m %d plain %d dispatched %d",n,m,p256,d256);
+                                                }
+                                                if(m <= 255){
+                                                        /* independent check against the DP */
+                                                        const int dyn = dyn_256(a,b,n,m);
+                                                        if(dyn != d256){
+                                                                ERROR_MSG("bpm_256 vs dyn_256: n %d m %d dyn %d bpm %d",n,m,dyn,d256);
+                                                        }
+                                                }
+                                        }else if(n == 0 || m == 0){
+                                                /* degenerate: only require identical plain and dispatched (done above) */
+                                        }
+                                        checked++;
+                                }
+                        }
+                }
         }
-        fprintf(stdout,"\n");
+        LOG_MSG("bpm_equal_test: %ld pairs identical (%s)", checked, kalign_simd_name());
+        MFREE(a);
+        MFREE(b);
+        free_rng(rng);
+        return OK;
+ERROR:
+        return FAIL;
 }
-#endif

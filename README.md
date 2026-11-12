@@ -25,7 +25,7 @@ make install
 
 Kalign runs on Linux and macOS. It parallelises with a built-in thread pool (pthreads); with `-n 1` it runs serially.
 
-On x86-64, Kalign is built with AVX2 when the compiler and the build machine support it and does not check the CPU at run time. The x86-64 Python wheels need a CPU with AVX2 (Intel Haswell, 2013, or later; AMD Excavator, 2015, or later). On older CPUs, build from source with `cmake -DENABLE_AVX2=OFF ..`.
+On x86-64, one binary runs on every CPU. It is built for the original x86-64 instruction set and, when the CPU has AVX2, switches to the AVX2 kernels at run time. The alignments are the same with and without AVX2. `cmake -DENABLE_AVX2=OFF ..` leaves the AVX2 kernels out; it is not needed for old CPUs, and the former options `ENABLE_SSE` and `ENABLE_AVX` no longer exist. Packagers should build with the defaults and without `-mavx2`. On 64-bit Arm the NEON kernels are used. For testing, the environment variable `KALIGN_SIMD=scalar` selects the plain kernels on any CPU.
 
 ### Zig build (alternative)
 

@@ -1,10 +1,7 @@
 #include "tldevel.h"
 #include "msa_struct.h"
 
-#ifdef HAVE_AVX2
-#include <xmmintrin.h>
-#include <mm_malloc.h>
-#endif
+#include "kalign_simd.h"
 
 #include "threadpool.h"
 
@@ -325,12 +322,8 @@ int compute_aln_anchor_dist(struct msa* msa, int* anchors, int K,
                 dm[i] = NULL;
         }
         for(i = 0; i < numseq; i++){
-#ifdef HAVE_AVX2
-                dm[i] = _mm_malloc(sizeof(float) * padded_K, 32);
-                if(!dm[i]) goto ERROR;
-#else
-                MMALLOC(dm[i], sizeof(float) * padded_K);
-#endif
+                dm[i] = kalign_aligned_malloc(sizeof(float) * padded_K);
+                ASSERT(dm[i] != NULL, "aligned allocation failed");
                 for(j = 0; j < padded_K; j++){
                         dm[i][j] = 0.0f;
                 }
@@ -360,11 +353,7 @@ ERROR:
         if(dm){
                 for(i = 0; i < numseq; i++){
                         if(dm[i]){
-#ifdef HAVE_AVX2
-                                _mm_free(dm[i]);
-#else
-                                MFREE(dm[i]);
-#endif
+                                kalign_aligned_free(dm[i]);
                         }
                 }
                 MFREE(dm);

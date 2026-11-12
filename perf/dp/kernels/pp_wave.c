@@ -142,7 +142,7 @@ static inline float pp_term(float pa, const float* p1, const int* nz, int f, con
         return pa;
 }
 
-static inline __attribute__((always_inline)) int pw_sweep(struct aln_mem* m, const int dir)
+static inline __attribute__((always_inline)) WAVE_TARGET int pw_sweep(struct aln_mem* m, const int dir)
 {
         const struct pw_state* st = kdp_kernel_state;
         struct states* s = dir > 0 ? m->f : m->b;
@@ -420,16 +420,16 @@ static inline __attribute__((always_inline)) int pw_sweep(struct aln_mem* m, con
 #undef GE1
 }
 
-static int pw_fwd(struct aln_mem* m)
+static WAVE_TARGET int pw_fwd(struct aln_mem* m)
 {
-        if(!kdp_kernel_state || m->endb - m->startb - 1 < PW_MIN_W || m->enda <= m->starta)
+        if(!kalign_simd_on() || !kdp_kernel_state || m->endb - m->startb - 1 < PW_MIN_W || m->enda <= m->starta)
                 return aln_profileprofile_foward(m);
         return pw_sweep(m, 1);
 }
 
-static int pw_bwd(struct aln_mem* m)
+static WAVE_TARGET int pw_bwd(struct aln_mem* m)
 {
-        if(!kdp_kernel_state || m->endb - m->startb - 1 < PW_MIN_W || m->enda_2 <= m->starta_2)
+        if(!kalign_simd_on() || !kdp_kernel_state || m->endb - m->startb - 1 < PW_MIN_W || m->enda_2 <= m->starta_2)
                 return aln_profileprofile_backward(m);
         return pw_sweep(m, -1);
 }

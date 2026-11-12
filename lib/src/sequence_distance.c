@@ -1,9 +1,6 @@
 #include "tldevel.h"
 #include <stdint.h>
-#ifdef HAVE_AVX2
-#include <xmmintrin.h>
-#include <mm_malloc.h>
-#endif
+#include "kalign_simd.h"
 
 #include "msa_struct.h"
 
@@ -84,9 +81,7 @@ float** d_estimation_cached(struct msa* msa, int* samples, int num_samples,int p
         int len_b;
 
         int i,j;
-#if HAVE_AVX2
         set_broadcast_mask();
-#endif
 
         if(pair){
 
@@ -129,11 +124,12 @@ float** d_estimation_cached(struct msa* msa, int* samples, int num_samples,int p
 
                 for(i = 0; i < numseq;i++){
                         dm[i] = NULL;
-#ifdef HAVE_AVX2
-                        dm[i] = _mm_malloc(sizeof(float) * a,32);
-#else
-                        MMALLOC(dm[i], sizeof(float) *a);
-#endif
+                }
+                for(i = 0; i < numseq;i++){
+                        dm[i] = kalign_aligned_malloc(sizeof(float) * a);
+                        if(dm[i] == NULL){
+                                ERROR_MSG("aligned allocation failed");
+                        }
 
                         for(j = 0; j < a;j++){
                                 dm[i][j] = 0.0F;
@@ -186,6 +182,13 @@ float** d_estimation_cached(struct msa* msa, int* samples, int num_samples,int p
 
         return dm;
 ERROR:
+        if(dm && !pair){
+                /* rows come from kalign_aligned_malloc, the outer array from MMALLOC */
+                for(i = 0; i < msa->numseq;i++){
+                        kalign_aligned_free(dm[i]);
+                }
+                MFREE(dm);
+        }
         return NULL;
 }
 

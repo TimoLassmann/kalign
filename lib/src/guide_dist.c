@@ -4,10 +4,7 @@
 
 #include "tldevel.h"
 
-#ifdef HAVE_AVX2
-#include <xmmintrin.h>
-#include <mm_malloc.h>
-#endif
+#include "kalign_simd.h"
 
 #include "threadpool/threadpool.h"
 
@@ -390,12 +387,8 @@ float** guide_dist_anchor_matrix(struct msa* msa, struct guide_dist_ctx* c,
                 dm[i] = NULL;
         }
         for(i = 0; i < numseq; i++){
-#ifdef HAVE_AVX2
-                dm[i] = _mm_malloc(sizeof(float) * padded, 32);
-                ASSERT(dm[i] != NULL, "_mm_malloc failed");
-#else
-                MMALLOC(dm[i], sizeof(float) * padded);
-#endif
+                dm[i] = kalign_aligned_malloc(sizeof(float) * padded);
+                ASSERT(dm[i] != NULL, "aligned allocation failed");
                 for(j = 0; j < padded; j++){
                         dm[i][j] = 0.0f;
                 }
@@ -454,11 +447,7 @@ ERROR:
         if(dm){
                 for(i = 0; i < numseq; i++){
                         if(dm[i]){
-#ifdef HAVE_AVX2
-                                _mm_free(dm[i]);
-#else
-                                MFREE(dm[i]);
-#endif
+                                kalign_aligned_free(dm[i]);
                         }
                 }
                 MFREE(dm);

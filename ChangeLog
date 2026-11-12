@@ -5,6 +5,31 @@
 	  cross-validation and scored on held-out data. First release since
 	  3.6.0: it includes the unreleased 3.6.1 and 3.7.0 and the 4.0.0
 	  pre-release entries below, whose mode settings are all replaced.
+	- Build: one binary runs on every x86-64 CPU. It is compiled for the
+	  original x86-64 instruction set and selects the AVX2 kernels at run
+	  time when the CPU has AVX2 (Arm: NEON, same switch;
+	  KALIGN_SIMD=scalar selects the plain kernels for testing). Aligned
+	  memory comes from one allocator. The plain distance sum now matches the
+	  AVX2 order, so both paths give the same alignments. Tests compare the
+	  two paths; CI runs the binary under qemu CPU models with and without
+	  AVX2. The zig build no longer adds the avx2 CPU feature. Speed on
+	  AVX2 CPUs is that of the former -mavx2 build: bit counts are done
+	  inline (shifts and adds) instead of by a library call, and the hot
+	  consensus and profile-update loops also have an AVX2 copy.
+	  For packagers: the CMake options ENABLE_SSE and ENABLE_AVX are gone,
+	  and ENABLE_AVX2=OFF now only leaves the AVX2 kernels out (it is no
+	  longer needed for a binary that runs on old CPUs, and it makes
+	  Kalign slower on new ones). Build with the defaults, without
+	  -DENABLE_AVX2=OFF and without -mavx2. On x86-64 the library is
+	  compiled with -ffp-contract=off, so a build with -march=x86-64-v3 or
+	  -march=native gives the same alignments as the default build.
+	- Guide tree (single linkage on the Myers distance, the DNA/RNA
+	  default): the cut-off after which a pair distance is abandoned is
+	  now exact for the comparison it serves. Before, two distances equal
+	  as fractions but one unit in the last place apart as floating-point
+	  numbers (5/41 and 15/123) could be decided differently by the plain,
+	  NEON and AVX2 kernels and with different thread counts. Tests:
+	  tests/data/sl_ties.
 	- Modes: "fast" (single run; "default" is an alias) and "accurate"
 	  (5-member ensemble with per-column confidence; "recall" is an
 	  alias). The sequence type is detected from the input.

@@ -8,20 +8,19 @@
 #include "bpm.h"
 #include  <stdalign.h>
 #include <string.h>
+#include "kalign_simd.h"
 
 #define SIGMA 13
 #define DIV_CEIL(a,b) (a == 0 ? 1 : a/b+(a%b == 0 ? 0 : 1))
 
 
-#ifdef HAVE_AVX2
+#if KALIGN_AVX2
 #include <immintrin.h>
 
-__m256i BROADCAST_MASK[16];
-
- void bitShiftLeft256ymm (__m256i *data, int count);
+static KALIGN_TARGET_AVX2 void bitShiftLeft256ymm (__m256i *data, int count);
 
 /* taken from Alexander Yee: http://www.numberworld.org/y-cruncher/internals/addition.html#ks_add */
- __m256i add256(uint32_t carry, __m256i A, __m256i B);
+static KALIGN_TARGET_AVX2 __m256i add256(uint32_t carry, __m256i A, __m256i B);
 #endif
 
 
@@ -153,8 +152,8 @@ uint8_t bpm(const uint8_t* t,const uint8_t* p,int n,int m)
 }
 
 
-#ifdef HAVE_AVX2
-uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
+#if KALIGN_AVX2
+static KALIGN_TARGET_AVX2 uint8_t bpm_256_avx2(const uint8_t* t,const uint8_t* p,int n,int m)
 {
         __m256i VP,VN,D0,HN,HP,X,NOTONE;
         __m256i xmm1,xmm2;
@@ -274,29 +273,20 @@ uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
 
 
 
-/* Must be called before BPM_256 is!!!  */
-void set_broadcast_mask(void)
+/* Carry-correction mask for add256: lane j is 0x8000000000000000 plus bit j
+   of m.  Built on the stack, so there is no global state to initialise. */
+static KALIGN_TARGET_AVX2 __m256i broadcast_mask(uint32_t m)
 {
-        BROADCAST_MASK[0] =  _mm256_set_epi64x(0x8000000000000000, 0x8000000000000000, 0x8000000000000000, 0x8000000000000000);
-        BROADCAST_MASK[1] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000000, 0x8000000000000000, 0x8000000000000001);
-        BROADCAST_MASK[2] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000000, 0x8000000000000001, 0x8000000000000000);
-        BROADCAST_MASK[3] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000000, 0x8000000000000001, 0x8000000000000001);
-        BROADCAST_MASK[4] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000001, 0x8000000000000000, 0x8000000000000000);
-        BROADCAST_MASK[5] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000001, 0x8000000000000000, 0x8000000000000001);
-        BROADCAST_MASK[6] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000001, 0x8000000000000001, 0x8000000000000000);
-        BROADCAST_MASK[7] = _mm256_set_epi64x(0x8000000000000000, 0x8000000000000001, 0x8000000000000001, 0x8000000000000001);
-        BROADCAST_MASK[8] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000000, 0x8000000000000000, 0x8000000000000000);
-        BROADCAST_MASK[9] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000000, 0x8000000000000000, 0x8000000000000001);
-        BROADCAST_MASK[10] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000000, 0x8000000000000001, 0x8000000000000000);
-        BROADCAST_MASK[11] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000000, 0x8000000000000001, 0x8000000000000001);
-        BROADCAST_MASK[12] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000001, 0x8000000000000000, 0x8000000000000000);
-        BROADCAST_MASK[13] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000001, 0x8000000000000000, 0x8000000000000001);
-        BROADCAST_MASK[14] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000001, 0x8000000000000001, 0x8000000000000000);
-        BROADCAST_MASK[15] = _mm256_set_epi64x(0x8000000000000001, 0x8000000000000001, 0x8000000000000001, 0x8000000000000001);
+        uint64_t v[4];
+        int j;
+        for(j = 0; j < 4; j++){
+                v[j] = 0x8000000000000000ull | (uint64_t)((m >> j) & 1u);
+        }
+        return _mm256_loadu_si256((const __m256i*)v);
 }
 
 
-__m256i add256(uint32_t carry, __m256i A, __m256i B)
+static KALIGN_TARGET_AVX2 __m256i add256(uint32_t carry, __m256i A, __m256i B)
 {
         A = _mm256_xor_si256(A, _mm256_set1_epi64x(0x8000000000000000));
         __m256i s = _mm256_add_epi64(A, B);
@@ -312,7 +302,7 @@ __m256i add256(uint32_t carry, __m256i A, __m256i B)
                 carry >>= 4;
                 m &= 0x0f;
         }
-        return _mm256_add_epi64(s, BROADCAST_MASK[m]);
+        return _mm256_add_epi64(s, broadcast_mask(m));
 }
 
 
@@ -322,7 +312,7 @@ __m256i add256(uint32_t carry, __m256i A, __m256i B)
 //          int count     - number of bits to shift
 // return:  __m256i       - carry out bit(s)
 
-void bitShiftLeft256ymm (__m256i *data, int count)
+static KALIGN_TARGET_AVX2 void bitShiftLeft256ymm (__m256i *data, int count)
 {
         __m256i innerCarry, rotate;
 
@@ -335,13 +325,96 @@ void bitShiftLeft256ymm (__m256i *data, int count)
         //return carryOut;
 }
 
+#endif /* KALIGN_AVX2 */
+
+/* Plain version of bpm_256: the same 256-bit Myers recurrence on four 64-bit
+   words, same pattern cap (255) and same result as bpm_256_avx2. */
+uint8_t bpm_256_plain(const uint8_t* t,const uint8_t* p,int n,int m)
+{
+        uint64_t B[13][4];
+        uint64_t VP[4],VN[4],D0[4],HN[4],HP[4],MASK[4];
+        int i,j,k,diff;
+
+        if(m > 255){
+                m = 255;
+        }
+        if(m <= 0){
+                return 0;
+        }
+        for(i = 0; i < 13;i++){
+                for(j = 0;j < 4;j++){
+                        B[i][j] = 0;
+                }
+        }
+        for(i = 0; i < m;i++){
+                B[p[i]][i / 64] |= (1ull << (i % 64));
+        }
+        for(j = 0; j < 4; j++){
+                VP[j] = ~0ull;
+                VN[j] = 0ull;
+                MASK[j] = 0ull;
+        }
+        MASK[(m - 1) / 64] = 1ull << ((m - 1) % 64);
+        diff = m;
+        k = m;
+        for(i = 0; i < n; i++){
+                const uint64_t* Bt = B[t[i]];
+                uint64_t carry = 0;
+                uint64_t hpc = 0;
+                uint64_t hnc = 0;
+                int hit_p = 0;
+                int hit_n = 0;
+                for(j = 0; j < 4; j++){
+                        const uint64_t X = Bt[j] | VN[j];
+                        const uint64_t a = VP[j] + (X & VP[j]);
+                        const uint64_t sum = a + carry;
+                        carry = (uint64_t)((a < VP[j]) | (sum < a));
+                        D0[j] = (sum ^ VP[j]) | X;
+                        HN[j] = VP[j] & D0[j];
+                        HP[j] = VN[j] | ~(VP[j] | D0[j]);
+                }
+                for(j = 0; j < 4; j++){
+                        if(HP[j] & MASK[j]) hit_p = 1;
+                        if(HN[j] & MASK[j]) hit_n = 1;
+                }
+                for(j = 0; j < 4; j++){
+                        const uint64_t xs = (HP[j] << 1) | hpc;
+                        const uint64_t hs = (HN[j] << 1) | hnc;
+                        hpc = HP[j] >> 63;
+                        hnc = HN[j] >> 63;
+                        VN[j] = xs & D0[j];
+                        VP[j] = hs | ~(xs | D0[j]);
+                }
+                diff += hit_p;
+                diff -= hit_n;
+                k = MACRO_MIN(k, diff);
+        }
+        return (uint8_t)k;
+}
+
+/* bpm_256 for every CPU: the AVX2 kernel when the CPU has it, else plain. */
+uint8_t bpm_256(const uint8_t* t,const uint8_t* p,int n,int m)
+{
+#if KALIGN_AVX2
+        if(kalign_simd_on()){
+                return bpm_256_avx2(t,p,n,m);
+        }
 #endif
+        return bpm_256_plain(t,p,n,m);
+}
+
+/* Kept for source compatibility: the AVX2 kernel keeps no global constants
+   any more, so there is nothing to set up.  Safe on any CPU, any number of
+   times, from any thread. */
+void set_broadcast_mask(void)
+{
+}
 
 
 
 
 #if defined(__GNUC__) || defined(__clang__)
-#define U4_INLINE static inline __attribute__((always_inline))
+#define U4_INLINE static inline __attribute__((always_inline)) KALIGN_TARGET_AVX2
 #else
 #define U4_INLINE static inline
 #endif
@@ -354,7 +427,7 @@ void bitShiftLeft256ymm (__m256i *data, int count)
    have finished too, and the result is read from the last block while it is
    active.  Used from BPM_SIMD_MIN_BLOCKS blocks on (NEON pays off only for
    long patterns: the scalar integer path is already fast on Apple cores). */
-#if defined(__ARM_NEON)
+#if KALIGN_NEON
 #include <arm_neon.h>
 #define BPM_SIMD 1
 #define BPM_SIMD_MIN_BLOCKS 6
@@ -397,8 +470,7 @@ U4_INLINE uint64_t u4_lane(u64x4 a, int l)
         default: return vgetq_lane_u64(a.hi, 1);
         }
 }
-#elif defined(__AVX2__)
-#include <immintrin.h>
+#elif KALIGN_AVX2
 #define BPM_SIMD 1
 #define BPM_SIMD_MIN_BLOCKS 2
 typedef __m256i u64x4;
@@ -435,7 +507,7 @@ U4_INLINE uint64_t u4_lane(u64x4 a, int l)
 
 #if BPM_SIMD
 /* peq: SIGMA x 16 table as built by bpm_block; B blocks; L = n + padding */
-static int bpm_block_simd(const uint8_t* t, int n, const uint64_t peq[SIGMA][16], int B, int L, int m)
+static KALIGN_TARGET_AVX2 int bpm_block_simd(const uint8_t* t, int n, const uint64_t peq[SIGMA][16], int B, int L, int m)
 {
         const int V = (B + 3) / 4;
         int k = m;
@@ -515,7 +587,7 @@ static int bpm_block_simd(const uint8_t* t, int n, const uint64_t peq[SIGMA][16]
 }
 #endif
 
-int bpm_block(const uint8_t *t, const uint8_t *p, int n, int m)
+static int bpm_block_impl(const uint8_t *t, const uint8_t *p, int n, int m, int allow_simd)
 {
         int32_t w;
         int32_t w_bytes;
@@ -594,12 +666,14 @@ int bpm_block(const uint8_t *t, const uint8_t *p, int n, int m)
         }
 
 #if BPM_SIMD
-        if(b_max >= BPM_SIMD_MIN_BLOCKS){
+        if(allow_simd && b_max >= BPM_SIMD_MIN_BLOCKS && kalign_simd_on()){
                 int ks = bpm_block_simd(t, n, (const uint64_t (*)[16])Peq, b_max, n + W, m);
                 if(ks >= 0){
                         return ks;
                 }
         }
+#else
+        (void)allow_simd;
 #endif
         int y = DIV_CEIL(maxd, w) - 1; /* 256 is max edit distance  */
         /* init blocks  */
@@ -647,4 +721,14 @@ int bpm_block(const uint8_t *t, const uint8_t *p, int n, int m)
         return k;
 }
 
+/* The entry point used by BPM(): SIMD kernel when the CPU allows it. */
+int bpm_block(const uint8_t *t, const uint8_t *p, int n, int m)
+{
+        return bpm_block_impl(t, p, n, m, 1);
+}
 
+/* Plain kernel only (reference for tests). */
+int bpm_block_plain(const uint8_t *t, const uint8_t *p, int n, int m)
+{
+        return bpm_block_impl(t, p, n, m, 0);
+}

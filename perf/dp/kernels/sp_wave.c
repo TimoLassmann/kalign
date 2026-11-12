@@ -58,7 +58,7 @@ static void sw_reserve(int W)
         }
 }
 
-static inline __attribute__((always_inline)) int sw_sweep(struct aln_mem* m, const int dir)
+static inline __attribute__((always_inline)) WAVE_TARGET int sw_sweep(struct aln_mem* m, const int dir)
 {
         struct states* s = dir > 0 ? m->f : m->b;
         const uint8_t* seq1 = m->seq1;
@@ -306,16 +306,16 @@ static inline __attribute__((always_inline)) int sw_sweep(struct aln_mem* m, con
 #undef GE1
 }
 
-static int spw_fwd(struct aln_mem* m)
+static WAVE_TARGET int spw_fwd(struct aln_mem* m)
 {
-        if(m->endb - m->startb - 1 < SW_MIN_W || m->enda <= m->starta)
+        if(!kalign_simd_on() || m->endb - m->startb - 1 < SW_MIN_W || m->enda <= m->starta)
                 return aln_seqprofile_foward(m);
         return sw_sweep(m, 1);
 }
 
-static int spw_bwd(struct aln_mem* m)
+static WAVE_TARGET int spw_bwd(struct aln_mem* m)
 {
-        if(m->endb - m->startb - 1 < SW_MIN_W || m->enda_2 <= m->starta_2)
+        if(!kalign_simd_on() || m->endb - m->startb - 1 < SW_MIN_W || m->enda_2 <= m->starta_2)
                 return aln_seqprofile_backward(m);
         return sw_sweep(m, -1);
 }

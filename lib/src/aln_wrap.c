@@ -6,10 +6,7 @@
 #include "task.h"
 #include "msa_struct.h"
 
-#ifdef HAVE_AVX2
-#include <xmmintrin.h>
-#include <mm_malloc.h>
-#endif
+#include "kalign_simd.h"
 #include "msa_op.h"
 #include "msa_alloc.h"
 #include "msa_check.h"
@@ -260,24 +257,24 @@ int kalign_single_run(struct msa *msa,
                    the aligned sequences (seq->seq still has gap chars). */
                 free_tasks(tasks);
                 tasks = NULL;
-                RUN(alloc_tasks(&tasks, msa->numseq));
-                RUN(build_tree_kmeans_from_dm(msa, &tasks, dm,
-                                              n_realign_anchors,
-                                              aln_identity_pair_dist));
-
-                /* Free N×K matrix (AVX2-aware) */
                 {
+                        /* dm: rows from kalign_aligned_malloc, outer array
+                           from MMALLOC; freed here on success and failure. */
                         int fi;
+                        int rc = FAIL;
+                        if(alloc_tasks(&tasks, msa->numseq) == OK){
+                                rc = build_tree_kmeans_from_dm(msa, &tasks, dm,
+                                                               n_realign_anchors,
+                                                               aln_identity_pair_dist);
+                        }
                         for(fi = 0; fi < msa->numseq; fi++){
-                                if(dm[fi]){
-#ifdef HAVE_AVX2
-                                        _mm_free(dm[fi]);
-#else
-                                        MFREE(dm[fi]);
-#endif
-                                }
+                                kalign_aligned_free(dm[fi]);
                         }
                         MFREE(dm);
+                        dm = NULL;
+                        if(rc != OK){
+                                ERROR_MSG("Realign guide tree failed");
+                        }
                 }
 
                 /* NOW dealign: strip gap characters from seq->seq. */

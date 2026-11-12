@@ -8,11 +8,11 @@ Python bindings for [Kalign](https://github.com/TimoLassmann/kalign), a fast mul
 pip install kalign-python
 ```
 
-Python 3.11 or later is required. On x86-64 the wheels are built with AVX2
-and do not check the CPU at run time, so they need a CPU with AVX2 (Intel
-Haswell, 2013, or later; AMD Excavator, 2015, or later). On older CPUs build
-from source with `-DENABLE_AVX2=OFF`. The Apple silicon (arm64) wheels and Arm builds from
-source do not use AVX2. Windows is not supported.
+Python 3.11 or later is required. The x86-64 wheels run on every x86-64 CPU:
+they use AVX2 kernels when the CPU has AVX2 (checked at run time) and plain
+kernels otherwise, with identical results. The Apple silicon (arm64) wheels use
+NEON. Setting the environment variable `KALIGN_SIMD=scalar` selects the plain
+kernels (for testing). Windows is not supported.
 
 Optional dependencies for ecosystem integration:
 

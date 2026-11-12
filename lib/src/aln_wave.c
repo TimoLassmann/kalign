@@ -10,7 +10,15 @@
  * aln_seqprofile.c and aln_profileprofile.c.  Per-alignment column tables
  * are owned by m->wave (built in aln_runner for a top-level call); scratch is
  * thread-local, since the forward and backward pass of one call can run on
- * different threads.  Builds without NEON or AVX2 use the scalar kernels.
+ * different threads.
+ *
+ * Run-time dispatch (kalign_simd.h): on x86-64 the file is compiled for the
+ * plain instruction set and every function that uses vector instructions is
+ * marked WAVE_TARGET (= target("avx2")); they are reached only when
+ * kalign_simd_on().  aln_wave_prepare returns 0 when the vector kernels are
+ * off, so m->wave stays NULL and the callers use the scalar kernels; the
+ * aln_wave_ss/sp/pp entries check again.  Builds without NEON or AVX2 (or with
+ * -DKALIGN_NO_AVX2) use the scalar kernels.
  */
 #ifdef KALIGN_WAVE
 #include <float.h>
@@ -118,7 +126,7 @@ static void sw_reserve(int W)
         }
 }
 
-static inline __attribute__((always_inline)) int sw_sweep(struct aln_mem* m, const int dir)
+static inline __attribute__((always_inline)) WAVE_TARGET int sw_sweep(struct aln_mem* m, const int dir)
 {
         const struct sw_state* st = ((const struct aln_wave*)m->wave)->ss;
         struct states* s = dir > 0 ? m->f : m->b;
@@ -442,7 +450,7 @@ static inline float pp_term(float pa, const float* p1, const int* nz, int f, con
         return pa;
 }
 
-static inline __attribute__((always_inline)) int pw_sweep(struct aln_mem* m, const int dir)
+static inline __attribute__((always_inline)) WAVE_TARGET int pw_sweep(struct aln_mem* m, const int dir)
 {
         const struct pw_state* st = ((const struct aln_wave*)m->wave)->pp;
         struct states* s = dir > 0 ? m->f : m->b;
@@ -749,7 +757,7 @@ static void spw_reserve(int W)
         }
 }
 
-static inline __attribute__((always_inline)) int spw_sweep(struct aln_mem* m, const int dir)
+static inline __attribute__((always_inline)) WAVE_TARGET int spw_sweep(struct aln_mem* m, const int dir)
 {
         struct states* s = dir > 0 ? m->f : m->b;
         const uint8_t* seq1 = m->seq1;
@@ -998,11 +1006,22 @@ static inline __attribute__((always_inline)) int spw_sweep(struct aln_mem* m, co
 }
 
 
+/* The sweeps are always-inline WAVE_TARGET functions with a constant
+   direction; these wrappers are the entry points (an AVX2 function cannot be
+   inlined into the plain functions below). */
+static WAVE_TARGET int sw_sweep_fwd(struct aln_mem* m) { return sw_sweep(m, 1); }
+static WAVE_TARGET int sw_sweep_bwd(struct aln_mem* m) { return sw_sweep(m, -1); }
+static WAVE_TARGET int pw_sweep_fwd(struct aln_mem* m) { return pw_sweep(m, 1); }
+static WAVE_TARGET int pw_sweep_bwd(struct aln_mem* m) { return pw_sweep(m, -1); }
+static WAVE_TARGET int spw_sweep_fwd(struct aln_mem* m) { return spw_sweep(m, 1); }
+static WAVE_TARGET int spw_sweep_bwd(struct aln_mem* m) { return spw_sweep(m, -1); }
+
 int aln_wave_prepare(struct aln_mem* m)
 {
         struct aln_wave* w;
         void* st = NULL;
         if(m->wave) return 0;
+        if(!kalign_simd_on()) return 0;
         if(m->seq1){
                 sw_prepare(m, KDP_SS, &st);
                 if(!st) return 0;
@@ -1033,37 +1052,37 @@ void aln_wave_free(struct aln_mem* m)
 int aln_wave_ss(struct aln_mem* m, int dir)
 {
         const struct aln_wave* w = m->wave;
-        if(!w || !w->ss || m->endb - m->startb - 1 < SW_MIN_W) return 1;
+        if(!w || !w->ss || !kalign_simd_on() || m->endb - m->startb - 1 < SW_MIN_W) return 1;
         if(dir > 0){
                 if(m->enda <= m->starta) return 1;
-                return sw_sweep(m, 1);
+                return sw_sweep_fwd(m);
         }
         if(m->enda_2 <= m->starta_2) return 1;
-        return sw_sweep(m, -1);
+        return sw_sweep_bwd(m);
 }
 
 int aln_wave_pp(struct aln_mem* m, int dir)
 {
         const struct aln_wave* w = m->wave;
-        if(!w || !w->pp || m->endb - m->startb - 1 < PW_MIN_W) return 1;
+        if(!w || !w->pp || !kalign_simd_on() || m->endb - m->startb - 1 < PW_MIN_W) return 1;
         if(dir > 0){
                 if(m->enda <= m->starta) return 1;
-                return pw_sweep(m, 1);
+                return pw_sweep_fwd(m);
         }
         if(m->enda_2 <= m->starta_2) return 1;
-        return pw_sweep(m, -1);
+        return pw_sweep_bwd(m);
 }
 
 int aln_wave_sp(struct aln_mem* m, int dir)
 {
         const struct aln_wave* w = m->wave;
-        if(!w || !w->sp || m->endb - m->startb - 1 < SW_MIN_W) return 1;
+        if(!w || !w->sp || !kalign_simd_on() || m->endb - m->startb - 1 < SW_MIN_W) return 1;
         if(dir > 0){
                 if(m->enda <= m->starta) return 1;
-                return spw_sweep(m, 1);
+                return spw_sweep_fwd(m);
         }
         if(m->enda_2 <= m->starta_2) return 1;
-        return spw_sweep(m, -1);
+        return spw_sweep_bwd(m);
 }
 
 #else

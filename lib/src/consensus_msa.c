@@ -5,6 +5,7 @@
 #include "msa_struct.h"
 #include "msa_alloc.h"
 #include "poar.h"
+#include "kalign_bits.h"
 
 #include "threadpool/threadpool.h"
 
@@ -613,13 +614,7 @@ ERROR:
 
 static inline int popcount32(uint32_t x)
 {
-#ifdef __GNUC__
-        return __builtin_popcount(x);
-#else
-        x = x - ((x >> 1) & 0x55555555u);
-        x = (x & 0x33333333u) + ((x >> 2) & 0x33333333u);
-        return (int)(((x + (x >> 4)) & 0x0F0F0F0Fu) * 0x01010101u >> 24);
-#endif
+        return kalign_popcount32(x);
 }
 
 #define MAX_SUPPORT 32
