@@ -103,15 +103,22 @@ jobs:
   x86-cpu-models:
     name: x86-64 CPU models (qemu-user)
     runs-on: ubuntu-latest
+    # The GitHub Ubuntu 26.04 image installs the amd64v3 packages, whose libc
+    # needs AVX2-class instructions: there even /bin/true dies under
+    # "qemu-x86_64 -cpu Nehalem". The Docker image has the plain amd64
+    # libraries, which run on every x86-64 CPU.
+    container: ubuntu:26.04
 
     steps:
     - uses: actions/checkout@v5
 
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y qemu-user
-        command -v cmake || sudo apt-get install -y cmake
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update
+        apt-get install -y --no-install-recommends gcc g++ make cmake binutils qemu-user
+        # the libc must be the plain amd64 build
+        qemu-x86_64 -cpu Nehalem /bin/true
 
     - name: Configure CMake
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release
