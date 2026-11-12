@@ -27,6 +27,7 @@
 #include <string.h>
 
 #include "tldevel.h"
+#include "kalign_simd.h"
 #include "tl_scratch.h"
 #include "aln_param.h"
 #include "aln_struct.h"
@@ -660,7 +661,7 @@ static void side_boundary(const float* nxt, int k, int len, float nsip, float* l
 
 /* update_n with the member gap model: same profile merge (including the sequence-weight rebalancing), the member
    counts carried along, and the charge stored in a new gap column computed per member. */
-int update_n_gm(const float* profa, const float* profb, float* newp, struct aln_param* ap, int* path, int sipa, int sipb)
+KALIGN_ALWAYS_INLINE int update_n_gm_body(const float* profa, const float* profb, float* newp, struct aln_param* ap, int* path, int sipa, int sipb)
 {
         float gp;
         int i, j, c;
@@ -843,6 +844,31 @@ int update_n_gm(const float* profa, const float* profb, float* newp, struct aln_
         return OK;
 }
 
+/* update_n_gm is compiled twice: the compiler vectorises its column loops (element-wise sums; the one reduction keeps
+   its order, and this file is compiled with -ffp-contract=off), so the AVX2 copy gives the same profile.  It runs
+   on a CPU with AVX2, the plain copy otherwise (kalign_simd.h). */
+static int update_n_gm_plain(const float* profa, const float* profb, float* newp, struct aln_param* ap, int* path, int sipa, int sipb)
+{
+        return update_n_gm_body(profa, profb, newp, ap, path, sipa, sipb);
+}
+
+#if KALIGN_AVX2
+static KALIGN_TARGET_AVX2 int update_n_gm_avx2(const float* profa, const float* profb, float* newp, struct aln_param* ap, int* path, int sipa, int sipb)
+{
+        return update_n_gm_body(profa, profb, newp, ap, path, sipa, sipb);
+}
+#endif
+
+int update_n_gm(const float* profa, const float* profb, float* newp, struct aln_param* ap, int* path, int sipa, int sipb)
+{
+#if KALIGN_AVX2
+        if(kalign_simd_on()){
+                return update_n_gm_avx2(profa, profb, newp, ap, path, sipa, sipb);
+        }
+#endif
+        return update_n_gm_plain(profa, profb, newp, ap, path, sipa, sipb);
+}
+
 /* ------------------------------------------------------------------ wavefront SIMD kernels
 
    The member-model forward/backward passes on the wavefront skeleton of aln_wave.c (pw_sweep / spw_sweep): strips
@@ -874,7 +900,7 @@ int update_n_gm(const float* profa, const float* profb, float* newp, struct aln_
 #define GMW_PART_MIN 3
 #define GMW_MIN_W 16
 
-#if defined(__ARM_NEON)
+#if KALIGN_NEON
 VF8_INLINE vf8 gmw_mul(vf8 a, vf8 b) { vf8 r = { vmulq_f32(a.lo, b.lo), vmulq_f32(a.hi, b.hi) }; return r; }
 #else
 VF8_INLINE vf8 gmw_mul(vf8 a, vf8 b) { return _mm256_mul_ps(a, b); }
@@ -897,6 +923,7 @@ struct gmw {
 static void* gm_wave_build(const struct gm* g, const struct aln_mem* m)
 {
         struct gmw* w = NULL;
+        if(!kalign_simd_on()) return NULL;
         const int lb = m->len_b;
         if(lb < GMW_MIN_W + 1) return NULL;
         w = calloc(1, sizeof(*w));
@@ -984,7 +1011,7 @@ static inline float gmw_match(const struct aln_mem* m, int pp, float pa, const f
         return pa;
 }
 
-static inline __attribute__((always_inline)) int gmw_sweep(struct aln_mem* m, const int dir, const int pp)
+static inline __attribute__((always_inline)) WAVE_TARGET int gmw_sweep(struct aln_mem* m, const int dir, const int pp)
 {
         const struct gm* g = m->gm;
         const struct gmw* wv = g->wv;
@@ -1340,24 +1367,36 @@ static int gmw_usable(const struct aln_mem* m, int dir)
 
 static void* gm_wave_build(const struct gm* g, const struct aln_mem* m) { (void)g; (void)m; return NULL; }
 static void gm_wave_release(void* wv) { (void)wv; }
-static int gmw_usable(const struct aln_mem* m, int dir) { (void)m; (void)dir; return 0; }
 
 #endif
 
-/* the wavefront kernel when the band is wide enough, else the scalar kernel */
-static int gm_dispatch(struct aln_mem* m, int dir, int pp, int (*scalar)(struct aln_mem*))
+#if WAVE_SIMD
+/* entry points with a constant direction (an AVX2 function cannot be inlined into the plain dispatcher) */
+static WAVE_TARGET int gmw_sweep_ppf(struct aln_mem* m) { return gmw_sweep(m, 1, 1); }
+static WAVE_TARGET int gmw_sweep_ppb(struct aln_mem* m) { return gmw_sweep(m, -1, 1); }
+static WAVE_TARGET int gmw_sweep_spf(struct aln_mem* m) { return gmw_sweep(m, 1, 0); }
+static WAVE_TARGET int gmw_sweep_spb(struct aln_mem* m) { return gmw_sweep(m, -1, 0); }
+#else
+#define gmw_sweep_ppf NULL
+#define gmw_sweep_ppb NULL
+#define gmw_sweep_spf NULL
+#define gmw_sweep_spb NULL
+#endif
+
+/* the wavefront kernel when the band is wide enough and the vector kernels are on, else the scalar kernel */
+static int gm_dispatch(struct aln_mem* m, int dir, int (*wave)(struct aln_mem*), int (*scalar)(struct aln_mem*))
 {
 #if WAVE_SIMD
-        if(gmw_usable(m, dir)){
-                return gmw_sweep(m, dir, pp);
+        if(kalign_simd_on() && gmw_usable(m, dir)){
+                return wave(m);
         }
 #else
-        (void)dir; (void)pp;
+        (void)dir; (void)wave;
 #endif
         return scalar(m);
 }
 
-int gm_pp_forward(struct aln_mem* m) { return gm_dispatch(m, 1, 1, gm_pp_forward_scalar); }
-int gm_pp_backward(struct aln_mem* m) { return gm_dispatch(m, -1, 1, gm_pp_backward_scalar); }
-int gm_sp_forward(struct aln_mem* m) { return gm_dispatch(m, 1, 0, gm_sp_forward_scalar); }
-int gm_sp_backward(struct aln_mem* m) { return gm_dispatch(m, -1, 0, gm_sp_backward_scalar); }
+int gm_pp_forward(struct aln_mem* m) { return gm_dispatch(m, 1, gmw_sweep_ppf, gm_pp_forward_scalar); }
+int gm_pp_backward(struct aln_mem* m) { return gm_dispatch(m, -1, gmw_sweep_ppb, gm_pp_backward_scalar); }
+int gm_sp_forward(struct aln_mem* m) { return gm_dispatch(m, 1, gmw_sweep_spf, gm_sp_forward_scalar); }
+int gm_sp_backward(struct aln_mem* m) { return gm_dispatch(m, -1, gmw_sweep_spb, gm_sp_backward_scalar); }

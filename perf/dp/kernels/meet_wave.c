@@ -24,6 +24,9 @@
 #include <stdlib.h>
 
 #include "kdp_kernel.h"
+#include "aln_seqseq.h"
+#include "aln_seqprofile.h"
+#include "aln_profileprofile.h"
 #include "wave_simd.h"
 
 #if WAVE_SIMD
@@ -42,7 +45,7 @@
                 }                                                               \
         } while(0)
 
-static inline vf8 vf8_hmax_bcast(vf8 v)
+static inline WAVE_TARGET vf8 vf8_hmax_bcast(vf8 v)
 {
         float t[8];
         vf8_storeu(t, v);
@@ -52,7 +55,7 @@ static inline vf8 vf8_hmax_bcast(vf8 v)
 }
 
 /* kind: KDP_SS, KDP_SP, KDP_PP */
-static int meet_wave(struct aln_mem* m, int old_cor[], int* meet, int* t, float* score, const int kind)
+static WAVE_TARGET int meet_wave(struct aln_mem* m, int old_cor[], int* meet, int* t, float* score, const int kind)
 {
         struct states* f = m->f;
         struct states* b = m->b;
@@ -255,16 +258,19 @@ static int meet_wave(struct aln_mem* m, int old_cor[], int* meet, int* t, float*
         return 0;
 }
 
-static int meet_ss(struct aln_mem* m, int old_cor[], int* meet, int* t, float* score)
+static WAVE_TARGET int meet_ss(struct aln_mem* m, int old_cor[], int* meet, int* t, float* score)
 {
+        if(!kalign_simd_on()) return aln_seqseq_meetup(m, old_cor, meet, t, score);
         return meet_wave(m, old_cor, meet, t, score, KDP_SS);
 }
-static int meet_sp(struct aln_mem* m, int old_cor[], int* meet, int* t, float* score)
+static WAVE_TARGET int meet_sp(struct aln_mem* m, int old_cor[], int* meet, int* t, float* score)
 {
+        if(!kalign_simd_on()) return aln_seqprofile_meetup(m, old_cor, meet, t, score);
         return meet_wave(m, old_cor, meet, t, score, KDP_SP);
 }
-static int meet_pp(struct aln_mem* m, int old_cor[], int* meet, int* t, float* score)
+static WAVE_TARGET int meet_pp(struct aln_mem* m, int old_cor[], int* meet, int* t, float* score)
 {
+        if(!kalign_simd_on()) return aln_profileprofile_meetup(m, old_cor, meet, t, score);
         return meet_wave(m, old_cor, meet, t, score, KDP_PP);
 }
 

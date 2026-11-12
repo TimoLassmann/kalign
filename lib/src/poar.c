@@ -8,6 +8,8 @@
 
 #define POAR_IMPORT
 #include "poar.h"
+#include "kalign_bits.h"
+#include "kalign_simd.h"
 
 static inline int64_t pair_index(int i, int j, int numseq)
 {
@@ -272,9 +274,10 @@ static int cmp_entry_key(const void* a, const void* b)
         return (x > y) - (x < y);
 }
 
-int poar_pair_entries(const struct poar_table* table, int i, int j,
-                      struct poar_scratch* sc,
-                      const struct poar_entry** entries, size_t* n)
+/* Body of poar_pair_entries; compiled twice (plain and AVX2), see the wrappers below. */
+KALIGN_ALWAYS_INLINE int pair_entries_body(const struct poar_table* table, int i, int j,
+                                           struct poar_scratch* sc,
+                                           const struct poar_entry** entries, size_t* n)
 {
         size_t li, lj, cap, ne = 0;
         int nr = table->n_present;
@@ -483,7 +486,7 @@ size_t dense_enum(const struct poar_table* table, const struct poar_dense* dn,
                                 }
                         }
                         for(int r = 0; r < NR; r++){
-                                const int runs = __builtin_popcount(eq[r]);
+                                const int runs = kalign_popcount32(eq[r]);
                                 const uint32_t ok = (uint32_t)(y[r] >= 0) & (uint32_t)((eq[r] & ((1u << r) - 1u)) == 0)
                                         & (uint32_t)(runs >= lo) & (uint32_t)(runs <= hi);
                                 sel |= ok << r;
@@ -519,13 +522,14 @@ size_t dense_enum(const struct poar_table* table, const struct poar_dense* dn,
         return ne;
 }
 
-int poar_pair_entries_dense_levels(const struct poar_table* table, struct poar_dense* dn,
-                                   int i, int j, struct poar_scratch* sc, int lo, int hi,
-                                   const struct poar_entry** entries, size_t* n)
+/* Body of poar_pair_entries_dense_levels; compiled twice, see the wrappers below. */
+KALIGN_ALWAYS_INLINE int dense_levels_body(const struct poar_table* table, struct poar_dense* dn,
+                                           int i, int j, struct poar_scratch* sc, int lo, int hi,
+                                           const struct poar_entry** entries, size_t* n)
 {
         size_t li, lj, cap;
         if(dn->j != j || table->pairs || !poar_pair_is_exact(table, i, j)){
-                return poar_pair_entries(table, i, j, sc, entries, n);
+                return pair_entries_body(table, i, j, sc, entries, n);
         }
         li = table->off[i + 1] - table->off[i];
         lj = table->off[j + 1] - table->off[j];
@@ -548,6 +552,59 @@ int poar_pair_entries_dense_levels(const struct poar_table* table, struct poar_d
         return OK;
 ERROR:
         return FAIL;
+}
+
+/* The two functions above are integer code that the compiler vectorises; on a CPU with AVX2 the copy compiled
+   for AVX2 runs (same C code, same results), otherwise the plain copy (kalign_simd.h). */
+static int pair_entries_plain(const struct poar_table* table, int i, int j, struct poar_scratch* sc,
+                              const struct poar_entry** entries, size_t* n)
+{
+        return pair_entries_body(table, i, j, sc, entries, n);
+}
+
+static int dense_levels_plain(const struct poar_table* table, struct poar_dense* dn, int i, int j,
+                              struct poar_scratch* sc, int lo, int hi, const struct poar_entry** entries, size_t* n)
+{
+        return dense_levels_body(table, dn, i, j, sc, lo, hi, entries, n);
+}
+
+#if KALIGN_AVX2
+static KALIGN_TARGET_AVX2 int pair_entries_avx2(const struct poar_table* table, int i, int j, struct poar_scratch* sc,
+                                                const struct poar_entry** entries, size_t* n)
+{
+        return pair_entries_body(table, i, j, sc, entries, n);
+}
+
+static KALIGN_TARGET_AVX2 int dense_levels_avx2(const struct poar_table* table, struct poar_dense* dn, int i, int j,
+                                                struct poar_scratch* sc, int lo, int hi,
+                                                const struct poar_entry** entries, size_t* n)
+{
+        return dense_levels_body(table, dn, i, j, sc, lo, hi, entries, n);
+}
+#endif
+
+int poar_pair_entries(const struct poar_table* table, int i, int j,
+                      struct poar_scratch* sc,
+                      const struct poar_entry** entries, size_t* n)
+{
+#if KALIGN_AVX2
+        if(kalign_simd_on()){
+                return pair_entries_avx2(table, i, j, sc, entries, n);
+        }
+#endif
+        return pair_entries_plain(table, i, j, sc, entries, n);
+}
+
+int poar_pair_entries_dense_levels(const struct poar_table* table, struct poar_dense* dn,
+                                   int i, int j, struct poar_scratch* sc, int lo, int hi,
+                                   const struct poar_entry** entries, size_t* n)
+{
+#if KALIGN_AVX2
+        if(kalign_simd_on()){
+                return dense_levels_avx2(table, dn, i, j, sc, lo, hi, entries, n);
+        }
+#endif
+        return dense_levels_plain(table, dn, i, j, sc, lo, hi, entries, n);
 }
 
 int poar_pair_entries_dense(const struct poar_table* table, struct poar_dense* dn,

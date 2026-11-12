@@ -1,10 +1,7 @@
 #include "tldevel.h"
 #include "threadpool.h"
 
-#ifdef HAVE_AVX2
-#include <xmmintrin.h>
-#include <mm_malloc.h>
-#endif
+#include "kalign_simd.h"
 
 
 #include "tlrng.h"
@@ -129,11 +126,7 @@ static void free_anchor_dm(float** dm, int numseq)
         }
         for(i = 0; i < numseq; i++){
                 if(dm[i]){
-#ifdef HAVE_AVX2
-                        _mm_free(dm[i]);
-#else
-                        MFREE(dm[i]);
-#endif
+                        kalign_aligned_free(dm[i]);
                 }
         }
         MFREE(dm);
@@ -254,11 +247,7 @@ int build_tree_kmeans_noisy(struct msa* msa, struct aln_tasks** tasks,
 
         MFREE(root);
         for(i = 0; i < numseq; i++){
-#ifdef HAVE_AVX2
-                _mm_free(dm[i]);
-#else
-                MFREE(dm[i]);
-#endif
+                kalign_aligned_free(dm[i]);
         }
         MFREE(dm);
         DESTROY_TIMER(timer);
@@ -374,11 +363,7 @@ int build_tree_kmeans(struct msa* msa, struct aln_tasks** tasks,
 
         MFREE(root);
         for(i = 0; i < numseq; i++){
-#ifdef HAVE_AVX2
-                _mm_free(dm[i]);
-#else
-                MFREE(dm[i]);
-#endif
+                kalign_aligned_free(dm[i]);
         }
         MFREE(dm);
         DESTROY_TIMER(timer);
@@ -779,19 +764,14 @@ int split2(const float * const * dm,const int* samples, const int num_anchors,co
 
 
 
-#ifdef HAVE_AVX2
-        wr = _mm_malloc(sizeof(float) * num_var,32);
-        wl = _mm_malloc(sizeof(float) * num_var,32);
-        cr = _mm_malloc(sizeof(float) * num_var,32);
-        cl = _mm_malloc(sizeof(float) * num_var,32);
-        w = _mm_malloc(sizeof(float) * num_var,32);
-#else
-        MMALLOC(wr,sizeof(float) * num_var);
-        MMALLOC(wl,sizeof(float) * num_var);
-        MMALLOC(cr,sizeof(float) * num_var);
-        MMALLOC(cl,sizeof(float) * num_var);
-        MMALLOC(w,sizeof(float) * num_var);
-#endif
+        wr = kalign_aligned_malloc(sizeof(float) * num_var);
+        wl = kalign_aligned_malloc(sizeof(float) * num_var);
+        cr = kalign_aligned_malloc(sizeof(float) * num_var);
+        cl = kalign_aligned_malloc(sizeof(float) * num_var);
+        w = kalign_aligned_malloc(sizeof(float) * num_var);
+        if(!wr || !wl || !cr || !cl || !w){
+                ERROR_MSG("aligned allocation failed");
+        }
 
         if(*ret){
                 res = *ret;
@@ -836,11 +816,7 @@ int split2(const float * const * dm,const int* samples, const int num_anchors,co
 
         }
 
-#ifdef HAVE_AVX2
-        _mm_free(w);
-#else
-        MFREE(w);
-#endif
+        kalign_aligned_free(w);
 
         w = NULL;
         for(int stop = 0; stop < 500; stop++){
@@ -854,13 +830,8 @@ int split2(const float * const * dm,const int* samples, const int num_anchors,co
                 score = 0.0f;
                 for(i = 0; i < num_samples;i++){
                         s = samples[i];
-#ifdef HAVE_AVX2
-                        edist_256(dm[s], cl, num_anchors, &dl);
-                        edist_256(dm[s], cr, num_anchors, &dr);
-#else
-                        edist_serial(dm[s], cl, num_anchors, &dl);
-                        edist_serial(dm[s], cr, num_anchors, &dr);
-#endif
+                        edist(dm[s], cl, num_anchors, &dl);
+                        edist(dm[s], cr, num_anchors, &dr);
                         score += MACRO_MIN(dl,dr);
 
 
@@ -937,17 +908,10 @@ int split2(const float * const * dm,const int* samples, const int num_anchors,co
                 }
         }
 
-#ifdef HAVE_AVX2
-        _mm_free(wr);
-        _mm_free(wl);
-        _mm_free(cr);
-        _mm_free(cl);
-#else
-        MFREE(wr);
-        MFREE(wl);
-        MFREE(cr);
-        MFREE(cl);
-#endif
+        kalign_aligned_free(wr);
+        kalign_aligned_free(wl);
+        kalign_aligned_free(cr);
+        kalign_aligned_free(cl);
 
         res->nl =  num_l;
         res->nr =  num_r;
@@ -955,6 +919,14 @@ int split2(const float * const * dm,const int* samples, const int num_anchors,co
         *ret = res;
         return OK;
 ERROR:
+        /* w is an alias of one of the others once the loop has started */
+        if(w && w != wr && w != wl && w != cr && w != cl){
+                kalign_aligned_free(w);
+        }
+        kalign_aligned_free(wr);
+        kalign_aligned_free(wl);
+        kalign_aligned_free(cr);
+        kalign_aligned_free(cl);
         return FAIL;
 }
 

@@ -45,10 +45,11 @@
 #include "kalign/kalign_config.h"
 
 #include "threadpool.h"
-#ifdef HAVE_AVX2
+#include "kalign_simd.h"
+#include "kalign_bits.h"
+#if KALIGN_AVX2
 #include <immintrin.h>
-#include <mm_malloc.h>
-#elif defined(__aarch64__) && defined(__ARM_NEON)
+#elif KALIGN_NEON && defined(__aarch64__)
 #include <arm_neon.h>
 #endif
 
@@ -67,6 +68,11 @@ enum { D_RAW = 0, D_NORM, D_LCS_INDEL, D_LCS_FRAC };
 #else
 #define SL_ALWAYS_INLINE static inline
 #define SL_NOINLINE static
+#endif
+/* AVX2 kernels: the same helpers with the AVX2 target (reached only through kalign_simd_on()) */
+#if KALIGN_AVX2
+#define SL_AVX2_INLINE SL_ALWAYS_INLINE KALIGN_TARGET_AVX2
+#define SL_AVX2_NOINLINE SL_NOINLINE KALIGN_TARGET_AVX2
 #endif
 
 struct sl_seq {
@@ -297,8 +303,10 @@ static int sl_bpm(const struct sl_seq* t, const struct sl_seq* p, int cut)
 }
 
 /* Several pairs at once, one pair per 64-bit lane: AVX2 four lanes, NEON two, otherwise scalar only. */
-#if defined(HAVE_AVX2)
+#if KALIGN_AVX2
 #define SLV_N 4
+#define SLV_INLINE SL_AVX2_INLINE
+#define SLV_FN_NOINLINE SL_AVX2_NOINLINE
 typedef __m256i slv;
 #define slv_lanes(r, b) _mm256_set_epi64x((long long)(r)[3][b], (long long)(r)[2][b], \
                                           (long long)(r)[1][b], (long long)(r)[0][b])
@@ -316,8 +324,10 @@ typedef __m256i slv;
 #define slv_gt(a, b) _mm256_cmpgt_epi64(a, b)                   /* signed a > b, all ones or zero */
 #define slv_blend(a, b, mask) _mm256_blendv_epi8(a, b, mask)    /* mask ? b : a */
 #define slv_none(mask) _mm256_testz_si256(mask, mask)
-#elif defined(__aarch64__) && defined(__ARM_NEON)
+#elif KALIGN_NEON && defined(__aarch64__)
 #define SLV_N 2
+#define SLV_INLINE SL_ALWAYS_INLINE
+#define SLV_FN_NOINLINE SL_NOINLINE
 typedef uint64x2_t slv;
 #define slv_lanes(r, b) vcombine_u64(vcreate_u64((r)[0][b]), vcreate_u64((r)[1][b]))
 #define slv_set1(x) vdupq_n_u64((uint64_t)(int64_t)(x))
@@ -353,7 +363,7 @@ static const uint64_t sl_zero_row[SL_FIXED] = { 0 };
    The loop ends early only when every lane is past its end or meets the scalar exit test (its minimum and
    its score minus the columns left are both >= its cut), so every lane returns either its exact value or,
    as the scalar function may, a value >= its cut when the exact value is >= its cut. */
-SL_ALWAYS_INLINE void sl_bpmv_rows(const struct sl_bpm_lane* ln, const int B, int* kout)
+SLV_INLINE void sl_bpmv_rows(const struct sl_bpm_lane* ln, const int B, int* kout)
 {
         const int w = SL_W;
         int64_t Ll[SLV_N], cutl[SLV_N], kl[SLV_N];
@@ -420,7 +430,7 @@ SL_ALWAYS_INLINE void sl_bpmv_rows(const struct sl_bpm_lane* ln, const int B, in
         }
 }
 
-#define SL_BPMV_B(x) SL_NOINLINE void sl_bpmv_b##x(const struct sl_bpm_lane* ln, int* kout) \
+#define SL_BPMV_B(x) SLV_FN_NOINLINE void sl_bpmv_b##x(const struct sl_bpm_lane* ln, int* kout) \
         { sl_bpmv_rows(ln, x, kout); }
 SL_BPMV_B(1) SL_BPMV_B(2) SL_BPMV_B(3) SL_BPMV_B(4) SL_BPMV_B(5) SL_BPMV_B(6) SL_BPMV_B(7) SL_BPMV_B(8)
 SL_BPMV_B(9) SL_BPMV_B(10) SL_BPMV_B(11) SL_BPMV_B(12) SL_BPMV_B(13) SL_BPMV_B(14) SL_BPMV_B(15) SL_BPMV_B(16)
@@ -437,11 +447,11 @@ static int lcs_zeros(const uint64_t* V, int B, int m)
 {
         int z = 0;
         for(int b = 0; b < B - 1; b++){
-                z += 64 - __builtin_popcountll(V[b]);
+                z += 64 - kalign_popcount64(V[b]);
         }
         int rest = m - 64 * (B - 1);
         uint64_t mask = rest >= 64 ? ~(uint64_t)0 : (((uint64_t)1 << rest) - 1);
-        z += __builtin_popcountll(~V[B - 1] & mask);
+        z += kalign_popcount64(~V[B - 1] & mask);
         return z;
 }
 
@@ -451,10 +461,10 @@ static inline int lcs_zeros_prefix(const uint64_t* V, int j)
         int z = 0;
         int b = 0;
         for(; j >= 64; j -= 64, b++){
-                z += 64 - __builtin_popcountll(V[b]);
+                z += 64 - kalign_popcount64(V[b]);
         }
         if(j > 0){
-                z += __builtin_popcountll(~V[b] & (((uint64_t)1 << j) - 1));
+                z += kalign_popcount64(~V[b] & (((uint64_t)1 << j) - 1));
         }
         return z;
 }
@@ -567,13 +577,13 @@ static int sl_lcs(const struct sl_seq* t, const struct sl_seq* p, int need)
         return sl_lcs_any(t->s, t->ln, p->lpeq, p->lb, p->ln, need);
 }
 
-#ifdef HAVE_AVX2
+#if KALIGN_AVX2
 /* Four LCS at once: one text against four bit-vector sides, one side per 64-bit lane.  tab holds the match
    masks of the four sides interleaved (letter c, block b at tab[c * B + b]); a side with fewer than B blocks
    has zero masks in the blocks it lacks, which leaves those blocks at all ones and passes the carry through.
    The carry out of old + u (u a subset of old) is the top bit of u | (old & ~s1); the carry out of adding
    the incoming carry is the top bit of s1 & ~s2.  Same recurrence as sl_lcs_rows, so the same LCS. */
-SL_ALWAYS_INLINE void sl_lcs4_rows(const uint8_t* s, const int n, const __m256i* tab, const int B, uint64_t* out)
+SL_AVX2_INLINE void sl_lcs4_rows(const uint8_t* s, const int n, const __m256i* tab, const int B, uint64_t* out)
 {
         __m256i V[SL_FIXED];
         const __m256i ones = _mm256_set1_epi64x(-1);
@@ -599,7 +609,7 @@ SL_ALWAYS_INLINE void sl_lcs4_rows(const uint8_t* s, const int n, const __m256i*
         for(int b = 0; b < B; b++) _mm256_storeu_si256((__m256i*)(out + 4 * b), V[b]);
 }
 
-#define SL_LCS4_B(k) SL_NOINLINE void sl_lcs4_b##k(const uint8_t* s, int n, const __m256i* tab, uint64_t* out) \
+#define SL_LCS4_B(k) SL_AVX2_NOINLINE void sl_lcs4_b##k(const uint8_t* s, int n, const __m256i* tab, uint64_t* out) \
         { sl_lcs4_rows(s, n, tab, k, out); }
 SL_LCS4_B(1) SL_LCS4_B(2) SL_LCS4_B(3) SL_LCS4_B(4) SL_LCS4_B(5) SL_LCS4_B(6) SL_LCS4_B(7) SL_LCS4_B(8)
 SL_LCS4_B(9) SL_LCS4_B(10) SL_LCS4_B(11) SL_LCS4_B(12) SL_LCS4_B(13) SL_LCS4_B(14) SL_LCS4_B(15) SL_LCS4_B(16)
@@ -611,7 +621,7 @@ static const sl_lcs4_fn sl_lcs4_fixed[SL_FIXED + 1] = {
 };
 
 /* LCS of text t with the four sides p[0..3] (each at most SL_FIXED blocks) */
-static void sl_lcs4(const struct sl_seq* t, const struct sl_seq* const* p, int* L)
+static KALIGN_TARGET_AVX2 void sl_lcs4(const struct sl_seq* t, const struct sl_seq* const* p, int* L)
 {
         __m256i tab[SL_SIGMA * SL_FIXED];
         uint64_t out[4 * SL_FIXED];
@@ -642,14 +652,15 @@ static void sl_lcs4(const struct sl_seq* t, const struct sl_seq* const* p, int* 
 #endif
 
 /* exact LCS of sequence v with each of the cnt (<= SL_MANY) sequences us[]; the LCS does not depend on which
-   sequence is the text, so with AVX2 v is the text of all pairs and the others go four to a vector, grouped by
-   their number of blocks */
+   sequence is the text, so with AVX2 (simd) v is the text of all pairs and the others go four to a vector,
+   grouped by their number of blocks */
 #define SL_MANY 128
-static void sl_lcs_many(const struct sl_ctx* c, int v, const int* us, int cnt, int* L)
+#if KALIGN_AVX2
+/* the four-lane LCS of sl_lcs_many (simd): the kernels are AVX2, reached only when kalign_simd_on() */
+static void sl_lcs_many4(const struct sl_ctx* c, int v, const int* us, int cnt, int* L)
 {
         const struct sl_seq* a = &c->q[v];
         int k = 0;
-#ifdef HAVE_AVX2
         int ord[SL_MANY];
         int start[SL_FIXED + 2];
         int no = 0;
@@ -681,12 +692,25 @@ static void sl_lcs_many(const struct sl_ctx* c, int v, const int* us, int cnt, i
                 const struct sl_seq* b = &c->q[us[ord[k]]];
                 L[ord[k]] = (a->ln >= b->ln) ? sl_lcs(a, b, 0) : sl_lcs(b, a, 0);
         }
+}
+#endif
+
+static void sl_lcs_many(const struct sl_ctx* c, int v, const int* us, int cnt, int* L, int simd)
+{
+        const struct sl_seq* a = &c->q[v];
+        int k = 0;
+#if KALIGN_AVX2
+        if(simd){
+                sl_lcs_many4(c, v, us, cnt, L);
+                return;
+        }
 #else
+        (void)simd;
+#endif
         for(; k < cnt; k++){
                 const struct sl_seq* b = &c->q[us[k]];
                 L[k] = (a->ln >= b->ln) ? sl_lcs(a, b, 0) : sl_lcs(b, a, 0);
         }
-#endif
 }
 
 /* ---------------------------------------------------------------- pair distance */
@@ -743,6 +767,11 @@ struct sl_bpm_plan {
         int icut;
 };
 
+static inline double sl_bpm_d(const struct sl_bpm_plan* pl, int k)
+{
+        return ((double)k * pl->scale + pl->add) * pl->f;
+}
+
 static inline void sl_bpm_plan_pair(const struct sl_ctx* c, const struct sl_seq* a, const struct sl_seq* b,
                                     int gi, int gj, double cut, struct sl_bpm_plan* pl)
 {
@@ -764,11 +793,21 @@ static inline void sl_bpm_plan_pair(const struct sl_ctx* c, const struct sl_seq*
                 if(icut < 0) icut = 0;
         }
         pl->t = t; pl->p = p; pl->add = add; pl->scale = scale; pl->f = f; pl->icut = icut;
-}
-
-static inline double sl_bpm_d(const struct sl_bpm_plan* pl, int k)
-{
-        return ((double)k * pl->scale + pl->add) * pl->f;
+        /* Make the integer cut exact for the comparison the caller makes (d < cut, d = sl_bpm_d): icut becomes
+           the smallest k whose distance is not below cut.  The value above can be one off, because the
+           distance is rounded: with norm, 5 * (1 / 41) is one ulp below 15 * (1 / 123).  A kernel returns the
+           exact k below its cut and some k >= cut otherwise, and which k depends on the kernel (plain, 2 or 4
+           lanes) and on the pairs sharing a vector; with an exact cut none of those can pass d < cut, so every
+           kernel, CPU and thread count makes the same decision.  sl_bpm_d does not decrease with k. */
+        if(icut != INT32_MAX){
+                while(icut < INT32_MAX && sl_bpm_d(pl, icut) < cut){
+                        icut++;
+                }
+                while(icut > 0 && !(sl_bpm_d(pl, icut - 1) < cut)){
+                        icut--;
+                }
+                pl->icut = icut;
+        }
 }
 
 static double sl_dist(const struct sl_ctx* c, int i, int j, int gi, int gj, double cut)
@@ -797,17 +836,30 @@ static double sl_dist(const struct sl_ctx* c, int i, int j, int gi, int gj, doub
                 if(x < 0) x = -1;
                 need = x > 1e9 ? INT32_MAX : (int)floor(x) + 1;
                 if(need < 0) need = 0;
+                /* exact for the caller's comparison (d < cut), as in sl_bpm_plan_pair: need becomes the
+                   smallest L whose distance is below cut (the distance does not increase with L), so the
+                   early exit of sl_lcs and the exact four-lane LCS make the same decision */
+                if(need != INT32_MAX){
+                        const int top = (int)m;         /* L <= m */
+                        while(need <= top && !(sl_lcs_d(c, n, m, need, f) < cut)){
+                                need++;
+                        }
+                        while(need > 0 && need - 1 <= top && sl_lcs_d(c, n, m, need - 1, f) < cut){
+                                need--;
+                        }
+                }
         }
         int L = sl_lcs(t, p, need);
         return sl_lcs_d(c, n, m, L, f);
 }
 
 /* LCS distances of v to the cnt (<= SL_MANY) sequences us[] (no cut: every value exact) */
-static void sl_dist_many(const struct sl_ctx* c, int v, int gv, const int* us, const int* gid, int cnt, double* d)
+static void sl_dist_many(const struct sl_ctx* c, int v, int gv, const int* us, const int* gid, int cnt, double* d,
+                         int simd)
 {
         int L[SL_MANY];
         const struct sl_seq* a = &c->q[v];
-        sl_lcs_many(c, v, us, cnt, L);
+        sl_lcs_many(c, v, us, cnt, L, simd);
         for(int k = 0; k < cnt; k++){
                 const struct sl_seq* b = &c->q[us[k]];
                 const double n = a->ln > b->ln ? a->ln : b->ln;
@@ -932,6 +984,7 @@ struct prim_ctx {
         double* best;
         int* parent;
         int v;
+        int simd;       /* kalign_simd_on() of this call: the vector kernels may run */
 };
 
 #ifdef SLV_N
@@ -996,7 +1049,7 @@ static void prim_chunk(int start, int end, void* arg)
 {
         struct prim_ctx* x = arg;
 #ifdef SLV_N
-        if(x->c->dist == D_RAW || x->c->dist == D_NORM){
+        if(x->simd && (x->c->dist == D_RAW || x->c->dist == D_NORM)){
                 int us[SL_MANY];
                 int cnt = 0;
                 for(int u = start; u <= end; u++){
@@ -1009,17 +1062,17 @@ static void prim_chunk(int start, int end, void* arg)
                 return;
         }
 #endif
-#ifdef HAVE_AVX2
+#if KALIGN_AVX2
         /* LCS distances four at a time; all exact, so the comparison below sees the same or a larger value
            than the scalar path, which may stop early only when the distance cannot beat best[u] */
-        if(x->c->dist == D_LCS_INDEL || x->c->dist == D_LCS_FRAC){
+        if(x->simd && (x->c->dist == D_LCS_INDEL || x->c->dist == D_LCS_FRAC)){
                 int us[SL_MANY];
                 double d[SL_MANY];
                 int cnt = 0;
                 for(int u = start; u <= end; u++){
                         if(u < end && !x->in[u]) us[cnt++] = u;
                         if(cnt == SL_MANY || (u == end && cnt > 0)){
-                                sl_dist_many(x->c, x->v, x->gid[x->v], us, x->gid, cnt, d);
+                                sl_dist_many(x->c, x->v, x->gid[x->v], us, x->gid, cnt, d, 1);
                                 for(int k = 0; k < cnt; k++){
                                         if(d[k] < x->best[us[k]]){
                                                 x->best[us[k]] = d[k];
@@ -1049,7 +1102,7 @@ static int sl_prim(struct sl_ctx* c, const int* gid, struct sl_link* links, void
         double* best = malloc(sizeof(double) * (size_t)N);
         int* parent = malloc(sizeof(int) * (size_t)N);
         for(int i = 0; i < N; i++){ best[i] = INFINITY; parent[i] = -1; }
-        struct prim_ctx x = { c, gid, in, best, parent, 0 };
+        struct prim_ctx x = { c, gid, in, best, parent, 0, kalign_simd_on() };
         (void)pool_v;
         in[0] = 1;
         for(int step = 0; step < N - 1; step++){
@@ -1169,7 +1222,7 @@ int sl_build(struct msa* msa, int mode, float noise, uint64_t seed, void* pool, 
 
 /* anchor distance matrix for k-means on the tree distance: numseq rows, padded to a multiple of 8 columns,
    allocated like Kalign's anchor matrices (32-byte aligned under AVX2; freed by free_anchor_dm) */
-struct anchor_ctx { const struct sl_ctx* c; const int* anchors; int K; float** dm; };
+struct anchor_ctx { const struct sl_ctx* c; const int* anchors; int K; float** dm; int simd; };
 
 static void anchor_rows(int start, int end, void* arg)
 {
@@ -1190,7 +1243,7 @@ static void anchor_rows(int start, int end, void* arg)
                                         }
                                 }
                                 if(cnt == SL_MANY || (k == a->K && cnt > 0)){
-                                        sl_dist_many(a->c, i, i, us, NULL, cnt, d);
+                                        sl_dist_many(a->c, i, i, us, NULL, cnt, d, a->simd);
                                         for(int x = 0; x < cnt; x++) a->dm[i][ks[x]] = (float)d[x];
                                         cnt = 0;
                                 }
@@ -1218,16 +1271,12 @@ float** sl_anchor_matrix(struct msa* msa, const int* anchors, int K)
                 dm[i] = NULL;
         }
         for(int i = 0; i < numseq; i++){
-#ifdef HAVE_AVX2
-                dm[i] = _mm_malloc(sizeof(float) * (size_t)padded, 32);
-                ASSERT(dm[i] != NULL, "_mm_malloc failed");
-#else
-                MMALLOC(dm[i], sizeof(float) * (size_t)padded);
-#endif
+                dm[i] = kalign_aligned_malloc(sizeof(float) * (size_t)padded);
+                ASSERT(dm[i] != NULL, "aligned allocation of the anchor matrix failed");
                 for(int k = 0; k < padded; k++) dm[i][k] = 0.0f;
         }
         {
-                struct anchor_ctx a = { &c, anchors, K, dm };
+                struct anchor_ctx a = { &c, anchors, K, dm, kalign_simd_on() };
                 if(msa->pool && numseq >= 512){
                         tp_parallel_for_chunked(msa->pool, 0, numseq, 64, anchor_rows, &a);
                 }else

@@ -2,7 +2,13 @@
  *
  * One type, vf8, and the few operations the kernels need, implemented with
  * NEON (two float32x4_t) or AVX2 (one __m256).  WAVE_SIMD is 1 when one of
- * them is available, 0 otherwise (callers then use the scalar kernels).
+ * them is compiled in, 0 otherwise (callers then use the scalar kernels).
+ *
+ * Run-time selection (kalign_simd.h): on x86-64 nothing is built with -mavx2;
+ * every function that touches a vf8 is marked WAVE_TARGET (= KALIGN_TARGET_AVX2
+ * there, empty on Arm) and is called only when kalign_simd_on() is true.  A
+ * WAVE_TARGET function cannot be inlined into an unmarked one, so the
+ * entry points that call a sweep are WAVE_TARGET wrappers too.
  *
  * Exactness rules (the kernels must reproduce the scalar DP bit for bit):
  *  - vf8_max(a, b) returns b when a > b is false, like MAX(a, b) in the DP
@@ -10,9 +16,11 @@
  *    fmax differs only for +0/-0 ties, which the DP never produces.
  *  - vf8_muladd(acc, w, x) must round like the scalar statement
  *    acc += w * x as the compiler builds it for the reference kernels: fused
- *    on AArch64 and on x86 with FMA enabled (compilers contract it there),
- *    a separate multiply and add otherwise (x86 -mavx2 without -mfma, the
- *    default Kalign build).  bench_dp --check verifies this per platform.
+ *    on AArch64 (compilers contract it there), a separate multiply and add
+ *    on x86 (the AVX2 kernels never use FMA, and the library is compiled
+ *    with -ffp-contract=off on x86-64, so the plain kernels are not fused
+ *    either, even when a build switches FMA on with -march=x86-64-v3 or
+ *    -march=native).  bench_dp --check verifies this per platform.
  */
 #ifndef WAVE_SIMD_H
 #define WAVE_SIMD_H
@@ -20,15 +28,27 @@
 /* Force inlining so that unoptimised (-O0, ASAN, Debug) builds do not turn
    every vector operation into a call: without it the wave kernels are a few
    hundred times slower than the scalar code in such builds. */
+#include "kalign_simd.h"
+
+#if KALIGN_NEON
+#define WAVE_SIMD 1
+#define WAVE_TARGET
+#elif KALIGN_AVX2
+#define WAVE_SIMD 1
+#define WAVE_TARGET KALIGN_TARGET_AVX2
+#else
+#define WAVE_SIMD 0
+#define WAVE_TARGET
+#endif
+
 #if defined(__GNUC__) || defined(__clang__)
-#define VF8_INLINE static inline __attribute__((always_inline))
+#define VF8_INLINE static inline __attribute__((always_inline)) WAVE_TARGET
 #else
 #define VF8_INLINE static inline
 #endif
 
-#if defined(__ARM_NEON)
+#if KALIGN_NEON
 #include <arm_neon.h>
-#define WAVE_SIMD 1
 
 typedef struct { float32x4_t lo, hi; } vf8;
 
@@ -69,9 +89,8 @@ VF8_INLINE vf8 vf8_gather(const float* const* p, int off)
         return r;
 }
 
-#elif defined(__AVX2__)
+#elif KALIGN_AVX2
 #include <immintrin.h>
-#define WAVE_SIMD 1
 
 typedef __m256 vf8;
 
@@ -84,11 +103,7 @@ VF8_INLINE vf8 vf8_max(vf8 a, vf8 b) { return _mm256_max_ps(a, b); }
 VF8_INLINE vf8 vf8_div(vf8 a, vf8 b) { return _mm256_div_ps(a, b); }
 VF8_INLINE vf8 vf8_muladd(vf8 acc, vf8 w, vf8 x)
 {
-#if defined(__FMA__)
-        return _mm256_fmadd_ps(w, x, acc);
-#else
         return _mm256_add_ps(acc, _mm256_mul_ps(w, x));
-#endif
 }
 VF8_INLINE vf8 vf8_shift_in(vf8 v, float x)
 {
@@ -106,8 +121,6 @@ VF8_INLINE vf8 vf8_gather(const float* const* p, int off)
                               p[4][off], p[5][off], p[6][off], p[7][off]);
 }
 
-#else
-#define WAVE_SIMD 0
 #endif
 
 #if WAVE_SIMD

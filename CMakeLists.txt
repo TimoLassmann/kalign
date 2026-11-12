@@ -34,7 +34,7 @@ set (CMAKE_C_STANDARD 11)
 # Compiler-specific flags
 add_compile_options("$<$<CONFIG:RELEASE>:-W;-Wall;-O3;-pedantic>")
 add_compile_options("$<$<CONFIG:DEBUG>:-W;-Wall;-O0;-g;-pedantic>")
-add_compile_options("$<$<CONFIG:ASAN>:-W;-Wall;-Wextra;-O0;-g;-DDEBUG;-pedantic;-ffunction-sections;-fdata-sections;-fstack-protector-strong;-fsanitize=address>")
+add_compile_options("$<$<CONFIG:ASAN>:-W;-Wall;-Wextra;-O0;-g;-DDEBUG;-pedantic;-ffunction-sections;-fdata-sections;-fstack-protector-strong;-fsanitize=address;-DKALIGN_DEBUG_ALIGNED>")
 
 if(CMAKE_BUILD_TYPE MATCHES ASAN)
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
@@ -53,11 +53,12 @@ endif()
 include(GNUInstallDirs)
 
 include(CTest)
-include(CheckCSourceRuns)
 
-option(ENABLE_SSE    "Enable compile-time SSE4.1 support." ON)
-option(ENABLE_AVX    "Enable compile-time AVX support."    ON)
-option(ENABLE_AVX2   "Enable compile-time AVX2 support."   ON)
+# ENABLE_AVX2: include the AVX2 kernels in x86-64 builds. They are chosen at
+# run time (kalign_simd_on in lib/src/kalign_simd.h); the program itself is
+# compiled for the plain x86-64 instruction set, so no flag here raises the
+# instruction set. OFF leaves the AVX2 kernels out (-DKALIGN_NO_AVX2).
+option(ENABLE_AVX2   "Include the AVX2 kernels (selected at run time on x86-64)." ON)
 
 # Performance tuning parameters
 # Threadpool parallelization thresholds (all settings in one place)
@@ -66,112 +67,14 @@ set(KALIGN_KMEANS_UPGMA_THRESHOLD "50" CACHE STRING "Sequence count below which 
 set(KALIGN_DIST_MIN_SEQS "50" CACHE STRING "Minimum sequences to parallelize distance/anchor computations")
 set(KALIGN_PFOR_MIN_CHUNK "10" CACHE STRING "Minimum iterations per chunk in tp_parallel_for")
 
-# option(ENABLE_FMA    "Enable compile-time FMA support."    ON)
-# option(ENABLE_AVX512 "Enable compile-time AVX512 support." ON)
-
-
 # Parallelism: built-in work-stealing threadpool (pthreads). With one thread
 # no pool is created and every task runs on the calling thread.
 find_package(Threads REQUIRED)
 
-if (ENABLE_SSE)
-  #
-  # Check compiler for SSE4_1 intrinsics
-  #
-  if (CMAKE_COMPILER_IS_GNUCC OR (CMAKE_C_COMPILER_ID MATCHES "Clang") OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
-    set(CMAKE_REQUIRED_FLAGS "-msse4.1")
-    check_c_source_runs("
-        #include <emmintrin.h>
-        #include <smmintrin.h>
-        int main()
-        {
-        __m128i a = _mm_setzero_si128();
-        __m128i b = _mm_minpos_epu16(a);
-        return 0;
-        }"
-      HAVE_SSE)
-  endif()
-
-  if (HAVE_SSE)
-    message(STATUS "SSE4.1 is enabled - target CPU must support it")
-  endif()
-
-  if (ENABLE_AVX)
-
-    #
-    # Check compiler for AVX intrinsics
-    #
-    if (CMAKE_COMPILER_IS_GNUCC OR (CMAKE_C_COMPILER_ID MATCHES "Clang") OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
-      set(CMAKE_REQUIRED_FLAGS "-mavx")
-      check_c_source_runs("
-            #include <immintrin.h>
-            int main()
-            {
-              __m256 a, b, c;
-              const float src[8] = { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f };
-              float dst[8];
-              a = _mm256_loadu_ps( src );
-              b = _mm256_loadu_ps( src );
-              c = _mm256_add_ps( a, b );
-              _mm256_storeu_ps( dst, c );
-              int i = 0;
-              for( i = 0; i < 8; i++ ){
-                if( ( src[i] + src[i] ) != dst[i] ){
-                  return -1;
-                }
-              }
-              return 0;
-            }"
-        HAVE_AVX)
-    endif()
-
-    if (HAVE_AVX)
-      message(STATUS "AVX is enabled - target CPU must support it")
-    endif()
-  endif()
-
-  if (ENABLE_AVX2)
-
-    #
-    # Check compiler for AVX intrinsics
-    #
-    if (CMAKE_COMPILER_IS_GNUCC OR (CMAKE_C_COMPILER_ID MATCHES "Clang") OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
-      set(CMAKE_REQUIRED_FLAGS "-mavx2")
-      check_c_source_runs("
-          #include <immintrin.h>
-          int main()
-          {
-            __m256i a, b, c;
-            const int src[8] = { 1, 2, 3, 4, 5, 6, 7, 8 };
-            int dst[8];
-            a =  _mm256_loadu_si256( (__m256i*)src );
-            b =  _mm256_loadu_si256( (__m256i*)src );
-            c = _mm256_add_epi32( a, b );
-            _mm256_storeu_si256( (__m256i*)dst, c );
-            int i = 0;
-            for( i = 0; i < 8; i++ ){
-              if( ( src[i] + src[i] ) != dst[i] ){
-                return -1;
-              }
-            }
-            return 0;
-          }"
-        HAVE_AVX2)
-    endif()
-
-    if (HAVE_AVX2)
-      message(STATUS "AVX2 is enabled - target CPU must support it")
-    endif()
-  endif()
+if (NOT ENABLE_AVX2)
+  add_compile_options(-DKALIGN_NO_AVX2)
+  message(STATUS "AVX2 kernels are left out (ENABLE_AVX2=OFF)")
 endif()
-
-if (HAVE_AVX2)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx2 -DHAVE_AVX2")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx2 -DHAVE_AVX2")
-else(HAVE_AVX2)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNOHAVE_AVX2")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNOHAVE_AVX2")
-endif(HAVE_AVX2)
 
 # Add performance tuning parameters as compile definitions
 add_definitions(-DKALIGN_ALN_SERIAL_THRESHOLD=${KALIGN_ALN_SERIAL_THRESHOLD})

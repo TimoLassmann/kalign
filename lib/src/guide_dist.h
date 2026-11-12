@@ -61,7 +61,7 @@ EXTERN int guide_dist_pair(const struct guide_dist_ctx* c, int i, int j, float* 
 EXTERN float** guide_dist_pair_matrix(struct msa* msa, int* samples, int n, void* ctx);
 
 /* numseq x num_anchors matrix, rows padded to a multiple of 8 and allocated
-   exactly like d_estimation(..., pair = 0) (_mm_malloc under AVX2). */
+   exactly like d_estimation(..., pair = 0) (kalign_aligned_malloc; free the rows with kalign_aligned_free). */
 EXTERN float** guide_dist_anchor_matrix(struct msa* msa, struct guide_dist_ctx* c,
                                         const int* anchors, int num_anchors);
 

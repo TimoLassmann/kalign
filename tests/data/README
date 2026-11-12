@@ -3,3 +3,5 @@ This directory contains test alignments:
 - from the balibase MSA benchmark: https://www.lbgi.fr/balibase/
 
 
+- sl_ties/: constructed DNA inputs with tied guide-tree distances (5/41 and
+  15/123 as normalised Myers distances), used by the kalign_sl_ties_* tests.

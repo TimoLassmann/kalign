@@ -109,7 +109,7 @@ static void sw_reserve(int W)
         }
 }
 
-static inline __attribute__((always_inline)) int sw_sweep(struct aln_mem* m, const int dir)
+static inline __attribute__((always_inline)) WAVE_TARGET int sw_sweep(struct aln_mem* m, const int dir)
 {
         const struct sw_state* st = kdp_kernel_state;
         struct states* s = dir > 0 ? m->f : m->b;
@@ -339,16 +339,16 @@ static inline __attribute__((always_inline)) int sw_sweep(struct aln_mem* m, con
         return 0;
 }
 
-static int sw_fwd(struct aln_mem* m)
+static WAVE_TARGET int sw_fwd(struct aln_mem* m)
 {
-        if(!kdp_kernel_state || m->endb - m->startb - 1 < SW_MIN_W || m->enda <= m->starta)
+        if(!kalign_simd_on() || !kdp_kernel_state || m->endb - m->startb - 1 < SW_MIN_W || m->enda <= m->starta)
                 return aln_seqseq_foward(m);
         return sw_sweep(m, 1);
 }
 
-static int sw_bwd(struct aln_mem* m)
+static WAVE_TARGET int sw_bwd(struct aln_mem* m)
 {
-        if(!kdp_kernel_state || m->endb - m->startb - 1 < SW_MIN_W || m->enda_2 <= m->starta_2)
+        if(!kalign_simd_on() || !kdp_kernel_state || m->endb - m->startb - 1 < SW_MIN_W || m->enda_2 <= m->starta_2)
                 return aln_seqseq_backward(m);
         return sw_sweep(m, -1);
 }

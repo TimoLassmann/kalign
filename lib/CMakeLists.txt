@@ -65,12 +65,29 @@ set(source_files
   src/ensemble.c
   src/threadpool/threadpool.c
   src/tl_scratch.c
+  src/kalign_simd.c
   )
 
 add_library(${PROJECT_NAME}_OBJ OBJECT ${source_files})
 # the member gap model's scalar and wavefront kernels must round identically on every platform
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
   set_source_files_properties(src/aln_gapmodel.c PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
+  # the plain and the AVX2 Euclidean distance must round identically (no fused multiply-add)
+  set_source_files_properties(src/euclidean_dist.c PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
+  # x86-64: nothing in the library may fuse a multiply and an add. The default
+  # build has no FMA, but -march=x86-64-v3 or -march=native in CFLAGS switch it
+  # on, and the plain DP kernels would then round differently from the AVX2
+  # kernels and from the default build. (Arm keeps the compiler default: its
+  # plain and NEON kernels are both fused.)
+  include(CheckCSourceCompiles)
+  check_c_source_compiles("
+#if !defined(__x86_64__)
+#error not x86-64
+#endif
+int main(void){ return 0; }" KALIGN_TARGET_IS_X86_64)
+  if(KALIGN_TARGET_IS_X86_64)
+    target_compile_options(${PROJECT_NAME}_OBJ PRIVATE -ffp-contract=off)
+  endif()
 endif()
 
 target_link_libraries(${PROJECT_NAME}_OBJ PRIVATE Threads::Threads)
@@ -186,6 +203,11 @@ target_include_directories(tldevel
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src
   )
 target_link_libraries(tldevel PRIVATE m)
+# x86-64: as for the library above (tlrng.c draws the k-means noise; a fused
+# multiply-add there would change the guide tree of a -march=native build)
+if(KALIGN_TARGET_IS_X86_64)
+  target_compile_options(tldevel PRIVATE -ffp-contract=off)
+endif()
 
 # adjust this path depending where cmake searches for the target files
 set(ConfigPackageLocation "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
@@ -242,7 +264,8 @@ add_executable(bpm_utest
   src/esl_stopwatch.c
   src/alphabet.c
   src/bpm.c
-  src/bpm_test.c 
+  src/bpm_test.c
+  src/kalign_simd.c
   
   
   )
@@ -269,6 +292,7 @@ add_executable(edist_utest
   src/tlrng.c
   src/esl_stopwatch.c
   src/euclidean_dist.c
+  src/kalign_simd.c
   )
 
 

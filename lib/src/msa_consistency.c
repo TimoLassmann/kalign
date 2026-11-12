@@ -3,6 +3,7 @@
 #include "msa_struct.h"
 #include "anchor_consistency.h"  /* for sparse_bonus, sparse_bonus_free */
 #include "poar.h"
+#include "kalign_bits.h"
 
 #define MSA_CONSISTENCY_IMPORT
 #include "msa_consistency.h"
@@ -142,7 +143,7 @@ int poar_consistency_get_bonus(struct poar_consistency_ctx* ctx,
 
                                         if(dp_row >= len_a || dp_col >= len_b) continue;
 
-                                        count = __builtin_popcount(support);
+                                        count = kalign_popcount32(support);
                                         val = pair_weight * (float)count;
 
                                         /* Insert into sparse bonus */
